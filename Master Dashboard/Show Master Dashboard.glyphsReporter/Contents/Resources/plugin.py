@@ -22,7 +22,7 @@ class ShowMasterDashboard(ReporterPlugin):
 
 	@objc.python_method
 	def settings(self):
-		self.menuName = "Master FontDashboard"
+		self.menuName = "Master Dashboard"
 
 		if not Glyphs.defaults["com.HugoJourdan.ShowMasterDashboard"]:
 			Glyphs.defaults["com.HugoJourdan.ShowMasterDashboard"] = "fullwidth"
