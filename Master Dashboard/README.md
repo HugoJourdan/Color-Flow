@@ -10,6 +10,6 @@ Two display modes are available :
 *   `small` : Set Progress Bar in the top left corner of EditView
 
 To change display mode, run this command in the macro panel, and restart GlyphsApp.
-`Glyphs.defaults["com.HugoJourdan.showFontDashboardProgressBar"] == "small"`
+`Glyphs.defaults["com.HugoJourdan.ShowMasterDashboard"] == "small"`
 
 

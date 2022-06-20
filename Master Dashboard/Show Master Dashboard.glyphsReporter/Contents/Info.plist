@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>plugin</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.hugojourdan.ShowMasterDashboard</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>ShowMasterDashboard</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1.0</string>
+	<key>UpdateFeedURL</key>
+	<string>None</string>
+	<key>productPageURL</key>
+	<string>None</string>
+	<key>productReleaseNotes</key>
+	<string>Update for Glyphs 3</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright, hugojourdan, 2022</string>
+	<key>NSPrincipalClass</key>
+	<string>ShowMasterDashboard</string>
+	<key>PyMainFileNames</key>
+	<array>
+		<string>plugin.py</string>
+	</array>
+</dict>
+</plist>
