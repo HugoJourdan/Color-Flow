@@ -63,8 +63,9 @@ class ColorWorkflow(PalettePlugin):
 		# Draw Action Button
 		self.paletteView.frame.actionPopUpButton = ActionButton((self.width-22, 0, 34, 19), 
 			[
-			dict(title="Setup ColorFlow based on Color Layers", callback=self.resetColorWorkflow),
-			dict(title="Reset ColorFlow", callback=self.hardreset),
+			dict(title="Setup Color Flow based on Color Layers", callback=self.resetColorWorkflow),
+			dict(title="Reset Color Flow", callback=self.hardreset),
+			dict(title="Generate Color Flow Smart Filters", callback=self.generateColorFlow_SmartFilter),
 			],
 			sizeStyle='small')
 
@@ -336,6 +337,34 @@ class ColorWorkflow(PalettePlugin):
 			self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name] = {x:0 for x in self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name]}
 
 		self.updateView()
+
+	# Generate Color Flow smart filter
+	@objc.python_method
+	def generateColorFlow_SmartFilter(self,sender):
+		import plistlib
+			
+							
+		with open("/Users/hugojourdan/Library/Application Support/Glyphs 3/CustomFilter.plist", 'rb') as fp:
+			pl = plistlib.load(fp)
+			
+			trigger = True
+			for item in pl:
+				print(item)
+				if item["name"]=="Color Flow":
+					trigger = False
+			print(trigger)
+			
+			layerColor = []
+			for i in range (0,12):
+				layerColor.append({'name': self.meaning[str(i)], 'predicate': f"layer0.colorIndex == {i}"})
+				
+			pl.append({"name":"Color Flow", "subGroup": [{'name': 'Layer', 'subGroup': layerColor}]})
+			
+
+		if trigger == True:
+			with open("/Users/hugojourdan/Library/Application Support/Glyphs 3/CustomFilter.plist", 'wb') as fp:
+				plistlib.dump(pl, fp)
+		Message("Color Flow Smart Filters have been generated.\nRestart Glyph to see them", title='Alert', OKButton=None)
 
 	# Find and read color.txt, if missing, create it
 	@objc.python_method
