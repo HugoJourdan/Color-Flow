@@ -1,8 +1,8 @@
 
-<img src="https://user-images.githubusercontent.com/76793951/174094620-7af15631-342b-4437-8724-eaeb038e1e56.png" width="500">
+# Color Flow
 
 
-**Color Label Organiser** is a Palette Plugin, to organize your workflow and track easier your project.  
+**Color Flow** is a Palette Plugin, to organize your workflow and track easier your project.  
 This helps you not to forget anything when working on a font.
 
 <img src="https://user-images.githubusercontent.com/76793951/174275455-665033a1-334e-492a-86ab-a85d5b1a4140.jpg" width="500">
@@ -39,6 +39,14 @@ magenta=Step 10
 lightGray=Step 11
 charcoal=Step 12
 ```
+
+
+Layers Color are set automaticaly set according to checkboxes. Layer Color set is precedent color of the first uncheck checkbox.  
+In the following example Layer Color is set to`Orange` because even if `Light Green` and `Yellow` are ✅, `Brown` is uncheck, so color set is the color that precedes it.
+
+<img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup1.jpg" width="300"> <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup2.jpg" width="300"> 
+
+# How to customize color meanings
 
 You can customise color order by changing line order, and you can also hide a color by deleting the line associated with it.
 Here is an example :
