@@ -7,28 +7,26 @@
 	<key>CFBundleExecutable</key>
 	<string>plugin</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.hugojourdan.ShowMasterDashboard</string>
+	<string>com.HugoJourdan.ColorWorkflow</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>ShowMasterDashboard</string>
+	<string>Color Workflow</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
-	<string>1.0</string>
+	<string>1</string>
 	<key>UpdateFeedURL</key>
-	<string>None</string>
+	<string>https://github.com/HugoJourdan/ColorWorkflow</string>
 	<key>productPageURL</key>
-	<string>None</string>
+	<string>https://github.com/HugoJourdan/ColorWorkflow</string>
 	<key>productReleaseNotes</key>
-	<string>Update for Glyphs 3</string>
+	<string></string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright, hugojourdan, 2022</string>
+	<string>Copyright, HugoJourdan, 20222</string>
 	<key>NSPrincipalClass</key>
-	<string>ShowMasterDashboard</string>
-	<key>PyMainFileNames</key>
-	<array>
-		<string>plugin.py</string>
-	</array>
+	<string>ColorWorkflow</string>
+	<key>class</key>
+	<string></string>
 </dict>
 </plist>
