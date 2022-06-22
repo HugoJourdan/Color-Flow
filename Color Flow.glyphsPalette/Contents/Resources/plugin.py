@@ -182,6 +182,8 @@ class ColorWorkflow(PalettePlugin):
 						setattr(self.paletteView.frame, str(k)+"box", Box((self.xPos, y+1-self.shift, self.barWidthDic[k]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
 
 					# Draw checkboxes
+					if len(meaning) > 16:
+						meaning = meaning[0:16]+"…"
 					setattr(self.paletteView.frame, str(k), CheckBox((12, y-self.shift, -10, 20), meaning, value=check, callback=self.checkBoxCallback, sizeStyle='small'))
 					
 					# Replace Counter by ✅ if goal reached
