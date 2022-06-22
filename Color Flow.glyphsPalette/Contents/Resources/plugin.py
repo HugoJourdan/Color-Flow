@@ -100,8 +100,9 @@ class ColorWorkflow(PalettePlugin):
 
 		# Create fon.userData to update the plugin
 		self.font.userData["com.hugojourdan.ColorFlow-export"] = None
-		self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = None
+		self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = False
 		self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] = None
+
 
 		# Store data per Master
 		self.font.userData["com.hugojourdan.ColorFlow-master-data"] = {}
@@ -170,7 +171,7 @@ class ColorWorkflow(PalettePlugin):
 		for k, meaning in self.meaning.items():
 			if meaning:
 				
-				try:
+				if self.font.selectedLayers:
 					self.selectedLayer = self.font.selectedLayers[0]
 					check = self.selectedLayer.userData["com.hugojourdan.ColorFlow"][k]
 
@@ -202,8 +203,20 @@ class ColorWorkflow(PalettePlugin):
 						setattr(self.paletteView.frame, str(k)+"count", TextBox((self.width-50, y+3-self.shift, -6, 20), f"{self.LayerColorLabel[k]}/{len(self.font.glyphs)}", alignment="right", sizeStyle='small'))
 					
 					y += 22
-				except:pass
-		
+
+				else:
+					if self.barWidthDic[k] != 0:
+						setattr(self.paletteView.frame, str(k)+"box", Box((self.xPos, y+1-self.shift, self.barWidthDic[k]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
+
+					setattr(self.paletteView.frame, str(k), CheckBox((12, y-self.shift, -10, 20), meaning, value=False, callback=self.checkBoxCallback, sizeStyle='small'))
+					
+					# Replace Counter by ✅ if goal reached
+					if self.LayerColorLabel[k] >= len(self.font.glyphs):
+						setattr(self.paletteView.frame, str(k)+"count", TextBox((self.width-50, y+5-self.shift, -6, 20), "✅", alignment="right", sizeStyle='mini'))
+					else:
+						setattr(self.paletteView.frame, str(k)+"count", TextBox((self.width-50, y+3-self.shift, -6, 20), f"{self.LayerColorLabel[k]}/{len(self.font.glyphs)}", alignment="right", sizeStyle='small'))
+					
+					y += 22
 
 	@objc.python_method
 	def update(self, sender):
@@ -216,46 +229,59 @@ class ColorWorkflow(PalettePlugin):
 				self.updateView()
 				self.init += 1
 
-			# If number of exported Glyph change, update UI
-			# self.export = [glyph.name for glyph in self.font.glyphs if glyph.export]
-			# if self.font.userData["com.hugojourdan.ColorFlow-export"] != self.export:
-			# 	self.font.userData["com.hugojourdan.ColorFlow-export"] = self.export
-			# 	self.updateView()
-
-			# If master added, add key
-			for master in self.font.masters:
-				if master.name not in self.font.userData["com.hugojourdan.ColorFlow-master-data"]:
-
-					for glyph in self.font.glyphs:
-						if not glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"]: 
-							glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
-					self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name] = self.GetDicLayerColorLabel(master.id)
-
-
-			# If no data, create default data
-			try:
-				if not self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"]: 
-					#print("data missing, so created")
-					self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
-			except:pass
+			# If no selected Layer, trigger update
+			if not self.font.selectedLayers:
+				self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = False
+				self.updateView()
+				trigger = True
 			
-			# If selectedMaster is changed, update UI
-			try:
-				if self.font.userData["com.hugojourdan.ColorFlow-selectedMaster"] != self.font.selectedFontMaster:
-					self.font.userData["com.hugojourdan.ColorFlow-selectedMaster"] = self.font.selectedFontMaster
-					self.updateView()
-					trigger = True
-			except:pass
+			# If selected Layers
+			if trigger == False and self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] == False:
+				self.updateView()
+				self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = True
+				trigger = True
 
-			#If ColorFlow data changed, trigger update
-			try:
-				if trigger == False:
-					for selectedLayer in self.font.selectedLayers:
-						if self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] != self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"]:
-							self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] = self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"].copy()
-							self.updateView()
-							trigger = True
-			except:pass
+			if trigger == False:		
+				self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = True
+				
+				# If master added, add key
+				for master in self.font.masters:
+					if master.name not in self.font.userData["com.hugojourdan.ColorFlow-master-data"]:
+
+						for glyph in self.font.glyphs:
+							if not glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"]: 
+								glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
+						self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name] = self.GetDicLayerColorLabel(master.id)
+
+
+				# If no data, create default data
+				try:
+					if not self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"]: 
+						#print("data missing, so created")
+						self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
+				except:pass
+
+				
+				# If selectedMaster is changed, update UI
+				try:
+					if self.font.userData["com.hugojourdan.ColorFlow-selectedMaster"] != self.font.selectedFontMaster:
+						self.font.userData["com.hugojourdan.ColorFlow-selectedMaster"] = self.font.selectedFontMaster
+						self.updateView()
+						trigger = True
+				except:pass
+
+
+				#If ColorFlow data changed, trigger update
+				try:
+					if trigger == False:
+						for selectedLayer in self.font.selectedLayers:
+							if self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] != self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"]:
+								self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] = self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"].copy()
+								self.updateView()
+								trigger = True
+				except:pass
+
+				
 		
 
 	@objc.python_method
