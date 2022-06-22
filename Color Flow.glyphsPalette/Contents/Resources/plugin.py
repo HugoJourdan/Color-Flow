@@ -357,42 +357,43 @@ class ColorWorkflow(PalettePlugin):
 			
 		
 		plistFile = os.path.expanduser("~/Library/Application Support/Glyphs 3/CustomFilter.plist")		
-		print(plistFile)		
-		with open(plistFile, 'rb') as fp:
-			pl = plistlib.load(fp)
-			print(pl)
-			
-			trigger = True
-			for item in pl:
-				if item["name"]=="Color Flow":
-					trigger = False
-			
-			layerColor = []
-			notlayerColor = []
-			for i in range (0,12):
-				I = str(i)
-				layerColor.append({'name': self.meaning[str(i)], 'predicate': f"'{I}' IN layer.userData"})
-				notlayerColor.append({'name': self.meaning[str(i)], 'predicate': f"NOT '{I}' IN layer.userData"})
-
-			print(notlayerColor)
-			print(layerColor)
+		try:		
+			with open(plistFile, 'rb') as fp:
+				pl = plistlib.load(fp)
+				print(pl)
 				
-			#pl.append({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
-			pl.append({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
-			
-		if trigger == True:
-			with open(plistFile, 'wb') as fp:
-				plistlib.dump(pl, fp)
-			Message("Color Flow Smart Filters have been generated.\nRestart Glyph to see them", title='Alert', OKButton=None)
-		else:
+				trigger = True
+				for item in pl:
+					if item["name"]=="Color Flow":
+						trigger = False
+				
+				layerColor = []
+				notlayerColor = []
+				for i in range (0,12):
+					I = str(i)
+					layerColor.append({'name': self.meaning[str(i)], 'predicate': f"'{I}' IN layer.userData"})
+					notlayerColor.append({'name': self.meaning[str(i)], 'predicate': f"NOT '{I}' IN layer.userData"})
 
-			if dialogs.askYesNo("Color Flow", "Color Flow filter already exist, do you want to overwrite them ?") == True:
+				print(notlayerColor)
+				print(layerColor)
+					
+				#pl.append({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
+				pl.append({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
+				
+			if trigger == True:
 				with open(plistFile, 'wb') as fp:
-					pl.remove({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
-
 					plistlib.dump(pl, fp)
-				Message("Color Flow Smart Filters have been generated.\nRestart Glyph to update Filter UI", title='Alert', OKButton=None)
+				Message("Color Flow Smart Filters have been generated.\nRestart Glyph to see them", title='Alert', OKButton=None)
+			else:
 
+				if dialogs.askYesNo("Color Flow", "Color Flow filter already exist, do you want to overwrite them ?") == True:
+					with open(plistFile, 'wb') as fp:
+						pl.remove({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
+
+						plistlib.dump(pl, fp)
+					Message("Color Flow Smart Filters have been generated.\nRestart Glyph to update Filter UI", title='Alert', OKButton=None)
+		except:
+			Message("To Fix it, add an item in Filter Section and Restart Glyph. After that run again this function", title=".plist not writable", OKButton=None)
 	# Find and read color.txt, if missing, create it
 	@objc.python_method
 	def getKeyFile(self):
