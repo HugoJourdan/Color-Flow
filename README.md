@@ -2,10 +2,10 @@
 # Color Flow
 
 
-**Color Flow** is a Palette Plugin, to organize your workflow and make it more visual.
+**Color Flow** is a Palette Plugin, to organize your workflow and make it more visual.  
 It allows to define for each layer work steps done, and update automaticaly Layer Color Label.
 
-<img src="https://user-images.githubusercontent.com/76793951/174275455-665033a1-334e-492a-86ab-a85d5b1a4140.jpg" width="500">
+<img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/ColorFlow_thumbnail.jpg" width="900">
 
 # Glyph Color vs Layer Color
 GlyphsApp propose two different kind of Color Labels.
@@ -17,7 +17,10 @@ GlyphsApp propose two different kind of Color Labels.
 | :---: | :---: | :---: |
 | <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/Glyph-Color-Label.png" width="100"> | <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/Layer-Color-Label.png" width="100"> | <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/Glyph+Layer-Color-Label.png" width="100"> |
 
-A glyph can have only one `Glyph Color Label`, but many `Layer Color Label` (as many layers of the glyph).  
+A glyph can have only one `Glyph Color Label`, but many `Layer Color Label` (as many layers of the glyph). 
+
+
+# Use of Layer Color
 Convenient use of `Layer Color Label` is to set them to indicate progress status of a layer.  
 
 For example:
@@ -25,7 +28,9 @@ For example:
 * Green → Anchors placed
 * Blue → Spacing set
 
-This Plugin is a alternative way to use Layer Color Labels. Instead of setting Layer Color Labels with ⌥ + Right-Click,
+
+
+# How to customize color meanings
 
 The plugin requires a **coolorWorkflow.txt** file stored in either ~/Library/Application Support/Glyphs 3/info/ or the same directory as the current Glyphs source file. Preference is given to the latter allowing for the sharing of the **fontdashboard.txt** file with glyphs source files to retain labelling information between project contributors. 
 
@@ -52,7 +57,7 @@ In the following example Layer Color is set to`Orange` because even if `Light Gr
 
 <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup1.jpg" width="300"> <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup2.jpg" width="300"> 
 
-# How to customize color meanings
+
 
 You can customise color order by changing line order, and you can also hide a color by deleting the line associated with it.
 Here is an example :
