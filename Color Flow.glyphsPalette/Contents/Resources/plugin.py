@@ -112,9 +112,9 @@ class ColorWorkflow(PalettePlugin):
 		# Needed to display the palette plugin
 		self.dialog = self.paletteView.frame.getNSView()
 
+
 	@objc.python_method
 	def start(self):
-		# Adding a callback for the 'GSUpdateInterface' event
 		Glyphs.addCallback(self.update, UPDATEINTERFACE)
 
 
@@ -131,6 +131,7 @@ class ColorWorkflow(PalettePlugin):
 					self.LayerColorLabel[k] += int(v)
 
 			return self.LayerColorLabel
+
 
 	@objc.python_method
 	def updateView(self):
@@ -189,9 +190,9 @@ class ColorWorkflow(PalettePlugin):
 					if check == True and k != None and self.barWidthDic[k] != 0 and self.font.selectedLayers[0].color == int(k) :
 						setattr(self.paletteView.frame, str(k)+"box", Box((self.xPos, y+1-self.shift, self.barWidthDic[k]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
 
-					# Draw checkboxes
+					## Draw checkboxes
 					#if len(meaning) > 16:
-					#meaning = meaning[0:16]+"…"
+						#meaning = meaning[0:16]+"…"
 					setattr(self.paletteView.frame, str(k), CheckBox((12, y-self.shift, -10, 20), meaning, value=check, callback=self.checkBoxCallback, sizeStyle='small'))
 					
 					# Replace Counter by ✅ if goal reached
@@ -203,6 +204,7 @@ class ColorWorkflow(PalettePlugin):
 					y += 22
 				except:pass
 		
+
 	@objc.python_method
 	def update(self, sender):
 		# do not update in case the palette is collapsed
@@ -255,6 +257,7 @@ class ColorWorkflow(PalettePlugin):
 							trigger = True
 			except:pass
 		
+
 	@objc.python_method
 	def checkBoxCallback(self, sender):
 
@@ -300,6 +303,7 @@ class ColorWorkflow(PalettePlugin):
 		self.updateView()
 		#self.update(self)			
 		
+
 	# Setup ColorFlow based on Color Layers callback
 	@objc.python_method
 	def resetColorWorkflow(self, sender):
@@ -330,6 +334,7 @@ class ColorWorkflow(PalettePlugin):
 
 		self.updateView()
 	
+
 	# Reset ColorFlow callback
 	@objc.python_method
 	def hardreset(self,sender):
@@ -350,30 +355,32 @@ class ColorWorkflow(PalettePlugin):
 
 		self.updateView()
 
+
 	# Generate Color Flow smart filter
 	@objc.python_method
 	def generateColorFlow_SmartFilter(self,sender):
+
 		import plistlib
 			
-		
 		plistFile = os.path.expanduser("~/Library/Application Support/Glyphs 3/CustomFilter.plist")		
-		try:		
+
+		try:	
+
 			with open(plistFile, 'rb') as fp:
+
 				pl = plistlib.load(fp)
-				
 				trigger = True
+				layerColor = []
+				notlayerColor = []
+
 				for item in pl:
 					if item["name"]=="Color Flow":
 						trigger = False
 				
-				layerColor = []
-				notlayerColor = []
 				for i in range (0,12):
-					I = str(i)
-					layerColor.append({'name': self.meaning[str(i)], 'predicate': f"'{I}' IN layer.userData"})
-					notlayerColor.append({'name': self.meaning[str(i)], 'predicate': f"NOT '{I}' IN layer.userData"})
+					layerColor.append({'name': self.meaning[str(i)], 'predicate': f"'{str(i)}' IN layer.userData"})
+					notlayerColor.append({'name': self.meaning[str(i)], 'predicate': f"NOT '{str(i)}' IN layer.userData"})
 					
-				#pl.append({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
 				pl.append({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
 				
 			if trigger == True:
@@ -390,6 +397,8 @@ class ColorWorkflow(PalettePlugin):
 					Message("Color Flow Smart Filters have been generated.\nRestart Glyph to update Filter UI", title='Alert', OKButton=None)
 		except:
 			Message("To Fix it, add an item in Filter Section and Restart Glyph. After that run again this function", title=".plist not writable", OKButton=None)
+	
+
 	# Find and read color.txt, if missing, create it
 	@objc.python_method
 	def getKeyFile(self):
@@ -416,6 +425,7 @@ class ColorWorkflow(PalettePlugin):
 			pass
 		return keyFile
 
+
 	# Build Dic from color.txt content
 	@objc.python_method
 	def mapKeys(self, keyFile):
@@ -436,10 +446,12 @@ class ColorWorkflow(PalettePlugin):
 		self.colourLabels = switch
 		return self.colourLabels
 
+
 	@objc.python_method
 	def __del__(self):
 		# Delete callbacks when Glyphs quits, otherwise it'll crash :( 
 		Glyphs.removeCallback(self.update)
+
 
 	@objc.python_method
 	def __file__(self):
