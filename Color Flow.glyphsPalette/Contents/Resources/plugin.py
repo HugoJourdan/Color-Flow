@@ -54,7 +54,7 @@ class ColorWorkflow(PalettePlugin):
 		self.shift = 10
 		self.barWidth = self.width+6
 		self.barWidthDic = {}
-		self.height = 22 * len(self.meaning) + 25
+		self.height = 22 * len([x for x in self.meaning.values() if x]) + 25
 		self.xPos = 9
 
 		self.paletteView = Window((self.width, self.height + 10))
@@ -81,8 +81,9 @@ class ColorWorkflow(PalettePlugin):
 		# Draw Color Tags
 		y = 36
 		for k, v in self.meaning.items():
-			setattr(self.paletteView.frame, str(k)+"colorTag", Box((0, y+1-self.shift, 3, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
-			y += 22
+			if v:
+				setattr(self.paletteView.frame, str(k)+"colorTag", Box((0, y+1-self.shift, 3, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
+				y += 22
 
 		# Select a master if none is selected
 		if not self.font.selectedFontMaster:
@@ -158,90 +159,92 @@ class ColorWorkflow(PalettePlugin):
 		
 		y = 36
 		for k, meaning in self.meaning.items():
+			if meaning:
 
-			try:
-				self.selectedLayer = self.font.selectedLayers[0]
-				check = self.selectedLayer.userData["com.hugojourdan.ColorFlow"][k]
+				try:
+					self.selectedLayer = self.font.selectedLayers[0]
+					check = self.selectedLayer.userData["com.hugojourdan.ColorFlow"][k]
 
-				if len(self.font.selectedLayers) > 1:
-					for layer in self.font.selectedLayers:
-						check = layer.userData["com.hugojourdan.ColorFlow"][k]
-						if check == False:
-							break
+					if len(self.font.selectedLayers) > 1:
+						for layer in self.font.selectedLayers:
+							check = layer.userData["com.hugojourdan.ColorFlow"][k]
+							if check == False:
+								break
 
 
-				# Draw Gray Bar if ◻️, Colored Bar if ✅
-				if check == False and k != None and self.barWidthDic[k] != 0:
-					setattr(self.paletteView.frame, str(k)+"box", Box((self.xPos, y+1-self.shift, self.barWidthDic[k]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(0,0,0,0.06)), cornerRadius=0, borderWidth=0))
-				
-				if check == True and k != None and self.barWidthDic[k] != 0 and self.font.selectedLayers[0].color != int(k):
-					setattr(self.paletteView.frame, str(k)+"box", Box((self.xPos, y+1-self.shift, self.barWidthDic[k]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(0,0,0,0.06)), cornerRadius=0, borderWidth=0))
+					# Draw Gray Bar if ◻️, Colored Bar if ✅
+					if check == False and k != None and self.barWidthDic[k] != 0:
+						setattr(self.paletteView.frame, str(k)+"box", Box((self.xPos, y+1-self.shift, self.barWidthDic[k]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(0,0,0,0.06)), cornerRadius=0, borderWidth=0))
+					
+					if check == True and k != None and self.barWidthDic[k] != 0 and self.font.selectedLayers[0].color != int(k):
+						setattr(self.paletteView.frame, str(k)+"box", Box((self.xPos, y+1-self.shift, self.barWidthDic[k]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(0,0,0,0.06)), cornerRadius=0, borderWidth=0))
 
-				if check == True and k != None and self.barWidthDic[k] != 0 and self.font.selectedLayers[0].color == int(k) :
-					setattr(self.paletteView.frame, str(k)+"box", Box((self.xPos, y+1-self.shift, self.barWidthDic[k]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
+					if check == True and k != None and self.barWidthDic[k] != 0 and self.font.selectedLayers[0].color == int(k) :
+						setattr(self.paletteView.frame, str(k)+"box", Box((self.xPos, y+1-self.shift, self.barWidthDic[k]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
 
-				# Draw checkboxes
-				setattr(self.paletteView.frame, str(k), CheckBox((12, y-self.shift, -10, 20), meaning, value=check, callback=self.checkBoxCallback, sizeStyle='small'))
-				
-				# Replace Counter by ✅ if goal reached
-				if self.LayerColorLabel[k] >= len(self.font.glyphs):
-					setattr(self.paletteView.frame, str(k)+"count", TextBox((self.width-50, y+5-self.shift, -6, 20), "✅", alignment="right", sizeStyle='mini'))
-				else:
-					setattr(self.paletteView.frame, str(k)+"count", TextBox((self.width-50, y+3-self.shift, -6, 20), f"{self.LayerColorLabel[k]}/{len(self.font.glyphs)}", alignment="right", sizeStyle='small'))
-				
-				y += 22
-			except:pass
+					# Draw checkboxes
+					setattr(self.paletteView.frame, str(k), CheckBox((12, y-self.shift, -10, 20), meaning, value=check, callback=self.checkBoxCallback, sizeStyle='small'))
+					
+					# Replace Counter by ✅ if goal reached
+					if self.LayerColorLabel[k] >= len(self.font.glyphs):
+						setattr(self.paletteView.frame, str(k)+"count", TextBox((self.width-50, y+5-self.shift, -6, 20), "✅", alignment="right", sizeStyle='mini'))
+					else:
+						setattr(self.paletteView.frame, str(k)+"count", TextBox((self.width-50, y+3-self.shift, -6, 20), f"{self.LayerColorLabel[k]}/{len(self.font.glyphs)}", alignment="right", sizeStyle='small'))
+					
+					y += 22
+				except:pass
 		
 	@objc.python_method
 	def update(self, sender):
-		
-		trigger = False 
+		# do not update in case the palette is collapsed
+		if self.dialog.frame().origin.y != 0:
+			trigger = False 
 
-		# Need to start [NEED TO BE FIXED]
-		if self.init != 3:
-			self.updateView()
-			self.init += 1
-
-		# If number of exported Glyph change, update UI
-		# self.export = [glyph.name for glyph in self.font.glyphs if glyph.export]
-		# if self.font.userData["com.hugojourdan.ColorFlow-export"] != self.export:
-		# 	self.font.userData["com.hugojourdan.ColorFlow-export"] = self.export
-		# 	self.updateView()
-
-		# If master added, add key
-		for master in self.font.masters:
-			if master.name not in self.font.userData["com.hugojourdan.ColorFlow-master-data"]:
-
-				for glyph in self.font.glyphs:
-					if not glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"]: 
-						glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
-				self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name] = self.GetDicLayerColorLabel(master.id)
-
-
-		# If no data, create default data
-		try:
-			if not self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"]: 
-				print("data missing, so created")
-				self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
-		except Exception as e: print(e)
-		
-		# If selectedMaster is changed, update UI
-		try:
-			if self.font.userData["com.hugojourdan.ColorFlow-selectedMaster"] != self.font.selectedFontMaster:
-				self.font.userData["com.hugojourdan.ColorFlow-selectedMaster"] = self.font.selectedFontMaster
+			# Need to start [NEED TO BE FIXED]
+			if self.init != 3:
 				self.updateView()
-				trigger = True
-		except Exception as e: print(e)
+				self.init += 1
 
-		#If ColorFlow data changed, trigger update
-		try:
-			if trigger == False:
-				for selectedLayer in self.font.selectedLayers:
-					if self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] != self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"]:
-						self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] = self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"].copy()
-						self.updateView()
-						trigger = True
-		except Exception as e: print(e)
+			# If number of exported Glyph change, update UI
+			# self.export = [glyph.name for glyph in self.font.glyphs if glyph.export]
+			# if self.font.userData["com.hugojourdan.ColorFlow-export"] != self.export:
+			# 	self.font.userData["com.hugojourdan.ColorFlow-export"] = self.export
+			# 	self.updateView()
+
+			# If master added, add key
+			for master in self.font.masters:
+				if master.name not in self.font.userData["com.hugojourdan.ColorFlow-master-data"]:
+
+					for glyph in self.font.glyphs:
+						if not glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"]: 
+							glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
+					self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name] = self.GetDicLayerColorLabel(master.id)
+
+
+			# If no data, create default data
+			try:
+				if not self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"]: 
+					print("data missing, so created")
+					self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
+			except Exception as e: print(e)
+			
+			# If selectedMaster is changed, update UI
+			try:
+				if self.font.userData["com.hugojourdan.ColorFlow-selectedMaster"] != self.font.selectedFontMaster:
+					self.font.userData["com.hugojourdan.ColorFlow-selectedMaster"] = self.font.selectedFontMaster
+					self.updateView()
+					trigger = True
+			except Exception as e: print(e)
+
+			#If ColorFlow data changed, trigger update
+			try:
+				if trigger == False:
+					for selectedLayer in self.font.selectedLayers:
+						if self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] != self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"]:
+							self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] = self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"].copy()
+							self.updateView()
+							trigger = True
+			except Exception as e: print(e)
 		
 	@objc.python_method
 	def checkBoxCallback(self, sender):
