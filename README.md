@@ -3,7 +3,7 @@
 **Color Flow** is a Palette Plugin, to organize your workflow and make it more visual.  
 It allows user to define for each layer, work steps done and update automaticaly Layer Color Label.
 
-<img src="https://user-images.githubusercontent.com/76793951/174275455-665033a1-334e-492a-86ab-a85d5b1a4140.jpg" width="500">
+<img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/ColorFlow_thumbnail.jpg?raw=true" width="900">
 
 <br>
 
