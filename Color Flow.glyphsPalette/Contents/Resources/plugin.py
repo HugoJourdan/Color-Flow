@@ -355,9 +355,12 @@ class ColorWorkflow(PalettePlugin):
 	def generateColorFlow_SmartFilter(self,sender):
 		import plistlib
 			
-							
-		with open("/Users/hugojourdan/Library/Application Support/Glyphs 3/CustomFilter.plist", 'rb') as fp:
+		
+		plistFile = os.path.expanduser("~/Library/Application Support/Glyphs 3/CustomFilter.plist")		
+		print(plistFile)		
+		with open(plistFile, 'rb') as fp:
 			pl = plistlib.load(fp)
+			print(pl)
 			
 			trigger = True
 			for item in pl:
@@ -365,22 +368,28 @@ class ColorWorkflow(PalettePlugin):
 					trigger = False
 			
 			layerColor = []
+			notlayerColor = []
 			for i in range (0,12):
 				I = str(i)
 				layerColor.append({'name': self.meaning[str(i)], 'predicate': f"'{I}' IN layer.userData"})
-				
-			pl.append({"name":"Color Flow", "subGroup": layerColor})
-			
+				notlayerColor.append({'name': self.meaning[str(i)], 'predicate': f"NOT '{I}' IN layer.userData"})
 
+			print(notlayerColor)
+			print(layerColor)
+				
+			#pl.append({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
+			pl.append({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
+			
 		if trigger == True:
-			with open("~/Library/Application Support/Glyphs 3/CustomFilter.plist", 'wb') as fp:
+			with open(plistFile, 'wb') as fp:
 				plistlib.dump(pl, fp)
 			Message("Color Flow Smart Filters have been generated.\nRestart Glyph to see them", title='Alert', OKButton=None)
 		else:
 
 			if dialogs.askYesNo("Color Flow", "Color Flow filter already exist, do you want to overwrite them ?") == True:
-				with open("/Users/hugojourdan/Library/Application Support/Glyphs 3/CustomFilter.plist", 'wb') as fp:
-					pl.remove({"name":"Color Flow", "subGroup": layerColor})
+				with open(plistFile, 'wb') as fp:
+					pl.remove({"name":"Color Flow", "subGroup": [{"name":"Has […]", "subGroup": layerColor}, {"name":"Has not […]", "subGroup": notlayerColor} ]})
+
 					plistlib.dump(pl, fp)
 				Message("Color Flow Smart Filters have been generated.\nRestart Glyph to update Filter UI", title='Alert', OKButton=None)
 
