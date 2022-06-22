@@ -388,7 +388,7 @@ class ColorWorkflow(PalettePlugin):
 
 			if dialogs.askYesNo("Color Flow", "Color Flow filter already exist, do you want to overwrite them ?") == True:
 				with open(plistFile, 'wb') as fp:
-					pl.remove({"name":"Color Flow", "subGroup": [{"name":"Has […]", "subGroup": layerColor}, {"name":"Has not […]", "subGroup": notlayerColor} ]})
+					pl.append({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
 
 					plistlib.dump(pl, fp)
 				Message("Color Flow Smart Filters have been generated.\nRestart Glyph to update Filter UI", title='Alert', OKButton=None)
