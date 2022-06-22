@@ -1,40 +1,41 @@
-
-# Color Flow
-
+# ABOUT
 
 **Color Flow** is a Palette Plugin, to organize your workflow and make it more visual.  
-It allows to define for each layer work steps done, and update automaticaly Layer Color Label.
+It allows user to define for each layer, work steps done and update automaticaly Layer Color Label.
 
-<img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/ColorFlow_thumbnail.jpg" width="900">
+<img src="https://user-images.githubusercontent.com/76793951/174275455-665033a1-334e-492a-86ab-a85d5b1a4140.jpg" width="500">
 
-# Glyph Color vs Layer Color
-GlyphsApp propose two different kind of Color Labels.
+<br>
 
-* `Glyph Color Label` , assigned to glyph with `Right-Click`
-* `Layer Color Label` , assigned to layer with `Right-Click + Option`
+_________________
+# GLYPH COLOR 🆚 LAYER COLOR
+
+
+Glyphs and glyph layers can be marked with color labels. Control-click or right-click a glyph to apply one of the twelve
+predefined colors.  
+Hold down the Option key to define or clear the color label of the current layer. The glyph color spans across the entire glyph cell.  
+The layer color is drawn on the right half of the cell if a glyph color is set or across the entire cell with a cut-out in the top left if no glyph
+color is set.
 
 | Glyph Color | Layer Color | Glyph+Layer Color |
 | :---: | :---: | :---: |
 | <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/Glyph-Color-Label.png" width="100"> | <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/Layer-Color-Label.png" width="100"> | <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/Glyph+Layer-Color-Label.png" width="100"> |
+ 
+Convenient use of `Layer Color Label` is to indicate progress status of a layer, as the following example.
 
-A glyph can have only one `Glyph Color Label`, but many `Layer Color Label` (as many layers of the glyph). 
+* 🟣 → Outline corrected
+* 🟢 → Anchors placed
+* 🔵 → Spacing set
+* 🟡 → Ready to Export
+<br>
 
+_________________
+# REQUIREMENTS
 
-# Use of Layer Color
-Convenient use of `Layer Color Label` is to set them to indicate progress status of a layer.  
+Color Flow requires a `color.txt` file stored in either `~/Library/Application Support/Glyphs 3/info` or the same directory as the current Glyphs source file. Preference is given to the latter allowing for the sharing of the `color.txt` file with glyphs source files to retain labelling information between project contributors. 
 
-For example:
-* Yellow → Outline corrected
-* Green → Anchors placed
-* Blue → Spacing set
-
-
-
-# How to customize color meanings
-
-The plugin requires a **coolorWorkflow.txt** file stored in either ~/Library/Application Support/Glyphs 3/info/ or the same directory as the current Glyphs source file. Preference is given to the latter allowing for the sharing of the **fontdashboard.txt** file with glyphs source files to retain labelling information between project contributors. 
-
-The **coolorWorkflow.txt** file requires the formatting `colorName=meaning`, with each key on a newline and with no space surrounding the '='. An example, with the defined colorNames is given below. 
+The `color.txt` file requires the formatting `colorName=meaning`, with each key on a newline and with no space surrounding the '='.  
+An example, with the defined colorNames is given below. 
 
 ```
 red=Step 1
@@ -51,30 +52,54 @@ lightGray=Step 11
 charcoal=Step 12
 ```
 
+<br>
 
-Layers Color are set automaticaly set according to checkboxes. Layer Color set is precedent color of the first uncheck checkbox.  
-In the following example Layer Color is set to`Orange` because even if `Light Green` and `Yellow` are ✅, `Brown` is uncheck, so color set is the color that precedes it.
+_________________
+# CUSTOMIZE
+
+The whole point of Color Flow is that meaning and order of colors can be customized, so that each designer can build his own workflow.  
+Color order can be modified by changing line order and color can be hidden by removing it's meaning.
+An example, with a customize `color.txt` is given below. 
+
+```
+red=
+orange=
+brown=
+purple=Outline corrected
+lightGreen=Anchors placed
+darkGreen=
+lightBlue=Spacing set
+darkBlue=
+yellow=Ready to Export
+magenta=
+lightGray=
+charcoal=
+```
+
+Display in Color Flow UI:
+* 🟣 → Outline corrected
+* 🟢 → Anchors placed
+* 🔵 → Spacing set
+* 🟡 → Ready to Export
+
+
+<br>
+
+_________________
+# HOW IT WORK
+
+Layers Color Labels are set automaticaly according to checkboxes. Color set is the precedent color of the first uncheck checkbox.  
+In the following example Layer Color is set to `Orange` because even if `Light Green` and `Yellow` are ✅ , `Brown` is uncheck, so color set is the color that precedes it.
 
 <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup1.jpg" width="300"> <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup2.jpg" width="300"> 
 
+_________________
+# EXTRA FEATURE
 
+Some extra feature are accesible from the Action Button.
 
-You can customise color order by changing line order, and you can also hide a color by deleting the line associated with it.
-Here is an example :
-
-```
-red=Step 1
-yellow=Step 2
-magenta=Step 3
-purple=Step 4
-lightGreen=Step 5
-```
-
-# Additionnal features
-Some extra feature are accesible from the Action Button in the UI.
-
-* `Setup Color Flow based on Color Layers` : Set for all layer, Color Flow data based on it Layer Color (Useful when you open for the first time a .glyph file with Layer Color already set)
-* `Reset Color Flow` : Reset for all layers, Color Flow data and Layer Color.
-* `Generate Color Flow Smart Filters` : Generate in the Filters UI section, a `Color Flow` folder containing two sub-folder. 
-  *  `Has [...]` : filters to sort all layer with a specific step checked.
-  *  `Has not [...]` : filters to sort all layer with a specific step not checked.
+* **Setup Color Flow based on Color Layers** : Set for all layer, Color Flow data based on it Layer Color (Useful when you open for the first time a .glyph file with Layer Color already set)
+* **Reset Color Flow** : Reset for all layers, Color Flow data and Layer Color.
+* **Generate Color Flow Smart Filters** : Generate in the Filters UI section, a "Color Flow" folder containing two sub-folder. 
+  *  **Has [...]** : filters to sort all layer with a specific step checked.
+  *  **Has not [...]** : filters to sort all layer with a specific step not checked.
