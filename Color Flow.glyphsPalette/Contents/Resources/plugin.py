@@ -160,7 +160,7 @@ class ColorWorkflow(PalettePlugin):
 		y = 36
 		for k, meaning in self.meaning.items():
 			if meaning:
-
+				
 				try:
 					self.selectedLayer = self.font.selectedLayers[0]
 					check = self.selectedLayer.userData["com.hugojourdan.ColorFlow"][k]
@@ -170,7 +170,6 @@ class ColorWorkflow(PalettePlugin):
 							check = layer.userData["com.hugojourdan.ColorFlow"][k]
 							if check == False:
 								break
-
 
 					# Draw Gray Bar if ◻️, Colored Bar if ✅
 					if check == False and k != None and self.barWidthDic[k] != 0:
