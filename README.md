@@ -2,22 +2,28 @@
 # Color Flow
 
 
-**Color Flow** is a Palette Plugin, to organize your workflow and track easier your project.  
-This helps you not to forget anything when working on a font.
+**Color Flow** is a Palette Plugin, to organize your workflow and make it more visual.
+It allows to define for each layer work steps done, and update automaticaly Layer Color Label.
 
 <img src="https://user-images.githubusercontent.com/76793951/174275455-665033a1-334e-492a-86ab-a85d5b1a4140.jpg" width="500">
 
+# Glyph Color vs Layer Color
 GlyphsApp propose two different kind of Color Labels.
 
-* `Glyph Color Label` , assigned to glyphs with Right-Click
-* `Layer Color Label` , assigned to layers with Right-Click + Option
+* `Glyph Color Label` , assigned to glyph with `Right-Click`
+* `Layer Color Label` , assigned to layer with `Right-Click + Option`
 
+| Glyph Color | Layer Color | Glyph+Layer Color |
+| :---: | :---: | :---: |
+| <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/Glyph-Color-Label.png" width="100"> | <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/Layer-Color-Label.png" width="100"> | <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/Glyph+Layer-Color-Label.png" width="100"> |
 
-<img src="https://user-images.githubusercontent.com/76793951/174276486-13d2ae58-0ca4-464b-a9c6-a996c38059ac.png" width="400">
+A glyph can have only one `Glyph Color Label`, but many `Layer Color Label` (as many layers of the glyph).  
+Convenient use of `Layer Color Label` is to set them to indicate progress status of a layer.  
 
-A glyph can have only one Glyph Color Label, but many Layer Color Labels (as many as the number of layers of the glyph). A useful use of layer color labels is to set them to indicate the state of a layer. For example, you could decide to use the ![Capture d’écran 2022-06-15 à 20.43.33|32x32, 50%](upload://ePMsUmXa7nwz0qOEOCqHk5jrha4.jpeg) Red layer color for layers that need outline corrected.
-
-
+For example:
+* Yellow → Outline corrected
+* Green → Anchors placed
+* Blue → Spacing set
 
 This Plugin is a alternative way to use Layer Color Labels. Instead of setting Layer Color Labels with ⌥ + Right-Click,
 
@@ -58,3 +64,12 @@ magenta=Step 3
 purple=Step 4
 lightGreen=Step 5
 ```
+
+# Additionnal features
+Some extra feature are accesible from the Action Button in the UI.
+
+* `Setup Color Flow based on Color Layers` : Set for all layer, Color Flow data based on it Layer Color (Useful when you open for the first time a .glyph file with Layer Color already set)
+* `Reset Color Flow` : Reset for all layers, Color Flow data and Layer Color.
+* `Generate Color Flow Smart Filters` : Generate in the Filters UI section, a `Color Flow` folder containing two sub-folder. 
+  *  `Has [...]` : filters to sort all layer with a specific step checked.
+  *  `Has not [...]` : filters to sort all layer with a specific step not checked.
