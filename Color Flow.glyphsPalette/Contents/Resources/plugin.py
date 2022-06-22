@@ -233,9 +233,9 @@ class ColorWorkflow(PalettePlugin):
 			# If no data, create default data
 			try:
 				if not self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"]: 
-					print("data missing, so created")
+					#print("data missing, so created")
 					self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
-			except Exception as e: print(e)
+			except:pass
 			
 			# If selectedMaster is changed, update UI
 			try:
@@ -243,7 +243,7 @@ class ColorWorkflow(PalettePlugin):
 					self.font.userData["com.hugojourdan.ColorFlow-selectedMaster"] = self.font.selectedFontMaster
 					self.updateView()
 					trigger = True
-			except Exception as e: print(e)
+			except:pass
 
 			#If ColorFlow data changed, trigger update
 			try:
@@ -253,7 +253,7 @@ class ColorWorkflow(PalettePlugin):
 							self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] = self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"].copy()
 							self.updateView()
 							trigger = True
-			except Exception as e: print(e)
+			except:pass
 		
 	@objc.python_method
 	def checkBoxCallback(self, sender):
@@ -360,7 +360,6 @@ class ColorWorkflow(PalettePlugin):
 		try:		
 			with open(plistFile, 'rb') as fp:
 				pl = plistlib.load(fp)
-				print(pl)
 				
 				trigger = True
 				for item in pl:
@@ -373,9 +372,6 @@ class ColorWorkflow(PalettePlugin):
 					I = str(i)
 					layerColor.append({'name': self.meaning[str(i)], 'predicate': f"'{I}' IN layer.userData"})
 					notlayerColor.append({'name': self.meaning[str(i)], 'predicate': f"NOT '{I}' IN layer.userData"})
-
-				print(notlayerColor)
-				print(layerColor)
 					
 				#pl.append({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
 				pl.append({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
