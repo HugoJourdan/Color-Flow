@@ -196,7 +196,7 @@ class ColorWorkflow(PalettePlugin):
 	@objc.python_method
 	def update(self, sender):
 		# do not update in case the palette is collapsed
-		if self.dialog.frame().origin.y != 0:
+		if self.dialog.frame().origin.y == 0:
 			trigger = False 
 
 			# Need to start [NEED TO BE FIXED]
