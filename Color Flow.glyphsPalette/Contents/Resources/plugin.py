@@ -11,6 +11,7 @@ from __future__ import division, print_function, unicode_literals
 ###########################################################################################################
 
 from vanilla import *
+from vanilla import dialogs
 import re
 import os
 import codecs
@@ -116,6 +117,7 @@ class ColorWorkflow(PalettePlugin):
 		# Adding a callback for the 'GSUpdateInterface' event
 		Glyphs.addCallback(self.update, UPDATEINTERFACE)
 
+
 	# Build Dic with number of LayerColor
 	@objc.python_method
 	def GetDicLayerColorLabel(self ,masterId):
@@ -132,6 +134,12 @@ class ColorWorkflow(PalettePlugin):
 
 	@objc.python_method
 	def updateView(self):
+
+		if self.font.selectedLayers:
+			for layer in self.font.selectedLayers:
+				for k, v in layer.userData["com.hugojourdan.ColorFlow"].items():
+					if v == True:
+						layer.userData["com.hugojourdan.ColorFlow_Color_"+str(k)] = str(k)
 
 		selectedMasterName = self.font.selectedFontMaster.name
 		self.LayerColorLabel = self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterName]
@@ -353,22 +361,28 @@ class ColorWorkflow(PalettePlugin):
 			
 			trigger = True
 			for item in pl:
-				print(item)
 				if item["name"]=="Color Flow":
 					trigger = False
-			print(trigger)
 			
 			layerColor = []
 			for i in range (0,12):
-				layerColor.append({'name': self.meaning[str(i)], 'predicate': f"layer0.colorIndex == {i}"})
+				I = str(i)
+				layerColor.append({'name': self.meaning[str(i)], 'predicate': f"'{I}' IN layer.userData"})
 				
-			pl.append({"name":"Color Flow", "subGroup": [{'name': 'Layer', 'subGroup': layerColor}]})
+			pl.append({"name":"Color Flow", "subGroup": layerColor})
 			
 
 		if trigger == True:
-			with open("/Users/hugojourdan/Library/Application Support/Glyphs 3/CustomFilter.plist", 'wb') as fp:
+			with open("~/Library/Application Support/Glyphs 3/CustomFilter.plist", 'wb') as fp:
 				plistlib.dump(pl, fp)
-		Message("Color Flow Smart Filters have been generated.\nRestart Glyph to see them", title='Alert', OKButton=None)
+			Message("Color Flow Smart Filters have been generated.\nRestart Glyph to see them", title='Alert', OKButton=None)
+		else:
+
+			if dialogs.askYesNo("Color Flow", "Color Flow filter already exist, do you want to overwrite them ?") == True:
+				with open("/Users/hugojourdan/Library/Application Support/Glyphs 3/CustomFilter.plist", 'wb') as fp:
+					pl.remove({"name":"Color Flow", "subGroup": layerColor})
+					plistlib.dump(pl, fp)
+				Message("Color Flow Smart Filters have been generated.\nRestart Glyph to update Filter UI", title='Alert', OKButton=None)
 
 	# Find and read color.txt, if missing, create it
 	@objc.python_method
