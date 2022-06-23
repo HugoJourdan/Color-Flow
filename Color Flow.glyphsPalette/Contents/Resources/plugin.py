@@ -155,13 +155,18 @@ class ColorFlow(PalettePlugin):
 	# Update Palette UI
 	@objc.python_method
 	def updateView(self):
+		from datetime import datetime
+		startTime = datetime.now()
 
-		masterId = self.font.selectedFontMaster.id
-		for glyph in self.font.glyphs:
-			for k, v in glyph.layers[masterId].userData["com.hugojourdan.ColorFlow"].items():
+
+		for layer in self.font.selectedLayers:
+			for k, v in layer.userData["com.hugojourdan.ColorFlow"].items():
 				if v == True:
-					glyph.layers[masterId].userData["com.hugojourdan.ColorFlow_Color_"+str(k)] = str(k)
+					layer.userData["com.hugojourdan.ColorFlow_Color_"+str(k)] = str(k)
+				else:
+					del layer.userData["com.hugojourdan.ColorFlow_Color_"+str(k)]
 
+		
 		selectedMasterName = self.font.selectedFontMaster.name
 		self.LayerColorLabel = self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterName]
 
@@ -176,8 +181,7 @@ class ColorFlow(PalettePlugin):
 		if len(masterName) > 16:
 			masterName = masterName[0:16]+"…"
 		setattr(self.paletteView.frame, "masterName", TextBox((6, 2.6, 140, 20), masterName, alignment="left", sizeStyle='small'))
-
-
+		
 		for k in self.meaning.keys():
 			if hasattr(self.paletteView.frame, str(k)):
 				delattr(self.paletteView.frame, str(k))
@@ -185,7 +189,6 @@ class ColorFlow(PalettePlugin):
 				delattr(self.paletteView.frame, str(k)+"box")
 			if hasattr(self.paletteView.frame, str(k)+"count"):
 				delattr(self.paletteView.frame, str(k)+"count")
-		
 		y = 36
 		for k, meaning in self.meaning.items():
 			if meaning:
@@ -245,12 +248,9 @@ class ColorFlow(PalettePlugin):
 			if self.dialog.frame().origin.y == 0:
 				trigger = False 
 
-				#Need to start [NEED TO BE FIXED]
-				if self.init != 3:
-					self.updateView()
-					self.init += 1
 				# If no selected Layer, trigger update
 				if self.font == None :
+					
 					self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = False
 					self.updateView()
 					trigger = True
@@ -260,6 +260,7 @@ class ColorFlow(PalettePlugin):
 					self.updateView()
 					self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = True
 					trigger = True
+
 				if trigger == False:		
 					self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = True
 					
@@ -311,18 +312,16 @@ class ColorFlow(PalettePlugin):
 					if not glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"]: 
 						glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
 				self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name] = self.GetDicLayerColorLabel(master.id)
-
 		
-		selectedLayer = self.font.selectedLayers
 		color = sender.getTitle()
 		check = sender.get()
 
 		for k, v in self.meaning.items():
 			if color == v:
 				color = k
-
 		selectedMasterName = self.font.selectedFontMaster.name
-		for layer in selectedLayer:
+
+		for layer in self.font.selectedLayers:
 			if check == True and layer.userData["com.hugojourdan.ColorFlow"][color] == False:
 				self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterName][color]+= 1
 			if check == False and layer.userData["com.hugojourdan.ColorFlow"][color] == True:
@@ -343,8 +342,7 @@ class ColorFlow(PalettePlugin):
 				else:
 					break
 		
-		self.updateView()
-		#self.update(self)			
+			#self.update(self)			
 		
 
 	########################################################################################################
