@@ -88,10 +88,16 @@ Display in Color Flow UI:
 _________________
 # HOW IT WORK
 
-Layers Color Labels are set automaticaly according to checkboxes. Color set is the precedent color of the first uncheck checkbox.  
-In the following example Layer Color is set to `Orange` because even if `Light Green` and `Yellow` are ✅ , `Brown` is uncheck, so color set is the color that precedes it.
+Each layer has is own Color Flow data, show in the panel. Depending of checked items Layers Color Labels are set automaticaly.  
+Color set is the precedent color of the first uncheck checkbox. In the following example Layer Color is set to `Orange` because even if `Light Green` and `Yellow` are ✅ , `Brown` is uncheck, so color set is the color that precedes it.
 
 <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup1.jpg" width="300"> <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup2.jpg" width="300"> 
+
+You can toggle checkbox by using Color Flow shorcuts available. For that follow these steps :
+
+1. Download "Color Florw Shortcut" from Window > Plugin Manager.
+2. Reload script folder by pressing [ Option + MAJ + Command + Y ].
+3. In Glyph Preferences > Shortcuts, search "Color Flow" and assign a shortcut for each item. (I personnaly use Control+Number as shortcuts)
 
 _________________
 # EXTRA FEATURE
