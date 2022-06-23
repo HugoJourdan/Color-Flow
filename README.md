@@ -58,8 +58,7 @@ _________________
 # CUSTOMIZE
 
 The whole point of Color Flow is that meaning and order of colors can be customized, so that each designer can build his own workflow.  
-Color order can be modified by changing line order and color can be hidden by removing it's meaning.
-An example, with a customize `color.txt` is given below. 
+Color order can be modified by changing line order and color can be hidden by removing it's meaning. An example, with a customize `color.txt` is given below. 
 
 ```
 red=
