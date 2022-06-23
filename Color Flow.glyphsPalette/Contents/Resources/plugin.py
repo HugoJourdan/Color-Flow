@@ -10,21 +10,31 @@ from __future__ import division, print_function, unicode_literals
 #
 ###########################################################################################################
 
-from vanilla import *
-from vanilla import dialogs
+
 import re
 import os
 import codecs
 import AppKit
-from datetime import datetime
 
+from vanilla import *
+from vanilla import dialogs
+from AppKit import NSColor
 from GlyphsApp.plugins import *
 from GlyphsApp.UI import *
 from GlyphsApp import *
-from AppKit import NSColor
+
 
 
 class ColorFlow(PalettePlugin):
+
+
+	########################################################################################################
+	#																									   #
+	#	SETUP																					           #
+	#																									   #
+	########################################################################################################
+	#																									   #
+	#																									   #
 
 	@objc.python_method
 	def settings(self):
@@ -48,7 +58,6 @@ class ColorFlow(PalettePlugin):
 						}
 
 		self.meaning = self.mapKeys(self.getKeyFile())
-		self.init = 0
 		self.width = 160
 		self.rectHeight = 10
 		self.lineSpacing = 20
@@ -64,9 +73,10 @@ class ColorFlow(PalettePlugin):
 		# Draw Action Button
 		self.paletteView.frame.actionPopUpButton = ActionButton((self.width-22, 0, 34, 19), 
 			[
-			dict(title="Setup Color Flow based on Color Layers", callback=self.resetColorWorkflow),
+			dict(title="Setup Color Flow based on Color Layers", callback=self.setupColorFlow),
 			dict(title="Reset Color Flow", callback=self.hardreset),
 			dict(title="Generate Color Flow Smart Filters", callback=self.generateColorFlow_SmartFilter),
+			dict(title="Copy Color Flow to Master", callback=self.copyColorFlowToMaster)
 			],
 			sizeStyle='small')
 
@@ -119,6 +129,14 @@ class ColorFlow(PalettePlugin):
 		Glyphs.addCallback(self.update, UPDATEINTERFACE)
 
 
+	########################################################################################################
+	#																									   #
+	#	DATA + UI 																				           #
+	#																									   #
+	########################################################################################################
+	#																									   #
+	#																									   #
+
 	# Build Dic with number of LayerColor
 	@objc.python_method
 	def GetDicLayerColorLabel(self ,masterId):
@@ -134,14 +152,15 @@ class ColorFlow(PalettePlugin):
 			return self.LayerColorLabel
 
 
+	# Update Palette UI
 	@objc.python_method
 	def updateView(self):
 
-		if self.font.selectedLayers:
-			for layer in self.font.selectedLayers:
-				for k, v in layer.userData["com.hugojourdan.ColorFlow"].items():
-					if v == True:
-						layer.userData["com.hugojourdan.ColorFlow_Color_"+str(k)] = str(k)
+		masterId = self.font.selectedFontMaster.id
+		for glyph in self.font.glyphs:
+			for k, v in glyph.layers[masterId].userData["com.hugojourdan.ColorFlow"].items():
+				if v == True:
+					glyph.layers[masterId].userData["com.hugojourdan.ColorFlow_Color_"+str(k)] = str(k)
 
 		selectedMasterName = self.font.selectedFontMaster.name
 		self.LayerColorLabel = self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterName]
@@ -172,8 +191,7 @@ class ColorFlow(PalettePlugin):
 			if meaning:
 				
 				if self.font.selectedLayers:
-					self.selectedLayer = self.font.selectedLayers[0]
-					check = self.selectedLayer.userData["com.hugojourdan.ColorFlow"][k]
+					check = self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"][k]
 
 					if len(self.font.selectedLayers) > 1:
 						for layer in self.font.selectedLayers:
@@ -218,72 +236,71 @@ class ColorFlow(PalettePlugin):
 					
 					y += 22
 
+
+	# Detect if UI need to be update
 	@objc.python_method
 	def update(self, sender):
 		# do not update in case the palette is collapsed
-		if self.dialog.frame().origin.y == 0:
-			trigger = False 
+		try:
+			if self.dialog.frame().origin.y == 0:
+				trigger = False 
 
-			# Need to start [NEED TO BE FIXED]
-			if self.init != 3:
-				self.updateView()
-				self.init += 1
-
-			# If no selected Layer, trigger update
-			if not self.font.selectedLayers:
-				self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = False
-				self.updateView()
-				trigger = True
-			
-			# If selected Layers
-			if trigger == False and self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] == False:
-				self.updateView()
-				self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = True
-				trigger = True
-
-			if trigger == False:		
-				self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = True
+				#Need to start [NEED TO BE FIXED]
+				if self.init != 3:
+					self.updateView()
+					self.init += 1
+				# If no selected Layer, trigger update
+				if self.font == None :
+					self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = False
+					self.updateView()
+					trigger = True
 				
-				# If master added, add key
-				for master in self.font.masters:
-					if master.name not in self.font.userData["com.hugojourdan.ColorFlow-master-data"]:
+				# If selected Layers
+				if trigger == False and self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] == False:
+					self.updateView()
+					self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = True
+					trigger = True
+				if trigger == False:		
+					self.font.userData["com.hugojourdan.ColorFlow-selectedLayer"] = True
+					
+					# If master added, add key
+					for master in self.font.masters:
+						if master.name not in self.font.userData["com.hugojourdan.ColorFlow-master-data"]:
 
-						for glyph in self.font.glyphs:
-							if not glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"]: 
-								glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
-						self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name] = self.GetDicLayerColorLabel(master.id)
-
-
-				# If no data, create default data
-				try:
-					if not self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"]: 
-						#print("data missing, so created")
-						self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
-				except:pass
-
-				
-				# If selectedMaster is changed, update UI
-				try:
-					if self.font.userData["com.hugojourdan.ColorFlow-selectedMaster"] != self.font.selectedFontMaster:
-						self.font.userData["com.hugojourdan.ColorFlow-selectedMaster"] = self.font.selectedFontMaster
-						self.updateView()
-						trigger = True
-				except:pass
+							for glyph in self.font.glyphs:
+								if not glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"]: 
+									glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
+							self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name] = self.GetDicLayerColorLabel(master.id)
 
 
-				#If ColorFlow data changed, trigger update
-				try:
-					if trigger == False:
-						for selectedLayer in self.font.selectedLayers:
+					# If no data, create default data
+					try:
+						for layer in self.font.selectedLayers:
+							if not layer.userData["com.hugojourdan.ColorFlow"]: 
+								layer.userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
+					except:pass
+
+					# If selectedMaster is changed, update UI
+					try:
+						if self.font.userData["com.hugojourdan.ColorFlow-selectedMaster"] != self.font.selectedFontMaster:
+							self.font.userData["com.hugojourdan.ColorFlow-selectedMaster"] = self.font.selectedFontMaster
+							self.updateView()
+							trigger = True
+					except:pass
+
+
+					#If ColorFlow data changed, trigger update
+					try:
+						if trigger == False:
 							if self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] != self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"]:
 								self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] = self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"].copy()
 								self.updateView()
 								trigger = True
-				except:pass
+					except:pass
+		except Exception as e: print(e)
 
-				
-		
 
+	# Action when a checkbox is toogle
 	@objc.python_method
 	def checkBoxCallback(self, sender):
 
@@ -330,9 +347,17 @@ class ColorFlow(PalettePlugin):
 		#self.update(self)			
 		
 
+	########################################################################################################
+	#																									   #
+	#	EXTRA FEATURES																					   #
+	#																									   #
+	########################################################################################################
+	#																									   #
+	#																									   #
+
 	# Setup ColorFlow based on Color Layers callback
 	@objc.python_method
-	def resetColorWorkflow(self, sender):
+	def setupColorFlow(self, sender):
 
 		print(f"✅ UPDATE > ColorFlow settings [{self.font.selectedFontMaster.name}]")
 
@@ -370,14 +395,21 @@ class ColorFlow(PalettePlugin):
 		for glyph in self.font.glyphs:
 			for layer in glyph.layers:
 				if layer.isMasterLayer and layer.layerId == self.font.selectedFontMaster.id:
+
+					for k in layer.userData.keys():
+						if k != "com.hugojourdan.ColorFlow":
+							del layer.userData[k]
+
 					layer.userData["com.hugojourdan.ColorFlow"] = {x: False for x in layer.userData["com.hugojourdan.ColorFlow"]}
 					layer.color = None
 				else:
 					pass
 
+		selectedMaster = self.font.selectedFontMaster.name
+		#for master in self.font.masters:
+			#self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name] = {x:0 for x in self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name]}
+		self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMaster] = {x:0 for x in self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMaster]}
 
-		for master in self.font.masters:
-			self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name] = {x:0 for x in self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name]}
 
 		self.updateView()
 
@@ -424,6 +456,52 @@ class ColorFlow(PalettePlugin):
 		except:
 			Message("To Fix it, add an item in Filter Section and Restart Glyph. After that run again this function", title=".plist not writable", OKButton=None)
 	
+
+	# Copy Color Flow Data to Master
+	@objc.python_method
+	def copyColorFlowToMaster(self, sender):
+		
+		MASTER = []
+		for master in self.font.masters:
+			MASTER.append(master.name)
+		
+		self.w = FloatingWindow((200, 110), "Copy Color Flow Data")		
+		self.w.textFrom = TextBox((10, 10, -10, 17), "From")
+		self.w.fromMaster = PopUpButton((55, 10, -10, 20),MASTER)
+		self.w.line = HorizontalLine((10, 37, -10, 1))
+		self.w.line2 = HorizontalLine((10, 37, -10, 1))
+		self.w.textTo = TextBox((10, 46, -10, 17), "To")
+		self.w.toMaster = PopUpButton((55, 46, -10, 20),MASTER)
+		self.w.button = Button((10, 76, -10, 20), "Run", callback=self.buttonCallback)
+		self.w.center()
+		self.w.open()
+	
+
+	@objc.python_method
+	def buttonCallback(self, sender):
+		fromMaster = self.w.fromMaster.getTitle()
+		toMaster = self.w.toMaster.getTitle()
+		self.font.userData["com.hugojourdan.ColorFlow-master-data"][toMaster] = self.font.userData["com.hugojourdan.ColorFlow-master-data"][fromMaster]
+		
+		fromMasterID, toMasterID = None, None
+		for master in self.font.masters:
+			if master.name == fromMaster:
+				fromMasterID = master.id
+			if master.name == toMaster:
+				toMasterID = master.id
+				
+		for glyph in self.font.glyphs:
+			glyph.layers[toMasterID].color = glyph.layers[fromMasterID].color
+			glyph.layers[toMasterID].userData["com.hugojourdan.ColorFlow"] = glyph.layers[fromMasterID].userData["com.hugojourdan.ColorFlow"]
+
+
+	########################################################################################################
+	#																									   #
+	#	SETUP COLOR MEANING																			       #
+	#																									   #
+	########################################################################################################
+	#																									   #
+	#																									   #
 
 	# Find and read color.txt, if missing, create it
 	@objc.python_method
@@ -472,6 +550,13 @@ class ColorFlow(PalettePlugin):
 		self.colourLabels = switch
 		return self.colourLabels
 
+
+	########################################################################################################
+	#																									   #
+	#	DON'T MODIFY																			           #
+	#																									   #
+	########################################################################################################
+	#																									   #
 
 	@objc.python_method
 	def __del__(self):
