@@ -24,7 +24,7 @@ from GlyphsApp import *
 from AppKit import NSColor
 
 
-class ColorWorkflow(PalettePlugin):
+class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def settings(self):

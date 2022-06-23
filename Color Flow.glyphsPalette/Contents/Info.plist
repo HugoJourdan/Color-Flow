@@ -7,25 +7,25 @@
 	<key>CFBundleExecutable</key>
 	<string>plugin</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.HugoJourdan.ColorWorkflow</string>
+	<string>com.HugoJourdan.ColorFlow</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Color Workflow</string>
+	<string>Color Flow</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>UpdateFeedURL</key>
-	<string>https://github.com/HugoJourdan/ColorWorkflow</string>
+	<string>https://github.com/HugoJourdan/Color-Flow</string>
 	<key>productPageURL</key>
-	<string>https://github.com/HugoJourdan/ColorWorkflow</string>
+	<string>https://github.com/HugoJourdan/Color-Flow</string>
 	<key>productReleaseNotes</key>
 	<string></string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright, HugoJourdan, 20222</string>
 	<key>NSPrincipalClass</key>
-	<string>ColorWorkflow</string>
+	<string>ColorFlow</string>
 	<key>class</key>
 	<string></string>
 </dict>
