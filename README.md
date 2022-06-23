@@ -94,11 +94,12 @@ Color set is the precedent color of the first uncheck checkbox. In the following
 
 <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup1.jpg" width="300"> <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup2.jpg" width="300"> 
 
-You can toggle checkbox by using Color Flow shorcuts available. For that follow these steps :
+You can toggle checkbox with shortcuts. For that follow these steps :
 
-1. Download "Color Florw Shortcut" from Window > Plugin Manager.
+1. Download "Color Flow Shortcut" from Window > Plugin Manager.
 2. Reload script folder by pressing [ Option + MAJ + Command + Y ].
 3. In Glyph Preferences > Shortcuts, search "Color Flow" and assign a shortcut for each item. (I personnaly use Control+Number as shortcuts)
+
 
 _________________
 # EXTRA FEATURE
