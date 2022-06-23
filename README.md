@@ -100,6 +100,9 @@ Some extra feature are accesible from the Action Button.
 
 * **Setup Color Flow based on Color Layers** : Set for all layer, Color Flow data based on it Layer Color (Useful when you open for the first time a .glyph file with Layer Color already set)
 * **Reset Color Flow** : Reset for all layers, Color Flow data and Layer Color.
-* **Generate Color Flow Smart Filters** : Generate in the Filters UI section, a "Color Flow" folder containing two sub-folder. 
-  *  **Has [...]** : filters to sort all layer with a specific step checked.
-  *  **Has not [...]** : filters to sort all layer with a specific step not checked.
+* **Generate Color Flow Smart Filters** : Generate in the Filters UI section, a "Color Flow" folder containing filters to sort layer who has or not a specific step checked.
+
+<br>
+
+*Thanks to Gor Jihanian for his contribution.*
+
