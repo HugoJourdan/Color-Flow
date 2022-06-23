@@ -1,6 +1,6 @@
 # COLOR FLOW SHORTCUT
 
-You can toggle checkbox by using Color Flow script. For that follow these steps :
+You can toggle checkbox with shortcuts. For that follow these steps :
 
 1. Download "Color Flow Shortcut" from Window > Plugin Manager.
 2. Reload script folder by pressing [ Option + MAJ + Command + Y ].
