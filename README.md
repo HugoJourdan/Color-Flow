@@ -1,6 +1,6 @@
 # ABOUT
 
-**Color Flow** is a Palette Plugin to help organize and gamify your workflow by allowing users to maximize the potential of Color Layer presets by applying meaningful and visual feedback based on customizable categories and color-coded progress bars.  
+**Color Flow** is a Palette Plugin to help organize and gamify your workflow by allowing users to maximize the potential of Color Layer Labels by applying meaningful and visual feedback based on customizable categories and color-coded progress bars.  
 
 <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/ColorFlow_thumbnail.jpg?raw=true" width="900">
 
