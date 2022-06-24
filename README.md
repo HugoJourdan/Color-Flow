@@ -1,7 +1,6 @@
 # ABOUT
 
-**Color Flow** is a Palette Plugin, to organize your workflow and make it more visual.  
-It allows user to define for each layer, work steps done and update automaticaly Layer Color Label.
+**Color Flow** is a Palette Plugin to help organize and gamify your workflow by allowing users to maximize the potential of Color Layer presets by applying meaningful and visual feedback based on customizable categories and color-coded progress bars.  
 
 <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/ColorFlow_thumbnail.jpg?raw=true" width="900">
 
@@ -10,11 +9,12 @@ It allows user to define for each layer, work steps done and update automaticaly
 _________________
 # GLYPH COLOR 🆚 LAYER COLOR
 
+In Glyphs App, color labels can be defined on two levels: Glyph and Layer, and applied in one of twelve predefined colors.
+Set Glyph Color can be accessed by control-click or right-click on a glyph.
+Set Layer Color can be accessed by right-click on a glyph and holding the Option key.
 
-Glyphs and glyph layers can be marked with color labels. Control-click or right-click a glyph to apply one of the twelve
-predefined colors.  
-Hold down the Option key to define or clear the color label of the current layer. The glyph color spans across the entire glyph cell.  
-The layer color is drawn on the right half of the cell if a glyph color is set or across the entire cell with a cut-out in the top left if no glyph
+Glyph Color spans across the entire glyph cell.  
+Layer Color is drawn on the right half of the cell if a Glyph Color is set, or across the entire cell with a cut-out in the top left if no glyph
 color is set.
 
 | Glyph Color | Layer Color | Glyph+Layer Color |
@@ -57,7 +57,7 @@ charcoal=Step 12
 _________________
 # CUSTOMIZE
 
-The whole point of Color Flow is that meaning and order of colors can be customized, so that each designer can build his own workflow.  
+The whole point of Color Flow is that meaning and order of colors can be customized, so that each designer can build their own workflow.  
 Color order can be modified by changing line order and color can be hidden by removing it's meaning. An example, with a customize `color.txt` is given below. 
 
 ```
@@ -87,9 +87,9 @@ Display in Color Flow UI:
 _________________
 # HOW IT WORK
 
-Each layer has is own Color Flow data, show in the panel.  
-Depending of checked items Layers Color Labels are set automaticaly.  
-Color set is the precedent color of the first uncheck checkbox. In the following example Layer Color is set to `Orange` because even if `Light Green` and `Yellow` are ✅ , `Brown` is uncheck, so color set is the color that precedes it.
+Each layer has is own Color Flow data, shown in the panel.  
+Layers Color Labels are set automaticaly depending on the status and order of each category checkbox.  
+The Color set is the precedent color of the first uncheck checkbox. In the following example Layer Color is set to `Orange` because even if `Light Green` and `Yellow` are ✅ , `Brown` is uncheck, so color set is the color that precedes it.
 
 <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup1.jpg" width="300"> <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup2.jpg" width="300"> 
 
