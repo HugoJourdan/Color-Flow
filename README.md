@@ -88,13 +88,11 @@ Display in Color Flow UI:
 _________________
 # HOW IT WORK
 
-Each layer has is own Color Flow data, shown in the panel.  
-Layers Color Labels are set automaticaly depending on the status and order of each category checkbox.  
-The Color set is the precedent color of the first uncheck checkbox. 
+Each layer has is own Color Flow data, shown in the panel. Layers Color Labels are set automaticaly depending on the status and order of each category checkbox. The Color set is the precedent color of the first uncheck checkbox. 
 
 In the following example Layer Color is set to `Orange` because even if `Light Green` and `Yellow` are ✅ , `Brown` is uncheck, so the color set is the color that precedes it.
 
-<img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup1.jpg" width="300"> <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup2.jpg" width="300"> 
+<img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup1.jpg" width="450">   <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup2.jpg" width="450"> 
 
 Shortcuts can be used to toggle checkboxes. To assign shortcuts, follow these steps:
 
@@ -111,6 +109,7 @@ Some extra features are accessible from the Action Button.
 * **Setup Color Flow based on Color Layers** : Set for all layer, Color Flow data based on its Layer Color (useful when you open for the first time a .glyph file with Layer Color already set)
 * **Reset Color Flow** : Reset for all layers, Color Flow data and Layer Color.
 * **Generate Color Flow Smart Filters** : Generate in the Filters UI section, a "Color Flow" folder containing filters to sort which layer has or has not a specific step checked.
+* **Copy Color Flow to Master** : Copy Color Flow data from a master to another.
 
 <br>
 
