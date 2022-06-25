@@ -33,9 +33,9 @@ Convenient use of Layer Color Label is to indicate progress status of a layer, a
 _________________
 # REQUIREMENTS
 
-Color Flow requires a `color.txt` file stored in either `~/Library/Application Support/Glyphs 3/info` or the same directory as the current Glyphs source file. Preference is given to the latter allowing for the sharing of the `color.txt` file with glyphs source files to retain labelling information between project collaborators. 
+Color Flow requires a `ColorNames.txt` file stored in either `~/Library/Application Support/Glyphs 3/info` or the same directory as the current Glyphs source file. Preference is given to the latter allowing for the sharing of the `ColorNames.txt` file with glyphs source files to retain labelling information between project collaborators. 
 
-The `color.txt` file requires the formatting `colorName=meaning`, with each key on a newline and with no space surrounding the '='.  
+The `ColorNames.txt` file requires the formatting `colorName=meaning`, with each key on a newline and with no space surrounding the '='.  
 An example, with the defined colorNames is given below. 
 
 ```
@@ -59,7 +59,7 @@ _________________
 # CUSTOMIZE
 
 The whole point of Color Flow is that meaning and order of colors can be customized, so that each designer can build their own workflow.  
-Color order can be modified by changing line order and color can be hidden by removing it's meaning. An example, with a customize `color.txt` is given below. 
+Color order can be modified by changing line order and color can be hidden by removing it's meaning. An example, with a customize `ColorNames.txt` is given below. 
 
 ```
 red=
