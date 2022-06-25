@@ -549,13 +549,13 @@ class ColorFlow(PalettePlugin):
 	#																									   #
 	#																									   #
 
-	# Find and read color.txt, if missing, create it
+	# Find and read ColorNames.txt, if missing, create it
 	@objc.python_method
 	def Get_Key_File(self):
 		keyFile = None
 		try:
 			thisDirPath = os.path.dirname(self.font.filepath)
-			localKeyFile = thisDirPath + '/color.txt'
+			localKeyFile = thisDirPath + '/ColorNames.txt'
 			if os.path.exists(localKeyFile):
 				keyFile = localKeyFile
 		except:
@@ -566,7 +566,7 @@ class ColorFlow(PalettePlugin):
 			os.mkdir(dirInfo)
 
 		if keyFile is None:
-			keyFile = os.path.expanduser('~/Library/Application Support/Glyphs 3/info/color.txt')
+			keyFile = os.path.expanduser('~/Library/Application Support/Glyphs 3/info/ColorNames.txt')
 
 		if not os.path.exists(keyFile):
 			f = open(keyFile,"w+")
@@ -576,7 +576,7 @@ class ColorFlow(PalettePlugin):
 		return keyFile
 
 
-	# Build Dic from color.txt content
+	# Build Dic from ColorNames.txt content
 	@objc.python_method
 	def Map_Keys(self, keyFile):
 
