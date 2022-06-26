@@ -239,6 +239,7 @@ class ColorFlow(PalettePlugin):
 						
 						yPos += 22
 		except:pass
+
 	# Detect if UI need to be update
 	@objc.python_method
 	def update(self, sender):
@@ -378,6 +379,11 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def CheckBox_Callback(self, sender):
 
+		color = sender.getTitle()
+		check = sender.get()
+		selectedMasterName = self.font.selectedFontMaster.name
+		firstMeaning = list(self.meaning.keys())[0]
+
 		for master in self.font.masters:
 			if master.name not in self.font.userData["com.hugojourdan.ColorFlow-master-data"]:
 
@@ -386,13 +392,10 @@ class ColorFlow(PalettePlugin):
 						glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
 				self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name] = self.Get_Dic_Layer_Color_Label(master.id)
 		
-		color = sender.getTitle()
-		check = sender.get()
-
 		for k, v in self.meaning.items():
 			if color == v:
 				color = k
-		selectedMasterName = self.font.selectedFontMaster.name
+		
 
 		for layer in self.font.selectedLayers:
 			if check == True and layer.userData["com.hugojourdan.ColorFlow"][color] == False:
@@ -406,7 +409,7 @@ class ColorFlow(PalettePlugin):
 			# Update LayerColor
 			for COLOR in self.meaning.keys():
 				
-				if layer.userData["com.hugojourdan.ColorFlow"]["0"] == False:
+				if layer.userData["com.hugojourdan.ColorFlow"][firstMeaning] == False:
 					layer.color = None
 					
 				if layer.userData["com.hugojourdan.ColorFlow"][COLOR] == True:
