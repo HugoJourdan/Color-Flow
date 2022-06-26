@@ -143,101 +143,102 @@ class ColorFlow(PalettePlugin):
 	# Update Palette UI
 	@objc.python_method
 	def Update_Plugin_UI(self):
-		yPos = 36
-
-		
-		#---------------------------------------------------------------------------#
-		# Update data for sorting in CF Smart Filter								#
-		#---------------------------------------------------------------------------#
 		try:
-			for layer in self.font.selectedLayers:
-				for k, v in layer.userData["com.hugojourdan.ColorFlow"].items():
-					if v == True:
-						layer.userData["com.hugojourdan.ColorFlow_Color_"+str(k)] = str(k)
-					else:
-						del layer.userData["com.hugojourdan.ColorFlow_Color_"+str(k)]
-		except:pass
+			yPos = 36
 
-		#---------------------------------------------------------------------------#
-		# Access, build data to update UI											#
-		#---------------------------------------------------------------------------#
-		selectedMasterName = self.font.selectedFontMaster.name
-		self.LayerColorLabel = self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterName]
-
-		for color in self.LayerColorLabel:
-			self.barWidthDic[color]= self.barWidth/len(self.font.glyphs)*self.LayerColorLabel[color]
-
-		#---------------------------------------------------------------------------#
-		# Updated element in UI														#
-		#---------------------------------------------------------------------------#
-		
-		# Update Master Name
-		if hasattr(self.paletteView.frame, "masterName"):
-				delattr(self.paletteView.frame, "masterName")
-
-		masterName = self.font.selectedFontMaster.name
-		if len(masterName) > 16:
-			masterName = masterName[0:16]+"…"
-		setattr(self.paletteView.frame, "masterName", TextBox((6, 2.6, 140, 20), masterName, alignment="left", sizeStyle='small'))
 			
+			#---------------------------------------------------------------------------#
+			# Update data for sorting in CF Smart Filter								#
+			#---------------------------------------------------------------------------#
+			try:
+				for layer in self.font.selectedLayers:
+					for k, v in layer.userData["com.hugojourdan.ColorFlow"].items():
+						if v == True:
+							layer.userData["com.hugojourdan.ColorFlow_Color_"+str(k)] = str(k)
+						else:
+							del layer.userData["com.hugojourdan.ColorFlow_Color_"+str(k)]
+			except:pass
 
-		for color, meaning in self.meaning.items():
+			#---------------------------------------------------------------------------#
+			# Access, build data to update UI											#
+			#---------------------------------------------------------------------------#
+			selectedMasterName = self.font.selectedFontMaster.name
+			self.LayerColorLabel = self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterName]
 
-			if hasattr(self.paletteView.frame, str(color)):
-				delattr(self.paletteView.frame, str(color))
-			if hasattr(self.paletteView.frame, str(color)+"box"):
-				delattr(self.paletteView.frame, str(color)+"box")
-			if hasattr(self.paletteView.frame, str(color)+"count"):
-				delattr(self.paletteView.frame, str(color)+"count")
+			for color in self.LayerColorLabel:
+				self.barWidthDic[color]= self.barWidth/len(self.font.glyphs)*self.LayerColorLabel[color]
 
-			if meaning:
+			#---------------------------------------------------------------------------#
+			# Updated element in UI														#
+			#---------------------------------------------------------------------------#
+			
+			# Update Master Name
+			if hasattr(self.paletteView.frame, "masterName"):
+					delattr(self.paletteView.frame, "masterName")
+
+			masterName = self.font.selectedFontMaster.name
+			if len(masterName) > 16:
+				masterName = masterName[0:16]+"…"
+			setattr(self.paletteView.frame, "masterName", TextBox((6, 2.6, 140, 20), masterName, alignment="left", sizeStyle='small'))
 				
-				if self.font.selectedLayers:
-					check = self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"][color]
 
-					if len(self.font.selectedLayers) > 1:
-						for layer in self.font.selectedLayers:
-							check = layer.userData["com.hugojourdan.ColorFlow"][color]
-							if check == False:
-								break 
+			for color, meaning in self.meaning.items():
 
-					# Draw Gray Bar if ◻️, Colored Bar if ✅
-					if check == False and color != None and self.barWidthDic[color] != 0:
-						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos+1-self.shift, self.barWidthDic[color]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(0,0,0,0.06)), cornerRadius=0, borderWidth=0))
+				if hasattr(self.paletteView.frame, str(color)):
+					delattr(self.paletteView.frame, str(color))
+				if hasattr(self.paletteView.frame, str(color)+"box"):
+					delattr(self.paletteView.frame, str(color)+"box")
+				if hasattr(self.paletteView.frame, str(color)+"count"):
+					delattr(self.paletteView.frame, str(color)+"count")
+
+				if meaning:
 					
-					if check == True and color != None and self.barWidthDic[color] != 0 and self.font.selectedLayers[0].color != int(color):
-						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos+1-self.shift, self.barWidthDic[color]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(0,0,0,0.06)), cornerRadius=0, borderWidth=0))
+					if self.font.selectedLayers:
+						check = self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"][color]
 
-					if check == True and color != None and self.barWidthDic[color] != 0 and self.font.selectedLayers[0].color == int(color) :
-						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos+1-self.shift, self.barWidthDic[color]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])), cornerRadius=0, borderWidth=0))
+						if len(self.font.selectedLayers) > 1:
+							for layer in self.font.selectedLayers:
+								check = layer.userData["com.hugojourdan.ColorFlow"][color]
+								if check == False:
+									break 
 
-					## Draw checkboxes
-					#if len(meaning) > 16:
-						#meaning = meaning[0:16]+"…"
-					setattr(self.paletteView.frame, str(color), CheckBox((12, yPos-self.shift, -10, 20), meaning, value=check, callback=self.CheckBox_Callback, sizeStyle='small'))
-					
-					# Replace Counter by ✅ if goal reached
-					if self.LayerColorLabel[color] >= len(self.font.glyphs):
-						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+5-self.shift, -6, 20), "✅", alignment="right", sizeStyle='mini'))
+						# Draw Gray Bar if ◻️, Colored Bar if ✅
+						if check == False and color != None and self.barWidthDic[color] != 0:
+							setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos+1-self.shift, self.barWidthDic[color]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(0,0,0,0.06)), cornerRadius=0, borderWidth=0))
+						
+						if check == True and color != None and self.barWidthDic[color] != 0 and self.font.selectedLayers[0].color != int(color):
+							setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos+1-self.shift, self.barWidthDic[color]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(0,0,0,0.06)), cornerRadius=0, borderWidth=0))
+
+						if check == True and color != None and self.barWidthDic[color] != 0 and self.font.selectedLayers[0].color == int(color) :
+							setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos+1-self.shift, self.barWidthDic[color]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])), cornerRadius=0, borderWidth=0))
+
+						## Draw checkboxes
+						#if len(meaning) > 16:
+							#meaning = meaning[0:16]+"…"
+						setattr(self.paletteView.frame, str(color), CheckBox((12, yPos-self.shift, -10, 20), meaning, value=check, callback=self.CheckBox_Callback, sizeStyle='small'))
+						
+						# Replace Counter by ✅ if goal reached
+						if self.LayerColorLabel[color] >= len(self.font.glyphs):
+							setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+5-self.shift, -6, 20), "✅", alignment="right", sizeStyle='mini'))
+						else:
+							setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+3-self.shift, -6, 20), f"{self.LayerColorLabel[color]}/{len(self.font.glyphs)}", alignment="right", sizeStyle='small'))
+						
+						yPos += 22
+
 					else:
-						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+3-self.shift, -6, 20), f"{self.LayerColorLabel[color]}/{len(self.font.glyphs)}", alignment="right", sizeStyle='small'))
-					
-					yPos += 22
+						if self.barWidthDic[color] != 0:
+							setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos+1-self.shift, self.barWidthDic[color]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])), cornerRadius=0, borderWidth=0))
 
-				else:
-					if self.barWidthDic[color] != 0:
-						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos+1-self.shift, self.barWidthDic[color]+0.01, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])), cornerRadius=0, borderWidth=0))
-
-					setattr(self.paletteView.frame, str(color), CheckBox((12, yPos-self.shift, -10, 20), meaning, value=False, callback=self.CheckBox_Callback, sizeStyle='small'))
-					
-					# Replace Counter by ✅ if goal reached
-					if self.LayerColorLabel[color] >= len(self.font.glyphs):
-						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+5-self.shift, -6, 20), "✅", alignment="right", sizeStyle='mini'))
-					else:
-						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+3-self.shift, -6, 20), f"{self.LayerColorLabel[color]}/{len(self.font.glyphs)}", alignment="right", sizeStyle='small'))
-					
-					yPos += 22
-
+						setattr(self.paletteView.frame, str(color), CheckBox((12, yPos-self.shift, -10, 20), meaning, value=False, callback=self.CheckBox_Callback, sizeStyle='small'))
+						
+						# Replace Counter by ✅ if goal reached
+						if self.LayerColorLabel[color] >= len(self.font.glyphs):
+							setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+5-self.shift, -6, 20), "✅", alignment="right", sizeStyle='mini'))
+						else:
+							setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+3-self.shift, -6, 20), f"{self.LayerColorLabel[color]}/{len(self.font.glyphs)}", alignment="right", sizeStyle='small'))
+						
+						yPos += 22
+		except:pass
 	# Detect if UI need to be update
 	@objc.python_method
 	def update(self, sender):
