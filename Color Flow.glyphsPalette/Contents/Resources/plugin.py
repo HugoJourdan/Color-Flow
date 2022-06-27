@@ -620,9 +620,12 @@ class ColorFlow(PalettePlugin):
 					colorMeaning = "None"
 				layerColorData[master.id][glyph.name] = colorMeaning
 
-		self.dataSaveLocation = f"{os.path.dirname(self.font.filepath)}/ColorFlow-Data.json"
-		with open(self.dataSaveLocation, 'w') as outfile:
-			json.dump(layerColorData, outfile)
+		if not self.font.userData["com.hugojourdan.ColorFlow-Report_Data"]:
+			self.font.userData["com.hugojourdan.ColorFlow-Report_Data"] = layerColorData
+
+		#self.dataSaveLocation = f"{os.path.dirname(self.font.filepath)}/ColorFlow-Data.json"
+		#with open(self.dataSaveLocation, 'w') as outfile:
+			#json.dump(layerColorData, outfile)
 
 	@objc.python_method
 	def Color_Flow_Report_PRINT(self, sender):
@@ -641,8 +644,7 @@ class ColorFlow(PalettePlugin):
 
 			#layerColorData = json.dumps(layerColorData)
 
-			f = open(self.dataSaveLocation)
-			DATA = json.load(f)
+			DATA = self.font.userData["com.hugojourdan.ColorFlow-Report_Data"]
 
 			LayerColorChanged = {}
 			for master, data in DATA.items():
