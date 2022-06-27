@@ -17,8 +17,9 @@ import os
 import codecs
 import AppKit
 import traceback
+import json
 
-
+from datetime import datetime
 from vanilla import *
 from AppKit import NSColor
 from GlyphsApp.plugins import *
@@ -68,7 +69,9 @@ class ColorFlow(PalettePlugin):
 
 		self.paletteView = Window((self.width, self.height + 10))
 		self.paletteView.frame = Group((0, 0, self.width, self.height))
-
+		if not Glyphs.defaults["com.hugojourdan.ColorFlow-Report"]:
+			Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] = "Enable Color Flow Report"
+			self.report = False
 		# Draw Action Button
 		self.paletteView.frame.actionPopUpButton = ActionButton((self.width-22, 0, 34, 19), 
 			[
@@ -76,6 +79,7 @@ class ColorFlow(PalettePlugin):
 			dict(title="Reset Color Flow", callback=self.Color_Flow_Reset),
 			dict(title="Generate Color Flow Smart Filters", callback=self.Generate_Color_Flow_Smart_Filter),
 			dict(title="Copy Color Flow to Master", callback=self.Copy_Color_Flow_To_Master),
+			dict(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback=self.Activate_Color_Flow_Report),
 			"----",
 			dict(title="Open Color Flow Documentation", callback=self.Open_Color_Flow_Documentation),
 			],
@@ -116,11 +120,16 @@ class ColorFlow(PalettePlugin):
 		Glyphs.addCallback(self.update, UPDATEINTERFACE)
 		self.font = Glyphs.font
 		self.init = False
-		try:
-			self.update(self._windowController)
-		except Exception:
-			print(traceback.format_exc())
+		self.startSession = datetime.now().strftime('%m/%d/%Y - %H:%M')
+		self.update(self._windowController)
+		self.Color_Flow_Report(self._windowController)
 
+
+		if Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] == "Disable Color Flow Report":
+			self.report = True
+			Glyphs.addCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
+
+		
 
 
 
@@ -245,9 +254,7 @@ class ColorFlow(PalettePlugin):
 							setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+3-self.shift, -6, 20), f"{self.LayerColorLabel[color]}/{len(self.font.glyphs)}", alignment="right", sizeStyle='small'))
 						
 						yPos += 22
-			print("bah alors")
-		except Exception:
-			print(traceback.format_exc())
+		except:pass
 	
 
 	# Detect if UI need to be update
@@ -305,7 +312,7 @@ class ColorFlow(PalettePlugin):
 				self.Update_Plugin_UI()
 				self.init = True
 				trigger = True
-			except Exception as e: print(e)
+			except:pass
 
 		try:
 			if self._windowController:
@@ -600,6 +607,112 @@ class ColorFlow(PalettePlugin):
 		
 		import webbrowser
 		webbrowser.open(URL)
+
+	@objc.python_method
+	def Color_Flow_Report(self, sender):
+		layerColorData = {}
+		for master in self.font.masters:
+			layerColorData[master.id] = {}
+			for glyph in self.font.glyphs:
+				try:
+					colorMeaning = self.meaning[str(glyph.layers[master.id].color)]
+				except:
+					colorMeaning = "None"
+				layerColorData[master.id][glyph.name] = colorMeaning
+
+		self.dataSaveLocation = f"{os.path.dirname(self.font.filepath)}/ColorFlow-Data.json"
+		with open(self.dataSaveLocation, 'w') as outfile:
+			json.dump(layerColorData, outfile)
+
+	@objc.python_method
+	def Color_Flow_Report_PRINT(self, sender):
+
+
+		try :
+			layerColorData = {}
+			for master in self.font.masters:
+				layerColorData[master.id] = {}
+				for glyph in self.font.glyphs:
+					try:
+						colorMeaning = self.meaning[str(glyph.layers[master.id].color)]
+					except:
+						colorMeaning = "None"
+					layerColorData[master.id][glyph.name] = colorMeaning
+
+			#layerColorData = json.dumps(layerColorData)
+
+			f = open(self.dataSaveLocation)
+			DATA = json.load(f)
+
+			LayerColorChanged = {}
+			for master, data in DATA.items():
+				LayerColorChanged[master] = {}
+				for glyph in data:
+					if glyph in layerColorData[master] and DATA[master][glyph] != layerColorData[master][glyph]:
+						LayerColorChanged[master][glyph] = f"{DATA[master][glyph]} → {layerColorData[master][glyph]}"
+
+			if not os.path.exists(f"{os.path.dirname(self.font.filepath)}/Color Flow Reports"):
+				os.mkdir(f"{os.path.dirname(self.font.filepath)}/Color Flow Reports")
+
+			dateNow = datetime.now()
+			saveLocation = f"{os.path.dirname(self.font.filepath)}/Color Flow Reports"
+			fileName = f"{self.font.familyName} – {dateNow.strftime('%m%d%Y-%H%M%S')}.txt"
+
+			with open(saveLocation+"/"+fileName, 'w') as f:
+				f.write(f"Session start : {self.startSession}\nSession stop : {dateNow.strftime('%m/%d/%Y - %H:%M')}\n\n")
+				for master, data in LayerColorChanged.items():
+					f.write(f"Master : {self.font.masters[master].name}\n-----------------------------------------------------\n")
+					for k, v in data.items():
+						f.write(f"{k} : {v}\n- - - - - - - - - - - - - - - - - - - - - - - - - - -\n")
+					f.write("\n=====================================================\n\n")
+			f.close()
+
+		except:pass
+
+		# with open('/Users/hugojourdan/Desktop/POUBELLE/DATA.json', 'w') as outfile:
+			# json.dump(layerColorData, outfile)
+
+	@objc.python_method
+	def Activate_Color_Flow_Report(self, sender):
+
+		if Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] == "Enable Color Flow Report":
+			self.report = True
+			Glyphs.addCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
+			Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] = "Disable Color Flow Report"
+
+			if hasattr(self.paletteView.frame, "actionPopUpButton"):
+				delattr(self.paletteView.frame, "actionPopUpButton")
+			self.paletteView.frame.actionPopUpButton = ActionButton((self.width-22, 0, 34, 19), 
+			[
+			dict(title="Setup Color Flow based on Color Layers", callback=self.Setup_Color_Flow),
+			dict(title="Reset Color Flow", callback=self.Color_Flow_Reset),
+			dict(title="Generate Color Flow Smart Filters", callback=self.Generate_Color_Flow_Smart_Filter),
+			dict(title="Copy Color Flow to Master", callback=self.Copy_Color_Flow_To_Master),
+			dict(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback=self.Activate_Color_Flow_Report),
+			"----",
+			dict(title="Open Color Flow Documentation", callback=self.Open_Color_Flow_Documentation),
+			],
+			sizeStyle='small')  
+
+		else:
+			self.report = False
+			Glyphs.removeCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
+			Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] = "Enable Color Flow Report" 
+
+			if hasattr(self.paletteView.frame, "actionPopUpButton"):
+				delattr(self.paletteView.frame, "actionPopUpButton")
+			self.paletteView.frame.actionPopUpButton = ActionButton((self.width-22, 0, 34, 19), 
+			[
+			dict(title="Setup Color Flow based on Color Layers", callback=self.Setup_Color_Flow),
+			dict(title="Reset Color Flow", callback=self.Color_Flow_Reset),
+			dict(title="Generate Color Flow Smart Filters", callback=self.Generate_Color_Flow_Smart_Filter),
+			dict(title="Copy Color Flow to Master", callback=self.Copy_Color_Flow_To_Master),
+			dict(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback=self.Activate_Color_Flow_Report),
+			"----",
+			dict(title="Open Color Flow Documentation", callback=self.Open_Color_Flow_Documentation),
+			],
+			sizeStyle='small')  
+
 
 	########################################################################################################
 	#																									   #
