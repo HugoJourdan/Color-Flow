@@ -110,6 +110,10 @@ Some extra features are accessible from the Action Button.
 * **Reset Color Flow** : Reset for all layers, Color Flow data and Layer Color.
 * **Generate Color Flow Smart Filters** : Generate in the Filters UI section, a "Color Flow" folder containing filters to sort which layer has or has not a specific step checked.
 * **Copy Color Flow to Master** : Copy Color Flow data from a master to another.
+* **Enbale/Disable Color Flow Report** : Enable or Disable Color Flow Report.  
+	Color Flow Report is a way to track Layer Color changes during a work session.
+	When enabled, it creates .txt file in a “Color Flow Reports” folder, next to your .glyph file.
+	This .txt file track all Layer Color changes during your work session. (a work session start when you open your file, and finish when you close it).
 
 <br>
 

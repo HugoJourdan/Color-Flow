@@ -16,8 +16,6 @@ import re
 import os
 import codecs
 import AppKit
-import traceback
-import json
 
 from datetime import datetime
 from vanilla import *
