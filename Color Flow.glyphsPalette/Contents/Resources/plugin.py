@@ -679,6 +679,9 @@ class ColorFlow(PalettePlugin):
 			self.report = True
 			Glyphs.addCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
 			Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] = "Disable Color Flow Report"
+			print("Color Flow Report enabled.\nWhen you will close your document, a .txt file will be generated in 'Color Flow Reports' folder located next to your Glyphs file")
+
+			Glyphs.showMacroWindow()
 
 			if hasattr(self.paletteView.frame, "actionPopUpButton"):
 				delattr(self.paletteView.frame, "actionPopUpButton")
@@ -698,6 +701,8 @@ class ColorFlow(PalettePlugin):
 			self.report = False
 			Glyphs.removeCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
 			Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] = "Enable Color Flow Report" 
+			print("Color Flow Report disabled")
+			Glyphs.showMacroWindow()
 
 			if hasattr(self.paletteView.frame, "actionPopUpButton"):
 				delattr(self.paletteView.frame, "actionPopUpButton")
