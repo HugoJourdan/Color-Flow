@@ -70,6 +70,7 @@ class ColorFlow(PalettePlugin):
 		if not Glyphs.defaults["com.hugojourdan.ColorFlow-Report"]:
 			Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] = "Enable Color Flow Report"
 			self.report = False
+
 		# Draw Action Button
 		self.paletteView.frame.actionPopUpButton = ActionButton((self.width-22, 0, 34, 19), 
 			[
@@ -717,10 +718,11 @@ class ColorFlow(PalettePlugin):
 	def Get_Key_File(self):
 		keyFile = None
 		try:
-			thisDirPath = os.path.dirname(self.font.filepath)
-			localKeyFile = thisDirPath + '/ColorNames.txt'
+			thisDirPath = os.path.dirname(Glyphs.font.filepath)
+			localKeyFile = thisDirPath + '/colorNames.txt'
 			if os.path.exists(localKeyFile):
 				keyFile = localKeyFile
+				print("local")
 		except:
 			pass
 
@@ -729,7 +731,7 @@ class ColorFlow(PalettePlugin):
 			os.mkdir(dirInfo)
 
 		if keyFile is None:
-			keyFile = os.path.expanduser('~/Library/Application Support/Glyphs 3/info/ColorNames.txt')
+			keyFile = os.path.expanduser('~/Library/Application Support/Glyphs 3/info/colorNames.txt')
 
 		if not os.path.exists(keyFile):
 			f = open(keyFile,"w+")
