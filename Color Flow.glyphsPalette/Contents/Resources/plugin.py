@@ -722,7 +722,6 @@ class ColorFlow(PalettePlugin):
 			localKeyFile = thisDirPath + '/colorNames.txt'
 			if os.path.exists(localKeyFile):
 				keyFile = localKeyFile
-				print("local")
 		except:
 			pass
 
