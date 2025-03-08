@@ -101,7 +101,9 @@ class ColorFlow(PalettePlugin):
 		yPos = 36
 		for k, v in self.meaning.items():
 			if v:
-				setattr(self.paletteView.frame, str(k) + "colorTag", Box((0, yPos + 1 - self.shift, 3, 16), fillColor=(NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
+				color_value = self.colorKeys.get(str(k))
+				color = NSColor.colorWithRed_green_blue_alpha_(*color_value) if color_value else None
+				setattr(self.paletteView.frame, str(k) + "colorTag", Box((0, yPos + 1 - self.shift, 3, 16), fillColor=(color), cornerRadius=0, borderWidth=0))
 				yPos += 22
 
 		# # Select a master if none is selected
@@ -762,19 +764,19 @@ class ColorFlow(PalettePlugin):
 	def Map_Keys(self, keyFile):
 		"""Build Dic from ColorNames.txt content"""
 		self.colourLabels = {}
-		if os.path.exists(keyFile):
-			with codecs.open(keyFile, "r", "utf-8") as file:
-				for line in file:
-					colour = re.match(r".*?(?=\=)", line).group(0)
-					label = re.search(r"(?<=\=).*", line).group(0)
-					self.colourLabels[colour] = label
-		switch = {}
+		if not os.path.exists(keyFile):
+			return self.colourLabels
+
 		replace = {"red": "0", "orange": "1", "brown": "2", "yellow": "3", "lightGreen": "4", "darkGreen": "5", "lightBlue": "6", "darkBlue": "7", "purple": "8", "magenta": "9", "lightGray": "10", "charcoal": "11"}
 
-		for k, v in self.colourLabels.items():
-			switch[replace[k]] = v
+		with codecs.open(keyFile, "r", "utf-8") as file:
+			for line in file:
+				colour = re.match(r".*?(?=\=)", line).group(0)
+				label = re.search(r"(?<=\=).*", line).group(0)
+				if colour in replace:
+					colour = replace[colour]
+				self.colourLabels[colour] = label
 
-		self.colourLabels = switch
 		return self.colourLabels
 
 
