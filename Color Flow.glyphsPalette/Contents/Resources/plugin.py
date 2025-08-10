@@ -474,7 +474,11 @@ class ColorFlow(PalettePlugin):
 					if not layer.color:
 						layer.userData["com.hugojourdan.ColorFlow"] = {x: False for x in layer.userData["com.hugojourdan.ColorFlow"]}
 						for k, v in self.meaning.items():
-							if int(k) != layer.color:
+							try:
+								k = int(k)
+							except:
+								pass
+							if k != layer.color:
 								layer.userData["com.hugojourdan.ColorFlow"][k] = True
 								self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterId][k] += 1
 							else:
