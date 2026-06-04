@@ -122,6 +122,22 @@ def count_states(states: list, order: list[str]) -> dict[str, int]:
     return counts
 
 
+def selection_signature(master_id, layer_states: list) -> tuple:
+    """Cheap, hashable fingerprint of what the palette renders.
+
+    ``layer_states`` is a list of ``(glyph_name, state_dict)``. Comparing the
+    returned tuple against the last one lets the high-frequency update() handler
+    early-return when nothing the UI depends on (master, selection, or any
+    selected layer's checkbox state) has changed. Order-independent within a
+    state; tolerates a ``None`` state.
+    """
+    items = tuple(
+        (name, tuple(sorted((str(key), bool(value)) for key, value in (state or {}).items())))
+        for name, state in layer_states
+    )
+    return (master_id, items)
+
+
 def layer_color_for_state(state: dict[str, bool], order: list[str]) -> int | None:
     """Native Glyphs ``layer.color`` for a checkbox state.
 

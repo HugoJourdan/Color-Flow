@@ -309,3 +309,29 @@ def test_count_states_follows_order_keys_only():
     # Keys outside `order` are ignored.
     states = [{"0": True, "99": True}]
     assert cc.count_states(states, ["0"]) == {"0": 1}
+
+
+# --------------------------------------------------------------------------- #
+# selection_signature — cheap fingerprint of what the palette renders, so
+# update() can early-return when nothing relevant changed.
+# --------------------------------------------------------------------------- #
+
+def test_selection_signature_changes_with_master_layer_or_state():
+    base = cc.selection_signature("m1", [("a", {"0": True})])
+    assert cc.selection_signature("m1", [("a", {"0": True})]) == base       # stable
+    assert cc.selection_signature("m2", [("a", {"0": True})]) != base       # master change
+    assert cc.selection_signature("m1", [("a", {"0": False})]) != base      # state change
+    assert cc.selection_signature("m1", [("b", {"0": True})]) != base       # selection change
+    assert cc.selection_signature("m1", []) != base                        # empty selection
+
+
+def test_selection_signature_is_order_independent_within_a_state():
+    a = cc.selection_signature("m1", [("g", {"0": True, "1": False})])
+    b = cc.selection_signature("m1", [("g", {"1": False, "0": True})])
+    assert a == b
+
+
+def test_selection_signature_tolerates_none_state():
+    assert cc.selection_signature("m1", [("g", None)]) == cc.selection_signature(
+        "m1", [("g", {})]
+    )
