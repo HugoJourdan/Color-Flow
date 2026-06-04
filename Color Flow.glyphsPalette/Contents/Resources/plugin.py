@@ -25,7 +25,7 @@ from GlyphsApp import *
 # Shared, GlyphsApp-free colorNames logic (also embedded into the shortcut
 # scripts by tools/generate_shortcuts.py). Glyphs puts this bundle's Resources/
 # dir on sys.path, so a plain absolute import works.
-import colorflow_colornames as colornames
+import colornames
 
 
 
@@ -634,7 +634,7 @@ class ColorFlow(PalettePlugin):
 
 	# Resolve colorNames.txt (per-font dir, else the shared info dir) and parse it
 	# into {"0".."11": label}. All parsing/key-file logic lives in the shared
-	# colorflow_colornames module so the palette and the shortcut scripts can
+	# colornames module so the palette and the shortcut scripts can
 	# never diverge (see tools/generate_shortcuts.py).
 	@objc.python_method
 	def Load_Meaning(self):

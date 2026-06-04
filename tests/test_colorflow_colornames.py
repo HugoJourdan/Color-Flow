@@ -7,7 +7,7 @@ palette plugin and the keyboard-shortcut scripts.
 
 import os
 
-import colorflow_colornames as cc
+import colornames as cc
 
 
 # --------------------------------------------------------------------------- #
