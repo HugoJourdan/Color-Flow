@@ -420,3 +420,34 @@ def test_render_key_file_round_trips_through_parse():
     m2, o2, _ = cc.parse_key_file(text)
     assert m2 == meaning
     assert o2 == order
+
+
+# --------------------------------------------------------------------------- #
+# write_color_names (label-edit persistence)
+# --------------------------------------------------------------------------- #
+
+def test_write_color_names_creates_file(tmp_path):
+    target = tmp_path / "info" / cc.KEY_FILE_NAME
+    assert cc.write_color_names(str(target), "red=R\n") is True
+    assert target.read_text() == "red=R\n"
+
+
+def test_write_color_names_replaces_a_broken_symlink(tmp_path):
+    missing = tmp_path / "gone.txt"
+    link = tmp_path / cc.KEY_FILE_NAME
+    os.symlink(str(missing), str(link))
+    assert cc.write_color_names(str(link), "red=R\n") is True
+    assert not os.path.islink(str(link))  # dangling link replaced by a real file
+    assert link.read_text() == "red=R\n"
+
+
+def test_write_color_names_round_trips_a_label_edit(tmp_path):
+    info = tmp_path / "info"
+    info.mkdir()
+    path = info / cc.KEY_FILE_NAME
+    path.write_text(cc.DEFAULT_COLOR_NAMES)
+    meaning, order, _ = cc.parse_key_file(path.read_text())
+    meaning[1] = "🦊 Spacing"  # rename Orange
+    assert cc.write_color_names(str(path), cc.render_key_file(meaning, order)) is True
+    reparsed, _, _ = cc.parse_key_file(path.read_text())
+    assert reparsed[1] == "🦊 Spacing"

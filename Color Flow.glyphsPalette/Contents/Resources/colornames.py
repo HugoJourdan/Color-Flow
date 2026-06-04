@@ -267,6 +267,25 @@ def get_key_file(font_dir: str | None, info_dir: str | None = None) -> str:
     return path
 
 
+def write_color_names(path: str, text: str) -> bool:
+    """Write ``text`` to ``path``, best-effort. Returns True on success.
+
+    If ``path`` is a *broken* symlink (its target is gone, e.g. an unmounted
+    shared file), the dangling link is replaced with a real file so the edit can
+    be saved locally. A valid symlink is written through to its target."""
+    try:
+        if os.path.islink(path) and not os.path.exists(path):
+            os.unlink(path)
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as key_file:
+            key_file.write(text)
+        return True
+    except OSError:
+        return False
+
+
 def read_color_names(path: str) -> str:
     """Read a colorNames.txt file as UTF-8 text (empty string if unreadable)."""
     try:

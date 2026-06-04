@@ -17,7 +17,7 @@ import AppKit
 
 from datetime import datetime
 from vanilla import *
-from AppKit import NSColor, NSMenuItem, NSOnState, NSOffState
+from AppKit import NSColor, NSMenuItem, NSOnState, NSOffState, NSClickGestureRecognizer
 from Foundation import NSObject
 from GlyphsApp.plugins import *
 from GlyphsApp.UI import *
@@ -129,6 +129,13 @@ class ColorFlow(PalettePlugin):
 			setattr(self.paletteView.frame, str(color)+"colorbar", colorBar)
 			check = CheckBox((12, yPos-self.shift, -10, 20), label, value=False, callback=self.CheckBox_Callback, sizeStyle='small')
 			setattr(self.paletteView.frame, str(color)+"check", check)
+			# Double-click the label to rename it inline (single-click still toggles).
+			try:
+				recognizer = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "labelDoubleClicked:")
+				recognizer.setNumberOfClicksRequired_(2)
+				self._ns_button(check).addGestureRecognizer_(recognizer)
+			except Exception:
+				pass
 			count = TextBox((self.width-50, yPos+3-self.shift, -6, 20), "", alignment="right", sizeStyle='small')
 			setattr(self.paletteView.frame, str(color)+"count", count)
 			self.rows[color] = {"gray": grayBar, "color": colorBar, "check": check, "count": count, "barY": barY}
@@ -300,6 +307,87 @@ class ColorFlow(PalettePlugin):
 		font = Glyphs.font
 		if font is not None:
 			self.fontview.set_mode(font, "Glyph")
+
+	# ------------------------------------------------------------------ inline label rename
+
+	@objc.python_method
+	def _ns_button(self, check):
+		if hasattr(check, "getNSButton"):
+			return check.getNSButton()
+		return check._nsObject
+
+	# ObjC selector fired by the per-row double-click gesture recognizer.
+	def labelDoubleClicked_(self, sender):
+		try:
+			view = sender.view()
+			for color, row in self.rows.items():
+				if self._ns_button(row["check"]) == view:
+					self._begin_rename(color)
+					return
+		except Exception:
+			import traceback
+			print("Color Flow [rename] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _begin_rename(self, color):
+		row = self.rows.get(color)
+		if row is None:
+			return
+		self._cancel_rename()
+		editY = row["barY"] - 1  # the checkbox's y (barY == y + 1 - shift)
+		editor = EditText((12, editY, -10, 20), self.meaning.get(color, ""),
+			callback=self._commit_rename, continuous=False, sizeStyle='small')
+		setattr(self.paletteView.frame, "renameEditor", editor)
+		self._renameColor = color
+		try:
+			field = editor.getNSTextField()
+			field.window().makeFirstResponder_(field)
+		except Exception:
+			pass
+
+	@objc.python_method
+	def _commit_rename(self, sender):
+		color = getattr(self, "_renameColor", None)
+		self._renameColor = None
+		if color is None:
+			self._cancel_rename()
+			return
+		newLabel = sender.get().strip()
+
+		font = Glyphs.font
+		fontDir = None
+		if font is not None and font.filepath:
+			fontDir = os.path.dirname(font.filepath)
+		path = colornames.resolve_key_file(fontDir)
+		text = colornames.read_color_names(path) or colornames.DEFAULT_COLOR_NAMES
+		meaningInt, orderInt, _ = colornames.parse_key_file(text)
+		intColor = int(color)
+		if newLabel:
+			meaningInt[intColor] = newLabel
+			if intColor not in orderInt:
+				orderInt.append(intColor)
+		colornames.write_color_names(path, colornames.render_key_file(meaningInt, orderInt))
+
+		self._cancel_rename()
+		self.meaning = self.Load_Meaning()
+		row = self.rows.get(color)
+		if row is not None and newLabel:
+			row["check"].setTitle(newLabel)
+		self._lastSignature = None
+		self.Update_Plugin_UI()
+		try:
+			if getattr(self, "fontview", None) and font is not None and self.fontview.is_enabled(font):
+				self.fontview.maybe_rebuild(font)
+		except Exception:
+			pass
+
+	@objc.python_method
+	def _cancel_rename(self):
+		if hasattr(self.paletteView.frame, "renameEditor"):
+			try:
+				delattr(self.paletteView.frame, "renameEditor")
+			except Exception:
+				pass
 
 
 	########################################################################################################
