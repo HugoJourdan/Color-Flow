@@ -17,7 +17,8 @@ import AppKit
 
 from datetime import datetime
 from vanilla import *
-from AppKit import NSColor
+from AppKit import NSColor, NSMenuItem, NSOnState, NSOffState
+from Foundation import NSObject
 from GlyphsApp.plugins import *
 from GlyphsApp.UI import *
 from GlyphsApp import *
@@ -26,6 +27,8 @@ from GlyphsApp import *
 # scripts by tools/generate_shortcuts.py). Glyphs puts this bundle's Resources/
 # dir on sys.path, so a plain absolute import works.
 import colornames
+# Font-View colour grouping engine (the merged Rainbow FontView half).
+import fontview
 
 
 
@@ -81,15 +84,7 @@ class ColorFlow(PalettePlugin):
 
 		# Draw Action Button
 		self.paletteView.frame.actionPopUpButton = ActionButton((self.width-22, 0, 34, 19),
-			[
-			dict(title="Setup Color Flow based on Color Layers", callback=self.Setup_Color_Flow),
-			dict(title="Reset Color Flow", callback=self.Color_Flow_Reset),
-			dict(title="Generate Color Flow Smart Filters", callback=self.Generate_Color_Flow_Smart_Filter),
-			dict(title="Copy Color Flow to Master", callback=self.Copy_Color_Flow_To_Master),
-			dict(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback=self.Activate_Color_Flow_Report),
-			"----",
-			dict(title="Open Color Flow Documentation", callback=self.Open_Color_Flow_Documentation),
-			],
+			self._action_menu_items(),
 			sizeStyle='small')
 
 		#---------------------------------------------------------------------------#
@@ -162,6 +157,149 @@ class ColorFlow(PalettePlugin):
 			self.report = True
 			Glyphs.addCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
 			self.reportCallbackRegistered = True
+
+		# Font-View colour grouping (the merged Rainbow FontView half). Opt-in and
+		# fully wrapped so a problem here can never stop the palette from loading.
+		self.fontview = fontview.FontViewGrouping()
+		self._pendingFont = None
+		try:
+			self._install_rainbow_menu()
+			self._rainbow_conflict_check()
+		except Exception:
+			import traceback
+			print("Color Flow [Rainbow setup] error:\n" + traceback.format_exc())
+
+
+	########################################################################################################
+	#																									   #
+	#	RAINBOW FONT VIEW																			       #
+	#																									   #
+	########################################################################################################
+
+	@objc.python_method
+	def _rainbow_menu_title(self):
+		return "Color Flow: Rainbow Font View"
+
+	# Shared action-menu definition (used by settings() and the report toggle
+	# rebuild) so the items never drift between the two.
+	@objc.python_method
+	def _action_menu_items(self):
+		return [
+			dict(title="Setup Color Flow based on Color Layers", callback=self.Setup_Color_Flow),
+			dict(title="Reset Color Flow", callback=self.Color_Flow_Reset),
+			dict(title="Generate Color Flow Smart Filters", callback=self.Generate_Color_Flow_Smart_Filter),
+			dict(title="Copy Color Flow to Master", callback=self.Copy_Color_Flow_To_Master),
+			dict(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback=self.Activate_Color_Flow_Report),
+			"----",
+			dict(title="Toggle Rainbow Font View", callback=self.Toggle_Rainbow),
+			dict(title="Rainbow Source: Layer Color", callback=self.Set_Rainbow_Layer_Source),
+			dict(title="Rainbow Source: Glyph Color", callback=self.Set_Rainbow_Glyph_Source),
+			"----",
+			dict(title="Open Color Flow Documentation", callback=self.Open_Color_Flow_Documentation),
+		]
+
+	@objc.python_method
+	def _install_rainbow_menu(self):
+		# Add a File-menu toggle, removing any stale copy from a previous load.
+		title = self._rainbow_menu_title()
+		self._rainbowMenuItem = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+			title, self.toggleRainbow_, "")
+		self._rainbowMenuItem.setTarget_(self)
+		barItem = Glyphs.menu[FILE_MENU]
+		submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
+		if submenu is not None:
+			for item in list(submenu.itemArray()):
+				if item.title() == title:
+					submenu.removeItem_(item)
+			submenu.addItem_(self._rainbowMenuItem)
+		else:
+			barItem.append(self._rainbowMenuItem)
+
+	@objc.python_method
+	def _teardown_rainbow_menu(self):
+		try:
+			title = self._rainbow_menu_title()
+			barItem = Glyphs.menu[FILE_MENU]
+			submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
+			if submenu is not None:
+				for item in list(submenu.itemArray()):
+					if item.title() == title:
+						submenu.removeItem_(item)
+		except Exception:
+			pass
+
+	@objc.python_method
+	def _rainbow_conflict_check(self):
+		# Warn once if the standalone Rainbow FontView is still installed (two
+		# plugins fighting over glyphOrder would conflict).
+		if Glyphs.defaults["com.hugojourdan.ColorFlow-RainbowConflictWarned"]:
+			return
+		barItem = Glyphs.menu[FILE_MENU]
+		submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
+		if submenu is None:
+			return
+		for item in list(submenu.itemArray()):
+			if item.title() == "Rainbow FontView":
+				Message(
+					"The standalone Rainbow FontView plugin is still installed.\n\n"
+					"Color Flow now includes Font-View grouping, so please disable or "
+					"remove Rainbow FontView to avoid them conflicting.",
+					title="Color Flow", OKButton=None)
+				Glyphs.defaults["com.hugojourdan.ColorFlow-RainbowConflictWarned"] = True
+				return
+
+	# --- ObjC selectors (no python_method decorator: called by menu / timer) ---
+
+	def validateMenuItem_(self, menuItem):
+		font = Glyphs.font
+		if font is None:
+			menuItem.setState_(NSOffState)
+			return False
+		try:
+			menuItem.setState_(NSOnState if self.fontview.is_enabled(font) else NSOffState)
+		except Exception:
+			menuItem.setState_(NSOffState)
+		return True
+
+	def toggleRainbow_(self, sender):
+		self.Toggle_Rainbow(sender)
+
+	def rainbowDebouncedRebuild_(self, sender):
+		font = self._pendingFont or Glyphs.font
+		self._pendingFont = None
+		if font is None:
+			return
+		try:
+			if self.fontview.is_enabled(font):
+				self.fontview.maybe_rebuild(font)
+		except Exception:
+			import traceback
+			print("Color Flow [Rainbow rebuild] error:\n" + traceback.format_exc())
+
+	# --- python callbacks (action menu + the ObjC toggle target) ---
+
+	@objc.python_method
+	def Toggle_Rainbow(self, sender):
+		font = Glyphs.font
+		if font is None:
+			return
+		try:
+			self.fontview.toggle(font)
+		except Exception:
+			import traceback
+			print("Color Flow [Rainbow toggle] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def Set_Rainbow_Layer_Source(self, sender):
+		font = Glyphs.font
+		if font is not None:
+			self.fontview.set_mode(font, "Layer")
+
+	@objc.python_method
+	def Set_Rainbow_Glyph_Source(self, sender):
+		font = Glyphs.font
+		if font is not None:
+			self.fontview.set_mode(font, "Glyph")
 
 
 	########################################################################################################
@@ -286,6 +424,20 @@ class ColorFlow(PalettePlugin):
 			self.font = self._windowController.documentFont()
 		if not self.font:
 			return
+
+		# Font-View grouping: cheap dirty-check, then debounce the (expensive)
+		# glyphOrder rebuild. Independent of the palette refresh below, and fully
+		# guarded so it can never break the palette.
+		try:
+			grouping = getattr(self, "fontview", None)
+			if grouping is not None and grouping.is_enabled(self.font) and grouping.is_dirty(self.font):
+				self._pendingFont = self.font
+				NSObject.cancelPreviousPerformRequestsWithTarget_selector_object_(
+					self, "rainbowDebouncedRebuild:", None)
+				self.performSelector_withObject_afterDelay_("rainbowDebouncedRebuild:", None, 0.15)
+		except Exception:
+			pass
+
 		try:
 			masterId = self.font.selectedFontMaster.id
 		except Exception:
@@ -577,51 +729,28 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def Activate_Color_Flow_Report(self, sender):
-
 		if Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] == "Enable Color Flow Report":
 			self.report = True
 			Glyphs.addCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
 			self.reportCallbackRegistered = True
 			Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] = "Disable Color Flow Report"
-			print("Color Flow Report enabled.\nWhen you will close your document, a .txt file will be generated in 'Color Flow Reports' folder located next to your Glyphs file")
-
-			Glyphs.showMacroWindow()
-
-			if hasattr(self.paletteView.frame, "actionPopUpButton"):
-				delattr(self.paletteView.frame, "actionPopUpButton")
-			self.paletteView.frame.actionPopUpButton = ActionButton((self.width-22, 0, 34, 19),
-			[
-			dict(title="Setup Color Flow based on Color Layers", callback=self.Setup_Color_Flow),
-			dict(title="Reset Color Flow", callback=self.Color_Flow_Reset),
-			dict(title="Generate Color Flow Smart Filters", callback=self.Generate_Color_Flow_Smart_Filter),
-			dict(title="Copy Color Flow to Master", callback=self.Copy_Color_Flow_To_Master),
-			dict(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback=self.Activate_Color_Flow_Report),
-			"----",
-			dict(title="Open Color Flow Documentation", callback=self.Open_Color_Flow_Documentation),
-			],
-			sizeStyle='small')
-
+			print("Color Flow Report enabled. A .txt report will be written to a 'Color Flow Reports' folder next to your .glyphs file when you close the document.")
 		else:
 			self.report = False
 			Glyphs.removeCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
 			self.reportCallbackRegistered = False
 			Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] = "Enable Color Flow Report"
-			print("Color Flow Report disabled")
-			Glyphs.showMacroWindow()
+			print("Color Flow Report disabled.")
+		Glyphs.showMacroWindow()
+		self._rebuild_action_button()
 
-			if hasattr(self.paletteView.frame, "actionPopUpButton"):
-				delattr(self.paletteView.frame, "actionPopUpButton")
-			self.paletteView.frame.actionPopUpButton = ActionButton((self.width-22, 0, 34, 19),
-			[
-			dict(title="Setup Color Flow based on Color Layers", callback=self.Setup_Color_Flow),
-			dict(title="Reset Color Flow", callback=self.Color_Flow_Reset),
-			dict(title="Generate Color Flow Smart Filters", callback=self.Generate_Color_Flow_Smart_Filter),
-			dict(title="Copy Color Flow to Master", callback=self.Copy_Color_Flow_To_Master),
-			dict(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback=self.Activate_Color_Flow_Report),
-			"----",
-			dict(title="Open Color Flow Documentation", callback=self.Open_Color_Flow_Documentation),
-			],
-			sizeStyle='small')
+	# Rebuild the action button (its Report item title reflects Glyphs.defaults).
+	@objc.python_method
+	def _rebuild_action_button(self):
+		if hasattr(self.paletteView.frame, "actionPopUpButton"):
+			delattr(self.paletteView.frame, "actionPopUpButton")
+		self.paletteView.frame.actionPopUpButton = ActionButton(
+			(self.width-22, 0, 34, 19), self._action_menu_items(), sizeStyle='small')
 
 
 	########################################################################################################
@@ -661,6 +790,8 @@ class ColorFlow(PalettePlugin):
 		if getattr(self, "reportCallbackRegistered", False):
 			Glyphs.removeCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
 			self.reportCallbackRegistered = False
+		# Remove the Rainbow Font View menu item this instance added.
+		self._teardown_rainbow_menu()
 
 
 	@objc.python_method
