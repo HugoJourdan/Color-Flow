@@ -138,6 +138,26 @@ def selection_signature(master_id, layer_states: list) -> tuple:
     return (master_id, items)
 
 
+def checked_state_for_color(color, order: list[str]) -> dict[str, bool]:
+    """Inverse of :func:`layer_color_for_state`.
+
+    Given a native ``layer.color`` (int or ``None``), return the checkbox state
+    that would derive it: every step up to and including ``color`` checked, the
+    rest unchecked. A ``None`` or hidden/unknown color yields all-unchecked.
+    """
+    state = {index: False for index in order}
+    if color is None:
+        return state
+    target = str(color)
+    if target not in state:
+        return state
+    for index in order:
+        state[index] = True
+        if index == target:
+            break
+    return state
+
+
 def layer_color_for_state(state: dict[str, bool], order: list[str]) -> int | None:
     """Native Glyphs ``layer.color`` for a checkbox state.
 

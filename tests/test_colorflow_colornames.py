@@ -335,3 +335,44 @@ def test_selection_signature_tolerates_none_state():
     assert cc.selection_signature("m1", [("g", None)]) == cc.selection_signature(
         "m1", [("g", {})]
     )
+
+
+# --------------------------------------------------------------------------- #
+# checked_state_for_color — inverse of layer_color_for_state, used by Setup to
+# derive checkbox state from an existing native layer color.
+# --------------------------------------------------------------------------- #
+
+def test_checked_state_marks_contiguous_prefix_up_to_color():
+    assert cc.checked_state_for_color(1, ["0", "1", "2"]) == {
+        "0": True, "1": True, "2": False
+    }
+
+
+def test_checked_state_all_true_when_color_is_last():
+    assert cc.checked_state_for_color(2, ["0", "1", "2"]) == {
+        "0": True, "1": True, "2": True
+    }
+
+
+def test_checked_state_first_only_when_color_is_first():
+    assert cc.checked_state_for_color(0, ["0", "1", "2"]) == {
+        "0": True, "1": False, "2": False
+    }
+
+
+def test_checked_state_all_false_for_none_color():
+    assert cc.checked_state_for_color(None, ["0", "1", "2"]) == {
+        "0": False, "1": False, "2": False
+    }
+
+
+def test_checked_state_all_false_for_hidden_color():
+    # color not present in the visible order (hidden) -> nothing checked.
+    assert cc.checked_state_for_color(5, ["0", "1"]) == {"0": False, "1": False}
+
+
+def test_checked_state_round_trips_with_layer_color_for_state():
+    order = ["0", "1", "2", "3"]
+    for color in (None, 0, 2, 3):
+        state = cc.checked_state_for_color(color, order)
+        assert cc.layer_color_for_state(state, order) == color

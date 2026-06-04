@@ -70,7 +70,6 @@ class ColorFlow(PalettePlugin):
 		self.lineSpacing = 20
 		self.shift = 10
 		self.barWidth = self.width+6
-		self.barWidthDic = {}
 		self.height = 22 * len([x for x in self.meaning.values() if x]) + 25
 		self.xPos = 9
 
@@ -173,21 +172,6 @@ class ColorFlow(PalettePlugin):
 	#																									   #
 	#																									   #
 
-	# Build Dic with number of LayerColor
-	@objc.python_method
-	def Get_Dic_Layer_Color_Label(self ,masterId):
-		try:
-			self.LayerColorLabel = {k:False for k in self.meaning.keys()}
-			for glyph in self.font.glyphs:
-				colorFlowData = glyph.layers[masterId].userData["com.hugojourdan.ColorFlow"].copy()
-
-				# colorFlowData = ["0":0, "1":0, "2":1, ..."]
-				for k, v in colorFlowData.items():
-					self.LayerColorLabel[k] += int(v)
-
-			return self.LayerColorLabel
-		except:pass
-
 	# Aggregate per-step counts for a master, derived from the real layer state.
 	@objc.python_method
 	def Recompute_Master_Counts(self, masterId):
@@ -222,6 +206,26 @@ class ColorFlow(PalettePlugin):
 			counts = self.Recompute_Master_Counts(masterId)
 			allCounts[masterId] = counts
 		return counts
+
+	# Store a counts dict for a master, repairing the container if corrupt.
+	@objc.python_method
+	def _store_master_counts(self, masterId, counts):
+		allCounts = self.font.userData["com.hugojourdan.ColorFlow-master-data"]
+		if not hasattr(allCounts, "keys"):
+			self.font.userData["com.hugojourdan.ColorFlow-master-data"] = {}
+			allCounts = self.font.userData["com.hugojourdan.ColorFlow-master-data"]
+		allCounts[masterId] = counts
+
+	# Mirror the checked steps into top-level userData keys that the generated
+	# Smart Filters query (Has / Has-not a given step).
+	@objc.python_method
+	def _sync_shadow_keys(self, layer, state):
+		for index in self.meaning.keys():
+			shadowKey = "com.hugojourdan.ColorFlow_Color_" + index
+			if index in state and state[index]:
+				layer.userData[shadowKey] = index
+			else:
+				del layer.userData[shadowKey]  # UserDataProxy: no-throw if absent
 
 	# Update Palette UI by mutating the widgets built once in settings().
 	@objc.python_method
@@ -328,12 +332,8 @@ class ColorFlow(PalettePlugin):
 					state = layer.userData[key]
 				state[color] = checked
 				layer.color = colornames.layer_color_for_state(state, order)
-			counts = self.Recompute_Master_Counts(masterId)
-			allCounts = self.font.userData["com.hugojourdan.ColorFlow-master-data"]
-			if not hasattr(allCounts, "keys"):
-				self.font.userData["com.hugojourdan.ColorFlow-master-data"] = {}
-				allCounts = self.font.userData["com.hugojourdan.ColorFlow-master-data"]
-			allCounts[masterId] = counts
+				self._sync_shadow_keys(layer, state)
+			self._store_master_counts(masterId, self.Recompute_Master_Counts(masterId))
 		finally:
 			self.font.enableUpdateInterface()
 
@@ -349,107 +349,108 @@ class ColorFlow(PalettePlugin):
 	#																									   #
 	#																									   #
 
-	# Setup ColorFlow based on Color Layers callback
+	# Setup Color Flow from each layer's existing native color.
 	@objc.python_method
 	def Setup_Color_Flow(self, sender):
-
-		print(f"✅ UPDATE > ColorFlow settings [{self.font.selectedFontMaster.name}]")
-
-		selectedMasterId = self.font.selectedFontMaster.id
-		self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterId] = {x:0 for x in self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterId]}
-
-		selectedLayers = self.font.selectedLayers
-
-		for glyph in self.font.glyphs:
-			for layer in glyph.layers:
-				if layer.isMasterLayer and layer.layerId == self.font.selectedFontMaster.id:
-					if layer.color != None:
-						layer.userData["com.hugojourdan.ColorFlow"] = {x: False for x in layer.userData["com.hugojourdan.ColorFlow"]}
-						for k, v in self.meaning.items():
-							if int(k) != layer.color:
-								layer.userData["com.hugojourdan.ColorFlow"][k]=True
-								self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterId][k]+= 1
-							else:
-								layer.userData["com.hugojourdan.ColorFlow"][k]=True
-								self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterId][k]+= 1
-								break
-					else:
-						layer.userData["com.hugojourdan.ColorFlow"] = {x: False for x in layer.userData["com.hugojourdan.ColorFlow"]}
-
+		if not self.font:
+			return
+		masterId = self.font.selectedFontMaster.id
+		order = list(self.meaning.keys())
+		key = "com.hugojourdan.ColorFlow"
+		self.font.disableUpdateInterface()
+		try:
+			for glyph in self.font.glyphs:
+				layer = glyph.layers[masterId]
+				if layer is None:
+					continue
+				state = colornames.checked_state_for_color(layer.color, order)
+				layer.userData[key] = state
+				self._sync_shadow_keys(layer, state)
+			self._store_master_counts(masterId, self.Recompute_Master_Counts(masterId))
+		finally:
+			self.font.enableUpdateInterface()
+		print(f"✅ Color Flow set up from layer colors [{self.font.selectedFontMaster.name}]")
 		Glyphs.showMacroWindow()
+		self._lastSignature = None
 		self.Update_Plugin_UI()
 
 
-	# Reset ColorFlow callback
+	# Reset Color Flow for the selected master (state, color, shadow keys, counts).
 	@objc.python_method
-	def Color_Flow_Reset(self,sender):
-
-		print(f"✅ RESET > ColorFlow settings [{self.font.selectedFontMaster.name}]")
-
-
-		for glyph in self.font.glyphs:
-			for layer in glyph.layers:
-				if layer.isMasterLayer and layer.layerId == self.font.selectedFontMaster.id:
-
-					for k in layer.userData.keys():
-						if k != "com.hugojourdan.ColorFlow":
-							del layer.userData[k]
-
-					layer.userData["com.hugojourdan.ColorFlow"] = {x: False for x in layer.userData["com.hugojourdan.ColorFlow"]}
-					layer.color = None
-				else:
-					pass
-
-		selectedMasterId = self.font.selectedFontMaster.id
-		#for master in self.font.masters:
-			#self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name] = {x:0 for x in self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.name]}
-		self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterId] = {x:0 for x in self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterId]}
-
+	def Color_Flow_Reset(self, sender):
+		if not self.font:
+			return
+		masterId = self.font.selectedFontMaster.id
+		order = list(self.meaning.keys())
+		key = "com.hugojourdan.ColorFlow"
+		self.font.disableUpdateInterface()
+		try:
+			for glyph in self.font.glyphs:
+				layer = glyph.layers[masterId]
+				if layer is None:
+					continue
+				# Only drop our own shadow keys — never other plugins' userData.
+				for existing in list(layer.userData.keys()):
+					if str(existing).startswith("com.hugojourdan.ColorFlow_Color_"):
+						del layer.userData[existing]
+				layer.userData[key] = colornames.default_state(order)
+				layer.color = None
+			self._store_master_counts(masterId, {index: 0 for index in order})
+		finally:
+			self.font.enableUpdateInterface()
+		print(f"✅ Color Flow reset [{self.font.selectedFontMaster.name}]")
 		Glyphs.showMacroWindow()
+		self._lastSignature = None
 		self.Update_Plugin_UI()
 
 
-	# Generate Color Flow smart filter
+	# Generate Color Flow smart filters in the Filter sidebar.
 	@objc.python_method
-	def Generate_Color_Flow_Smart_Filter(self,sender):
-
+	def Generate_Color_Flow_Smart_Filter(self, sender):
 		import plistlib
 
 		plistFile = os.path.expanduser("~/Library/Application Support/Glyphs 3/CustomFilter.plist")
+		shadowPrefix = "com.hugojourdan.ColorFlow_Color_"
 
 		try:
-
-			with open(plistFile, 'rb') as fp:
-
+			with open(plistFile, "rb") as fp:
 				pl = plistlib.load(fp)
-				trigger = True
-				layerColor = []
-				notlayerColor = []
+		except OSError:
+			Message(
+				"Could not read CustomFilter.plist.\nAdd any item in the Filter "
+				"section, restart Glyphs, then run this again.",
+				title="Color Flow", OKButton=None)
+			return
 
-				for item in pl:
-					if item["name"]=="Color Flow":
-						trigger = False
+		layerColor = []
+		notLayerColor = []
+		for index, label in self.meaning.items():
+			if not label:
+				continue
+			# The shadow keys are written by toggling / Setup; the predicate tests
+			# for their presence on a layer.
+			layerColor.append({"name": label, "predicate": f"'{shadowPrefix}{index}' IN layer.userData"})
+			notLayerColor.append({"name": label, "predicate": f"NOT '{shadowPrefix}{index}' IN layer.userData"})
 
-				for i in range (0,12):
-					layerColor.append({'name': self.meaning[str(i)], 'predicate': f"'{str(i)}' IN layer.userData"})
-					notlayerColor.append({'name': self.meaning[str(i)], 'predicate': f"NOT '{str(i)}' IN layer.userData"})
+		group = {"name": "Color Flow", "subGroup": [
+			{"name": "Has[...]", "subGroup": layerColor},
+			{"name": "Has not[...]", "subGroup": notLayerColor},
+		]}
 
-				pl.append({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
+		# Replace any existing Color Flow group rather than appending duplicates.
+		pl = [item for item in pl if item.get("name") != "Color Flow"]
+		pl.append(group)
 
-			if trigger == True:
-				with open(plistFile, 'wb') as fp:
-					plistlib.dump(pl, fp)
-				Message("Color Flow Smart Filters have been generated.\nRestart Glyph to see them", title='Alert', OKButton=None)
-			else:
+		try:
+			with open(plistFile, "wb") as fp:
+				plistlib.dump(pl, fp)
+		except OSError as error:
+			Message(f"Could not write CustomFilter.plist:\n{error}", title="Color Flow", OKButton=None)
+			return
 
-				if dialogs.askYesNo("Color Flow", "Color Flow filter already exist, do you want to overwrite them ?") == True:
-					with open(plistFile, 'wb') as fp:
-						pl.remove({'name': 'Color Flow', 'subGroup': [{'name': 'Has[...]', 'subGroup': layerColor}, {'name': 'Has not[...]', 'subGroup': notlayerColor}]})
-
-						plistlib.dump(pl, fp)
-					Message("Color Flow Smart Filters have been generated.\nRestart Glyph to update Filter UI", title='Alert', OKButton=None)
-		except:
-			Message("To Fix it, add an item in Filter Section and Restart Glyph. After that run again this function", title=".plist not writable", OKButton=None)
+		Message(
+			"Color Flow Smart Filters generated.\nRestart Glyphs to see them in the Filter list.",
+			title="Color Flow", OKButton=None)
 
 
 	# Copy Color Flow Data to Master
