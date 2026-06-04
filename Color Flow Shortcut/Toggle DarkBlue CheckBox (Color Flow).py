@@ -40,6 +40,16 @@ COLOR_ORDER = [
 # colorName -> index string ("0".."11").
 NAME_TO_INDEX = {name: str(index) for index, name in enumerate(COLOR_ORDER)}
 
+# Int-keyed views, used by the Font-View grouping (Glyphs' native .color is int).
+NAME_TO_COLOR = {name: index for index, name in enumerate(COLOR_ORDER)}
+COLOR_NAMES = {index: name for index, name in enumerate(COLOR_ORDER)}
+
+# The "no color label" bucket for Font-View grouping. Glyphs' .color is 0-11 or
+# None, so the sentinel sits outside that range; the parser maps the literal
+# "None" name to it and grouping always places it last.
+NO_COLOR = -1
+NONE_TOKEN = "None"
+
 # File the plugin and shortcuts both read. (The README documents this name too.)
 KEY_FILE_NAME = "colorNames.txt"
 
@@ -58,28 +68,53 @@ def _user_home() -> str:
     return home
 
 
+def _glyphs_support_dir() -> str:
+    """Glyphs 3 application-support directory.
+
+    Uses GlyphsApp's own ``GSGlyphsInfo.applicationSupportPath()`` when running
+    inside Glyphs (robust, sandbox-aware); falls back to a plain ``$HOME`` path
+    outside Glyphs so this module stays importable and unit-testable.
+    """
+    try:
+        from GlyphsApp import GSGlyphsInfo
+        path = os.path.expanduser(str(GSGlyphsInfo.applicationSupportPath()))
+        if path and not path.startswith("~"):
+            return path
+    except Exception:
+        pass
+    return os.path.join(_user_home(), "Library", "Application Support", "Glyphs 3")
+
+
 def default_info_dir() -> str:
     """Shared Glyphs info dir, resolved at call time (not import time)."""
-    return os.path.join(
-        _user_home(), "Library", "Application Support", "Glyphs 3", "info"
-    )
+    return os.path.join(_glyphs_support_dir(), "info")
 
-# Content written when no colorNames.txt exists yet. Unchanged from the original
-# default so existing users see the same labels.
+# Content written when no colorNames.txt exists yet. Emoji labels + a None bucket
+# (matches what Rainbow FontView writes, so the two halves agree out of the box).
 DEFAULT_COLOR_NAMES = (
-    "red=Red\n"
-    "orange=Orange\n"
-    "brown=Brown\n"
-    "yellow=Yellow\n"
-    "lightGreen=Light green\n"
-    "darkGreen=Dark green\n"
-    "lightBlue=Light blue\n"
-    "darkBlue=Dark blue\n"
-    "purple=Purple\n"
-    "magenta=Magenta\n"
-    "lightGray=Light Gray\n"
-    "charcoal=Charcoal"
+    "None=🫥 None\n"
+    "red=🚨 Red\n"
+    "orange=🦊 Orange\n"
+    "brown=🪵 Brown\n"
+    "yellow=🌼 Yellow\n"
+    "lightGreen=🍀 Light green\n"
+    "darkGreen=🫑 Dark green\n"
+    "lightBlue=💎 Light blue\n"
+    "darkBlue=🌀 Dark blue\n"
+    "purple=🔮 Purple\n"
+    "magenta=🌺 Magenta\n"
+    "lightGray=🏐 Light Gray\n"
+    "charcoal=🎱 Charcoal\n"
 )
+
+# Default display labels by int index (for Font-View section headers when the key
+# file omits an entry).
+DEFAULT_LABELS = {
+    0: "🚨 Red", 1: "🦊 Orange", 2: "🪵 Brown", 3: "🌼 Yellow",
+    4: "🍀 Light green", 5: "🫑 Dark green", 6: "💎 Light blue", 7: "🌀 Dark blue",
+    8: "🔮 Purple", 9: "🌺 Magenta", 10: "🏐 Light Gray", 11: "🎱 Charcoal",
+    NO_COLOR: "🫥 None",
+}
 
 
 def parse_color_names(text: str) -> dict[str, str]:
@@ -267,6 +302,114 @@ def load_meaning(font_dir: str | None, info_dir: str | None = None) -> dict[str,
         return parse_color_names(content)
     ensure_key_file(path)  # best-effort; a no-op if the path is a broken symlink
     return parse_color_names(DEFAULT_COLOR_NAMES)
+
+
+# --------------------------------------------------------------------------- #
+# Font-View grouping — int-keyed views ported from Rainbow FontView's core, so
+# the merged plugin groups the Font View into colour sections from the same file.
+# --------------------------------------------------------------------------- #
+
+
+def color_index_for_name(name: str) -> int | None:
+    """Resolve a key-file colour name to its int index, ``None`` if unknown.
+    The literal ``None`` token maps to :data:`NO_COLOR`."""
+    if name == NONE_TOKEN:
+        return NO_COLOR
+    return NAME_TO_COLOR.get(name)
+
+
+def parse_key_file(text: str) -> tuple[dict[int, str], list[int], list[str]]:
+    """Parse colorNames.txt into ``(meaning, order, rejected)``, int-keyed.
+
+    ``meaning`` maps an int index (0-11 or :data:`NO_COLOR`) to its label;
+    ``order`` lists indices in file order (section order); ``rejected`` collects
+    unrecognised colour names. Same tolerant rules as :func:`parse_color_names`,
+    but the ``None`` bucket is kept."""
+    meaning: dict[int, str] = {}
+    order: list[int] = []
+    rejected: list[str] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name_part, label_part = line.split("=", 1)
+        name = name_part.strip()
+        label = label_part.strip()
+        if not name or not label:
+            continue
+        index = color_index_for_name(name)
+        if index is None:
+            rejected.append(name)
+            continue
+        if index not in meaning:
+            meaning[index] = label
+            order.append(index)
+    return meaning, order, rejected
+
+
+def label_for(index: int, meaning: dict[int, str]) -> str:
+    """Display label for an int colour index, falling back to the built-in default."""
+    if index in meaning:
+        return meaning[index]
+    if index in DEFAULT_LABELS:
+        return DEFAULT_LABELS[index]
+    return f"Color {index}"
+
+
+def section_order(present: set[int], order: list[int]) -> list[int]:
+    """Section sequence for the colours present in the font. Key-file order first,
+    then remaining present colours numerically; :data:`NO_COLOR` last unless the
+    key file positioned it explicitly."""
+    listed = [index for index in order if index in present]
+    listed_set = set(listed)
+    remaining = sorted(
+        index for index in present if index not in listed_set and index != NO_COLOR
+    )
+    result = listed + remaining
+    if NO_COLOR in present and NO_COLOR not in listed_set:
+        result.append(NO_COLOR)
+    return result
+
+
+def build_glyph_order(
+    glyph_colors: list[tuple[str, int | None]],
+    meaning: dict[int, str],
+    order: list[int],
+    header: str = "#Color Flow",
+) -> list[str]:
+    """Build the ``glyphOrder`` custom-parameter value grouping glyphs by colour.
+    ``glyph_colors`` is ``(glyph_name, color_index_or_None)`` in font order."""
+    buckets: dict[int, list[str]] = {}
+    for name, color in glyph_colors:
+        index = NO_COLOR if color is None else color
+        buckets.setdefault(index, []).append(name)
+    code: list[str] = [header]
+    for index in section_order(set(buckets), order):
+        code.append(f"**{label_for(index, meaning)}**")
+        code.extend(buckets[index])
+    return code
+
+
+def render_key_file(meaning: dict[int, str], order: list[int]) -> str:
+    """Serialise an int-keyed meaning/order mapping back to colorNames.txt text,
+    preserving order (used to persist inline label edits)."""
+    seen: set[int] = set()
+    sequence: list[int] = []
+    for index in order:
+        if index not in seen:
+            sequence.append(index)
+            seen.add(index)
+    for index in sorted(meaning):
+        if index not in seen:
+            sequence.append(index)
+            seen.add(index)
+    lines: list[str] = []
+    for index in sequence:
+        name = NONE_TOKEN if index == NO_COLOR else COLOR_NAMES.get(index)
+        if name is None:
+            continue
+        lines.append(f"{name}={label_for(index, meaning)}")
+    return "\n".join(lines) + "\n"
 
 
 # ---------------------------------------------------------------------------

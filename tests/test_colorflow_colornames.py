@@ -27,13 +27,14 @@ def test_name_to_index_maps_each_color_to_its_string_index():
     assert len(cc.NAME_TO_INDEX) == 12
 
 
-def test_default_content_parses_to_the_twelve_default_labels():
+def test_default_content_parses_to_the_twelve_emoji_default_labels():
+    # parse_color_names drops the leading None= line, leaving the 12 colours.
     parsed = cc.parse_color_names(cc.DEFAULT_COLOR_NAMES)
     assert parsed == {
-        "0": "Red", "1": "Orange", "2": "Brown", "3": "Yellow",
-        "4": "Light green", "5": "Dark green", "6": "Light blue",
-        "7": "Dark blue", "8": "Purple", "9": "Magenta",
-        "10": "Light Gray", "11": "Charcoal",
+        "0": "🚨 Red", "1": "🦊 Orange", "2": "🪵 Brown", "3": "🌼 Yellow",
+        "4": "🍀 Light green", "5": "🫑 Dark green", "6": "💎 Light blue",
+        "7": "🌀 Dark blue", "8": "🔮 Purple", "9": "🌺 Magenta",
+        "10": "🏐 Light Gray", "11": "🎱 Charcoal",
     }
 
 
@@ -376,3 +377,46 @@ def test_checked_state_round_trips_with_layer_color_for_state():
     for color in (None, 0, 2, 3):
         state = cc.checked_state_for_color(color, order)
         assert cc.layer_color_for_state(state, order) == color
+
+
+# --------------------------------------------------------------------------- #
+# Font-View grouping (int-keyed parser + builders)
+# --------------------------------------------------------------------------- #
+
+def test_parse_key_file_is_int_keyed_with_none_bucket_and_order():
+    meaning, order, rejected = cc.parse_key_file("None=Z\npurple=P\nlightGreen=G")
+    assert meaning == {cc.NO_COLOR: "Z", 8: "P", 4: "G"}
+    assert order == [cc.NO_COLOR, 8, 4]
+    assert rejected == []
+
+
+def test_parse_key_file_collects_rejected_names():
+    meaning, order, rejected = cc.parse_key_file("pink=Nope\nred=R")
+    assert meaning == {0: "R"}
+    assert rejected == ["pink"]
+
+
+def test_label_for_falls_back_to_default():
+    assert cc.label_for(0, {}) == "🚨 Red"
+    assert cc.label_for(0, {0: "Custom"}) == "Custom"
+
+
+def test_section_order_lists_then_remaining_then_none_last():
+    assert cc.section_order({0, 4, 8, cc.NO_COLOR}, [8, 0]) == [8, 0, 4, cc.NO_COLOR]
+
+
+def test_build_glyph_order_groups_with_headers_in_font_order():
+    glyph_colors = [("a", 0), ("b", None), ("c", 0)]
+    meaning = {0: "Red", cc.NO_COLOR: "None"}
+    code = cc.build_glyph_order(glyph_colors, meaning, [0], header="#CF")
+    assert code == ["#CF", "**Red**", "a", "c", "**None**", "b"]
+
+
+def test_render_key_file_round_trips_through_parse():
+    meaning = {8: "Outline", 4: "Anchors", cc.NO_COLOR: "None"}
+    order = [8, 4, cc.NO_COLOR]
+    text = cc.render_key_file(meaning, order)
+    assert text == "purple=Outline\nlightGreen=Anchors\nNone=None\n"
+    m2, o2, _ = cc.parse_key_file(text)
+    assert m2 == meaning
+    assert o2 == order
