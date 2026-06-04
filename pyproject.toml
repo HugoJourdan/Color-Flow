@@ -1,0 +1,13 @@
+[project]
+name = "color-flow-dev"
+version = "0.0.0"
+description = "Dev tooling and tests for the Color Flow Glyphs plugin (not shipped in the .glyphsPalette bundle)."
+requires-python = ">=3.9"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+# This repo is a Glyphs plugin, not an installable Python package — only its
+# pure-logic modules are unit-tested. Tell uv not to try to build/install it.
+[tool.uv]
+package = false

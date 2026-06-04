@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# uv / virtualenv
+.venv/
+
+# macOS
+.DS_Store
+
+# Stray Glyphs support tree accidentally created by no-$HOME test runs
+/Library/
