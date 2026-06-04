@@ -12,9 +12,7 @@ from __future__ import division, print_function, unicode_literals
 #######################################################
 
 
-import re
 import os
-import codecs
 import AppKit
 
 from datetime import datetime
@@ -23,6 +21,11 @@ from AppKit import NSColor
 from GlyphsApp.plugins import *
 from GlyphsApp.UI import *
 from GlyphsApp import *
+
+# Shared, GlyphsApp-free colorNames logic (also embedded into the shortcut
+# scripts by tools/generate_shortcuts.py). Glyphs puts this bundle's Resources/
+# dir on sys.path, so a plain absolute import works.
+import colorflow_colornames as colornames
 
 
 
@@ -55,7 +58,13 @@ class ColorFlow(PalettePlugin):
 						"10":(0.50, 0.50, 0.50, 0.5),
 						"11":(0.25, 0.25, 0.25, 0.5)
 						}
-		self.meaning = self.Map_Keys(self.Get_Key_File())
+		# A colorNames.txt problem must never crash plugin load — degrade to an
+		# empty palette instead of taking the whole plugin down.
+		try:
+			self.meaning = self.Load_Meaning()
+		except Exception as error:
+			print(f"Color Flow: could not load colorNames.txt ({error}); starting empty.")
+			self.meaning = {}
 		self.width = 160
 		self.rectHeight = 10
 		self.lineSpacing = 20
@@ -119,6 +128,7 @@ class ColorFlow(PalettePlugin):
 		Glyphs.addCallback(self.update, UPDATEINTERFACE)
 		self.font = Glyphs.font
 		self.init = False
+		self.reportCallbackRegistered = False
 		self.startSession = datetime.now().strftime('%m/%d/%Y - %H:%M')
 		self.update(self._windowController)
 		self.Color_Flow_Report(self._windowController)
@@ -127,6 +137,7 @@ class ColorFlow(PalettePlugin):
 		if Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] == "Disable Color Flow Report":
 			self.report = True
 			Glyphs.addCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
+			self.reportCallbackRegistered = True
 
 
 	########################################################################################################
@@ -152,6 +163,41 @@ class ColorFlow(PalettePlugin):
 			return self.LayerColorLabel
 		except:pass
 
+	# Aggregate per-step counts for a master, derived from the real layer state.
+	@objc.python_method
+	def Recompute_Master_Counts(self, masterId):
+		order = list(self.meaning.keys())
+		states = []
+		for glyph in self.font.glyphs:
+			try:
+				state = glyph.layers[masterId].userData["com.hugojourdan.ColorFlow"]
+			except Exception:
+				state = None
+			states.append(state if state else {})
+		return colornames.count_states(states, order)
+
+	# Return a valid counts dict for the master, repairing it in place when the
+	# persisted value is missing, corrupt (e.g. a serialized None "<null>"), or
+	# has drifted from the current colorNames keys.
+	@objc.python_method
+	def Get_Master_Counts(self, masterId):
+		userData = self.font.userData
+		allCounts = userData["com.hugojourdan.ColorFlow-master-data"]
+		if not hasattr(allCounts, "keys"):
+			userData["com.hugojourdan.ColorFlow-master-data"] = {}
+			allCounts = userData["com.hugojourdan.ColorFlow-master-data"]
+		counts = allCounts[masterId] if masterId in allCounts else None
+		needsRecompute = not hasattr(counts, "keys")
+		if not needsRecompute:
+			for key in self.meaning.keys():
+				if key not in counts:
+					needsRecompute = True
+					break
+		if needsRecompute:
+			counts = self.Recompute_Master_Counts(masterId)
+			allCounts[masterId] = counts
+		return counts
+
 	# Update Palette UI
 	@objc.python_method
 	def Update_Plugin_UI(self):
@@ -175,10 +221,12 @@ class ColorFlow(PalettePlugin):
 			# Access, build data to update UI											#
 			#---------------------------------------------------------------------------#
 			selectedMasterId = self.font.selectedFontMaster.id
-			self.LayerColorLabel = self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterId]
+			self.LayerColorLabel = self.Get_Master_Counts(selectedMasterId)
 
-			for color in self.LayerColorLabel:
-				self.barWidthDic[color]= self.barWidth/len(self.font.glyphs)*self.LayerColorLabel[color]
+			glyphCount = len(self.font.glyphs)
+			for color in self.meaning.keys():
+				count = self.LayerColorLabel[color] if color in self.LayerColorLabel else 0
+				self.barWidthDic[color] = (self.barWidth / glyphCount * count) if glyphCount else 0
 
 			#---------------------------------------------------------------------------#
 			# Updated element in UI														#
@@ -250,7 +298,9 @@ class ColorFlow(PalettePlugin):
 							setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+3-self.shift, -6, 20), f"{self.LayerColorLabel[color]}/{len(self.font.glyphs)}", alignment="right", sizeStyle='small'))
 
 						yPos += 22
-		except:pass
+		except:
+			import traceback
+			print("Color Flow [Update_Plugin_UI] error:\n" + traceback.format_exc())
 
 	# Detect if UI need to be update
 	@objc.python_method
@@ -324,6 +374,15 @@ class ColorFlow(PalettePlugin):
 						if not glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"]:
 							glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
 					self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.id] = self.Get_Dic_Layer_Color_Label(master.id)
+
+					masterName = master.name
+					for master in self.font.masters:
+						fromMasterID = master.id
+						break
+
+					self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.id] = self.font.userData["com.hugojourdan.ColorFlow-master-data"][fromMasterID]
+					print("Freeze ?")
+
 					self.Update_Plugin_UI()
 		except:pass
 
@@ -404,11 +463,15 @@ class ColorFlow(PalettePlugin):
 
 		for master in self.font.masters:
 			if master.id not in self.font.userData["com.hugojourdan.ColorFlow-master-data"]:
+				print("master.name")
 
 				for glyph in self.font.glyphs:
 					if not glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"]:
 						glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"] = {color:False for color in self.meaning.keys()}
-				self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.id] = self.Get_Dic_Layer_Color_Label(master.id)
+
+				# self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.id] = self.Get_Dic_Layer_Color_Label(master.id)
+
+
 
 		for k, v in self.meaning.items():
 			if color == v:
@@ -418,10 +481,10 @@ class ColorFlow(PalettePlugin):
 		for layer in self.font.selectedLayers:
 			if check == True and layer.userData["com.hugojourdan.ColorFlow"][color] == False:
 				self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterID][color]+= 1
-				layer.userData["com.hugojourdan.ColorFlow"][color]= True
+				layer.userData["com.hugojourdan.ColorFlow"][color]= 1
 			if check == False and layer.userData["com.hugojourdan.ColorFlow"][color] == True:
 				self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterID][color]-= 1
-				layer.userData["com.hugojourdan.ColorFlow"][color]= False
+				layer.userData["com.hugojourdan.ColorFlow"][color]= 0
 
 
 			# Update LayerColor
@@ -580,13 +643,22 @@ class ColorFlow(PalettePlugin):
 			if master.name == toMaster:
 				toMasterID = master.id
 
-		self.font.userData["com.hugojourdan.ColorFlow-master-data"][toMasterID] = self.font.userData["com.hugojourdan.ColorFlow-master-data"][fromMasterID]
+		if fromMasterID is None or toMasterID is None or fromMasterID == toMasterID:
+			return
 
-
+		# Copy by value, never by reference: each master must own an independent
+		# dict, otherwise editing one master's checkboxes mutates the other's.
+		masterData = self.font.userData["com.hugojourdan.ColorFlow-master-data"]
+		if masterData is not None and fromMasterID in masterData:
+			masterData[toMasterID] = dict(masterData[fromMasterID])
 
 		for glyph in self.font.glyphs:
 			glyph.layers[toMasterID].color = glyph.layers[fromMasterID].color
-			glyph.layers[toMasterID].userData["com.hugojourdan.ColorFlow"] = glyph.layers[fromMasterID].userData["com.hugojourdan.ColorFlow"]
+			fromState = glyph.layers[fromMasterID].userData["com.hugojourdan.ColorFlow"]
+			if fromState:
+				glyph.layers[toMasterID].userData["com.hugojourdan.ColorFlow"] = dict(fromState)
+
+		self.Update_Plugin_UI()
 
 	@objc.python_method
 	def Open_Color_Flow_Documentation( self, sender ):
@@ -655,7 +727,6 @@ class ColorFlow(PalettePlugin):
 					for k, v in data.items():
 						f.write(f"{k} : {v}\n- - - - - - - - - - - - - - - - - - - - - - - - - - -\n")
 					f.write("\n=====================================================\n\n")
-			f.close()
 
 		except:pass
 
@@ -668,6 +739,7 @@ class ColorFlow(PalettePlugin):
 		if Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] == "Enable Color Flow Report":
 			self.report = True
 			Glyphs.addCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
+			self.reportCallbackRegistered = True
 			Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] = "Disable Color Flow Report"
 			print("Color Flow Report enabled.\nWhen you will close your document, a .txt file will be generated in 'Color Flow Reports' folder located next to your Glyphs file")
 
@@ -690,6 +762,7 @@ class ColorFlow(PalettePlugin):
 		else:
 			self.report = False
 			Glyphs.removeCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
+			self.reportCallbackRegistered = False
 			Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] = "Enable Color Flow Report"
 			print("Color Flow Report disabled")
 			Glyphs.showMacroWindow()
@@ -717,52 +790,17 @@ class ColorFlow(PalettePlugin):
 	#																									   #
 	#																									   #
 
-	# Find and read ColorNames.txt, if missing, create it
+	# Resolve colorNames.txt (per-font dir, else the shared info dir) and parse it
+	# into {"0".."11": label}. All parsing/key-file logic lives in the shared
+	# colorflow_colornames module so the palette and the shortcut scripts can
+	# never diverge (see tools/generate_shortcuts.py).
 	@objc.python_method
-	def Get_Key_File(self):
-		keyFile = None
-		try:
-			thisDirPath = os.path.dirname(Glyphs.font.filepath)
-			localKeyFile = thisDirPath + '/colorNames.txt'
-			if os.path.exists(localKeyFile):
-				keyFile = localKeyFile
-		except:
-			pass
-
-		dirInfo = os.path.expanduser("~/Library/Application Support/Glyphs 3/info")
-		if not os.path.exists(dirInfo):
-			os.mkdir(dirInfo)
-
-		if keyFile is None:
-			keyFile = os.path.expanduser('~/Library/Application Support/Glyphs 3/info/colorNames.txt')
-
-		if not os.path.exists(keyFile):
-			f = open(keyFile,"w+")
-			f.write("red=Red\norange=Orange\nbrown=Brown\nyellow=Yellow\nlightGreen=Light green\ndarkGreen=Dark green\nlightBlue=Light blue\ndarkBlue=Dark blue\npurple=Purple\nmagenta=Magenta\nlightGray=Light Gray\ncharcoal=Charcoal")
-		else:
-			pass
-		return keyFile
-
-
-	# Build Dic from ColorNames.txt content
-	@objc.python_method
-	def Map_Keys(self, keyFile):
-
-		self.colourLabels = {}
-		if os.path.exists(keyFile):
-			with codecs.open(keyFile, "r", "utf-8") as file:
-				for line in file:
-					colour = re.match(r".*?(?=\=)", line).group(0)
-					label = re.search(r"(?<=\=).*", line).group(0)
-					self.colourLabels[colour] = label
-		switch = {}
-		replace = {"red":"0", "orange":"1", "brown":"2", "yellow":"3", "lightGreen":"4", "darkGreen":"5", "lightBlue":"6", "darkBlue":"7", "purple":"8", "magenta":"9", "lightGray":"10", "charcoal":"11"}
-
-		for k, v in self.colourLabels.items():
-			switch[replace[k]] = v
-
-		self.colourLabels = switch
-		return self.colourLabels
+	def Load_Meaning(self):
+		fontDir = None
+		font = Glyphs.font
+		if font is not None and font.filepath:
+			fontDir = os.path.dirname(font.filepath)
+		return colornames.load_meaning(fontDir)
 
 
 	########################################################################################################
@@ -776,6 +814,11 @@ class ColorFlow(PalettePlugin):
 	def __del__(self):
 		# Delete callbacks when Glyphs quits, otherwise it'll crash :(
 		Glyphs.removeCallback(self.update)
+		# The report callback (DOCUMENTCLOSED) is registered conditionally, so it
+		# must be removed here too or it leaks and can crash on close/quit.
+		if getattr(self, "reportCallbackRegistered", False):
+			Glyphs.removeCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
+			self.reportCallbackRegistered = False
 
 
 	@objc.python_method
