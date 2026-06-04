@@ -64,7 +64,7 @@ def _glyphs_support_dir() -> str:
     outside Glyphs so this module stays importable and unit-testable.
     """
     try:
-        from GlyphsApp import GSGlyphsInfo
+        from GlyphsApp import GSGlyphsInfo  # type: ignore[import]  # Glyphs-only
         path = os.path.expanduser(str(GSGlyphsInfo.applicationSupportPath()))
         if path and not path.startswith("~"):
             return path

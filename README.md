@@ -33,9 +33,9 @@ Convenient use of Layer Color Label is to indicate progress status of a layer, a
 _________________
 # REQUIREMENTS
 
-Color Flow requires a `ColorNames.txt` file stored in either `~/Library/Application Support/Glyphs 3/info` or the same directory as the current Glyphs source file. Preference is given to the latter allowing for the sharing of the `ColorNames.txt` file with glyphs source files to retain labelling information between project collaborators. 
+Color Flow requires a `colorNames.txt` file stored in either `~/Library/Application Support/Glyphs 3/info` or the same directory as the current Glyphs source file. Preference is given to the latter allowing for the sharing of the `colorNames.txt` file with glyphs source files to retain labelling information between project collaborators. 
 
-The `ColorNames.txt` file requires the formatting `colorName=meaning`, with each key on a newline and with no space surrounding the '='.  
+The `colorNames.txt` file requires the formatting `colorName=meaning`, with each key on a newline and with no space surrounding the '='.  
 An example, with the defined colorNames is given below. 
 
 ```
@@ -59,7 +59,7 @@ _________________
 # CUSTOMIZE
 
 The whole point of Color Flow is that meaning and order of colors can be customized, so that each designer can build their own workflow.  
-Color order can be modified by changing line order and color can be hidden by removing it's meaning. An example, with a customize `ColorNames.txt` is given below. 
+Color order can be modified by changing line order and color can be hidden by removing it's meaning. An example, with a customize `colorNames.txt` is given below. 
 
 ```
 red=
@@ -110,10 +110,40 @@ Some extra features are accessible from the Action Button.
 * **Reset Color Flow** : Reset for all layers, Color Flow data and Layer Color.
 * **Generate Color Flow Smart Filters** : Generate in the Filters UI section, a "Color Flow" folder containing filters to sort which layer has or has not a specific step checked.
 * **Copy Color Flow to Master** : Copy Color Flow data from a master to another.
+* **Toggle Rainbow Font View** : Group the Font View into colour-labelled sections (see below).
+* **Rainbow Source: Layer / Glyph Color** : Choose whether grouping reads the layer colour (of the selected master) or the glyph colour.
 * **Enbale/Disable Color Flow Report** : Enable or Disable Color Flow Report.  
 	Color Flow Report is a way to track Layer Color changes during a work session.
 	When enabled, it creates .txt file in a “Color Flow Reports” folder, next to your .glyph file.
 	This .txt file track all Layer Color changes during your work session. (a work session start when you open your file, and finish when you close it).
+
+<br>
+
+_________________
+# RAINBOW FONT VIEW
+
+Color Flow can reorder the **Font View** into labelled colour sections, using the
+same `colorNames.txt` labels and order. Toggle it from **File > Color Flow: Rainbow
+Font View** (a checkmark shows the state) or the palette’s Action Button.
+
+It is **non-destructive**: your original glyph order is backed up when you enable it
+and restored when you disable it. Sections follow the order of `colorNames.txt`, and
+the "None" bucket (glyphs with no colour) is always placed last.
+
+> This feature merges the former **Rainbow FontView** plugin into Color Flow. If you
+> still have the standalone *Rainbow FontView* plugin installed, **disable or remove
+> it** — otherwise both will fight over the Font View order. Color Flow warns you once
+> if it detects the old plugin.
+
+<br>
+
+_________________
+# RENAME LABELS INLINE
+
+**Double-click a label** in the palette to edit it in place; press Return to save.
+Single-click still toggles the step. The new name is written straight to
+`colorNames.txt`, so the palette, the keyboard shortcuts, and the Rainbow Font View
+sections all relabel immediately.
 
 <br>
 
