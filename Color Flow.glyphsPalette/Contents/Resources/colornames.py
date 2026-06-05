@@ -408,6 +408,63 @@ def build_glyph_order(
     return code
 
 
+def parse_settings(text: str) -> tuple[list[tuple[int, str, bool]], str]:
+    """Parse colorNames.txt for the Settings panel.
+
+    Returns ``(rows, none_label)`` where ``rows`` is an ordered list of
+    ``(index, label, visible)`` covering all 12 colours (file order first, then
+    any missing colours appended hidden), and ``none_label`` is the label of the
+    Rainbow "None" bucket (``""`` if absent). A ``#``-commented line is a HIDDEN
+    colour whose label is remembered.
+    """
+    rows: list[tuple[int, str, bool]] = []
+    seen: set[int] = set()
+    none_label = ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        visible = True
+        if line.startswith("#"):
+            visible = False
+            line = line[1:].strip()
+        if "=" not in line:
+            continue
+        name, _, label = line.partition("=")
+        name = name.strip()
+        label = label.strip()
+        if name == NONE_TOKEN:
+            none_label = label
+            continue
+        index = NAME_TO_COLOR.get(name)
+        if index is None or index in seen:
+            continue
+        seen.add(index)
+        rows.append((index, label, visible))
+    for index in range(12):
+        if index not in seen:
+            rows.append((index, DEFAULT_LABELS.get(index, ""), False))
+    return rows, none_label
+
+
+def render_settings(rows: list[tuple[int, str, bool]], none_label: str = "") -> str:
+    """Serialise the Settings panel state back to colorNames.txt text.
+
+    Visible colours are written ``name=label``; hidden colours are written
+    ``#name=label`` so their label survives. The ``None`` bucket is preserved at
+    the top when present."""
+    lines: list[str] = []
+    if none_label:
+        lines.append(f"{NONE_TOKEN}={none_label}")
+    for index, label, visible in rows:
+        name = COLOR_NAMES.get(index)
+        if name is None:
+            continue
+        prefix = "" if visible else "#"
+        lines.append(f"{prefix}{name}={label}")
+    return "\n".join(lines) + "\n"
+
+
 def render_key_file(meaning: dict[int, str], order: list[int]) -> str:
     """Serialise an int-keyed meaning/order mapping back to colorNames.txt text,
     preserving order (used to persist inline label edits)."""

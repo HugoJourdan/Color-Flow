@@ -92,26 +92,10 @@ class ColorFlow(PalettePlugin):
 		#---------------------------------------------------------------------------#
 		self.paletteView.frame.masterNameBox = Box((6, 4, 127, 10), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(0, 0,0,0.1)), cornerRadius=4, borderWidth=0)
 
-		#---------------------------------------------------------------------------#
-		# Draw Horitzontal Lines 													#
-		#---------------------------------------------------------------------------#
-		yPos = 25
-		for k, v in self.meaning.items():
-			setattr(self.paletteView.frame, str(k)+"line", HorizontalLine((0, yPos, 0, 1)))
-			yPos += 22
-
-		#---------------------------------------------------------------------------#
-		# Draw Color Tags															#
-		#---------------------------------------------------------------------------#
-		yPos = 36
-		for k, v in self.meaning.items():
-			if v:
-				setattr(self.paletteView.frame, str(k)+"colorTag", Box((0, yPos-self.shift-1, 3, 22), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
-				yPos += 22
-
-		# Per-row widgets (checkbox / bar / count) are built by Update_Plugin_UI,
-		# which rebuilds them on change (gated by a dirty-check in update()).
+		# Separator lines + colour tags (depend on the meaning order/visibility).
+		# Per-row widgets (checkbox / bar / count) are built by Update_Plugin_UI.
 		self._rowChecks = {}
+		self._build_static_rows()
 
 		# # Select a master if none is selected
 		# if not self.font.selectedFontMaster:
@@ -119,6 +103,56 @@ class ColorFlow(PalettePlugin):
 
 		# Needed to display the palette plugin
 		self.dialog = self.paletteView.frame.getNSView()
+
+	# Separator lines + colour tags from the current meaning (order + visibility).
+	@objc.python_method
+	def _build_static_rows(self):
+		yPos = 25
+		for k in self.meaning.keys():
+			setattr(self.paletteView.frame, str(k)+"line", HorizontalLine((0, yPos, 0, 1)))
+			yPos += 22
+		yPos = 36
+		for k, v in self.meaning.items():
+			if v:
+				setattr(self.paletteView.frame, str(k)+"colorTag", Box((0, yPos-self.shift-1, 3, 22), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
+				yPos += 22
+
+	# Open the Settings panel (reorder colours + choose which show).
+	@objc.python_method
+	def Open_Settings(self, sender):
+		try:
+			import importlib
+			import settings_panel
+			importlib.reload(settings_panel)
+			self._settingsWindow = settings_panel.ColorFlowSettings(self, Glyphs.font)
+		except Exception:
+			import traceback
+			print("Color Flow [settings] error:\n" + traceback.format_exc())
+
+	# Re-read colorNames.txt and rebuild the palette after a Settings-panel save.
+	@objc.python_method
+	def reload_after_settings(self):
+		self.meaning = self.Load_Meaning()
+		for i in range(12):
+			for suffix in ("line", "colorTag", "", "box", "count"):
+				attr = str(i) + suffix
+				if hasattr(self.paletteView.frame, attr):
+					delattr(self.paletteView.frame, attr)
+		self.height = 22 * len([x for x in self.meaning.values() if x]) + 25
+		self._build_static_rows()
+		try:
+			self.paletteView.frame.setPosSize((0, 0, self.width, self.height))
+			self.paletteView.setPosSize((0, 0, self.width, self.height + 10))
+		except Exception:
+			pass
+		self._lastSignature = None
+		self.Update_Plugin_UI()
+		try:
+			font = Glyphs.font
+			if getattr(self, "fontview", None) is not None and font is not None and self.fontview.is_enabled(font):
+				self.fontview.maybe_rebuild(font)
+		except Exception:
+			pass
 
 
 	@objc.python_method
@@ -176,6 +210,8 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def _action_menu_items(self):
 		return [
+			dict(title="Settings…", callback=self.Open_Settings),
+			"----",
 			dict(title="Refresh from Layer Colors", callback=self.Setup_Color_Flow),
 			dict(title="Reset Color Flow (clear colours)", callback=self.Color_Flow_Reset),
 			dict(title="Copy Color Flow to Master", callback=self.Copy_Color_Flow_To_Master),

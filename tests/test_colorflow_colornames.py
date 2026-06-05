@@ -471,3 +471,40 @@ def test_counts_from_colors_all_none_is_zero():
 def test_counts_from_colors_ignores_hidden_colors():
     # color 5 not in the visible order -> contributes nothing.
     assert cc.counts_from_colors([5, 0], ["0", "1"]) == {"0": 1, "1": 0}
+
+
+# --------------------------------------------------------------------------- #
+# parse_settings / render_settings (the Settings panel: order + visibility)
+# --------------------------------------------------------------------------- #
+
+def test_parse_settings_captures_order_visibility_and_hidden_labels():
+    text = "None=Z\nmagenta=Mag\n#red=Red\nblue isnt a color\n"
+    rows, none_label = cc.parse_settings(text)
+    assert none_label == "Z"
+    # magenta(9) visible first, red(0) hidden second, then the rest appended hidden
+    assert rows[0] == (9, "Mag", True)
+    assert rows[1] == (0, "Red", False)
+    assert len(rows) == 12  # all 12 colours represented
+    assert {r[0] for r in rows} == set(range(12))
+
+
+def test_parse_settings_appends_missing_colours_hidden():
+    rows, _ = cc.parse_settings("red=R")
+    assert rows[0] == (0, "R", True)
+    # everything else appended, hidden, with default labels
+    assert all(not visible for _, _, visible in rows[1:])
+    assert rows[1][1] == cc.DEFAULT_LABELS[1]  # default Orange label
+
+
+def test_render_settings_writes_hidden_as_commented_and_preserves_none():
+    rows = [(9, "Mag", True), (0, "Red", False)]
+    text = cc.render_settings(rows, none_label="🫥 None")
+    assert text == "None=🫥 None\nmagenta=Mag\n#red=Red\n"
+
+
+def test_settings_round_trip():
+    rows = [(8, "Outline", True), (4, "Anchors", False), (3, "Export", True)]
+    text = cc.render_settings(rows, none_label="None")
+    rows2, none2 = cc.parse_settings(text)
+    assert none2 == "None"
+    assert rows2[:3] == rows  # order + visibility + labels preserved
