@@ -387,3 +387,86 @@ def test_coerce_snapshot_stringifies_and_ints() -> None:
 class _FakeLayerColor:
     def __init__(self, color: int | None) -> None:
         self.color = color
+
+
+# --------------------------------------------------------------------------- #
+# build_model
+# --------------------------------------------------------------------------- #
+
+def test_build_model_shape_and_compact_glyph_names(tmp_path) -> None:
+    (tmp_path / "colorNames.txt").write_text(
+        "purple=Outline\nlightGreen=Anchors\nyellow=Ready\nNone=Nothing\n", encoding="utf-8")
+    master = _FakeMaster("m1", "Regular")
+    glyphs = [
+        _FakeGlyph("A", {"m1": _FakeLayerColor(8)}),
+        _FakeGlyph("B", {"m1": _FakeLayerColor(4)}),
+        _FakeGlyph("C", {}),  # no layer -> none
+    ]
+    font = _FakeFont([master], glyphs, filepath=str(tmp_path / "Font.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+
+    assert model["family"] == "Acme Sans"
+    assert model["fileName"] == "Font.glyphs"
+    assert model["version"] == "2.5"
+    assert model["generated"] == "2026-06-05"
+    assert model["mode"] == "step"
+    assert model["glyphTotal"] == 3
+    assert model["order"] == ["8", "4", "3"]
+    assert model["steps"] == [{"key": 8, "label": "Outline"},
+                              {"key": 4, "label": "Anchors"},
+                              {"key": 3, "label": "Ready"}]
+    assert model["noneLabel"] == "Nothing"
+    assert model["glyphNames"] == ["A", "B", "C"]          # stored once
+    assert model["masters"][0]["keys"] == [8, 4, -1]        # parallel to glyphNames
+    assert model["changes"] == {"m1": {}}
+
+
+def test_build_model_counts_match_palette_step_and_free(tmp_path) -> None:
+    (tmp_path / "colorNames.txt").write_text(_HIDDEN_REORDERED, encoding="utf-8")
+    glyphs = [
+        _FakeGlyph("A", {"m1": _FakeLayerColor(8)}),
+        _FakeGlyph("B", {"m1": _FakeLayerColor(4)}),
+        _FakeGlyph("C", {"m1": _FakeLayerColor(3)}),
+        _FakeGlyph("D", {}),  # none
+    ]
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs, filepath=str(tmp_path / "F.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    order = list(cc.parse_color_names(_HIDDEN_REORDERED).keys())
+    colors = [8, 4, 3, None]
+
+    step = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert step["mode"] == "step"
+    assert step["masters"][0]["counts"] == cc.counts_from_colors(colors, order)
+    assert step["masters"][0]["uncolored"] == db.uncolored_count(colors, order)
+
+
+def test_build_model_free_mode(monkeypatch, tmp_path) -> None:
+    fake = _FakeGlyphsApp()
+    fake.defaults[db.FREE_KEY] = True
+    monkeypatch.setattr(db, "Glyphs", fake)
+    (tmp_path / "colorNames.txt").write_text(_HIDDEN_REORDERED, encoding="utf-8")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)}), _FakeGlyph("B", {"m1": _FakeLayerColor(4)})]
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs, filepath=str(tmp_path / "F.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    order = list(cc.parse_color_names(_HIDDEN_REORDERED).keys())
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["mode"] == "free"
+    assert model["masters"][0]["counts"] == cc.single_counts_from_colors([8, 4], order)
+
+
+def test_build_model_multi_master_keys_align_to_glyph_names(tmp_path) -> None:
+    (tmp_path / "colorNames.txt").write_text("purple=Outline\nyellow=Ready\n", encoding="utf-8")
+    glyphs = [
+        _FakeGlyph("A", {"m1": _FakeLayerColor(8), "m2": _FakeLayerColor(3)}),
+        _FakeGlyph("B", {"m1": _FakeLayerColor(3), "m2": _FakeLayerColor(8)}),
+    ]
+    font = _FakeFont([_FakeMaster("m1", "Regular"), _FakeMaster("m2", "Bold")],
+                     glyphs, filepath=str(tmp_path / "F.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+
+    assert model["glyphNames"] == ["A", "B"]
+    by_id = {m["id"]: m for m in model["masters"]}
+    assert by_id["m1"]["keys"] == [8, 3]   # keys[i] aligns with glyphNames[i]
+    assert by_id["m2"]["keys"] == [3, 8]

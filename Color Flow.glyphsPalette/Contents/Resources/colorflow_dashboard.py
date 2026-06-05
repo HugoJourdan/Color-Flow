@@ -561,6 +561,53 @@ def build_html(font, total: int, order: list[str], is_free: bool,
 
 
 # --------------------------------------------------------------------------- #
+# Full JSON model
+# --------------------------------------------------------------------------- #
+
+def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
+    """The full data model the JS app renders. Pure aside from reading the
+    font's colorNames.txt (via _meaning_and_none) — the same source the palette
+    uses, so counts stay in lockstep."""
+    is_free = free_mode()
+    meaning, none_label = _meaning_and_none(font)
+    order = list(meaning.keys())
+    display = display_from_meaning(meaning, none_label)
+    steps = [{"key": key, "label": label} for key, label in display
+             if key != colornames.NO_COLOR]
+    none_text = next((label for key, label in display
+                      if key == colornames.NO_COLOR), "")
+    glyph_total = len(font.glyphs)
+    glyph_names = list(current[font.masters[0].id].keys()) if font.masters else []
+
+    masters = []
+    for master in font.masters:
+        per_glyph = current.get(master.id, {})
+        colors = snapshot_to_colors(per_glyph)
+        masters.append({
+            "id": master.id,
+            "name": master.name,
+            "keys": [per_glyph.get(name, colornames.NO_COLOR) for name in glyph_names],
+            "counts": master_counts(colors, order, is_free),
+            "uncolored": uncolored_count(colors, order),
+        })
+
+    return {
+        "family": font.familyName or "",
+        "fileName": Path(font.filepath).name if font.filepath else (font.familyName or "Untitled"),
+        "version": f"{font.versionMajor}.{font.versionMinor}",
+        "generated": now.strftime("%Y-%m-%d"),
+        "mode": "free" if is_free else "step",
+        "glyphTotal": glyph_total,
+        "order": order,
+        "steps": steps,
+        "noneLabel": none_text,
+        "glyphNames": glyph_names,
+        "masters": masters,
+        "changes": compute_changes(current, previous),
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Entry point
 # --------------------------------------------------------------------------- #
 
