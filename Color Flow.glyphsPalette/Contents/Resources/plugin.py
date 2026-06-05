@@ -17,7 +17,7 @@ import AppKit
 
 from datetime import datetime
 from vanilla import *
-from AppKit import NSColor, NSMenuItem, NSOnState, NSOffState, NSClickGestureRecognizer
+from AppKit import NSColor, NSMenuItem, NSOnState, NSOffState, NSClickGestureRecognizer, NSPanGestureRecognizer, NSGestureRecognizerStateEnded
 from Foundation import NSObject
 from GlyphsApp.plugins import *
 from GlyphsApp.UI import *
@@ -510,17 +510,80 @@ class ColorFlow(PalettePlugin):
 	def _invalidate_counts(self, masterId):
 		self.font.tempData["com.hugojourdan.ColorFlow-counts-" + masterId] = None
 
-	# Attach the double-click-to-rename gesture to a freshly built checkbox and
-	# remember which colour it is (widgets are rebuilt each refresh).
+	# Attach the double-click-to-rename and drag-to-reorder gestures to a freshly
+	# built checkbox and remember which colour it is (widgets rebuild each refresh).
 	@objc.python_method
 	def _attach_rename(self, checkbox, color):
 		self._rowChecks[color] = checkbox
+		button = self._ns_button(checkbox)
 		try:
 			recognizer = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "labelDoubleClicked:")
 			recognizer.setNumberOfClicksRequired_(2)
-			self._ns_button(checkbox).addGestureRecognizer_(recognizer)
+			button.addGestureRecognizer_(recognizer)
 		except Exception:
 			pass
+		try:
+			pan = NSPanGestureRecognizer.alloc().initWithTarget_action_(self, "colorDragged:")
+			pan._cf_color = color
+			button.addGestureRecognizer_(pan)
+		except Exception:
+			pass
+
+	# Drag a row up/down to reorder the colours; reorder + persist on release.
+	def colorDragged_(self, recognizer):
+		try:
+			if recognizer.state() != NSGestureRecognizerStateEnded:
+				return
+			color = getattr(recognizer, "_cf_color", None)
+			if color is None:
+				return
+			view = recognizer.view()
+			translation = recognizer.translationInView_(view.superview() if view is not None else None)
+			steps = int(round(translation.y / 22.0))  # palette y increases downward
+			if steps:
+				self._reorder_color(color, steps)
+		except Exception:
+			import traceback
+			print("Color Flow [drag] error:\n" + traceback.format_exc())
+
+	# Move `color` by `delta` positions among the visible colours and persist.
+	@objc.python_method
+	def _reorder_color(self, color, delta):
+		visible = list(self.meaning.keys())
+		key = str(color)
+		if key not in visible:
+			return
+		src = visible.index(key)
+		dst = max(0, min(len(visible) - 1, src + delta))
+		if dst == src:
+			return
+		visible.insert(dst, visible.pop(src))
+		self._write_order(visible)
+		self.reload_after_settings()
+
+	# Write colorNames.txt with the visible colours in `new_order`, preserving
+	# each colour's label + the hidden colours.
+	@objc.python_method
+	def _write_order(self, new_order):
+		fontDir = None
+		font = Glyphs.font
+		if font is not None and font.filepath:
+			fontDir = os.path.dirname(font.filepath)
+		path = colornames.resolve_key_file(fontDir)
+		text = colornames.read_color_names(path) or colornames.DEFAULT_COLOR_NAMES
+		rows, noneLabel = colornames.parse_settings(text)
+		info = {index: (label, visible) for index, label, visible in rows}
+		newRows = []
+		seen = set()
+		for key in new_order:
+			index = int(key)
+			label = info.get(index, ("", True))[0]
+			newRows.append((index, label, True))
+			seen.add(index)
+		for index, label, visible in rows:
+			if index not in seen:
+				newRows.append((index, label, visible))
+		colornames.write_color_names(path, colornames.render_settings(newRows, noneLabel))
 
 	# Update Palette UI (original look; checkbox state + counts derived from colour).
 	@objc.python_method
