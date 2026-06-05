@@ -17,7 +17,7 @@ import AppKit
 
 from datetime import datetime
 from vanilla import *
-from AppKit import NSColor, NSMenuItem, NSOnState, NSOffState, NSClickGestureRecognizer, NSPanGestureRecognizer, NSGestureRecognizerStateEnded
+from AppKit import NSMenuItem, NSOnState, NSOffState, NSCursor, NSClickGestureRecognizer, NSPanGestureRecognizer, NSGestureRecognizerStateBegan, NSGestureRecognizerStateChanged, NSGestureRecognizerStateEnded
 from Foundation import NSObject
 from GlyphsApp.plugins import *
 from GlyphsApp.UI import *
@@ -78,19 +78,11 @@ class ColorFlow(PalettePlugin):
 
 		self.paletteView = Window((self.width, self.height + 10))
 		self.paletteView.frame = Group((0, 0, self.width, self.height))
-		if not Glyphs.defaults["com.hugojourdan.ColorFlow-Report"]:
-			Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] = "Enable Color Flow Report"
-			self.report = False
 
-		# Draw Action Button
-		self.paletteView.frame.actionPopUpButton = ActionButton((self.width-22, 0, 34, 19),
-			self._action_menu_items(),
-			sizeStyle='small')
-
-		#---------------------------------------------------------------------------#
-		# Draw Master Name Field 												    #
-		#---------------------------------------------------------------------------#
-		self.paletteView.frame.masterNameBox = Box((6, 4, 127, 10), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(0, 0,0,0.1)), cornerRadius=4, borderWidth=0)
+		# Action button (⋯) — opens a popover with the Dashboard and the Font Glyph
+		# Order control.
+		self.paletteView.frame.actionButton = Button((self.width-26, 1, 26, 17),
+			"⋯", callback=self.Open_Action_Popover, sizeStyle='small')
 
 		# Separator lines + colour tags (depend on the meaning order/visibility).
 		# Per-row widgets (checkbox / bar / count) are built by Update_Plugin_UI.
@@ -160,16 +152,7 @@ class ColorFlow(PalettePlugin):
 		Glyphs.addCallback(self.update, UPDATEINTERFACE)
 		self.font = Glyphs.font
 		self.init = False
-		self.reportCallbackRegistered = False
-		self.startSession = datetime.now().strftime('%m/%d/%Y - %H:%M')
 		self.update(self._windowController)
-		self.Color_Flow_Report(self._windowController)
-
-
-		if Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] == "Disable Color Flow Report":
-			self.report = True
-			Glyphs.addCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
-			self.reportCallbackRegistered = True
 
 		# Font-View colour grouping (the merged Rainbow FontView half). Opt-in and
 		# fully wrapped so a problem here can never stop the palette from loading.
@@ -203,26 +186,72 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _rainbow_menu_title(self):
-		return "Color Flow: Rainbow Font View"
+		return "Color Flow: Font Glyph Order"
 
-	# Shared action-menu definition (used by settings() and the report toggle
-	# rebuild) so the items never drift between the two.
+	# Action popover: the Dashboard and a Disable/Glyph/Layer segmented control
+	# for the Font Glyph Order grouping. Replaces the old ⋯ menu.
 	@objc.python_method
-	def _action_menu_items(self):
-		return [
-			dict(title="Settings…", callback=self.Open_Settings),
-			"----",
-			dict(title="Refresh from Layer Colors", callback=self.Setup_Color_Flow),
-			dict(title="Reset Color Flow (clear colours)", callback=self.Color_Flow_Reset),
-			dict(title="Copy Color Flow to Master", callback=self.Copy_Color_Flow_To_Master),
-			dict(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback=self.Activate_Color_Flow_Report),
-			"----",
-			dict(title="Toggle Rainbow Font View", callback=self.Toggle_Rainbow),
-			dict(title="Rainbow Source: Layer Color", callback=self.Set_Rainbow_Layer_Source),
-			dict(title="Rainbow Source: Glyph Color", callback=self.Set_Rainbow_Glyph_Source),
-			"----",
-			dict(title="Open Color Flow Documentation", callback=self.Open_Color_Flow_Documentation),
-		]
+	def Open_Action_Popover(self, sender):
+		try:
+			button = self._ns_button(sender)
+			self._popover = Popover((220, 100), parentView=button,
+				preferredEdge='bottom', behavior='semitransient')
+			popover = self._popover
+			popover.dashboard = Button((12, 12, -12, 22), "Open Color Font Dashboard",
+				callback=self._popover_dashboard, sizeStyle='small')
+			popover.fgoLabel = TextBox((12, 46, -12, 16), "Font Glyph Order",
+				sizeStyle='small')
+			popover.rainbow = SegmentedButton((12, 66, -12, 22),
+				[dict(title="Disable"), dict(title="Glyph"), dict(title="Layer")],
+				callback=self._popover_rainbow, sizeStyle='small')
+			popover.rainbow.set(self._rainbow_segment_index())
+			popover.open()
+		except Exception:
+			import traceback
+			print("Color Flow [popover] error:\n" + traceback.format_exc())
+
+	# Current grouping state -> segment index (0 Disable / 1 Glyph / 2 Layer).
+	@objc.python_method
+	def _rainbow_segment_index(self):
+		font = Glyphs.font
+		if font is None or not self.fontview.is_enabled(font):
+			return 0
+		return 1 if self.fontview.mode(font) == "Glyph" else 2
+
+	@objc.python_method
+	def _close_popover(self):
+		popover = getattr(self, "_popover", None)
+		if popover is not None:
+			try:
+				popover.close()
+			except Exception:
+				pass
+			self._popover = None
+
+	@objc.python_method
+	def _popover_dashboard(self, sender):
+		self._close_popover()
+		self.Open_Color_Font_Dashboard(sender)
+
+	# Disable / Glyph / Layer for the Font Glyph Order grouping (popover stays open
+	# so the source can be switched without reopening).
+	@objc.python_method
+	def _popover_rainbow(self, sender):
+		font = Glyphs.font
+		if font is None:
+			return
+		segment = sender.get()
+		try:
+			if segment == 0:
+				if self.fontview.is_enabled(font):
+					self.fontview.disable(font)
+			else:
+				self.fontview.set_mode(font, "Glyph" if segment == 1 else "Layer")
+				if not self.fontview.is_enabled(font):
+					self.fontview.enable(font)
+		except Exception:
+			import traceback
+			print("Color Flow [rainbow] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _install_rainbow_menu(self):
@@ -356,18 +385,6 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [Rainbow toggle] error:\n" + traceback.format_exc())
-
-	@objc.python_method
-	def Set_Rainbow_Layer_Source(self, sender):
-		font = Glyphs.font
-		if font is not None:
-			self.fontview.set_mode(font, "Layer")
-
-	@objc.python_method
-	def Set_Rainbow_Glyph_Source(self, sender):
-		font = Glyphs.font
-		if font is not None:
-			self.fontview.set_mode(font, "Glyph")
 
 	# ------------------------------------------------------------------ inline label rename
 
@@ -522,39 +539,192 @@ class ColorFlow(PalettePlugin):
 			button.addGestureRecognizer_(recognizer)
 		except Exception:
 			pass
+		# NOTE: do NOT set a Python attribute on the recognizer (e.g.
+		# pan._cf_color) — PyObjC framework objects have no __dict__, so it
+		# raises AttributeError and (when wrapped in try/except) silently
+		# prevents the gesture from ever being attached. The colour is resolved
+		# in colorDragged_ by matching the recognizer's view, exactly like the
+		# double-click handler does.
 		try:
 			pan = NSPanGestureRecognizer.alloc().initWithTarget_action_(self, "colorDragged:")
-			pan._cf_color = color
 			button.addGestureRecognizer_(pan)
 		except Exception:
-			pass
+			import traceback
+			print("Color Flow [attach pan] error:\n" + traceback.format_exc())
 
-	# Drag a row up/down to reorder the colours; reorder + persist on release.
+	# Resolve which colour-row a gesture recognizer is attached to (its view is
+	# the row's checkbox NSButton).
+	@objc.python_method
+	def _color_for_recognizer(self, recognizer):
+		view = recognizer.view()
+		for color, checkbox in getattr(self, "_rowChecks", {}).items():
+			if self._ns_button(checkbox) == view:
+				return color
+		return None
+
+	# Drag a row to reorder the colours: the dragged colour is dropped onto the
+	# row currently under the pointer (cursor-position targeting, so it always
+	# follows the mouse regardless of the view's coordinate flip). A grabbing-hand
+	# cursor shows while dragging. Reorder + persist on release.
 	def colorDragged_(self, recognizer):
 		try:
-			if recognizer.state() != NSGestureRecognizerStateEnded:
+			state = recognizer.state()
+			if state == NSGestureRecognizerStateBegan:
+				self._push_drag_cursor()
+				self._begin_drag_feedback(self._color_for_recognizer(recognizer))
 				return
-			color = getattr(recognizer, "_cf_color", None)
+			if state == NSGestureRecognizerStateChanged:
+				self._lastDragTime = datetime.now()  # suppress the end-of-drag toggle
+				try:
+					NSCursor.closedHandCursor().set()
+				except Exception:
+					pass
+				color = self._color_for_recognizer(recognizer)
+				dst = self._drop_index(recognizer)
+				if color is not None and dst is not None:
+					self._update_drop_line(color, dst)
+				return
+			# Ended / Cancelled / Failed (state >= Ended): restore cursor + clear feedback.
+			self._pop_drag_cursor()
+			self._clear_drag_feedback()
+			if state != NSGestureRecognizerStateEnded:
+				return
+			color = self._color_for_recognizer(recognizer)
 			if color is None:
 				return
-			view = recognizer.view()
-			translation = recognizer.translationInView_(view.superview() if view is not None else None)
-			steps = int(round(translation.y / 22.0))  # palette y increases downward
-			if steps:
-				self._reorder_color(color, steps)
+			dst = self._drop_index(recognizer)
+			if dst is not None:
+				self._reorder_color_to(color, dst)
 		except Exception:
 			import traceback
+			self._pop_drag_cursor()
+			self._clear_drag_feedback()
 			print("Color Flow [drag] error:\n" + traceback.format_exc())
 
-	# Move `color` by `delta` positions among the visible colours and persist.
+	# The visible-row index under the pointer right now (flip-safe).
 	@objc.python_method
-	def _reorder_color(self, color, delta):
+	def _drop_index(self, recognizer):
+		frameView = self.paletteView.frame.getNSView()
+		point = recognizer.locationInView_(frameView)
+		y = point.y
+		try:
+			if not frameView.isFlipped():
+				y = frameView.bounds().size.height - y
+		except Exception:
+			pass
+		return self._row_index_at_point(y)
+
+	# Top y (flipped coords) of a visible row band, matching the colour-bar offset.
+	@objc.python_method
+	def _row_top(self, index):
+		visible = list(self.meaning.keys())
+		if not (0 <= index < len(visible)):
+			return None
+		checkbox = self._rowChecks.get(visible[index])
+		if checkbox is None:
+			return None
+		try:
+			return checkbox.getPosSize()[1] - 1
+		except Exception:
+			return None
+
+	# Live drag highlight: tint the dragged row blue + show a blue insertion line.
+	@objc.python_method
+	def _begin_drag_feedback(self, color):
+		self._clear_drag_feedback()
+		if color is None:
+			return
+		visible = list(self.meaning.keys())
+		key = str(color)
+		if key not in visible:
+			return
+		top = self._row_top(visible.index(key))
+		if top is None:
+			return
+		tint = AppKit.NSColor.colorWithRed_green_blue_alpha_(0.16, 0.5, 0.96, 0.22)
+		line = AppKit.NSColor.colorWithRed_green_blue_alpha_(0.13, 0.45, 0.96, 1.0)
+		self.paletteView.frame.dragHighlight = Box((0, top, self.width, 22), fillColor=tint, cornerRadius=0, borderWidth=0)
+		self.paletteView.frame.dropLine = Box((0, top, self.width, 2), fillColor=line, cornerRadius=0, borderWidth=0)
+
+	# Move the insertion line to the slot the dragged colour would drop into.
+	@objc.python_method
+	def _update_drop_line(self, color, dst):
+		if not hasattr(self.paletteView.frame, "dropLine"):
+			return
 		visible = list(self.meaning.keys())
 		key = str(color)
 		if key not in visible:
 			return
 		src = visible.index(key)
-		dst = max(0, min(len(visible) - 1, src + delta))
+		top = self._row_top(dst)
+		if top is None:
+			return
+		lineY = top + 22 if dst > src else top
+		try:
+			self.paletteView.frame.dropLine.setPosSize((0, lineY, self.width, 2))
+		except Exception:
+			pass
+
+	@objc.python_method
+	def _clear_drag_feedback(self):
+		for attr in ("dragHighlight", "dropLine"):
+			if hasattr(self.paletteView.frame, attr):
+				try:
+					delattr(self.paletteView.frame, attr)
+				except Exception:
+					pass
+
+	# Grabbing-hand cursor while dragging (push once, pop once — flag-balanced).
+	@objc.python_method
+	def _push_drag_cursor(self):
+		if getattr(self, "_cursorPushed", False):
+			return
+		try:
+			NSCursor.closedHandCursor().push()
+			self._cursorPushed = True
+		except Exception:
+			pass
+
+	@objc.python_method
+	def _pop_drag_cursor(self):
+		if not getattr(self, "_cursorPushed", False):
+			return
+		try:
+			NSCursor.pop()
+		except Exception:
+			pass
+		self._cursorPushed = False
+
+	# Which visible row sits under a y-coordinate (in the frame view's flipped
+	# coords, top-down): the row whose checkbox vertical centre is nearest.
+	@objc.python_method
+	def _row_index_at_point(self, y):
+		visible = list(self.meaning.keys())
+		bestIndex = None
+		bestDist = None
+		for index, key in enumerate(visible):
+			checkbox = self._rowChecks.get(key)
+			if checkbox is None:
+				continue
+			try:
+				_, top, _, height = checkbox.getPosSize()
+			except Exception:
+				continue
+			center = top + (height / 2.0)
+			dist = abs(center - y)
+			if bestDist is None or dist < bestDist:
+				bestIndex, bestDist = index, dist
+		return bestIndex
+
+	# Move `color` to absolute position `dst` among the visible colours; persist.
+	@objc.python_method
+	def _reorder_color_to(self, color, dst):
+		visible = list(self.meaning.keys())
+		key = str(color)
+		if key not in visible:
+			return
+		src = visible.index(key)
+		dst = max(0, min(len(visible) - 1, dst))
 		if dst == src:
 			return
 		visible.insert(dst, visible.pop(src))
@@ -597,13 +767,6 @@ class ColorFlow(PalettePlugin):
 			counts = self._counts(masterId)
 			glyphCount = len(self.font.glyphs)
 			order = list(self.meaning.keys())
-
-			if hasattr(self.paletteView.frame, "masterName"):
-				delattr(self.paletteView.frame, "masterName")
-			masterName = self.font.selectedFontMaster.name
-			if len(masterName) > 16:
-				masterName = masterName[0:16] + "…"
-			setattr(self.paletteView.frame, "masterName", TextBox((6, 2.6, 140, 20), masterName, alignment="left", sizeStyle='small'))
 
 			selectedLayers = self.font.selectedLayers or []
 			selStates = [self._layer_state(layer, order) for layer in selectedLayers]
@@ -689,6 +852,12 @@ class ColorFlow(PalettePlugin):
 	def CheckBox_Callback(self, sender):
 		if not self.font:
 			return
+		# An NSButton can still fire its action at the end of a drag-to-reorder
+		# gesture. Ignore that spurious toggle (within ~250ms of real drag motion)
+		# so reordering never accidentally recolours the selected glyphs.
+		lastDrag = getattr(self, "_lastDragTime", None)
+		if lastDrag is not None and (datetime.now() - lastDrag).total_seconds() < 0.25:
+			return
 		color = None
 		for candidate, checkbox in getattr(self, "_rowChecks", {}).items():
 			if checkbox is sender:
@@ -698,10 +867,19 @@ class ColorFlow(PalettePlugin):
 			return
 		checked = bool(sender.get())
 		order = list(self.meaning.keys())
-		masterId = self.font.selectedFontMaster.id
+		master = self.font.selectedFontMaster
+		selectedLayers = self.font.selectedLayers
+		if master is None or not selectedLayers:
+			# No glyph/layer selected (e.g. clicked from Font View with nothing
+			# selected): nothing to toggle. Rebuild so the box snaps back to its
+			# derived (unchecked) state instead of looking toggled.
+			self._lastSignature = None
+			self.Update_Plugin_UI()
+			return
+		masterId = master.id
 		self.font.disableUpdateInterface()
 		try:
-			for layer in self.font.selectedLayers:
+			for layer in selectedLayers:
 				if self._free_mode():
 					# single-select: this colour exclusively, or clear if re-clicked
 					layer.color = int(color) if checked else None
@@ -723,178 +901,19 @@ class ColorFlow(PalettePlugin):
 	#																									   #
 	#																									   #
 
-	# Refresh the palette from current layer colours (state is always derived
-	# from layer.color, so this just rebuilds the cached counts).
+	# Open the HTML Color Font Dashboard for the current font (per-master colour
+	# distribution + what changed since last run). Reloaded each time so edits to
+	# dashboard.py take effect without restarting Glyphs.
 	@objc.python_method
-	def Setup_Color_Flow(self, sender):
-		if not self.font:
-			return
-		self._invalidate_counts(self.font.selectedFontMaster.id)
-		self._lastSignature = None
-		self.Update_Plugin_UI()
-
-	# Reset Color Flow for the selected master: clear every layer colour.
-	@objc.python_method
-	def Color_Flow_Reset(self, sender):
-		if not self.font:
-			return
-		masterId = self.font.selectedFontMaster.id
-		self.font.disableUpdateInterface()
+	def Open_Color_Font_Dashboard(self, sender):
 		try:
-			for glyph in self.font.glyphs:
-				layer = glyph.layers[masterId]
-				if layer is not None:
-					layer.color = None
-			self._invalidate_counts(masterId)
-		finally:
-			self.font.enableUpdateInterface()
-		self._lastSignature = None
-		self.Update_Plugin_UI()
-
-
-	# Copy Color Flow Data to Master
-	@objc.python_method
-	def Copy_Color_Flow_To_Master(self, sender):
-
-		MASTER = []
-		for master in self.font.masters:
-			MASTER.append(master.name)
-
-		self.w = FloatingWindow((200, 110), "Copy Color Flow Data")
-		self.w.textFrom = TextBox((10, 10, -10, 17), "From")
-		self.w.fromMaster = PopUpButton((55, 10, -10, 20),MASTER)
-		self.w.line = HorizontalLine((10, 37, -10, 1))
-		self.w.line2 = HorizontalLine((10, 37, -10, 1))
-		self.w.textTo = TextBox((10, 46, -10, 17), "To")
-		self.w.toMaster = PopUpButton((55, 46, -10, 20),MASTER)
-		self.w.button = Button((10, 76, -10, 20), "Run", callback=self.Copy_Color_Flow_To_Master_Callback)
-		self.w.center()
-		self.w.open()
-
-
-	@objc.python_method
-	def Copy_Color_Flow_To_Master_Callback(self, sender):
-		fromMaster = self.w.fromMaster.getTitle()
-		toMaster = self.w.toMaster.getTitle()
-
-		fromMasterID, toMasterID = None, None
-		for master in self.font.masters:
-			if master.name == fromMaster:
-				fromMasterID = master.id
-			if master.name == toMaster:
-				toMasterID = master.id
-
-		if fromMasterID is None or toMasterID is None or fromMasterID == toMasterID:
-			return
-
-		# State is derived from layer.color, so copying the colours is enough.
-		self.font.disableUpdateInterface()
-		try:
-			for glyph in self.font.glyphs:
-				glyph.layers[toMasterID].color = glyph.layers[fromMasterID].color
-			self._invalidate_counts(toMasterID)
-		finally:
-			self.font.enableUpdateInterface()
-		self._lastSignature = None
-		self.Update_Plugin_UI()
-
-	@objc.python_method
-	def Open_Color_Flow_Documentation( self, sender ):
-
-		URL = "https://github.com/HugoJourdan/Color-Flow"
-
-		import webbrowser
-		webbrowser.open(URL)
-
-	@objc.python_method
-	def Color_Flow_Report(self, sender):
-		layerColorData = {}
-		for master in self.font.masters:
-			layerColorData[master.id] = {}
-			for glyph in self.font.glyphs:
-				try:
-					colorMeaning = self.meaning[str(glyph.layers[master.id].color)]
-				except:
-					colorMeaning = "None"
-				layerColorData[master.id][glyph.name] = colorMeaning
-
-		if not self.font.userData["com.hugojourdan.ColorFlow-Report_Data"]:
-			self.font.userData["com.hugojourdan.ColorFlow-Report_Data"] = layerColorData
-
-		#self.dataSaveLocation = f"{os.path.dirname(self.font.filepath)}/ColorFlow-Data.json"
-		#with open(self.dataSaveLocation, 'w') as outfile:
-			#json.dump(layerColorData, outfile)
-
-	@objc.python_method
-	def Color_Flow_Report_PRINT(self, sender):
-
-
-		try :
-			layerColorData = {}
-			for master in self.font.masters:
-				layerColorData[master.id] = {}
-				for glyph in self.font.glyphs:
-					try:
-						colorMeaning = self.meaning[str(glyph.layers[master.id].color)]
-					except:
-						colorMeaning = "None"
-					layerColorData[master.id][glyph.name] = colorMeaning
-
-			#layerColorData = json.dumps(layerColorData)
-
-			DATA = self.font.userData["com.hugojourdan.ColorFlow-Report_Data"]
-
-			LayerColorChanged = {}
-			for master, data in DATA.items():
-				LayerColorChanged[master] = {}
-				for glyph in data:
-					if glyph in layerColorData[master] and DATA[master][glyph] != layerColorData[master][glyph]:
-						LayerColorChanged[master][glyph] = f"{DATA[master][glyph]} → {layerColorData[master][glyph]}"
-
-			if not os.path.exists(f"{os.path.dirname(self.font.filepath)}/Color Flow Reports"):
-				os.mkdir(f"{os.path.dirname(self.font.filepath)}/Color Flow Reports")
-
-			dateNow = datetime.now()
-			saveLocation = f"{os.path.dirname(self.font.filepath)}/Color Flow Reports"
-			fileName = f"{self.font.familyName} – {dateNow.strftime('%m%d%Y-%H%M%S')}.txt"
-
-			with open(saveLocation+"/"+fileName, 'w') as f:
-				f.write(f"Session start : {self.startSession}\nSession stop : {dateNow.strftime('%m/%d/%Y - %H:%M')}\n\n")
-				for master, data in LayerColorChanged.items():
-					f.write(f"Master : {self.font.masters[master].name}\n-----------------------------------------------------\n")
-					for k, v in data.items():
-						f.write(f"{k} : {v}\n- - - - - - - - - - - - - - - - - - - - - - - - - - -\n")
-					f.write("\n=====================================================\n\n")
-
-		except:pass
-
-		# with open('/Users/hugojourdan/Desktop/POUBELLE/DATA.json', 'w') as outfile:
-			# json.dump(layerColorData, outfile)
-
-	@objc.python_method
-	def Activate_Color_Flow_Report(self, sender):
-		if Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] == "Enable Color Flow Report":
-			self.report = True
-			Glyphs.addCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
-			self.reportCallbackRegistered = True
-			Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] = "Disable Color Flow Report"
-			print("Color Flow Report enabled. A .txt report will be written to a 'Color Flow Reports' folder next to your .glyphs file when you close the document.")
-		else:
-			self.report = False
-			Glyphs.removeCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
-			self.reportCallbackRegistered = False
-			Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] = "Enable Color Flow Report"
-			print("Color Flow Report disabled.")
-		Glyphs.showMacroWindow()
-		self._rebuild_action_button()
-
-	# Rebuild the action button (its Report item title reflects Glyphs.defaults).
-	@objc.python_method
-	def _rebuild_action_button(self):
-		if hasattr(self.paletteView.frame, "actionPopUpButton"):
-			delattr(self.paletteView.frame, "actionPopUpButton")
-		self.paletteView.frame.actionPopUpButton = ActionButton(
-			(self.width-22, 0, 34, 19), self._action_menu_items(), sizeStyle='small')
+			import importlib
+			import colorflow_dashboard
+			importlib.reload(colorflow_dashboard)
+			colorflow_dashboard.main(Glyphs.font)
+		except Exception:
+			import traceback
+			print("Color Flow [dashboard] error:\n" + traceback.format_exc())
 
 
 	########################################################################################################
@@ -929,11 +948,6 @@ class ColorFlow(PalettePlugin):
 	def __del__(self):
 		# Delete callbacks when Glyphs quits, otherwise it'll crash :(
 		Glyphs.removeCallback(self.update)
-		# The report callback (DOCUMENTCLOSED) is registered conditionally, so it
-		# must be removed here too or it leaks and can crash on close/quit.
-		if getattr(self, "reportCallbackRegistered", False):
-			Glyphs.removeCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
-			self.reportCallbackRegistered = False
 		# Remove the Rainbow Font View menu item this instance added.
 		self._teardown_rainbow_menu()
 		# Remove the Cocoa save-notification observers.
