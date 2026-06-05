@@ -193,6 +193,17 @@ def checked_state_for_color(color, order: list[str]) -> dict[str, bool]:
     return state
 
 
+def counts_from_colors(colors: list, order: list[str]) -> dict[str, int]:
+    """Per-step checked counts derived purely from native layer colors.
+
+    Each colour is expanded to its checkbox state via :func:`checked_state_for_color`
+    (the contiguous "steps up to this colour" model), then summed. This lets the
+    whole Color Flow data model be derived from ``layer.color`` (already saved by
+    Glyphs) instead of stored in userData."""
+    states = [checked_state_for_color(color, order) for color in colors]
+    return count_states(states, order)
+
+
 def layer_color_for_state(state: dict[str, bool], order: list[str]) -> int | None:
     """Native Glyphs ``layer.color`` for a checkbox state.
 

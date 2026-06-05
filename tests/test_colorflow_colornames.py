@@ -451,3 +451,23 @@ def test_write_color_names_round_trips_a_label_edit(tmp_path):
     assert cc.write_color_names(str(path), cc.render_key_file(meaning, order)) is True
     reparsed, _, _ = cc.parse_key_file(path.read_text())
     assert reparsed[1] == "🦊 Spacing"
+
+
+# --------------------------------------------------------------------------- #
+# counts_from_colors (derive aggregate progress from native layer colors)
+# --------------------------------------------------------------------------- #
+
+def test_counts_from_colors_counts_contiguous_prefixes():
+    # color 1 -> steps 0,1 done; color 0 -> step 0; None -> nothing.
+    order = ["0", "1", "2"]
+    counts = cc.counts_from_colors([1, 0, None], order)
+    assert counts == {"0": 2, "1": 1, "2": 0}
+
+
+def test_counts_from_colors_all_none_is_zero():
+    assert cc.counts_from_colors([None, None], ["0", "1"]) == {"0": 0, "1": 0}
+
+
+def test_counts_from_colors_ignores_hidden_colors():
+    # color 5 not in the visible order -> contributes nothing.
+    assert cc.counts_from_colors([5, 0], ["0", "1"]) == {"0": 1, "1": 0}

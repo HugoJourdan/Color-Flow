@@ -109,37 +109,9 @@ class ColorFlow(PalettePlugin):
 				setattr(self.paletteView.frame, str(k)+"colorTag", Box((0, yPos+1-self.shift, 3, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
 				yPos += 22
 
-		#---------------------------------------------------------------------------#
-		# Build interactive rows ONCE; update() mutates their values (no teardown). #
-		# Two pre-positioned bars per row (gray + colored) sit behind the checkbox;  #
-		# only their width is mutated, since vanilla Box fill colour is immutable.   #
-		#---------------------------------------------------------------------------#
-		self.paletteView.frame.masterName = TextBox((6, 2.6, 140, 20), "", alignment="left", sizeStyle='small')
-		self.masterName = self.paletteView.frame.masterName
-
-		self.rows = {}
-		yPos = 36
-		for color, label in self.meaning.items():
-			if not label:
-				continue
-			barY = yPos + 1 - self.shift
-			grayBar = Box((self.xPos, barY, 0, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.06)), cornerRadius=0, borderWidth=0)
-			setattr(self.paletteView.frame, str(color)+"graybar", grayBar)
-			colorBar = Box((self.xPos, barY, 0, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])), cornerRadius=0, borderWidth=0)
-			setattr(self.paletteView.frame, str(color)+"colorbar", colorBar)
-			check = CheckBox((12, yPos-self.shift, -10, 20), label, value=False, callback=self.CheckBox_Callback, sizeStyle='small')
-			setattr(self.paletteView.frame, str(color)+"check", check)
-			# Double-click the label to rename it inline (single-click still toggles).
-			try:
-				recognizer = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "labelDoubleClicked:")
-				recognizer.setNumberOfClicksRequired_(2)
-				self._ns_button(check).addGestureRecognizer_(recognizer)
-			except Exception:
-				pass
-			count = TextBox((self.width-50, yPos+3-self.shift, -6, 20), "", alignment="right", sizeStyle='small')
-			setattr(self.paletteView.frame, str(color)+"count", count)
-			self.rows[color] = {"gray": grayBar, "color": colorBar, "check": check, "count": count, "barY": barY}
-			yPos += 22
+		# Per-row widgets (checkbox / bar / count) are built by Update_Plugin_UI,
+		# which rebuilds them on change (gated by a dirty-check in update()).
+		self._rowChecks = {}
 
 		# # Select a master if none is selected
 		# if not self.font.selectedFontMaster:
@@ -192,9 +164,8 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def _action_menu_items(self):
 		return [
-			dict(title="Setup Color Flow based on Color Layers", callback=self.Setup_Color_Flow),
-			dict(title="Reset Color Flow", callback=self.Color_Flow_Reset),
-			dict(title="Generate Color Flow Smart Filters", callback=self.Generate_Color_Flow_Smart_Filter),
+			dict(title="Refresh from Layer Colors", callback=self.Setup_Color_Flow),
+			dict(title="Reset Color Flow (clear colours)", callback=self.Color_Flow_Reset),
 			dict(title="Copy Color Flow to Master", callback=self.Copy_Color_Flow_To_Master),
 			dict(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback=self.Activate_Color_Flow_Report),
 			"----",
@@ -320,8 +291,8 @@ class ColorFlow(PalettePlugin):
 	def labelDoubleClicked_(self, sender):
 		try:
 			view = sender.view()
-			for color, row in self.rows.items():
-				if self._ns_button(row["check"]) == view:
+			for color, checkbox in getattr(self, "_rowChecks", {}).items():
+				if self._ns_button(checkbox) == view:
 					self._begin_rename(color)
 					return
 		except Exception:
@@ -330,12 +301,15 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _begin_rename(self, color):
-		row = self.rows.get(color)
-		if row is None:
+		checkbox = getattr(self, "_rowChecks", {}).get(color)
+		if checkbox is None:
 			return
 		self._cancel_rename()
-		editY = row["barY"] - 1  # the checkbox's y (barY == y + 1 - shift)
-		editor = EditText((12, editY, -10, 20), self.meaning.get(color, ""),
+		try:
+			pos = checkbox.getPosSize()  # place the editor exactly over the checkbox
+		except Exception:
+			return
+		editor = EditText(pos, self.meaning.get(color, ""),
 			callback=self._commit_rename, continuous=False, sizeStyle='small')
 		setattr(self.paletteView.frame, "renameEditor", editor)
 		self._renameColor = color
@@ -370,9 +344,6 @@ class ColorFlow(PalettePlugin):
 
 		self._cancel_rename()
 		self.meaning = self.Load_Meaning()
-		row = self.rows.get(color)
-		if row is not None and newLabel:
-			row["check"].setTitle(newLabel)
 		self._lastSignature = None
 		self.Update_Plugin_UI()
 		try:
@@ -398,114 +369,111 @@ class ColorFlow(PalettePlugin):
 	#																									   #
 	#																									   #
 
-	# Aggregate per-step counts for a master, derived from the real layer state.
-	@objc.python_method
-	def Recompute_Master_Counts(self, masterId):
-		order = list(self.meaning.keys())
-		states = []
-		for glyph in self.font.glyphs:
-			try:
-				state = glyph.layers[masterId].userData["com.hugojourdan.ColorFlow"]
-			except Exception:
-				state = None
-			states.append(state if state else {})
-		return colornames.count_states(states, order)
+	# ------------------------------------------------------------------ derived data (tempData)
 
-	# Return a valid counts dict for the master, repairing it in place when the
-	# persisted value is missing, corrupt (e.g. a serialized None "<null>"), or
-	# has drifted from the current colorNames keys.
+	# Per-step counts for a master, derived from native layer colours and cached
+	# in tempData (volatile — Color Flow saves nothing in the .glyphs file).
 	@objc.python_method
-	def Get_Master_Counts(self, masterId):
-		userData = self.font.userData
-		allCounts = userData["com.hugojourdan.ColorFlow-master-data"]
-		if not hasattr(allCounts, "keys"):
-			userData["com.hugojourdan.ColorFlow-master-data"] = {}
-			allCounts = userData["com.hugojourdan.ColorFlow-master-data"]
-		counts = allCounts[masterId] if masterId in allCounts else None
-		needsRecompute = not hasattr(counts, "keys")
-		if not needsRecompute:
-			for key in self.meaning.keys():
-				if key not in counts:
-					needsRecompute = True
-					break
-		if needsRecompute:
-			counts = self.Recompute_Master_Counts(masterId)
-			allCounts[masterId] = counts
+	def _derive_counts(self, masterId):
+		order = list(self.meaning.keys())
+		colors = []
+		for glyph in self.font.glyphs:
+			layer = glyph.layers[masterId]
+			colors.append(layer.color if layer is not None else None)
+		return colornames.counts_from_colors(colors, order)
+
+	@objc.python_method
+	def _counts(self, masterId):
+		key = "com.hugojourdan.ColorFlow-counts-" + masterId
+		counts = self.font.tempData[key]
+		if not hasattr(counts, "keys"):
+			counts = self._derive_counts(masterId)
+			self.font.tempData[key] = counts
 		return counts
 
-	# Store a counts dict for a master, repairing the container if corrupt.
 	@objc.python_method
-	def _store_master_counts(self, masterId, counts):
-		allCounts = self.font.userData["com.hugojourdan.ColorFlow-master-data"]
-		if not hasattr(allCounts, "keys"):
-			self.font.userData["com.hugojourdan.ColorFlow-master-data"] = {}
-			allCounts = self.font.userData["com.hugojourdan.ColorFlow-master-data"]
-		allCounts[masterId] = counts
+	def _invalidate_counts(self, masterId):
+		self.font.tempData["com.hugojourdan.ColorFlow-counts-" + masterId] = None
 
-	# Mirror the checked steps into top-level userData keys that the generated
-	# Smart Filters query (Has / Has-not a given step).
+	# Attach the double-click-to-rename gesture to a freshly built checkbox and
+	# remember which colour it is (widgets are rebuilt each refresh).
 	@objc.python_method
-	def _sync_shadow_keys(self, layer, state):
-		for index in self.meaning.keys():
-			shadowKey = "com.hugojourdan.ColorFlow_Color_" + index
-			if index in state and state[index]:
-				layer.userData[shadowKey] = index
-			else:
-				del layer.userData[shadowKey]  # UserDataProxy: no-throw if absent
+	def _attach_rename(self, checkbox, color):
+		self._rowChecks[color] = checkbox
+		try:
+			recognizer = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "labelDoubleClicked:")
+			recognizer.setNumberOfClicksRequired_(2)
+			self._ns_button(checkbox).addGestureRecognizer_(recognizer)
+		except Exception:
+			pass
 
-	# Update Palette UI by mutating the widgets built once in settings().
+	# Update Palette UI (original look; checkbox state + counts derived from colour).
 	@objc.python_method
 	def Update_Plugin_UI(self):
 		try:
 			if not self.font or not self.meaning:
 				return
-			selectedMasterId = self.font.selectedFontMaster.id
-			counts = self.Get_Master_Counts(selectedMasterId)
+			self._rowChecks = {}
+			yPos = 36
+			masterId = self.font.selectedFontMaster.id
+			counts = self._counts(masterId)
 			glyphCount = len(self.font.glyphs)
+			order = list(self.meaning.keys())
 
+			if hasattr(self.paletteView.frame, "masterName"):
+				delattr(self.paletteView.frame, "masterName")
 			masterName = self.font.selectedFontMaster.name
 			if len(masterName) > 16:
 				masterName = masterName[0:16] + "…"
-			self.masterName.set(masterName)
+			setattr(self.paletteView.frame, "masterName", TextBox((6, 2.6, 140, 20), masterName, alignment="left", sizeStyle='small'))
 
 			selectedLayers = self.font.selectedLayers or []
+			selStates = [colornames.checked_state_for_color(layer.color, order) for layer in selectedLayers]
 			firstColor = selectedLayers[0].color if selectedLayers else None
 
-			for color, row in self.rows.items():
+			for color, meaning in self.meaning.items():
+				for suffix in ("", "box", "count"):
+					attr = str(color) + suffix
+					if hasattr(self.paletteView.frame, attr):
+						delattr(self.paletteView.frame, attr)
+				if not meaning:
+					continue
 				count = counts[color] if color in counts else 0
 				barWidth = (self.barWidth / glyphCount * count) if glyphCount else 0
 
 				if selectedLayers:
-					checked = all(self._layer_step(layer, color) for layer in selectedLayers)
-					colored = checked and firstColor == int(color)
+					check = all(state.get(color, False) for state in selStates)
+					if barWidth:
+						if check and firstColor == int(color):
+							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
+						else:
+							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.06)
+						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos+1-self.shift, barWidth+0.01, 16), fillColor=fill, cornerRadius=0, borderWidth=0))
+					checkbox = CheckBox((12, yPos-self.shift, -10, 20), meaning, value=check, callback=self.CheckBox_Callback, sizeStyle='small')
+					setattr(self.paletteView.frame, str(color), checkbox)
+					self._attach_rename(checkbox, color)
+					if glyphCount and count >= glyphCount:
+						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+5-self.shift, -6, 20), "✅", alignment="right", sizeStyle='mini'))
+					else:
+						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+3-self.shift, -6, 20), f"{count}/{glyphCount}", alignment="right", sizeStyle='small'))
+					yPos += 22
 				else:
-					checked = False
-					colored = True
-
-				row["check"].set(checked)
-				if glyphCount and count >= glyphCount:
-					row["count"].set("✅")
-				else:
-					row["count"].set(f"{count}/{glyphCount}")
-
-				activeWidth = (barWidth + 0.01) if barWidth else 0
-				if colored:
-					row["color"].setPosSize((self.xPos, row["barY"], activeWidth, 16))
-					row["gray"].setPosSize((self.xPos, row["barY"], 0, 16))
-				else:
-					row["gray"].setPosSize((self.xPos, row["barY"], activeWidth, 16))
-					row["color"].setPosSize((self.xPos, row["barY"], 0, 16))
+					if barWidth:
+						fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
+						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos+1-self.shift, barWidth+0.01, 16), fillColor=fill, cornerRadius=0, borderWidth=0))
+					checkbox = CheckBox((12, yPos-self.shift, -10, 20), meaning, value=False, callback=self.CheckBox_Callback, sizeStyle='small')
+					setattr(self.paletteView.frame, str(color), checkbox)
+					self._attach_rename(checkbox, color)
+					if glyphCount and count >= glyphCount:
+						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+5-self.shift, -6, 20), "✅", alignment="right", sizeStyle='mini'))
+					else:
+						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+3-self.shift, -6, 20), f"{count}/{glyphCount}", alignment="right", sizeStyle='small'))
+					yPos += 22
 		except Exception:
 			import traceback
 			print("Color Flow [Update_Plugin_UI] error:\n" + traceback.format_exc())
 
-	# True if the `color` step is checked on this layer (missing state == off).
-	@objc.python_method
-	def _layer_step(self, layer, color):
-		state = layer.userData["com.hugojourdan.ColorFlow"]
-		return bool(state) and color in state and bool(state[color])
-
-	# UPDATEINTERFACE handler: cheap dirty-check, then refresh only when needed.
+	# UPDATEINTERFACE handler: cheap dirty-check on selection + layer colours.
 	@objc.python_method
 	def update(self, sender):
 		if self._windowController:
@@ -513,15 +481,11 @@ class ColorFlow(PalettePlugin):
 		if not self.font:
 			return
 
-		# Font-View grouping: cheap dirty-check, then debounce the (expensive)
-		# glyphOrder rebuild. Independent of the palette refresh below, and fully
-		# guarded so it can never break the palette.
 		try:
 			grouping = getattr(self, "fontview", None)
 			if grouping is not None and grouping.is_enabled(self.font) and grouping.is_dirty(self.font):
 				self._pendingFont = self.font
-				NSObject.cancelPreviousPerformRequestsWithTarget_selector_object_(
-					self, "rainbowDebouncedRebuild:", None)
+				NSObject.cancelPreviousPerformRequestsWithTarget_selector_object_(self, "rainbowDebouncedRebuild:", None)
 				self.performSelector_withObject_afterDelay_("rainbowDebouncedRebuild:", None, 0.15)
 		except Exception:
 			pass
@@ -534,52 +498,40 @@ class ColorFlow(PalettePlugin):
 			return
 
 		selectedLayers = self.font.selectedLayers or []
-		layerStates = []
-		for layer in selectedLayers:
-			glyph = layer.parent
-			name = glyph.name if glyph is not None else ""
-			layerStates.append((name, layer.userData["com.hugojourdan.ColorFlow"]))
-		signature = colornames.selection_signature(masterId, layerStates)
+		signature = (masterId, tuple(
+			((layer.parent.name if layer.parent is not None else ""), layer.color)
+			for layer in selectedLayers))
 		if signature == getattr(self, "_lastSignature", None):
 			return
 		self._lastSignature = signature
 		self.Update_Plugin_UI()
 
-	# Action when a checkbox is toggled
+	# Toggle a step: recompute the native layer colour (the saved source of truth).
 	@objc.python_method
 	def CheckBox_Callback(self, sender):
 		if not self.font:
 			return
 		color = None
-		for candidate, row in self.rows.items():
-			if row["check"] is sender:
+		for candidate, checkbox in getattr(self, "_rowChecks", {}).items():
+			if checkbox is sender:
 				color = candidate
 				break
 		if color is None:
 			return
-
 		checked = bool(sender.get())
-		masterId = self.font.selectedFontMaster.id
 		order = list(self.meaning.keys())
-		key = "com.hugojourdan.ColorFlow"
-
+		masterId = self.font.selectedFontMaster.id
 		self.font.disableUpdateInterface()
 		try:
 			for layer in self.font.selectedLayers:
-				state = layer.userData[key]
-				if not state:
-					layer.userData[key] = colornames.default_state(order)
-					state = layer.userData[key]
+				state = colornames.checked_state_for_color(layer.color, order)
 				state[color] = checked
 				layer.color = colornames.layer_color_for_state(state, order)
-				self._sync_shadow_keys(layer, state)
-			self._store_master_counts(masterId, self.Recompute_Master_Counts(masterId))
+			self._invalidate_counts(masterId)
 		finally:
 			self.font.enableUpdateInterface()
-
-		self._lastSignature = None  # force the next refresh
+		self._lastSignature = None
 		self.Update_Plugin_UI()
-
 
 	########################################################################################################
 	#																									   #
@@ -589,108 +541,33 @@ class ColorFlow(PalettePlugin):
 	#																									   #
 	#																									   #
 
-	# Setup Color Flow from each layer's existing native color.
+	# Refresh the palette from current layer colours (state is always derived
+	# from layer.color, so this just rebuilds the cached counts).
 	@objc.python_method
 	def Setup_Color_Flow(self, sender):
 		if not self.font:
 			return
-		masterId = self.font.selectedFontMaster.id
-		order = list(self.meaning.keys())
-		key = "com.hugojourdan.ColorFlow"
-		self.font.disableUpdateInterface()
-		try:
-			for glyph in self.font.glyphs:
-				layer = glyph.layers[masterId]
-				if layer is None:
-					continue
-				state = colornames.checked_state_for_color(layer.color, order)
-				layer.userData[key] = state
-				self._sync_shadow_keys(layer, state)
-			self._store_master_counts(masterId, self.Recompute_Master_Counts(masterId))
-		finally:
-			self.font.enableUpdateInterface()
-		print(f"✅ Color Flow set up from layer colors [{self.font.selectedFontMaster.name}]")
-		Glyphs.showMacroWindow()
+		self._invalidate_counts(self.font.selectedFontMaster.id)
 		self._lastSignature = None
 		self.Update_Plugin_UI()
 
-
-	# Reset Color Flow for the selected master (state, color, shadow keys, counts).
+	# Reset Color Flow for the selected master: clear every layer colour.
 	@objc.python_method
 	def Color_Flow_Reset(self, sender):
 		if not self.font:
 			return
 		masterId = self.font.selectedFontMaster.id
-		order = list(self.meaning.keys())
-		key = "com.hugojourdan.ColorFlow"
 		self.font.disableUpdateInterface()
 		try:
 			for glyph in self.font.glyphs:
 				layer = glyph.layers[masterId]
-				if layer is None:
-					continue
-				# Only drop our own shadow keys — never other plugins' userData.
-				for existing in list(layer.userData.keys()):
-					if str(existing).startswith("com.hugojourdan.ColorFlow_Color_"):
-						del layer.userData[existing]
-				layer.userData[key] = colornames.default_state(order)
-				layer.color = None
-			self._store_master_counts(masterId, {index: 0 for index in order})
+				if layer is not None:
+					layer.color = None
+			self._invalidate_counts(masterId)
 		finally:
 			self.font.enableUpdateInterface()
-		print(f"✅ Color Flow reset [{self.font.selectedFontMaster.name}]")
-		Glyphs.showMacroWindow()
 		self._lastSignature = None
 		self.Update_Plugin_UI()
-
-
-	# Generate Color Flow smart filters in the Filter sidebar.
-	@objc.python_method
-	def Generate_Color_Flow_Smart_Filter(self, sender):
-		import plistlib
-
-		plistFile = os.path.expanduser("~/Library/Application Support/Glyphs 3/CustomFilter.plist")
-		shadowPrefix = "com.hugojourdan.ColorFlow_Color_"
-
-		try:
-			with open(plistFile, "rb") as fp:
-				pl = plistlib.load(fp)
-		except OSError:
-			Message(
-				"Could not read CustomFilter.plist.\nAdd any item in the Filter "
-				"section, restart Glyphs, then run this again.",
-				title="Color Flow", OKButton=None)
-			return
-
-		layerColor = []
-		notLayerColor = []
-		for index, label in self.meaning.items():
-			if not label:
-				continue
-			# The shadow keys are written by toggling / Setup; the predicate tests
-			# for their presence on a layer.
-			layerColor.append({"name": label, "predicate": f"'{shadowPrefix}{index}' IN layer.userData"})
-			notLayerColor.append({"name": label, "predicate": f"NOT '{shadowPrefix}{index}' IN layer.userData"})
-
-		group = {"name": "Color Flow", "subGroup": [
-			{"name": "Has[...]", "subGroup": layerColor},
-			{"name": "Has not[...]", "subGroup": notLayerColor},
-		]}
-
-		# Replace any existing Color Flow group rather than appending duplicates.
-		pl = [item for item in pl if item.get("name") != "Color Flow"]
-		pl.append(group)
-
-		try:
-			with open(plistFile, "wb") as fp:
-				plistlib.dump(pl, fp)
-		except OSError as error:
-			Message(f"Could not write CustomFilter.plist:\n{error}", title="Color Flow", OKButton=None)
-			return
-
-		Message(
-			"Color Flow Smart Filters generated.\nRestart Glyphs to see them in the Filter list.",
-			title="Color Flow", OKButton=None)
 
 
 	# Copy Color Flow Data to Master
@@ -728,18 +605,15 @@ class ColorFlow(PalettePlugin):
 		if fromMasterID is None or toMasterID is None or fromMasterID == toMasterID:
 			return
 
-		# Copy by value, never by reference: each master must own an independent
-		# dict, otherwise editing one master's checkboxes mutates the other's.
-		masterData = self.font.userData["com.hugojourdan.ColorFlow-master-data"]
-		if masterData is not None and fromMasterID in masterData:
-			masterData[toMasterID] = dict(masterData[fromMasterID])
-
-		for glyph in self.font.glyphs:
-			glyph.layers[toMasterID].color = glyph.layers[fromMasterID].color
-			fromState = glyph.layers[fromMasterID].userData["com.hugojourdan.ColorFlow"]
-			if fromState:
-				glyph.layers[toMasterID].userData["com.hugojourdan.ColorFlow"] = dict(fromState)
-
+		# State is derived from layer.color, so copying the colours is enough.
+		self.font.disableUpdateInterface()
+		try:
+			for glyph in self.font.glyphs:
+				glyph.layers[toMasterID].color = glyph.layers[fromMasterID].color
+			self._invalidate_counts(toMasterID)
+		finally:
+			self.font.enableUpdateInterface()
+		self._lastSignature = None
 		self.Update_Plugin_UI()
 
 	@objc.python_method

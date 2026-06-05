@@ -76,7 +76,7 @@ def _glyphs_support_dir() -> str:
     outside Glyphs so this module stays importable and unit-testable.
     """
     try:
-        from GlyphsApp import GSGlyphsInfo
+        from GlyphsApp import GSGlyphsInfo  # type: ignore[import]  # Glyphs-only
         path = os.path.expanduser(str(GSGlyphsInfo.applicationSupportPath()))
         if path and not path.startswith("~"):
             return path
@@ -205,6 +205,17 @@ def checked_state_for_color(color, order: list[str]) -> dict[str, bool]:
     return state
 
 
+def counts_from_colors(colors: list, order: list[str]) -> dict[str, int]:
+    """Per-step checked counts derived purely from native layer colors.
+
+    Each colour is expanded to its checkbox state via :func:`checked_state_for_color`
+    (the contiguous "steps up to this colour" model), then summed. This lets the
+    whole Color Flow data model be derived from ``layer.color`` (already saved by
+    Glyphs) instead of stored in userData."""
+    states = [checked_state_for_color(color, order) for color in colors]
+    return count_states(states, order)
+
+
 def layer_color_for_state(state: dict[str, bool], order: list[str]) -> int | None:
     """Native Glyphs ``layer.color`` for a checkbox state.
 
@@ -277,6 +288,25 @@ def get_key_file(font_dir: str | None, info_dir: str | None = None) -> str:
     path = resolve_key_file(font_dir, info_dir)
     ensure_key_file(path)
     return path
+
+
+def write_color_names(path: str, text: str) -> bool:
+    """Write ``text`` to ``path``, best-effort. Returns True on success.
+
+    If ``path`` is a *broken* symlink (its target is gone, e.g. an unmounted
+    shared file), the dangling link is replaced with a real file so the edit can
+    be saved locally. A valid symlink is written through to its target."""
+    try:
+        if os.path.islink(path) and not os.path.exists(path):
+            os.unlink(path)
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as key_file:
+            key_file.write(text)
+        return True
+    except OSError:
+        return False
 
 
 def read_color_names(path: str) -> str:
@@ -417,8 +447,7 @@ def render_key_file(meaning: dict[int, str], order: list[int]) -> str:
 # ---------------------------------------------------------------------------
 
 _COLOR_CHECK = "5"
-_LAYER_KEY = "com.hugojourdan.ColorFlow"
-_MASTER_DATA_KEY = "com.hugojourdan.ColorFlow-master-data"
+_COUNTS_KEY = "com.hugojourdan.ColorFlow-counts-"
 
 
 def _color_flow_font_dir(font):
@@ -437,34 +466,14 @@ def _color_flow_toggle():
     order = list(meaning.keys())
     if _COLOR_CHECK not in meaning:
         return  # this color is hidden in the current colorNames.txt
-    master_id = master.id
-    all_counts = font.userData[_MASTER_DATA_KEY]
-    if not hasattr(all_counts, "keys"):
-        font.userData[_MASTER_DATA_KEY] = {}
-        all_counts = font.userData[_MASTER_DATA_KEY]
-    counts = all_counts[master_id] if master_id in all_counts else None
-    if not hasattr(counts, "keys"):
-        # Missing or corrupt (e.g. a serialized None "<null>"): rebuild from the
-        # real layer state so the shortcut self-heals like the palette does.
-        states = []
-        for glyph in font.glyphs:
-            state = glyph.layers[master_id].userData[_LAYER_KEY]
-            states.append(state if state else {})
-        counts = count_states(states, order)
-        all_counts[master_id] = counts
-    if _COLOR_CHECK not in counts:
-        counts[_COLOR_CHECK] = 0
+    # Color Flow stores nothing in the file: the checkbox state is derived from
+    # the native layer colour. Toggle this step, then recompute the colour.
     for layer in layers:
-        state = layer.userData[_LAYER_KEY]
-        if not state:
-            layer.userData[_LAYER_KEY] = default_state(order)
-            state = layer.userData[_LAYER_KEY]
-        if _COLOR_CHECK not in state:
-            state[_COLOR_CHECK] = False
-        new_value = not state[_COLOR_CHECK]
-        state[_COLOR_CHECK] = new_value
-        counts[_COLOR_CHECK] = counts[_COLOR_CHECK] + (1 if new_value else -1)
+        state = checked_state_for_color(layer.color, order)
+        state[_COLOR_CHECK] = not state.get(_COLOR_CHECK, False)
         layer.color = layer_color_for_state(state, order)
+    # Invalidate the palette's cached counts (volatile tempData).
+    font.tempData[_COUNTS_KEY + master.id] = None
 
 
 _color_flow_toggle()

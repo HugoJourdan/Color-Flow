@@ -63,8 +63,7 @@ TOGGLE_TAIL = '''
 # ---------------------------------------------------------------------------
 
 _COLOR_CHECK = "__COLOR_INDEX__"
-_LAYER_KEY = "com.hugojourdan.ColorFlow"
-_MASTER_DATA_KEY = "com.hugojourdan.ColorFlow-master-data"
+_COUNTS_KEY = "com.hugojourdan.ColorFlow-counts-"
 
 
 def _color_flow_font_dir(font):
@@ -83,34 +82,14 @@ def _color_flow_toggle():
     order = list(meaning.keys())
     if _COLOR_CHECK not in meaning:
         return  # this color is hidden in the current colorNames.txt
-    master_id = master.id
-    all_counts = font.userData[_MASTER_DATA_KEY]
-    if not hasattr(all_counts, "keys"):
-        font.userData[_MASTER_DATA_KEY] = {}
-        all_counts = font.userData[_MASTER_DATA_KEY]
-    counts = all_counts[master_id] if master_id in all_counts else None
-    if not hasattr(counts, "keys"):
-        # Missing or corrupt (e.g. a serialized None "<null>"): rebuild from the
-        # real layer state so the shortcut self-heals like the palette does.
-        states = []
-        for glyph in font.glyphs:
-            state = glyph.layers[master_id].userData[_LAYER_KEY]
-            states.append(state if state else {})
-        counts = count_states(states, order)
-        all_counts[master_id] = counts
-    if _COLOR_CHECK not in counts:
-        counts[_COLOR_CHECK] = 0
+    # Color Flow stores nothing in the file: the checkbox state is derived from
+    # the native layer colour. Toggle this step, then recompute the colour.
     for layer in layers:
-        state = layer.userData[_LAYER_KEY]
-        if not state:
-            layer.userData[_LAYER_KEY] = default_state(order)
-            state = layer.userData[_LAYER_KEY]
-        if _COLOR_CHECK not in state:
-            state[_COLOR_CHECK] = False
-        new_value = not state[_COLOR_CHECK]
-        state[_COLOR_CHECK] = new_value
-        counts[_COLOR_CHECK] = counts[_COLOR_CHECK] + (1 if new_value else -1)
+        state = checked_state_for_color(layer.color, order)
+        state[_COLOR_CHECK] = not state.get(_COLOR_CHECK, False)
         layer.color = layer_color_for_state(state, order)
+    # Invalidate the palette's cached counts (volatile tempData).
+    font.tempData[_COUNTS_KEY + master.id] = None
 
 
 _color_flow_toggle()
