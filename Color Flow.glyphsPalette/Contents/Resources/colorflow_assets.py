@@ -9,6 +9,7 @@ no dependencies. The model is the single source of truth the JS app renders.
 from __future__ import annotations
 
 import json
+from xml.sax.saxutils import escape as xesc
 
 
 def embed_model(model: dict) -> str:
@@ -18,6 +19,21 @@ def embed_model(model: dict) -> str:
     payload = (json.dumps(model, ensure_ascii=False)
                .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
     return f'<script type="application/json" id="cfd-model">{payload}</script>'
+
+
+def build_html(model: dict) -> str:
+    """Assemble the complete, self-contained dashboard page from a model."""
+    title = xesc(f'{model["generated"]}_{model.get("family") or ""}_Color-Flow-Dashboard')
+    return (
+        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"<title>{title}</title><style>{DASHBOARD_CSS}</style></head>"
+        '<body><div id="cfd-app"></div>'
+        '<noscript>This report needs JavaScript — please open it in a modern browser.</noscript>'
+        f"{embed_model(model)}"
+        f"<script>{DASHBOARD_JS}</script>"
+        "</body></html>"
+    )
 
 
 DASHBOARD_CSS = """
