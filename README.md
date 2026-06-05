@@ -112,10 +112,33 @@ Some extra features are accessible from the Action Button.
 * **Copy Color Flow to Master** : Copy Color Flow data from a master to another.
 * **Toggle Rainbow Font View** : Group the Font View into colour-labelled sections (see below).
 * **Rainbow Source: Layer / Glyph Color** : Choose whether grouping reads the layer colour (of the selected master) or the glyph colour.
-* **Enbale/Disable Color Flow Report** : Enable or Disable Color Flow Report.  
-	Color Flow Report is a way to track Layer Color changes during a work session.
-	When enabled, it creates .txt file in a “Color Flow Reports” folder, next to your .glyph file.
-	This .txt file track all Layer Color changes during your work session. (a work session start when you open your file, and finish when you close it).
+* **Open Color Font Dashboard** : Open an HTML progress report for the current font (see below).
+
+<br>
+
+_________________
+# COLOR FONT DASHBOARD
+
+A visual progress report for the whole font, opened in your browser from the
+palette's **Action Button (⋯) → Open Color Font Dashboard**.
+
+* **Per-master sections** — every master gets a colour-distribution table with a
+  progress bar, count and percentage per step, plus a font-wide **Overall totals**
+  summary across all masters.
+* **Matches the palette** — the counts are exactly what the sidebar shows: the
+  same glyphs, the same Layer Color source, and the same mode. In **step mode**
+  the counts are cumulative (a glyph at a later step also counts toward the
+  earlier ones); in **free mode** each glyph counts once. The active mode is read
+  from the same setting the palette uses, so the two never disagree. The Overall
+  headline shows **completion** (glyphs that reached the final step) and
+  **started** (glyphs with any colour).
+* **Per-glyph heatmap** — a collapsible grid of the *unfinished* glyphs (in glyph
+  order), so you can spot exactly which ones still need work.
+* **Changed since last run** — each report remembers the previous run and lists
+  the glyphs whose colour changed since. This snapshot is stored in Glyphs'
+  preferences keyed by file path — **not** in your `.glyphs` file and **not** in a
+  sidecar file, so your source stays clean while the diff survives across sessions.
+* **Light & dark** — the report follows your system appearance.
 
 <br>
 
