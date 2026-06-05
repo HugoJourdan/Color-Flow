@@ -16,17 +16,19 @@ import colornames
 from vanilla import Button, CheckBox, HorizontalLine, RadioGroup, TextBox, Window
 
 try:
-    from GlyphsApp import Message
+    from GlyphsApp import Glyphs, Message
 except Exception:  # pragma: no cover - only importable inside Glyphs
+    Glyphs = None
     def Message(*args, **kwargs):
         pass
 
 MODE_KEY = "hugojourdan.RainbowFontView.labelUsed"
+FREE_KEY = "com.hugojourdan.ColorFlow-FreeMode"
 MODES = ("Layer", "Glyph")
 
 MARGIN = 15
 ROW_HEIGHT = 26
-TOP = 52  # first colour row sits below the source radio + separator
+TOP = 84  # first colour row sits below the source radio, free-mode box + separator
 
 
 class ColorFlowSettings:
@@ -66,7 +68,11 @@ class ColorFlowSettings:
             (135, y, -MARGIN, 20), ["Layer color", "Glyph color"], isVertical=False
         )
         self.w.source.set(MODES.index(current))
-        y += 30
+        y += 28
+        free = bool(Glyphs.defaults[FREE_KEY]) if Glyphs is not None else False
+        self.w.freeMode = CheckBox((MARGIN, y, -MARGIN, 20),
+                                   "Free mode (independent steps)", value=free)
+        y += 26
         self.w.separator = HorizontalLine((MARGIN, y, -MARGIN, 1))
 
         for position in range(len(self.rows)):
@@ -145,6 +151,8 @@ class ColorFlowSettings:
             return
         if self.font is not None:
             self.font.userData[MODE_KEY] = MODES[self.w.source.get()]
+        if Glyphs is not None:
+            Glyphs.defaults[FREE_KEY] = bool(self.w.freeMode.get())
         self.w.close()
         try:
             self.plugin.reload_after_settings()

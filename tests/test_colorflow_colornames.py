@@ -508,3 +508,19 @@ def test_settings_round_trip():
     rows2, none2 = cc.parse_settings(text)
     assert none2 == "None"
     assert rows2[:3] == rows  # order + visibility + labels preserved
+
+
+# --------------------------------------------------------------------------- #
+# highest_checked (free mode -> native layer colour)
+# --------------------------------------------------------------------------- #
+
+def test_highest_checked_returns_top_checked_index():
+    assert cc.highest_checked({"0": True, "1": False, "3": True}, ["0", "1", "2", "3"]) == 3
+
+
+def test_highest_checked_none_when_empty():
+    assert cc.highest_checked({"0": False, "1": False}, ["0", "1"]) is None
+
+
+def test_highest_checked_ignores_keys_outside_order():
+    assert cc.highest_checked({"0": True, "9": True}, ["0", "1"]) == 0

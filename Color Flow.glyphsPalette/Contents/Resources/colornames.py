@@ -193,6 +193,19 @@ def checked_state_for_color(color, order: list[str]) -> dict[str, bool]:
     return state
 
 
+def highest_checked(state: dict[str, bool], order: list[str]) -> int | None:
+    """Highest checked step index, or ``None`` if none are checked.
+
+    Used in free mode to set ``layer.color`` (so a glyph still gets a native
+    colour for the Font-View grouping) when the checkboxes are independent and
+    no longer form a contiguous run."""
+    result: int | None = None
+    for index in order:
+        if index in state and state[index]:
+            result = int(index)
+    return result
+
+
 def counts_from_colors(colors: list, order: list[str]) -> dict[str, int]:
     """Per-step checked counts derived purely from native layer colors.
 

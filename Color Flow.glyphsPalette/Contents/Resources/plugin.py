@@ -470,16 +470,43 @@ class ColorFlow(PalettePlugin):
 
 	# ------------------------------------------------------------------ derived data (tempData)
 
-	# Per-step counts for a master, derived from native layer colours and cached
-	# in tempData (volatile — Color Flow saves nothing in the .glyphs file).
+	# --- mode: contiguous "step" (default, nothing saved in the file) vs "free"
+	# (independent checkboxes, stored per-layer in userData). ---
+	@objc.python_method
+	def _free_mode(self):
+		return bool(Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"])
+
+	# A layer's checkbox state: in free mode from its userData (falling back to
+	# the colour-derived state), otherwise derived from layer.color.
+	@objc.python_method
+	def _layer_state(self, layer, order):
+		if self._free_mode():
+			stored = layer.userData["com.hugojourdan.ColorFlow"]
+			if stored:
+				return {index: bool(index in stored and stored[index]) for index in order}
+		return colornames.checked_state_for_color(layer.color, order)
+
+	# Persist a layer's state: free mode stores it in userData + sets layer.color
+	# to the highest checked step; step mode sets only the derived layer.color.
+	@objc.python_method
+	def _apply_state(self, layer, state, order):
+		if self._free_mode():
+			layer.userData["com.hugojourdan.ColorFlow"] = {index: bool(state.get(index, False)) for index in order}
+			layer.color = colornames.highest_checked(state, order)
+		else:
+			layer.color = colornames.layer_color_for_state(state, order)
+
+	# Per-step counts for a master, derived from layer state and cached in
+	# tempData (volatile). In step mode nothing is saved in the .glyphs file.
 	@objc.python_method
 	def _derive_counts(self, masterId):
 		order = list(self.meaning.keys())
-		colors = []
+		states = []
 		for glyph in self.font.glyphs:
 			layer = glyph.layers[masterId]
-			colors.append(layer.color if layer is not None else None)
-		return colornames.counts_from_colors(colors, order)
+			if layer is not None:
+				states.append(self._layer_state(layer, order))
+		return colornames.count_states(states, order)
 
 	@objc.python_method
 	def _counts(self, masterId):
@@ -527,7 +554,7 @@ class ColorFlow(PalettePlugin):
 			setattr(self.paletteView.frame, "masterName", TextBox((6, 2.6, 140, 20), masterName, alignment="left", sizeStyle='small'))
 
 			selectedLayers = self.font.selectedLayers or []
-			selStates = [colornames.checked_state_for_color(layer.color, order) for layer in selectedLayers]
+			selStates = [self._layer_state(layer, order) for layer in selectedLayers]
 			firstColor = selectedLayers[0].color if selectedLayers else None
 
 			for color, meaning in self.meaning.items():
@@ -623,9 +650,9 @@ class ColorFlow(PalettePlugin):
 		self.font.disableUpdateInterface()
 		try:
 			for layer in self.font.selectedLayers:
-				state = colornames.checked_state_for_color(layer.color, order)
+				state = self._layer_state(layer, order)
 				state[color] = checked
-				layer.color = colornames.layer_color_for_state(state, order)
+				self._apply_state(layer, state, order)
 			self._invalidate_counts(masterId)
 		finally:
 			self.font.enableUpdateInterface()
