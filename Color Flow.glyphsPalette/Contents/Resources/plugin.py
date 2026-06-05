@@ -84,8 +84,17 @@ class ColorFlow(PalettePlugin):
 		self.paletteView.frame.actionButton = Button((self.width-26, 1, 26, 17),
 			"⋯", callback=self.Open_Action_Popover, sizeStyle='small')
 
+		# Eye toggle: enter an inline visibility-edit mode (show every colour; click
+		# a row to stage show/hide; press again to apply + collapse to visible-only).
+		self._eye_mode = False
+		self._eye_rows = None
+		self._eye_none = ""
+		self._eyeRowViews = {}
+		self.paletteView.frame.eyeButton = Button((self.width-50, 1, 22, 17),
+			"👁", callback=self._toggle_eye_mode, sizeStyle='small')
+
 		# Separator lines + colour tags (depend on the meaning order/visibility).
-		# Per-row widgets (checkbox / bar / count) are built by Update_Plugin_UI.
+		# Per-row widgets (label / bar / count) are built by Update_Plugin_UI.
 		self._rowChecks = {}
 		self._build_static_rows()
 
@@ -126,7 +135,7 @@ class ColorFlow(PalettePlugin):
 	def reload_after_settings(self):
 		self.meaning = self.Load_Meaning()
 		for i in range(12):
-			for suffix in ("line", "colorTag", "", "box", "count"):
+			for suffix in ("line", "colorTag", "", "box", "count", "hl", "eye", "eyeTag", "eyeLine"):
 				attr = str(i) + suffix
 				if hasattr(self.paletteView.frame, attr):
 					delattr(self.paletteView.frame, attr)
@@ -419,7 +428,7 @@ class ColorFlow(PalettePlugin):
 			return
 		# Hide the label text + count so they don't show through the editor.
 		try:
-			checkbox.setTitle("")
+			checkbox.set("")
 		except Exception:
 			pass
 		countAttr = str(color) + "count"
@@ -759,7 +768,7 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def Update_Plugin_UI(self):
 		try:
-			if not self.font or not self.meaning:
+			if not self.font or not self.meaning or getattr(self, "_eye_mode", False):
 				return
 			self._rowChecks = {}
 			yPos = 36
@@ -773,7 +782,7 @@ class ColorFlow(PalettePlugin):
 			firstColor = selectedLayers[0].color if selectedLayers else None
 
 			for color, meaning in self.meaning.items():
-				for suffix in ("", "box", "count"):
+				for suffix in ("", "box", "count", "hl"):
 					attr = str(color) + suffix
 					if hasattr(self.paletteView.frame, attr):
 						delattr(self.paletteView.frame, attr)
@@ -784,13 +793,16 @@ class ColorFlow(PalettePlugin):
 
 				if selectedLayers:
 					check = all(state.get(color, False) for state in selStates)
+					if check:
+						rgb = self.colorKeys[str(color)]
+						setattr(self.paletteView.frame, str(color)+"hl", Box((0, yPos-self.shift-1, self.width, 22), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.16), cornerRadius=0, borderWidth=0))
 					if barWidth:
 						if check and firstColor == int(color):
 							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
 						else:
 							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.06)
 						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 22), fillColor=fill, cornerRadius=0, borderWidth=0))
-					checkbox = CheckBox((12, yPos-self.shift, -10, 20), meaning, value=check, callback=self.CheckBox_Callback, sizeStyle='small')
+					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
 					self._attach_rename(checkbox, color)
 					if glyphCount and count >= glyphCount:
@@ -802,7 +814,7 @@ class ColorFlow(PalettePlugin):
 					if barWidth:
 						fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
 						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 22), fillColor=fill, cornerRadius=0, borderWidth=0))
-					checkbox = CheckBox((12, yPos-self.shift, -10, 20), meaning, value=False, callback=self.CheckBox_Callback, sizeStyle='small')
+					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
 					self._attach_rename(checkbox, color)
 					if glyphCount and count >= glyphCount:
@@ -962,4 +974,118 @@ class ColorFlow(PalettePlugin):
 	def __file__(self):
 		"""Please leave this method unchanged"""
 		return __file__
+
+	# ------------------------------------------------------------------ eye visibility mode
+
+	# ObjC selector: a single click on a colour row in eye mode toggles whether
+	# that colour is staged visible or hidden.
+	def eyeRowClicked_(self, sender):
+		try:
+			view = sender.view()
+			for key, label in getattr(self, "_eyeRowViews", {}).items():
+				if label._nsObject == view:
+					index = int(key)
+					for row in self._eye_rows:
+						if row[0] == index:
+							row[2] = not row[2]
+							break
+					self._build_eye_mode_ui()
+					return
+		except Exception:
+			import traceback
+			print("Color Flow [eye click] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _toggle_eye_mode(self, sender):
+		try:
+			if self._eye_mode:
+				self._exit_eye_mode()
+			else:
+				self._enter_eye_mode()
+		except Exception:
+			import traceback
+			print("Color Flow [eye toggle] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _set_eye_button(self, on):
+		try:
+			self.paletteView.frame.eyeButton.setTitle("🙈" if on else "👁")
+		except Exception:
+			pass
+
+	@objc.python_method
+	def _eye_key_path(self):
+		font = Glyphs.font
+		fontDir = os.path.dirname(font.filepath) if (font is not None and font.filepath) else None
+		return colornames.resolve_key_file(fontDir)
+
+	@objc.python_method
+	def _enter_eye_mode(self):
+		path = self._eye_key_path()
+		text = colornames.read_color_names(path) or colornames.DEFAULT_COLOR_NAMES
+		rows, none_label = colornames.parse_settings(text)
+		self._eye_rows = [[index, label, visible] for index, label, visible in rows]
+		self._eye_none = none_label
+		self._eye_mode = True
+		self._set_eye_button(True)
+		self.height = 22 * len(self._eye_rows) + 25
+		try:
+			self.paletteView.frame.setPosSize((0, 0, self.width, self.height))
+			self.paletteView.setPosSize((0, 0, self.width, self.height + 10))
+		except Exception:
+			pass
+		self._build_eye_mode_ui()
+
+	@objc.python_method
+	def _exit_eye_mode(self):
+		self._eye_mode = False
+		self._set_eye_button(False)
+		rows = [(index, label, visible) for index, label, visible in (self._eye_rows or [])]
+		if rows:
+			path = self._eye_key_path()
+			colornames.write_color_names(path, colornames.render_settings(rows, self._eye_none))
+		self._teardown_eye_rows()
+		self.reload_after_settings()
+
+	@objc.python_method
+	def _teardown_eye_rows(self):
+		for index in range(12):
+			for suffix in ("eye", "eyeTag", "eyeLine"):
+				attr = str(index) + suffix
+				if hasattr(self.paletteView.frame, attr):
+					delattr(self.paletteView.frame, attr)
+		self._eyeRowViews = {}
+
+	# Render every colour (visible + hidden) as a click-to-toggle row; hidden rows
+	# are dimmed. A 1-click gesture per label flips its staged visibility.
+	@objc.python_method
+	def _build_eye_mode_ui(self):
+		for index in range(12):
+			for suffix in ("", "box", "count", "hl", "colorTag", "line", "eye", "eyeTag", "eyeLine"):
+				attr = str(index) + suffix
+				if hasattr(self.paletteView.frame, attr):
+					delattr(self.paletteView.frame, attr)
+		self._eyeRowViews = {}
+		yPos = 36
+		for index, label, visible in (self._eye_rows or []):
+			key = str(index)
+			rgb = self.colorKeys.get(key, (0.5, 0.5, 0.5, 0.5))
+			alpha = 0.5 if visible else 0.12
+			setattr(self.paletteView.frame, key+"eyeTag", Box((0, yPos-self.shift-1, 3, 22), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], alpha), cornerRadius=0, borderWidth=0))
+			shown = label or colornames.DEFAULT_LABELS.get(index, key)
+			textbox = TextBox((12, yPos-self.shift+2, -10, 20), shown, sizeStyle='small')
+			setattr(self.paletteView.frame, key+"eye", textbox)
+			try:
+				field = textbox.getNSTextField()
+				field.setTextColor_(AppKit.NSColor.labelColor() if visible else AppKit.NSColor.tertiaryLabelColor())
+			except Exception:
+				pass
+			self._eyeRowViews[key] = textbox
+			try:
+				recognizer = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "eyeRowClicked:")
+				recognizer.setNumberOfClicksRequired_(1)
+				textbox._nsObject.addGestureRecognizer_(recognizer)
+			except Exception:
+				pass
+			yPos += 22
 
