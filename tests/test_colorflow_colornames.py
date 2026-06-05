@@ -524,3 +524,23 @@ def test_highest_checked_none_when_empty():
 
 def test_highest_checked_ignores_keys_outside_order():
     assert cc.highest_checked({"0": True, "9": True}, ["0", "1"]) == 0
+
+
+# --------------------------------------------------------------------------- #
+# Free mode = single-select (derived from layer.color, no userData)
+# --------------------------------------------------------------------------- #
+
+def test_exclusive_state_checks_only_the_matching_colour():
+    assert cc.exclusive_state_for_color(2, ["0", "1", "2", "3"]) == {
+        "0": False, "1": False, "2": True, "3": False
+    }
+
+
+def test_exclusive_state_all_false_for_none():
+    assert cc.exclusive_state_for_color(None, ["0", "1"]) == {"0": False, "1": False}
+
+
+def test_single_counts_count_exact_colour_matches():
+    assert cc.single_counts_from_colors([0, 0, 2, None], ["0", "1", "2"]) == {
+        "0": 2, "1": 0, "2": 1
+    }

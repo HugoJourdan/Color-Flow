@@ -476,37 +476,26 @@ class ColorFlow(PalettePlugin):
 	def _free_mode(self):
 		return bool(Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"])
 
-	# A layer's checkbox state: in free mode from its userData (falling back to
-	# the colour-derived state), otherwise derived from layer.color.
+	# A layer's checkbox state, derived from its colour. Free mode is single-
+	# select (only the matching colour); step mode is the contiguous run.
 	@objc.python_method
 	def _layer_state(self, layer, order):
 		if self._free_mode():
-			stored = layer.userData["com.hugojourdan.ColorFlow"]
-			if stored:
-				return {index: bool(index in stored and stored[index]) for index in order}
+			return colornames.exclusive_state_for_color(layer.color, order)
 		return colornames.checked_state_for_color(layer.color, order)
 
-	# Persist a layer's state: free mode stores it in userData + sets layer.color
-	# to the highest checked step; step mode sets only the derived layer.color.
-	@objc.python_method
-	def _apply_state(self, layer, state, order):
-		if self._free_mode():
-			layer.userData["com.hugojourdan.ColorFlow"] = {index: bool(state.get(index, False)) for index in order}
-			layer.color = colornames.highest_checked(state, order)
-		else:
-			layer.color = colornames.layer_color_for_state(state, order)
-
-	# Per-step counts for a master, derived from layer state and cached in
-	# tempData (volatile). In step mode nothing is saved in the .glyphs file.
+	# Per-step counts for a master, derived from native layer colours. Nothing
+	# Color Flow tracks is saved in the .glyphs file, in either mode.
 	@objc.python_method
 	def _derive_counts(self, masterId):
 		order = list(self.meaning.keys())
-		states = []
+		colors = []
 		for glyph in self.font.glyphs:
 			layer = glyph.layers[masterId]
-			if layer is not None:
-				states.append(self._layer_state(layer, order))
-		return colornames.count_states(states, order)
+			colors.append(layer.color if layer is not None else None)
+		if self._free_mode():
+			return colornames.single_counts_from_colors(colors, order)
+		return colornames.counts_from_colors(colors, order)
 
 	@objc.python_method
 	def _counts(self, masterId):
@@ -650,9 +639,13 @@ class ColorFlow(PalettePlugin):
 		self.font.disableUpdateInterface()
 		try:
 			for layer in self.font.selectedLayers:
-				state = self._layer_state(layer, order)
-				state[color] = checked
-				self._apply_state(layer, state, order)
+				if self._free_mode():
+					# single-select: this colour exclusively, or clear if re-clicked
+					layer.color = int(color) if checked else None
+				else:
+					state = colornames.checked_state_for_color(layer.color, order)
+					state[color] = checked
+					layer.color = colornames.layer_color_for_state(state, order)
 			self._invalidate_counts(masterId)
 		finally:
 			self.font.enableUpdateInterface()

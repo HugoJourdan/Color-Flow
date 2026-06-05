@@ -193,6 +193,25 @@ def checked_state_for_color(color, order: list[str]) -> dict[str, bool]:
     return state
 
 
+def exclusive_state_for_color(color, order: list[str]) -> dict[str, bool]:
+    """Free-mode (single-select) checkbox state: only the step matching the
+    native ``layer.color`` is checked. Fully derived from the colour, so free
+    mode (like step mode) saves nothing in the .glyphs file."""
+    return {index: (color is not None and int(index) == color) for index in order}
+
+
+def single_counts_from_colors(colors: list, order: list[str]) -> dict[str, int]:
+    """Free-mode per-step counts: how many layers have *exactly* each colour."""
+    counts = {index: 0 for index in order}
+    for color in colors:
+        if color is None:
+            continue
+        key = str(color)
+        if key in counts:
+            counts[key] += 1
+    return counts
+
+
 def highest_checked(state: dict[str, bool], order: list[str]) -> int | None:
     """Highest checked step index, or ``None`` if none are checked.
 

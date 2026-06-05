@@ -82,21 +82,14 @@ def _color_flow_toggle():
     order = list(meaning.keys())
     if _COLOR_CHECK not in meaning:
         return  # this color is hidden in the current colorNames.txt
-    _LAYER_KEY = "com.hugojourdan.ColorFlow"
     free = bool(Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"])
+    target = int(_COLOR_CHECK)
     for layer in layers:
         if free:
-            # Independent steps: state lives in userData; layer.color = highest.
-            stored = layer.userData[_LAYER_KEY]
-            if stored:
-                state = {i: bool(i in stored and stored[i]) for i in order}
-            else:
-                state = checked_state_for_color(layer.color, order)
-            state[_COLOR_CHECK] = not state.get(_COLOR_CHECK, False)
-            layer.userData[_LAYER_KEY] = {i: bool(state.get(i, False)) for i in order}
-            layer.color = highest_checked(state, order)
+            # single-select: toggle this colour exclusively (clear if re-pressed)
+            layer.color = None if layer.color == target else target
         else:
-            # Contiguous steps: derive from layer.color, nothing saved in the file.
+            # contiguous steps: derive from layer.color, nothing saved in the file
             state = checked_state_for_color(layer.color, order)
             state[_COLOR_CHECK] = not state.get(_COLOR_CHECK, False)
             layer.color = layer_color_for_state(state, order)
