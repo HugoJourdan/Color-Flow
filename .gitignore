@@ -10,3 +10,6 @@ __pycache__/
 
 # Stray Glyphs support tree accidentally created by no-$HOME test runs
 /Library/
+
+# Brainstorming visual companion mockups
+.superpowers/
