@@ -106,7 +106,7 @@ class ColorFlow(PalettePlugin):
 		yPos = 36
 		for k, v in self.meaning.items():
 			if v:
-				setattr(self.paletteView.frame, str(k)+"colorTag", Box((0, yPos+1-self.shift, 3, 16), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
+				setattr(self.paletteView.frame, str(k)+"colorTag", Box((0, yPos-self.shift-1, 3, 22), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
 				yPos += 22
 
 		# Per-row widgets (checkbox / bar / count) are built by Update_Plugin_UI,
@@ -457,7 +457,7 @@ class ColorFlow(PalettePlugin):
 							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
 						else:
 							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.06)
-						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos+1-self.shift, barWidth+0.01, 16), fillColor=fill, cornerRadius=0, borderWidth=0))
+						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 22), fillColor=fill, cornerRadius=0, borderWidth=0))
 					checkbox = CheckBox((12, yPos-self.shift, -10, 20), meaning, value=check, callback=self.CheckBox_Callback, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
 					self._attach_rename(checkbox, color)
@@ -469,7 +469,7 @@ class ColorFlow(PalettePlugin):
 				else:
 					if barWidth:
 						fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
-						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos+1-self.shift, barWidth+0.01, 16), fillColor=fill, cornerRadius=0, borderWidth=0))
+						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 22), fillColor=fill, cornerRadius=0, borderWidth=0))
 					checkbox = CheckBox((12, yPos-self.shift, -10, 20), meaning, value=False, callback=self.CheckBox_Callback, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
 					self._attach_rename(checkbox, color)
