@@ -5,9 +5,29 @@ description = "Dev tooling and tests for the Color Flow Glyphs plugin (not shipp
 requires-python = ">=3.9"
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "pytest-xdist>=3", "ruff>=0.6", "pyright>=1.1.380"]
 
 # This repo is a Glyphs plugin, not an installable Python package — only its
 # pure-logic modules are unit-tested. Tell uv not to try to build/install it.
 [tool.uv]
 package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+# The plugin source lives inside the .glyphsPalette bundle (a space-containing
+# dir); list it explicitly alongside the tests.
+extend-include = ["Color Flow.glyphsPalette/Contents/Resources/*.py"]
+
+[tool.pyright]
+include = ["Color Flow.glyphsPalette/Contents/Resources", "tests"]
+# Resolve the bundle's sibling modules (colornames, colorflow_dashboard) the way
+# Glyphs does — by adding Resources/ to the path.
+extraPaths = ["Color Flow.glyphsPalette/Contents/Resources"]
+# GlyphsApp / AppKit only exist inside Glyphs; the imports are guarded at runtime.
+reportMissingImports = false
+reportMissingModuleSource = false
+pythonVersion = "3.9"
