@@ -119,26 +119,20 @@ Some extra features are accessible from the Action Button.
 _________________
 # COLOR FONT DASHBOARD
 
-A visual progress report for the whole font, opened in your browser from the
-palette's **Action Button (⋯) → Open Color Font Dashboard**.
+A contemporary, interactive progress report for the whole font, opened in your
+browser from the palette's **Action Button (⋯) → Open Color Font Dashboard**. It is
+a single self-contained HTML file — no internet, no install — that you can keep or share.
 
-* **Per-master sections** — every master gets a colour-distribution table with a
-  progress bar, count and percentage per step, plus a font-wide **Overall totals**
-  summary across all masters.
-* **Matches the palette** — the counts are exactly what the sidebar shows: the
-  same glyphs, the same Layer Color source, and the same mode. In **step mode**
-  the counts are cumulative (a glyph at a later step also counts toward the
-  earlier ones); in **free mode** each glyph counts once. The active mode is read
-  from the same setting the palette uses, so the two never disagree. The Overall
-  headline shows **completion** (glyphs that reached the final step) and
-  **started** (glyphs with any colour).
-* **Per-glyph heatmap** — a collapsible grid of the *unfinished* glyphs (in glyph
-  order), so you can spot exactly which ones still need work.
-* **Changed since last run** — each report remembers the previous run and lists
-  the glyphs whose colour changed since. This snapshot is stored in Glyphs'
-  preferences keyed by file path — **not** in your `.glyphs` file and **not** in a
-  sidecar file, so your source stays clean while the diff survives across sessions.
-* **Light & dark** — the report follows your system appearance.
+* **Search & filter** — find glyphs by name (press `/`), show only unfinished glyphs.
+* **Master tabs + Compare** — focus one master, or switch to a steps × masters matrix
+  to see which master lags on which step.
+* **Sort** — order steps by your workflow (`colorNames.txt`) or by progress.
+* **Per-glyph heatmap** — hover a cell for the glyph name + colour; click to copy the name.
+* **Light & dark** — follows your system, with a one-click toggle that remembers your choice.
+* **Matches the palette** — counts are exactly what the sidebar shows (same glyphs, same
+  Layer Color source, same step/free mode). Overall shows **completion** and **started**.
+* **Changed since last run** — lists glyphs whose colour changed since the previous open;
+  the snapshot lives in Glyphs' preferences, not in your `.glyphs` file.
 
 <br>
 
