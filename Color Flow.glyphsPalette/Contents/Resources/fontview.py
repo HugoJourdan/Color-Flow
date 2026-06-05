@@ -127,6 +127,36 @@ class FontViewGrouping:
         self.load(font)
         self.rebuild(font)
 
+    # --------------------------------------------------- keep our order out of saves
+    def _is_color_flow_order(self, value) -> bool:
+        """True only for a glyphOrder value WE wrote (tagged with our header), so
+        we never disturb a glyphOrder the user set themselves."""
+        try:
+            return bool(value) and not isinstance(value, str) and str(value[0]).startswith(HEADER)
+        except Exception:
+            return False
+
+    def strip_for_save(self, font) -> bool:
+        """Before a save: if our grouping order is the active glyphOrder, swap it
+        back to the user's own order (or remove it) so it is not written to the
+        file. Returns True if it changed anything (caller restores afterwards).
+        Never touches a glyphOrder that isn't ours."""
+        if font is None or not self.is_enabled(font):
+            return False
+        if not self._is_color_flow_order(font.customParameters[GLYPH_ORDER]):
+            return False  # the active glyphOrder is the user's — leave it alone
+        if bool(font.userData[HAD_ORDER_KEY]):
+            saved = font.userData[SAVED_ORDER_KEY]
+            font.customParameters[GLYPH_ORDER] = saved if saved else []
+        else:
+            self._remove_glyph_order(font)
+        return True
+
+    def restore_after_save(self, font) -> None:
+        """After a save: re-apply our grouping order in memory."""
+        if font is not None and self.is_enabled(font):
+            self.rebuild(font)
+
     # ----------------------------------------------------------- dirty check
     def is_dirty(self, font) -> bool:
         """Cheap O(selection) test for whether a rebuild is warranted."""

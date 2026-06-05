@@ -141,12 +141,24 @@ class ColorFlow(PalettePlugin):
 		# fully wrapped so a problem here can never stop the palette from loading.
 		self.fontview = fontview.FontViewGrouping()
 		self._pendingFont = None
+		self._strippedForSave = False
 		try:
 			self._install_rainbow_menu()
 			self._rainbow_conflict_check()
 		except Exception:
 			import traceback
 			print("Color Flow [Rainbow setup] error:\n" + traceback.format_exc())
+
+		# Keep our grouping glyphOrder OUT of the saved .glyphs file: strip it
+		# just before each save, restore it after. Glyphs has no DOCUMENTWILLSAVE
+		# callback, so observe Cocoa's NSDocument save notifications.
+		try:
+			from Foundation import NSNotificationCenter
+			center = NSNotificationCenter.defaultCenter()
+			center.addObserver_selector_name_object_(self, "documentWillSave:", "NSDocumentWillSaveNotification", None)
+			center.addObserver_selector_name_object_(self, "documentDidSave:", "NSDocumentDidSaveNotification", None)
+		except Exception:
+			pass
 
 
 	########################################################################################################
@@ -253,6 +265,48 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [Rainbow rebuild] error:\n" + traceback.format_exc())
+
+	# --- keep our grouping order out of saved files (Cocoa save notifications) ---
+
+	def documentWillSave_(self, notification):
+		self._strippedForSave = False
+		try:
+			font = self._font_from_document(notification.object())
+			if font is not None and getattr(self, "fontview", None) is not None:
+				self._strippedForSave = bool(self.fontview.strip_for_save(font))
+		except Exception:
+			import traceback
+			print("Color Flow [will-save] error:\n" + traceback.format_exc())
+
+	def documentDidSave_(self, notification):
+		try:
+			document = notification.object()
+			font = self._font_from_document(document)
+			if (font is not None and getattr(self, "fontview", None) is not None
+					and getattr(self, "_strippedForSave", False)):
+				self.fontview.restore_after_save(font)
+				try:
+					document.updateChangeCount_(2)  # NSChangeCleared: re-add is transient
+				except Exception:
+					pass
+		except Exception:
+			import traceback
+			print("Color Flow [did-save] error:\n" + traceback.format_exc())
+		self._strippedForSave = False
+
+	@objc.python_method
+	def _font_from_document(self, document):
+		if document is None:
+			return None
+		font = getattr(document, "font", None)
+		if callable(font):
+			try:
+				font = document.font()
+			except Exception:
+				font = None
+		if font is None and hasattr(document, "glyphs") and hasattr(document, "userData"):
+			font = document  # the notification object is already a GSFont
+		return font
 
 	# --- python callbacks (action menu + the ObjC toggle target) ---
 
@@ -763,6 +817,12 @@ class ColorFlow(PalettePlugin):
 			self.reportCallbackRegistered = False
 		# Remove the Rainbow Font View menu item this instance added.
 		self._teardown_rainbow_menu()
+		# Remove the Cocoa save-notification observers.
+		try:
+			from Foundation import NSNotificationCenter
+			NSNotificationCenter.defaultCenter().removeObserver_(self)
+		except Exception:
+			pass
 
 
 	@objc.python_method
