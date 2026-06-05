@@ -74,7 +74,7 @@ class ColorFlow(PalettePlugin):
 		self.shift = 10
 		self.barWidth = self.width+6
 		self.height = 22 * len([x for x in self.meaning.values() if x]) + 25
-		self.xPos = 9
+		self.xPos = 0  # progress bar flush to the left edge (no margin)
 
 		self.paletteView = Window((self.width, self.height + 10))
 		self.paletteView.frame = Group((0, 0, self.width, self.height))
