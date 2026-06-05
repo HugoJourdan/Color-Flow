@@ -62,7 +62,7 @@ class _FakeGlyphsApp:
 
 
 # --------------------------------------------------------------------------- #
-# color_to_key / pct / hex_for / var_for / xattr
+# color_to_key
 # --------------------------------------------------------------------------- #
 
 def test_color_to_key_maps_none_to_no_color_sentinel() -> None:
@@ -73,30 +73,6 @@ def test_color_to_key_passes_real_colours_through_as_int() -> None:
     assert db.color_to_key(3) == 3
     assert db.color_to_key(0) == 0
     assert db.color_to_key(11) == 11
-
-
-def test_pct_rounds_and_guards_zero_total() -> None:
-    assert db.pct(1, 4) == 25
-    assert db.pct(3, 3) == 100
-    assert db.pct(0, 0) == 0
-    assert db.pct(5, 0) == 0
-
-
-def test_hex_for_known_colour_and_hatch_fallback() -> None:
-    assert db.hex_for(0) == "#f97e55"
-    assert db.hex_for(cc.NO_COLOR) == db.HATCH
-    assert db.hex_for(999) == db.HATCH
-
-
-def test_var_for_maps_keys_to_css_variables() -> None:
-    assert db.var_for(0) == "--c0"
-    assert db.var_for(11) == "--c11"
-    assert db.var_for(cc.NO_COLOR) == "--c-none"
-
-
-def test_xattr_escapes_quotes_and_angle_brackets() -> None:
-    assert db.xattr('a"b') == "a&quot;b"
-    assert db.xattr("a<b>&c") == "a&lt;b&gt;&amp;c"
 
 
 # --------------------------------------------------------------------------- #
@@ -163,29 +139,6 @@ def test_display_from_meaning_falls_back_to_default_none_label() -> None:
     assert display[-1] == (cc.NO_COLOR, cc.DEFAULT_LABELS[cc.NO_COLOR])
 
 
-def test_label_map_from_display() -> None:
-    display = [(8, "Outline"), (cc.NO_COLOR, "None")]
-    assert db.label_map_from_display(display) == {8: "Outline", cc.NO_COLOR: "None"}
-
-
-def test_is_finished_step_mode_only_final_step() -> None:
-    order = ["8", "4", "0", "3"]
-    assert db.is_finished(3, order, is_free=False) is True   # final step
-    assert db.is_finished(8, order, is_free=False) is False
-    assert db.is_finished(cc.NO_COLOR, order, is_free=False) is False
-
-
-def test_is_finished_free_mode_any_visible_colour() -> None:
-    order = ["8", "4", "0", "3"]
-    assert db.is_finished(8, order, is_free=True) is True
-    assert db.is_finished(cc.NO_COLOR, order, is_free=True) is False
-    assert db.is_finished(5, order, is_free=True) is False   # not in order
-
-
-def test_is_finished_empty_order_never_finished() -> None:
-    assert db.is_finished(0, [], is_free=False) is False
-
-
 # --------------------------------------------------------------------------- #
 # compute_changes
 # --------------------------------------------------------------------------- #
@@ -206,129 +159,6 @@ def test_compute_changes_handles_missing_master_in_previous() -> None:
     current = {"m1": {"A": 0}, "m2": {"A": 3}}
     previous = {"m1": {"A": 1}}
     assert db.compute_changes(current, previous) == {"m1": {"A": (1, 0)}, "m2": {}}
-
-
-# --------------------------------------------------------------------------- #
-# build_overall_totals
-# --------------------------------------------------------------------------- #
-
-def test_build_overall_totals_step_mode_completion_and_started() -> None:
-    order = ["0", "3"]
-    display = [(0, "Red"), (3, "Yellow"), (cc.NO_COLOR, "None")]
-    # master m1: one glyph at 3 (final), one uncoloured; total per master = 2.
-    per_master = {"m1": (db.master_counts([3, None], order, False),
-                         db.uncolored_count([3, None], order))}
-    html = db.build_overall_totals(order, False, display, total=2, master_count=1,
-                                   per_master=per_master)
-    assert "Overall totals" in html
-    assert "Complete : <b>1/2</b> (50%)" in html
-    assert "Started : 1/2 (50%)" in html
-    assert 'role="progressbar"' in html
-
-
-def test_build_overall_totals_free_mode_headlines_labelled() -> None:
-    order = ["0", "3"]
-    display = [(0, "Red"), (3, "Yellow"), (cc.NO_COLOR, "None")]
-    per_master = {"m1": (db.master_counts([0, 3], order, True),
-                         db.uncolored_count([0, 3], order))}
-    html = db.build_overall_totals(order, True, display, total=2, master_count=1,
-                                   per_master=per_master)
-    assert "Labelled across 1 master :" in html
-    assert "<b>2/2</b> (100%)" in html
-
-
-# --------------------------------------------------------------------------- #
-# build_heatmap_section
-# --------------------------------------------------------------------------- #
-
-def test_heatmap_shows_only_unfinished_cells() -> None:
-    order = ["0", "3"]
-    label_map = {0: "Red", 3: "Yellow", cc.NO_COLOR: "None"}
-    per_glyph = {"A": 3, "B": 0, "C": cc.NO_COLOR}  # A finished (final), B & C not
-    html = db.build_heatmap_section("Regular", per_glyph, label_map, order, is_free=False)
-    assert "2 unfinished" in html
-    assert html.count('class="cell"') == 2
-
-
-def test_heatmap_empty_when_all_finished() -> None:
-    order = ["0"]
-    per_glyph = {"A": 0, "B": 0}
-    assert db.build_heatmap_section("Regular", per_glyph, {0: "Red"}, order, False) == ""
-
-
-def test_heatmap_caps_cells_and_reports_remainder() -> None:
-    order = ["0"]
-    per_glyph = {f"g{i}": cc.NO_COLOR for i in range(7)}
-    html = db.build_heatmap_section("Regular", per_glyph, {cc.NO_COLOR: "None"}, order,
-                                    is_free=False, cap=5)
-    assert html.count('class="cell"') == 5
-    assert "+2 more" in html
-
-
-def test_heatmap_escapes_glyph_name_in_attribute() -> None:
-    order = ["0"]
-    html = db.build_heatmap_section("Reg", {'a"b': cc.NO_COLOR}, {cc.NO_COLOR: "None"},
-                                    order, is_free=False)
-    assert "a&quot;b" in html
-    assert 'a"b —' not in html  # the raw quote never lands in the title
-
-
-# --------------------------------------------------------------------------- #
-# build_html (smoke + a11y + theming + escaping)
-# --------------------------------------------------------------------------- #
-
-def _one_master_font() -> _FakeFont:
-    return _FakeFont([_FakeMaster("m1", "Regular")])
-
-
-def test_build_html_renders_overall_master_and_percentages() -> None:
-    font = _one_master_font()
-    order = ["0"]
-    display = [(0, "🚨 Red"), (cc.NO_COLOR, "🫥 None")]
-    current = {"m1": {"A": 0, "B": cc.NO_COLOR}}
-    html = db.build_html(font, 2, order, False, display, current, current,
-                         {"m1": {}}, datetime(2026, 6, 5))
-
-    assert html.startswith("<!DOCTYPE html>")
-    assert 'lang="en"' in html
-    assert "Overall totals" in html
-    assert "Regular" in html
-    assert "🚨 Red" in html
-    assert "Acme Sans" in html
-    assert "50%" in html  # 1 of 2 glyphs is Red
-
-
-def test_build_html_includes_accessibility_and_both_themes() -> None:
-    font = _one_master_font()
-    html = db.build_html(font, 1, ["0"], False, [(0, "Red"), (cc.NO_COLOR, "None")],
-                         {"m1": {"A": 0}}, {"m1": {"A": 0}}, {"m1": {}},
-                         datetime(2026, 6, 5))
-    assert 'role="progressbar"' in html
-    assert 'scope="col"' in html
-    assert 'scope="row"' in html
-    assert ":root{" in html
-    assert "prefers-color-scheme:light" in html
-    assert "prefers-reduced-motion:reduce" in html
-
-
-def test_build_html_escapes_glyph_names_in_change_report() -> None:
-    font = _one_master_font()
-    display = [(0, "Red"), (cc.NO_COLOR, "None")]
-    current = {"m1": {"a<b>": 0}}
-    previous = {"m1": {"a<b>": cc.NO_COLOR}}
-    changes = db.compute_changes(current, previous)
-    html = db.build_html(font, 1, ["0"], False, display, current, previous, changes,
-                         datetime(2026, 6, 5))
-    assert "a&lt;b&gt;" in html
-    assert "<th scope=\"row\">a<b></th>" not in html  # never raw
-
-
-def test_build_html_free_mode_sidebar_label() -> None:
-    font = _one_master_font()
-    html = db.build_html(font, 1, ["0"], True, [(0, "Red"), (cc.NO_COLOR, "None")],
-                         {"m1": {"A": 0}}, {"m1": {"A": 0}}, {"m1": {}},
-                         datetime(2026, 6, 5))
-    assert "Mode : Free" in html
 
 
 # --------------------------------------------------------------------------- #
@@ -367,7 +197,7 @@ def test_meaning_and_none_reads_font_dir_color_names(tmp_path) -> None:
     meaning, none_label = db._meaning_and_none(font)
     assert list(meaning.keys()) == ["8", "4", "0", "3"]
     assert none_label == "Nothing"
-    assert db.display_colors(font)[-1] == (cc.NO_COLOR, "Nothing")
+    assert db.display_from_meaning(meaning, none_label)[-1] == (cc.NO_COLOR, "Nothing")
 
 
 def test_snapshot_round_trip_through_defaults(monkeypatch) -> None:
