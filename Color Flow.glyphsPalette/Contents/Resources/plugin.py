@@ -301,15 +301,24 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _begin_rename(self, color):
+		self._cancel_rename()
+		self.Update_Plugin_UI()  # rebuild a clean row before overlaying the editor
 		checkbox = getattr(self, "_rowChecks", {}).get(color)
 		if checkbox is None:
 			return
-		self._cancel_rename()
 		try:
-			pos = checkbox.getPosSize()  # place the editor exactly over the checkbox
+			rowY = checkbox.getPosSize()[1]
 		except Exception:
 			return
-		editor = EditText(pos, self.meaning.get(color, ""),
+		# Hide the label text + count so they don't show through the editor.
+		try:
+			checkbox.setTitle("")
+		except Exception:
+			pass
+		countAttr = str(color) + "count"
+		if hasattr(self.paletteView.frame, countAttr):
+			delattr(self.paletteView.frame, countAttr)
+		editor = EditText((32, rowY, -8, 20), self.meaning.get(color, ""),
 			callback=self._commit_rename, continuous=False, sizeStyle='small')
 		setattr(self.paletteView.frame, "renameEditor", editor)
 		self._renameColor = color
