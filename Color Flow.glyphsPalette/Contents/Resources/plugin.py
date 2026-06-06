@@ -27,6 +27,7 @@ from GlyphsApp import *
 # scripts by tools/generate_shortcuts.py). Glyphs puts this bundle's Resources/
 # dir on sys.path, so a plain absolute import works.
 import colornames
+import labelcolors
 # Font-View colour grouping engine (the merged Rainbow FontView half).
 import fontview
 
@@ -61,6 +62,13 @@ class ColorFlow(PalettePlugin):
 						"10":(0.50, 0.50, 0.50, 0.5),
 						"11":(0.25, 0.25, 0.25, 0.5)
 						}
+		# Override the hardcoded defaults with the user's Glyphs label colours
+		# (read live; the dict above is the fallback). Alpha stays at the palette's
+		# 0.5 convention so only the hue follows the label colour.
+		try:
+			self.colorKeys = self._label_color_keys()
+		except Exception:
+			pass
 		# A colorNames.txt problem must never crash plugin load — degrade to an
 		# empty palette instead of taking the whole plugin down.
 		try:
@@ -117,6 +125,13 @@ class ColorFlow(PalettePlugin):
 			self._heightConstraint = None
 
 	# Separator lines + colour tags from the current meaning (order + visibility).
+	# {"0".."11": (r, g, b, 0.5)} from the user's Glyphs label colours, keeping the
+	# palette's 0.5 alpha so only the hue follows the label colour.
+	@objc.python_method
+	def _label_color_keys(self):
+		colors = labelcolors.read_label_colors()
+		return {str(index): (rgba[0], rgba[1], rgba[2], 0.5) for index, rgba in enumerate(colors)}
+
 	@objc.python_method
 	def _build_static_rows(self):
 		yPos = 25
@@ -213,7 +228,7 @@ class ColorFlow(PalettePlugin):
 	def Open_Action_Popover(self, sender):
 		try:
 			button = self._ns_button(sender)
-			self._popover = Popover((220, 100), parentView=button,
+			self._popover = Popover((220, 214), parentView=button,
 				preferredEdge='bottom', behavior='semitransient')
 			popover = self._popover
 			popover.dashboard = Button((12, 12, -12, 22), "Open Color Font Dashboard",
@@ -224,6 +239,20 @@ class ColorFlow(PalettePlugin):
 				[dict(title="Disable"), dict(title="Glyph"), dict(title="Layer")],
 				callback=self._popover_rainbow, sizeStyle='small')
 			popover.rainbow.set(self._rainbow_segment_index())
+			popover.lcSep = HorizontalLine((12, 96, -12, 1))
+			popover.lcLabel = TextBox((12, 104, -12, 16), "Label Colors", sizeStyle='small')
+			self._labelWells = []
+			rgbaList = labelcolors.read_label_colors()
+			for index in range(12):
+				wellColor = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(*rgbaList[index])
+				well = ColorWell((12 + (index % 6) * 33, 124 + (index // 6) * 26, 30, 22),
+					callback=self._label_color_changed, color=wellColor)
+				setattr(popover, "lcWell%d" % index, well)
+				self._labelWells.append(well)
+			popover.lcReset = Button((12, 180, 70, 18), "Reset",
+				callback=self._label_colors_reset, sizeStyle='mini')
+			popover.lcNote = TextBox((90, 181, -12, 28),
+				"Restart Glyphs to update its own views.", sizeStyle='mini')
 			popover.open()
 		except Exception:
 			import traceback
@@ -246,6 +275,40 @@ class ColorFlow(PalettePlugin):
 			except Exception:
 				pass
 			self._popover = None
+
+	# Gather all twelve wells -> write LabelColors, best-effort live-refresh the
+	# app, and refresh Color Flow's own swatches immediately.
+	@objc.python_method
+	def _label_color_changed(self, sender):
+		try:
+			colors = []
+			for well in getattr(self, "_labelWells", []):
+				native = well.get()
+				rgb = native.colorUsingColorSpaceName_("NSCalibratedRGBColorSpace") or native
+				colors.append((rgb.redComponent(), rgb.greenComponent(),
+					rgb.blueComponent(), rgb.alphaComponent()))
+			if len(colors) == 12:
+				labelcolors.write_label_colors(colors)
+				labelcolors.refresh_app_label_colors(colors)
+				self.colorKeys = self._label_color_keys()
+				self.reload_after_settings()
+		except Exception:
+			import traceback
+			print("Color Flow [label colour] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _label_colors_reset(self, sender):
+		try:
+			labelcolors.reset_label_colors()
+			rgbaList = labelcolors.read_label_colors()
+			for index, well in enumerate(getattr(self, "_labelWells", [])):
+				well.set(AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(*rgbaList[index]))
+			labelcolors.refresh_app_label_colors(rgbaList)
+			self.colorKeys = self._label_color_keys()
+			self.reload_after_settings()
+		except Exception:
+			import traceback
+			print("Color Flow [label reset] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _popover_dashboard(self, sender):
