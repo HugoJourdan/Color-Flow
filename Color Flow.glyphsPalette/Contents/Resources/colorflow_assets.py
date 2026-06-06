@@ -143,7 +143,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cat:first-child{margin-top:0}
 .cat-h{font-size:var(--fs-xs);color:var(--muted);margin:14px 0 6px;display:flex;align-items:center;gap:6px}
 .cat-n{color:var(--muted-2)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:3px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:3px}
 .cell{aspect-ratio:1;border:0;padding:0;border-radius:5px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}
 .cell.copied{outline:2px solid var(--ok);outline-offset:1px}
