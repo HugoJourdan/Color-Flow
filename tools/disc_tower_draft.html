@@ -219,7 +219,7 @@ function render(){
   ctx.save();
   ctx.translate(cx, topY+towerH+ry*0.6); ctx.scale(1,tilt);
   const sg = ctx.createRadialGradient(0,0,0,0,0,rx);
-  sg.addColorStop(0,"rgba(0,0,0,.18)"); sg.addColorStop(1,"rgba(0,0,0,0)");
+  sg.addColorStop(0,"rgba(0,0,0,.10)"); sg.addColorStop(1,"rgba(0,0,0,0)");
   ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0,0,rx*1.05,0,7); ctx.fill();
   ctx.restore();
 
@@ -234,8 +234,8 @@ function render(){
     ctx.save();
     ctx.translate(cx, cy + ry*0.5); ctx.scale(1, ry/rx);
     const sh = ctx.createRadialGradient(0,0,0,0,0,rx);
-    sh.addColorStop(0, "rgba(0,0,0,0.13)");
-    sh.addColorStop(0.7, "rgba(0,0,0,0.06)");
+    sh.addColorStop(0, "rgba(0,0,0,0.07)");
+    sh.addColorStop(0.7, "rgba(0,0,0,0.03)");
     sh.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
     ctx.restore();
