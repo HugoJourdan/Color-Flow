@@ -192,6 +192,10 @@ class ColorFlow(PalettePlugin):
 			Glyphs.addCallback(self.contextMenuHandler, CONTEXTMENUCALLBACK)
 		except Exception:
 			pass
+		try:
+			Glyphs.addCallback(self.drawHUD, DRAWFOREGROUND)
+		except Exception:
+			pass
 		self.font = Glyphs.font
 		self.init = False
 		self.update(self._windowController)
@@ -1071,6 +1075,47 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [Update_Plugin_UI] error:\n" + traceback.format_exc())
+
+	# Edit-View step HUD (#7): a small constant-size badge over the active glyph
+	# showing its current workflow step, drawn via the DRAWFOREGROUND callback.
+	@objc.python_method
+	def drawHUD(self, layer, info):
+		try:
+			if layer is None or not self.meaning:
+				return
+			scale = 1.0
+			try:
+				scale = info["Scale"] if hasattr(info, "__getitem__") else getattr(info, "scale", 1.0)
+			except Exception:
+				scale = 1.0
+			if not scale:
+				scale = 1.0
+			visible = [key for key, label in self.meaning.items() if label]
+			color = layer.color
+			key = str(color) if color is not None else None
+			if key in visible:
+				text = "%d/%d \u00b7 %s" % (visible.index(key) + 1, len(visible), self.meaning.get(key, ""))
+				rgb = self.colorKeys.get(key, (0.5, 0.5, 0.5, 0.5))
+			else:
+				text = "Uncoloured"
+				rgb = (0.5, 0.5, 0.5, 0.5)
+			asc = 800
+			try:
+				asc = layer.master.ascender
+			except Exception:
+				try:
+					asc = Glyphs.font.selectedFontMaster.ascender
+				except Exception:
+					asc = 800
+			fontSize = 11.0 / scale
+			nsColor = AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 1.0)
+			attrs = {AppKit.NSFontAttributeName: AppKit.NSFont.systemFontOfSize_(fontSize),
+				AppKit.NSForegroundColorAttributeName: nsColor}
+			badge = AppKit.NSAttributedString.alloc().initWithString_attributes_(text, attrs)
+			badge.drawAtPoint_((0, asc + 40))
+		except Exception:
+			import traceback
+			print("Color Flow [HUD] error:\n" + traceback.format_exc())
 
 	# Right-click “Set workflow step” on the Font/Edit-View selection (#6).
 	# The callback signature for a palette is not firmly documented, so the handler
