@@ -1395,7 +1395,7 @@ class ColorFlow(PalettePlugin):
 			if header is None:
 				return
 			bounds = header.bounds()
-			barWidth, barHeight = 90.0, 6.0
+			barWidth, barHeight = 55.0, 6.0
 			xPos = bounds.size.width - barWidth - 10.0
 			yPos = (bounds.size.height - barHeight) / 2.0
 			bar = AppKit.NSView.alloc().initWithFrame_(((xPos, yPos), (barWidth, barHeight)))
