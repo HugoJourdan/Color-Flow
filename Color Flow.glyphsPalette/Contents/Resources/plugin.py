@@ -988,6 +988,10 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def Update_Plugin_UI(self):
 		try:
+			for attr in getattr(self, "_metaAttrs", []):
+				if hasattr(self.paletteView.frame, attr):
+					delattr(self.paletteView.frame, attr)
+			self._metaAttrs = []
 			if not self.font or not self.meaning or getattr(self, "_eye_mode", False):
 				return
 			self._rowChecks = {}
@@ -1042,9 +1046,50 @@ class ColorFlow(PalettePlugin):
 					else:
 						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+3-self.shift, -6, 20), f"{count}/{glyphCount}", alignment="right", sizeStyle='small'))
 					yPos += 22
+			self._build_meta_strip(order, glyphCount, masterId)
 		except Exception:
 			import traceback
 			print("Color Flow [Update_Plugin_UI] error:\n" + traceback.format_exc())
+
+	# Top strip: a fire progress-streak badge (#17) and a thin 100%-stacked
+	# whole-master progress ribbon (#23), drawn in the top band above the rows so
+	# the palette height is unchanged. Torn down each rebuild via self._metaAttrs.
+	@objc.python_method
+	def _build_meta_strip(self, order, glyphCount, masterId):
+		frame = self.paletteView.frame
+		attrs = []
+		try:
+			import colorflow_dashboard
+			streak = colorflow_dashboard.progress_streak(
+				colorflow_dashboard.load_history(self.font), order, self._free_mode())
+			if streak.get("current"):
+				frame.cfStreak = TextBox((4, 2, 80, 15), "\U0001F525 %d" % streak["current"], sizeStyle='small')
+				attrs.append("cfStreak")
+		except Exception:
+			pass
+		try:
+			if glyphCount:
+				colors = []
+				for glyph in self.font.glyphs:
+					layer = glyph.layers[masterId]
+					colors.append(layer.color if layer is not None else None)
+				exclusive = colornames.single_counts_from_colors(colors, order)
+				xPos = 0.0
+				for key in order:
+					count = exclusive.get(key, 0)
+					if not count:
+						continue
+					segWidth = self.width / glyphCount * count
+					rgb = self.colorKeys.get(str(key), (0.5, 0.5, 0.5, 0.5))
+					name = "cfMini" + str(key)
+					setattr(frame, name, Box((xPos, 19, segWidth + 0.01, 5),
+						fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.9),
+						cornerRadius=0, borderWidth=0))
+					attrs.append(name)
+					xPos += segWidth
+		except Exception:
+			pass
+		self._metaAttrs = attrs
 
 	# UPDATEINTERFACE handler: cheap dirty-check on selection + layer colours.
 	@objc.python_method
