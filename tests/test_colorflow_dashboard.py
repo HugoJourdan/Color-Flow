@@ -186,6 +186,60 @@ def test_build_master_glyph_colors_all_glyphs_layer_color_only() -> None:
     assert db.build_master_glyph_colors(font) == {"m1": {"A": 0, "B": cc.NO_COLOR, "C": 3}}
 
 
+# --------------------------------------------------------------------------- #
+# default_glyph_order — bypass the glyphOrder custom parameter
+# --------------------------------------------------------------------------- #
+
+class _FakeGlyphsInfo:
+    """Stand-in for ``GSGlyphsInfo``: maps a glyph to its GlyphData index, with
+    ``NS_NOT_FOUND`` for glyphs the database doesn't know."""
+
+    def __init__(self, index_by_name: dict) -> None:
+        self._index = index_by_name
+
+    def glyphIndex_(self, glyph) -> int:
+        return self._index.get(glyph.name, db.NS_NOT_FOUND)
+
+
+class _FakeFontWithInfo(_FakeFont):
+    def __init__(self, masters: list, glyphs: list, index_by_name: dict) -> None:
+        super().__init__(masters, glyphs)
+        self._info = _FakeGlyphsInfo(index_by_name)
+
+    def glyphsInfo(self) -> _FakeGlyphsInfo:
+        return self._info
+
+
+def test_default_glyph_order_sorts_by_glyphdata_index_ignoring_custom_order() -> None:
+    # font.glyphs is in a custom (glyphOrder) order: C, A, B
+    glyphs = [_FakeGlyph("C", {}), _FakeGlyph("A", {}), _FakeGlyph("B", {})]
+    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0, "B": 1, "C": 2})
+    assert db.default_glyph_order(font, ["C", "A", "B"]) == ["A", "B", "C"]
+
+
+def test_default_glyph_order_unknown_glyphs_sort_last_keeping_relative_order() -> None:
+    glyphs = [_FakeGlyph("zz", {}), _FakeGlyph("A", {}), _FakeGlyph("yy", {})]
+    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0})  # zz, yy unknown
+    assert db.default_glyph_order(font, ["zz", "A", "yy"]) == ["A", "zz", "yy"]
+
+
+def test_default_glyph_order_passthrough_without_glyphs_info() -> None:
+    glyphs = [_FakeGlyph("B", {}), _FakeGlyph("A", {})]
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs)  # no glyphsInfo()
+    assert db.default_glyph_order(font, ["B", "A"]) == ["B", "A"]
+
+
+def test_build_model_uses_default_order_over_glyph_iteration_order(tmp_path) -> None:
+    glyphs = [_FakeGlyph("C", {"m1": _FakeLayerColor(0)}),
+              _FakeGlyph("A", {"m1": _FakeLayerColor(0)}),
+              _FakeGlyph("B", {"m1": _FakeLayerColor(0)})]
+    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0, "B": 1, "C": 2})
+    font.filepath = str(tmp_path / "Font.glyphs")
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["glyphNames"] == ["A", "B", "C"]
+
+
 def test_free_mode_reads_global_pref(monkeypatch) -> None:
     fake = _FakeGlyphsApp()
     fake.defaults[db.FREE_KEY] = True

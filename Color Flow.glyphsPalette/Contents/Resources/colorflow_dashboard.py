@@ -192,6 +192,55 @@ def build_master_glyph_colors(font) -> dict[str, dict[str, int]]:
     return data
 
 
+# NSNotFound (NSIntegerMax) — what GSGlyphsInfo.glyphIndex_ returns for a glyph
+# the GlyphData database doesn't know about; such glyphs sort to the very end.
+NS_NOT_FOUND = (1 << 63) - 1
+
+
+def _font_glyphs_info(font) -> object | None:
+    """The font's ``GSGlyphsInfo`` (the GlyphData database), or ``None`` outside
+    Glyphs (tests / non-app context). Read by name so the data layer stays
+    import-clean and never imports GlyphsApp directly."""
+    getter = getattr(font, "glyphsInfo", None)
+    if getter is None:
+        return None
+    try:
+        return getter() if callable(getter) else getter
+    except Exception:  # pragma: no cover - defensive, app-only call path
+        return None
+
+
+def default_glyph_order(font, glyph_names: list[str]) -> list[str]:
+    """Return ``glyph_names`` in Glyphs' *default* GlyphData sort order, ignoring
+    any ``glyphOrder`` custom parameter.
+
+    ``font.glyphs`` (the source of ``glyph_names``) iterates in the order set by a
+    ``glyphOrder`` custom parameter when one is present, so a user's hand-tuned
+    order would otherwise drive the heatmap. Sorting by each glyph's index in the
+    GlyphData database (``GSGlyphsInfo.glyphIndex_``) reproduces the order Glyphs
+    uses when no ``glyphOrder`` parameter exists. The sort is stable, so glyphs
+    unknown to the database (index == ``NS_NOT_FOUND``) keep their original
+    relative order at the end. Falls back to the input order unchanged when the
+    sorting API is unavailable (tests / non-Glyphs context)."""
+    info = _font_glyphs_info(font)
+    glyph_index = getattr(info, "glyphIndex_", None)
+    if glyph_index is None:
+        return glyph_names
+    by_name = {glyph.name: glyph for glyph in font.glyphs}
+
+    def sort_index(name: str) -> int:
+        glyph = by_name.get(name)
+        if glyph is None:
+            return NS_NOT_FOUND
+        try:
+            value = int(glyph_index(glyph))
+        except Exception:  # pragma: no cover - defensive, app-only call path
+            return NS_NOT_FOUND
+        return value if 0 <= value < NS_NOT_FOUND else NS_NOT_FOUND
+
+    return sorted(glyph_names, key=sort_index)
+
+
 def _coerce_snapshot(raw) -> dict[str, dict[str, int]]:
     """Coerce a possibly NSDictionary-backed snapshot into plain
     ``{master_id: {glyph_name: int}}`` so iteration/indexing behave normally."""
@@ -632,6 +681,8 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
                       if key == colornames.NO_COLOR), "")
     glyph_total = len(font.glyphs)
     glyph_names = list(current[font.masters[0].id].keys()) if font.masters else []
+    # Use Glyphs' default GlyphData order, not the font's glyphOrder custom param.
+    glyph_names = default_glyph_order(font, glyph_names)
 
     previews = _master_previews(font)
     masters = []
