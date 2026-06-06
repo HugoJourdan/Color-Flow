@@ -82,29 +82,42 @@ function buildField(counts){
   const g = off.getContext("2d");
   const cx = FS/2, cy = FS/2, R = FS*0.46;
   const sum = counts.reduce((a,b)=>a+b,0) || 1;
-  // colour-only base: the master's average hue fills the ENTIRE field (opaque),
-  // so the disc is 100% opaque — no white, no transparent gaps, no faded rim
-  g.fillStyle = avgHex(counts);
-  g.fillRect(0,0,FS,FS);
-  // overlay each label colour as a vivid radial blob at its wheel position
+  // vivid base: a conic sweep through every present label colour (full hue ring),
+  // opaque so the disc is 100% and never muddy/grey
+  const present = [];
+  counts.forEach((c,i)=>{ if (c>0) present.push(COLORS[i]); });
+  if (!present.length) present.push("#cfcfd4");
+  let base;
+  try {
+    base = g.createConicGradient(-Math.PI/2, cx, cy);
+    present.forEach((hex,k)=>{
+      base.addColorStop(k/present.length, hex);
+      base.addColorStop((k+1)/present.length - 0.001, hex);
+    });
+    base.addColorStop(1, present[0]);
+  } catch (e) { base = present[0]; }
+  g.fillStyle = base; g.fillRect(0,0,FS,FS);
+  // bias the mix toward real proportions with vivid, fully-opaque radial blobs
   counts.forEach((cnt,i)=>{
     if (!cnt) return;
     const share = cnt/sum;
     const ang = (i/12)*Math.PI*2 - Math.PI/2;
     const rr = R*0.5;
     const bx = cx+Math.cos(ang)*rr, by = cy+Math.sin(ang)*rr;
-    const rad = R*(0.45 + 0.85*share);
+    const rad = R*(0.5 + 0.9*share);
     const grd = g.createRadialGradient(bx,by,0,bx,by,rad);
     grd.addColorStop(0, COLORS[i]);
     grd.addColorStop(1, hexA(COLORS[i],0));
-    g.globalAlpha = 0.85;
+    g.globalAlpha = 1;
     g.fillStyle = grd;
     g.beginPath(); g.arc(bx,by,rad,0,7); g.fill();
   });
   g.globalAlpha = 1;
   const blurred = document.createElement("canvas"); blurred.width = blurred.height = FS;
   const bg = blurred.getContext("2d");
-  bg.filter = "blur(26px)"; bg.drawImage(off,0,0);
+  // soften the conic seams + crank saturation & brightness for the super-colourful look
+  bg.filter = "blur(20px) saturate(1.9) brightness(1.12)";
+  bg.drawImage(off,0,0);
   return blurred;
 }
 const FIELDS = MASTERS.map(m=>buildField(m.counts));
