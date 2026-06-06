@@ -298,6 +298,35 @@ class ColorFlow(PalettePlugin):
 			popover.reportSep = HorizontalLine((12, reportY, -12, 1))
 			popover.dashboard = Button((12, reportY + 8, -12, 22), "Generate Colorflow Report",
 				callback=self._popover_dashboard, sizeStyle='small')
+			# Bordered button whose background is the animated loading-bar GIF, clipped
+			# inside a rounded-rect. The native bezel is removed so its own corners can
+			# never clip the art; an NSImageView the exact size of the button sits just
+			# behind it, plays the GIF masked to the rounded rect, and carries the
+			# border on its layer. The borderless button on top draws only the label
+			# (dark, for contrast on the bright gradient) and stays the click target.
+			try:
+				_gif = os.path.join(os.path.dirname(__file__), "report-loading.gif")
+				_img = AppKit.NSImage.alloc().initWithContentsOfFile_(_gif)
+				if _img is not None:
+					_btn = self._ns_button(popover.dashboard)
+					_btn.setBordered_(False)
+					_f = _btn.frame()
+					_iv = AppKit.NSImageView.alloc().initWithFrame_(_f)
+					_iv.setImage_(_img)
+					_iv.setAnimates_(True)
+					_iv.setImageScaling_(AppKit.NSImageScaleAxesIndependently)
+					_iv.setAutoresizingMask_(AppKit.NSViewWidthSizable)
+					_iv.setWantsLayer_(True)
+					_lyr = _iv.layer()
+					_lyr.setCornerRadius_(_f.size.height / 2.0)  # pill; clips GIF inside
+					_lyr.setMasksToBounds_(True)
+					_lyr.setBorderWidth_(1.5)
+					_lyr.setBorderColor_(AppKit.NSColor.separatorColor().CGColor())
+					_btn.superview().addSubview_positioned_relativeTo_(_iv, AppKit.NSWindowBelow, _btn)
+					self._reportGifView = _iv
+			except Exception:
+				import traceback
+				print("Color Flow [report gif] error:\n" + traceback.format_exc())
 			try:
 				popover.bind("did close", self._popover_did_close)
 			except Exception:
