@@ -161,7 +161,8 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cmp-wrap{overflow-x:auto;margin-top:8px}
 .cmp{border-collapse:collapse;width:100%;font-size:var(--fs-row)}
 .cmp caption{text-align:left;color:var(--muted-2);font-size:var(--fs-xs);padding-bottom:8px}
-.cmp th,.cmp td{border:1px solid var(--border);padding:7px 10px;text-align:left}
+.cmp th,.cmp td{border:1px solid var(--border);padding:5px 10px;text-align:left}
+.cmp thead th:first-child,.cmp tbody th[scope="row"]{width:1%;white-space:nowrap}
 .cmp thead th{color:var(--muted);font-weight:600;text-align:center}
 .cmp thead th .dot{margin:0}
 .cmp tbody th{font-weight:500}
@@ -533,15 +534,13 @@ DASHBOARD_JS = r"""
     // columns = steps (+None); rows = masters, labelled by the master name.
     var head = '<th scope="col">Master</th>'+H.steps.map(function(s){
       return '<th scope="col" title="'+esc(s.label)+'" aria-label="'+esc(s.label)+'"><span class="dot" style="background:var('+varFor(s.key)+')"></span></th>';
-    }).join("")+'<th scope="col" title="'+esc(H.noneLabel)+'" aria-label="'+esc(H.noneLabel)+'"><span class="dot" style="background:var(--c-none)"></span></th>';
+    }).join("");
     var body = H.masters.map(function(m){
       var aa = esc(m.name);
       var cells = H.steps.map(function(s){
         var p = pct(countFor(m,s.key),H.glyphTotal);
         return '<td><span class="cmpbar" style="width:'+p+'%;background:var('+varFor(s.key)+')"></span><span class="cmpn">'+p+'%</span></td>';
       }).join("");
-      var np = pct(m.uncolored,H.glyphTotal);
-      cells += '<td><span class="cmpbar" style="width:'+np+'%;background:var(--c-none)"></span><span class="cmpn">'+np+'%</span></td>';
       return '<tr><th scope="row" class="cmp-m" title="'+esc(m.name)+'" aria-label="'+esc(m.name)+'">'+aa+'</th>'+cells+'</tr>';
     }).join("");
     return '<div class="cmp-wrap"><table class="cmp"><caption>Step completion by master</caption><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
