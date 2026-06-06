@@ -52,3 +52,27 @@ def test_layer_svg_path_empty_without_path() -> None:
         bezierPath = None
 
     assert glyphsvg.layer_svg_path(_NoPath()) == ""
+
+
+def test_view_box_is_tight_with_padding() -> None:
+    elements = [("move", [(100, 0)]), ("line", [(500, 700)]), ("close", [])]
+    assert glyphsvg.view_box(elements, pad=40) == "60 -740 480 780"
+
+
+def test_view_box_empty_for_no_points() -> None:
+    assert glyphsvg.view_box([("close", [])]) == ""
+
+
+def test_layer_outline_returns_d_and_view_box() -> None:
+    bezier = _FakeBezier([(0, [(100, 0)]), (1, [(500, 0)]), (1, [(500, 700)]), (3, [])])
+    outline = glyphsvg.layer_outline(_FakeLayer(bezier))
+    assert outline["d"] == "M100 0L500 0L500 -700Z"
+    assert outline["vb"] == "60 -740 480 780"
+
+
+def test_layer_outline_empty_without_path() -> None:
+    class _NoPath:
+        drawBezierPath = None
+        bezierPath = None
+
+    assert glyphsvg.layer_outline(_NoPath()) == {}

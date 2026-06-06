@@ -202,22 +202,16 @@ def save_snapshot(font, snapshot: dict) -> None:
 # Full JSON model
 # --------------------------------------------------------------------------- #
 
-def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free: bool,
-                   masters: list, upm: float) -> dict:
-    """Per-master ``{glyph_name: svg_d}`` for the heatmap's *unfinished* glyphs
-    (capped), and stamp each master dict with its ascender/descender. Only the
-    likely-shown glyphs are rendered so big fonts stay light + fast."""
+def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free: bool) -> dict:
+    """Per-master ``{glyph_name: {"d", "vb"}}`` for the heatmap's *unfinished*
+    glyphs (capped) — only the likely-shown glyphs are rendered so big fonts stay
+    light + fast. Each entry carries a tight per-glyph viewBox."""
     order_set = set(order)
     last = order[-1] if order else None
     cap = 300
-    by_id = {entry["id"]: entry for entry in masters}
     paths: dict = {}
     for master in font.masters:
         master_id = master.id
-        entry = by_id.get(master_id)
-        if entry is not None:
-            entry["asc"] = float(getattr(master, "ascender", upm * 0.8) or 0.0)
-            entry["desc"] = float(getattr(master, "descender", -upm * 0.2) or 0.0)
         per_glyph = current.get(master_id, {})
         shown: dict = {}
         produced = 0
@@ -232,7 +226,7 @@ def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free:
                 layer = font.glyphs[name].layers[master_id]
             except Exception:
                 layer = None
-            outline = glyphsvg.layer_svg_path(layer) if layer is not None else ""
+            outline = glyphsvg.layer_outline(layer) if layer is not None else {}
             if outline:
                 shown[name] = outline
                 produced += 1
@@ -267,8 +261,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
             "uncolored": uncolored_count(colors, order),
         })
 
-    upm = float(getattr(font, "upm", 1000) or 1000)
-    paths = _outline_paths(font, current, glyph_names, order, is_free, masters, upm)
+    paths = _outline_paths(font, current, glyph_names, order, is_free)
 
     return {
         "family": font.familyName or "",
@@ -284,7 +277,6 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "masters": masters,
         "colors": {str(index): labelcolors.hex_for(rgba)
                    for index, rgba in enumerate(labelcolors.read_label_colors())},
-        "upm": upm,
         "filePath": font.filepath or "",
         "paths": paths,
         "changes": compute_changes(current, previous),

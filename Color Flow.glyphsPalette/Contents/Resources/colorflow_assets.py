@@ -271,14 +271,14 @@ DASHBOARD_JS = r"""
       var name = it[0], key = it[1], lab = labelFor(key);
       var href = "glyphsapp://show/?path=" + encodeURIComponent(H.filePath || "")
         + "&glyph=" + encodeURIComponent(name) + "&layer=" + encodeURIComponent(m.id);
-      var d = paths[name];
-      var inner = d ? '<svg viewBox="0 ' + (-m.asc) + ' ' + H.upm + ' ' + (m.asc - m.desc) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(d) + '" fill="var(' + varFor(key) + ')"/></svg>' : '';
-      return '<a class="cell' + (d ? ' glyph' : '') + '" href="' + href + '"' + (d ? '' : ' style="background:var(' + varFor(key) + ')"') + ' title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
+      var p = paths[name];
+      var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '" fill="var(' + varFor(key) + ')"/></svg>' : '';
+      return '<a class="cell' + (p ? ' glyph' : '') + '" href="' + href + '"' + (p ? '' : ' style="background:var(' + varFor(key) + ')"') + ' title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
     }).join("");
     var more = items.length>cap ? '<span class="more">… +'+(items.length-cap)+' more</span>' : "";
     var empty = items.length===0 ? '<p class="empty">No glyphs match.</p>' : "";
     return '<section class="heat"><div class="heat-h">Per-glyph · '+items.length+(state.unfinishedOnly?" unfinished":"")
-      + ' <span class="hint">hover for name · click to copy</span></div>'
+      + ' <span class="hint">hover for name · click to open</span></div>'
       + '<div class="grid" aria-label="Per-glyph colours">'+cells+'</div>'+more+empty+'</section>';
   }
   function changes(m){

@@ -41,6 +41,23 @@ def svg_path_d(elements: list) -> str:
     return "".join(parts)
 
 
+def view_box(elements: list, pad: float = 40.0) -> str:
+    """A tight SVG ``viewBox`` ("x y w h") around the outline (flipped Y), with a
+    little padding, so each glyph fills its cell instead of floating in the em."""
+    xs: list = []
+    ys: list = []
+    for _kind, points in elements:
+        for x, y in points:
+            xs.append(x)
+            ys.append(y)
+    if not xs:
+        return ""
+    min_x, max_x, min_y, max_y = min(xs), max(xs), min(ys), max(ys)
+    width = max(1.0, (max_x - min_x) + 2 * pad)
+    height = max(1.0, (max_y - min_y) + 2 * pad)
+    return f"{_num(min_x - pad)} {_num(-max_y - pad)} {_num(width)} {_num(height)}"
+
+
 def _bezier_path(layer) -> Any:
     """The layer's drawing path (outlines + components), tolerant of property vs
     method and of layers that have none."""
@@ -54,11 +71,11 @@ def _bezier_path(layer) -> Any:
     return path
 
 
-def layer_svg_path(layer) -> str:
-    """SVG ``d`` for one ``GSLayer`` (empty string when it has no outline)."""
+def _layer_elements(layer) -> list:
+    """``[(kind, points)]`` for a layer's outline, or ``[]`` when it has none."""
     path = _bezier_path(layer)
     if path is None:
-        return ""
+        return []
     try:
         elements = []
         for index in range(path.elementCount()):
@@ -71,6 +88,21 @@ def layer_svg_path(layer) -> str:
                 elements.append(("curve", [(point.x, point.y) for point in points[:3]]))
             elif element_type == _CLOSE:
                 elements.append(("close", []))
+        return elements
     except Exception:
-        return ""
-    return svg_path_d(elements)
+        return []
+
+
+def layer_svg_path(layer) -> str:
+    """SVG ``d`` for one ``GSLayer`` (empty string when it has no outline)."""
+    return svg_path_d(_layer_elements(layer))
+
+
+def layer_outline(layer) -> dict:
+    """``{"d": <path>, "vb": <viewBox>}`` for a layer's glyph, or ``{}`` when it has
+    no outline. The viewBox is tight to the glyph so it fills the dashboard cell."""
+    elements = _layer_elements(layer)
+    d = svg_path_d(elements)
+    if not d:
+        return {}
+    return {"d": d, "vb": view_box(elements)}

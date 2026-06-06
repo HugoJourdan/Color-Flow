@@ -50,10 +50,7 @@ def _model(is_free: bool) -> dict:
         uncolored = sum(1 for k in keys if k == -1)
         masters.append({"id": name.lower(), "name": name, "keys": keys,
                         "counts": _counts(keys, is_free), "uncolored": uncolored})
-    for master in masters:
-        master["asc"] = 800.0
-        master["desc"] = -200.0
-    outline = "M120 -700L520 -700L520 -100L120 -100Z"
+    outline = {"d": "M120 -700L520 -700L520 -100L120 -100Z", "vb": "80 -740 480 680"}
     paths = {master["id"]: {name: outline for name, key in zip(NAMES, master["keys"])
                             if key != -1} for master in masters}
     return {
@@ -63,7 +60,7 @@ def _model(is_free: bool) -> dict:
         "order": ORDER, "steps": STEPS, "noneLabel": "🫥 None",
         "glyphNames": NAMES, "masters": masters,
         "colors": {str(index): "#888888" for index in range(12)},
-        "upm": 1000.0, "filePath": "/fonts/Acme.glyphs", "paths": paths,
+        "filePath": "/fonts/Acme.glyphs", "paths": paths,
         "changes": {"regular": {"A": [4, 8], "H": [6, 3]}},
     }
 
