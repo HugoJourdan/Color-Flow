@@ -121,7 +121,7 @@ function buildField(counts){
   const blurred = document.createElement("canvas"); blurred.width = blurred.height = FS;
   const bg = blurred.getContext("2d");
   // soften the seams (lighter blur = sharper disc); HSL is already vivid so gentle boost
-  bg.filter = "blur(13px) saturate(1.3) brightness(1.06)";
+  bg.filter = "blur(4px) saturate(1.3) brightness(1.06)";
   bg.drawImage(off,0,0);
   return blurred;
 }
