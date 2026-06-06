@@ -83,7 +83,7 @@ class ColorFlow(PalettePlugin):
 		self.lineSpacing = 20
 		self.shift = 10
 		self.barWidth = self.width+6
-		self.height = 46
+		self.height = 19 * len([x for x in self.meaning.values() if x]) + 8
 		self.xPos = 0  # progress bar flush to the left edge (no margin)
 
 		self.paletteView = Window((self.width, self.height + 10))
@@ -131,7 +131,6 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _build_static_rows(self):
-		return  # palette body is a single bar now, not per-step rows
 		yPos = 6
 		for k in self.meaning.keys():
 			setattr(self.paletteView.frame, str(k)+"line", HorizontalLine((0, yPos, 0, 1)))
@@ -163,7 +162,7 @@ class ColorFlow(PalettePlugin):
 				attr = str(i) + suffix
 				if hasattr(self.paletteView.frame, attr):
 					delattr(self.paletteView.frame, attr)
-		self.height = 46
+		self.height = 19 * len([x for x in self.meaning.values() if x]) + 8
 		self._build_static_rows()
 		try:
 			self._set_palette_height(self.height, animated=True)
@@ -1078,10 +1077,73 @@ class ColorFlow(PalettePlugin):
 			self._bodyAttrs = []
 			if not self.font or not self.meaning or getattr(self, "_eye_mode", False):
 				return
+			self._rowChecks = {}
+			yPos = 17
 			masterId = self.font.selectedFontMaster.id
-			order = list(self.meaning.keys())
+			counts = self._counts(masterId)
 			glyphCount = len(self.font.glyphs)
-			self._build_body_bar(order, glyphCount, masterId)
+			order = list(self.meaning.keys())
+
+			selectedLayers = self.font.selectedLayers or []
+			selStates = [self._layer_state(layer, order) for layer in selectedLayers]
+			firstColor = selectedLayers[0].color if selectedLayers else None
+
+			for color, meaning in self.meaning.items():
+				for suffix in ("", "box", "count", "hl", "focus"):
+					attr = str(color) + suffix
+					if hasattr(self.paletteView.frame, attr):
+						delattr(self.paletteView.frame, attr)
+				if not meaning:
+					continue
+				count = counts[color] if color in counts else 0
+				barWidth = (self.barWidth / glyphCount * count) if glyphCount else 0
+				if getattr(self, "_focusColor", None) == color:
+					rgb = self.colorKeys[str(color)]
+					setattr(self.paletteView.frame, str(color)+"focus", Box((0, yPos-self.shift-1, self.width, 19), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.22), cornerRadius=0, borderWidth=0))
+
+				if selectedLayers:
+					check = all(state.get(color, False) for state in selStates)
+					if check:
+						rgb = self.colorKeys[str(color)]
+						setattr(self.paletteView.frame, str(color)+"hl", Box((0, yPos-self.shift-1, self.width, 19), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.16), cornerRadius=0, borderWidth=0))
+					if barWidth:
+						if check and firstColor == int(color):
+							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
+						else:
+							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.06)
+						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
+					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
+					setattr(self.paletteView.frame, str(color), checkbox)
+					self._attach_rename(checkbox, color)
+					self._make_count(color, count, yPos)
+					yPos += 19
+				else:
+					if barWidth:
+						fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
+						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
+					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
+					setattr(self.paletteView.frame, str(color), checkbox)
+					self._attach_rename(checkbox, color)
+					self._make_count(color, count, yPos)
+					yPos += 19
+			self._countBoxes = {}
+			for reviewColor in list(self._rowChecks.keys()):
+				countBox = getattr(self.paletteView.frame, str(reviewColor)+"count", None)
+				if countBox is None:
+					continue
+				self._countBoxes[reviewColor] = countBox
+				try:
+					recognizer = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "countClicked:")
+					recognizer.setNumberOfClicksRequired_(1)
+					view = self._ns_button(countBox)
+					view.addGestureRecognizer_(recognizer)
+					area = AppKit.NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
+						view.bounds(),
+						AppKit.NSTrackingCursorUpdate | AppKit.NSTrackingActiveInKeyWindow | AppKit.NSTrackingMouseEnteredAndExited,
+						self, None)
+					view.addTrackingArea_(area)
+				except Exception:
+					pass
 			self._build_meta_strip(order, glyphCount, masterId)
 			self._update_title_bar()
 		except Exception:
@@ -1374,7 +1436,7 @@ class ColorFlow(PalettePlugin):
 			if header is None:
 				return
 			bounds = header.bounds()
-			btn = 16.0
+			btn = 14.0
 			pad = 8.0
 			gap = 4.0
 			ctrlY = (bounds.size.height - btn) / 2.0
