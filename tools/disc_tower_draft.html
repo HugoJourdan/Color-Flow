@@ -142,9 +142,9 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   ctx.rotate(rot);
   ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.clip();
   const o = rx*1.14;            // overscan so the field's blurred rim is clipped away
-  ctx.globalAlpha = 1;          ctx.drawImage(fieldA,-o,-o,o*2,o*2);
-  if (fieldB && t>0){ ctx.globalAlpha = t; ctx.drawImage(fieldB,-o,-o,o*2,o*2); }
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = DISC_ALPHA;            ctx.drawImage(fieldA,-o,-o,o*2,o*2);
+  if (fieldB && t>0){ ctx.globalAlpha = DISC_ALPHA*t; ctx.drawImage(fieldB,-o,-o,o*2,o*2); }
+  ctx.globalAlpha = 1;          // full strength for the hole punch below
   if (holeFrac>0){
     const hr = rx*0.26;   // constant: same hole size on every disc
     // REAL hole: erase the disc pixels (destination-out) so it's see-through —
@@ -166,6 +166,7 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
 
 let rot = -0.5, dragging = false, lastX = 0, autospin = true;
 let tilt = 0.20, perGap = 1, holeOn = true;   // minimum tilt + one disc per master by default
+const DISC_ALPHA = 0.82;                       // discs a bit translucent (see-through stack)
 
 function render(){
   ctx.clearRect(0,0,W,H);
