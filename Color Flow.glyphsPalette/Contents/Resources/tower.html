@@ -143,70 +143,81 @@ const FROST = (function(){
   return out;
 })();
 
-// crossfade two fields into a tinted disc; returns nothing, draws into ctx
-function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac, dim){
+// offscreen buffer so a whole disc can be composited at a single opacity
+const buf = document.createElement("canvas"); buf.width = W; buf.height = H;
+const bctx = buf.getContext("2d");
+
+// paint one disc into target context g at full opacity (drawDisc handles fading)
+function paintDisc(g, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   const o = rx*1.14;            // overscan so the field's blurred rim is clipped away
   // 1) colour field — rotates with the spin
-  ctx.save();
-  ctx.translate(cx,cy); ctx.scale(1, ry/rx); ctx.rotate(rot);
-  ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.clip();
-  ctx.globalAlpha = DISC_ALPHA;            ctx.drawImage(fieldA,-o,-o,o*2,o*2);
-  if (fieldB && t>0){ ctx.globalAlpha = DISC_ALPHA*t; ctx.drawImage(fieldB,-o,-o,o*2,o*2); }
-  ctx.globalAlpha = 1;
-  ctx.restore();
+  g.save();
+  g.translate(cx,cy); g.scale(1, ry/rx); g.rotate(rot);
+  g.beginPath(); g.arc(0,0,rx,0,7); g.clip();
+  g.globalAlpha = DISC_ALPHA;            g.drawImage(fieldA,-o,-o,o*2,o*2);
+  if (fieldB && t>0){ g.globalAlpha = DISC_ALPHA*t; g.drawImage(fieldB,-o,-o,o*2,o*2); }
+  g.globalAlpha = 1;
+  g.restore();
   // 2) frosted-glass treatment — fixed light (NOT rotated): milky veil + top
   //    specular sheen, then punch the hole through everything
-  ctx.save();
-  ctx.translate(cx,cy); ctx.scale(1, ry/rx);
-  ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.clip();
-  ctx.fillStyle = "rgba(255,255,255,0.10)";                 // milky frost veil
-  ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
-  ctx.globalAlpha = 0.9;                                    // icy frost speckle
-  ctx.drawImage(FROST, -rx,-rx, rx*2, rx*2);
-  ctx.globalAlpha = 1;
+  g.save();
+  g.translate(cx,cy); g.scale(1, ry/rx);
+  g.beginPath(); g.arc(0,0,rx,0,7); g.clip();
+  g.fillStyle = "rgba(255,255,255,0.10)";                 // milky frost veil
+  g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
+  g.globalAlpha = 0.9;                                    // icy frost speckle
+  g.drawImage(FROST, -rx,-rx, rx*2, rx*2);
+  g.globalAlpha = 1;
   // directional light, brighter toward the BACK (top) edge — restored but at
   // HALF the former intensity, so the back is only gently lighter than the front
-  const sheen = ctx.createLinearGradient(0,-rx,0,rx);
+  const sheen = g.createLinearGradient(0,-rx,0,rx);
   sheen.addColorStop(0,    "rgba(255,255,255,0.25)");      // back edge
   sheen.addColorStop(0.34, "rgba(255,255,255,0.025)");
   sheen.addColorStop(0.66, "rgba(255,255,255,0.025)");
   sheen.addColorStop(1,    "rgba(255,255,255,0.16)");      // front edge
-  ctx.fillStyle = sheen; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
-  const hot = ctx.createRadialGradient(0,-rx*0.4,0, 0,-rx*0.4, rx*0.8);
+  g.fillStyle = sheen; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
+  const hot = g.createRadialGradient(0,-rx*0.4,0, 0,-rx*0.4, rx*0.8);
   hot.addColorStop(0, "rgba(255,255,255,0.13)");           // half-strength back hotspot
   hot.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = hot; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
+  g.fillStyle = hot; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
   if (holeFrac>0){
     const hr = rx*0.26;   // constant: same hole size on every disc
-    ctx.globalCompositeOperation = "destination-out";
-    const pg = ctx.createRadialGradient(0,0,0,0,0,hr);
+    g.globalCompositeOperation = "destination-out";
+    const pg = g.createRadialGradient(0,0,0,0,0,hr);
     pg.addColorStop(0,"rgba(0,0,0,1)");
     pg.addColorStop(0.94,"rgba(0,0,0,1)");
     pg.addColorStop(1,"rgba(0,0,0,0)");      // thin anti-alias edge — no border
-    ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(0,0,hr,0,7); ctx.fill();
-    ctx.globalCompositeOperation = "source-over";
+    g.fillStyle = pg; g.beginPath(); g.arc(0,0,hr,0,7); g.fill();
+    g.globalCompositeOperation = "source-over";
   }
-  ctx.restore();
+  g.restore();
   // 3) glassy rim — brighter at the BACK (top), darker at the front (bottom),
   //    at half the former light intensity
-  ctx.save();
-  ctx.translate(cx,cy); ctx.scale(1, ry/rx);
-  const rim = ctx.createLinearGradient(0,-rx,0,rx);
+  g.save();
+  g.translate(cx,cy); g.scale(1, ry/rx);
+  const rim = g.createLinearGradient(0,-rx,0,rx);
   rim.addColorStop(0, "rgba(255,255,255,0.375)");
   rim.addColorStop(0.5, "rgba(255,255,255,0.05)");
   rim.addColorStop(1, "rgba(0,0,0,0.18)");
-  ctx.strokeStyle = rim; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(0,0,rx*0.992,0,7); ctx.stroke();
-  ctx.restore();
-  // selection trim: fade a non-selected disc toward the page background
-  if (dim>0){
-    ctx.save();
-    ctx.translate(cx,cy); ctx.scale(1, ry/rx);
-    ctx.beginPath(); ctx.arc(0,0,rx,0,7);
-    ctx.fillStyle = "rgba(0,0,0,"+dim+")";   // fade toward the black page background
-    ctx.fill();
-    ctx.restore();
+  g.strokeStyle = rim; g.lineWidth = 2;
+  g.beginPath(); g.arc(0,0,rx*0.992,0,7); g.stroke();
+  g.restore();
+}
+
+// draw a disc to the main canvas at the given opacity (1 = full). For opacity<1
+// the disc is rendered once into the offscreen buffer then composited, so it
+// fades uniformly (true translucency) instead of being veiled toward the bg.
+function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac, opacity){
+  if (opacity>=1){
+    paintDisc(ctx, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac);
+    return;
   }
+  bctx.clearRect(0,0,W,H);
+  paintDisc(bctx, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac);
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.drawImage(buf, 0, 0);
+  ctx.restore();
 }
 
 let rot = -0.5, dragging = false, lastX = 0, autospin = true;
@@ -249,8 +260,8 @@ function render(){
     sh.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
     ctx.restore();
-    const dim = (selected>=0 && Math.round(p)!==selected) ? 0.85 : 0;   // trim the others
-    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0, dim);
+    const opacity = (selected>=0 && Math.round(p)!==selected) ? 0.16 : 1;   // trim others via opacity
+    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0, opacity);
   }
 }
 
