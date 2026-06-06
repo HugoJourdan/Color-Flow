@@ -37,20 +37,25 @@
 </div>
 <script>
 // ---------------------------------------------------------------------------
-// Fake model — mirrors the real colorflow_dashboard model shape so this maps
-// straight onto production: COLORS = the 12 label hexes (--c0..--c11), and each
-// master carries a per-label `counts` array + an `uncolored` tally.
+// Model. In Glyphs the plugin injects `window.TOWER_MODEL` (real per-master
+// label-colour counts + uncolored tally, built by colorflow_tower.py). Opened
+// directly in a browser there is no injection, so we fall back to this SAMPLE
+// model and the file runs standalone. Each master: per-label `counts` array
+// (12 slots) + an `uncolored` tally; `total` = glyphs per master (hole sizing).
 // ---------------------------------------------------------------------------
-const COLORS = ["#f97e55","#ffbe68","#ba9d6d","#fff157","#c1ec8a","#6bab59",
-                "#64a5ef","#576ef1","#a962e7","#e77eb4","#c5c5c5","#5f5f5f"];
-const TOTAL = 60; // glyphs per master (for hole sizing)
-const MASTERS = [
-  {name:"Thin",    counts:[2,1,0,3,1,0,1,0,0,0,5,2], uncolored:45},
-  {name:"Light",   counts:[5,3,1,6,3,2,3,1,1,1,3,1], uncolored:30},
-  {name:"Regular", counts:[8,6,2,9,6,4,6,3,3,2,2,1], uncolored:8},
-  {name:"Bold",    counts:[12,9,4,12,9,7,10,6,5,4,1,0], uncolored:3},
-  {name:"Black",   counts:[16,12,6,15,12,10,13,9,8,6,0,0], uncolored:0},
-];
+const SAMPLE_MODEL = {
+  total: 60,
+  masters: [
+    {name:"Thin",    counts:[2,1,0,3,1,0,1,0,0,0,5,2], uncolored:45},
+    {name:"Light",   counts:[5,3,1,6,3,2,3,1,1,1,3,1], uncolored:30},
+    {name:"Regular", counts:[8,6,2,9,6,4,6,3,3,2,2,1], uncolored:8},
+    {name:"Bold",    counts:[12,9,4,12,9,7,10,6,5,4,1,0], uncolored:3},
+    {name:"Black",   counts:[16,12,6,15,12,10,13,9,8,6,0,0], uncolored:0},
+  ],
+};
+const MODEL = (typeof window !== "undefined" && window.TOWER_MODEL) ? window.TOWER_MODEL : SAMPLE_MODEL;
+const TOTAL = MODEL.total || 1;     // glyphs per master (for hole sizing)
+const MASTERS = MODEL.masters || [];
 
 const cv = document.getElementById("c"), ctx = cv.getContext("2d");
 const W = cv.width, H = cv.height;
@@ -201,10 +206,11 @@ const DISC_ALPHA = 0.95;                       // discs a touch translucent
 function render(){
   ctx.clearRect(0,0,W,H);
   const M = MASTERS.length;
+  if (!M) return;                       // nothing to draw (no masters)
   const rx = 185, ry = rx*tilt;
   const N = (M-1)*perGap + 1;
   const towerH = 210;   // tighter stack -> each disc layer reads thinner
-  const dz = towerH/(N-1);
+  const dz = N>1 ? towerH/(N-1) : 0;    // single disc: no vertical spread (avoid /0)
   const cx = W/2, topY = (H-towerH)/2 + 20;
 
   // soft ground shadow
