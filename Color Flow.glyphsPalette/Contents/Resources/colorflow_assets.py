@@ -208,7 +208,23 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cfd-card-ic{font-size:22px;line-height:1.1}
 .cfd-card b{font-size:var(--fs-sm)}
 .cfd-card small{font-size:var(--fs-2xs);color:var(--muted-2)}
-@media print{.tb,.hd .icon,.cfd-modal,.cfd-tip,.toast{display:none!important}body{opacity:1!important}#cfd-app{max-width:none}}
+#cfd-print{display:none}
+.pcover{display:flex;flex-direction:column;gap:8px}
+.pcover-ttl{font-size:34px;font-weight:700;letter-spacing:-.01em}
+.pcover-sub{color:var(--muted);font-size:var(--fs-sm)}
+.ptabs{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.ptab{border:1px solid var(--border-2);border-radius:var(--r-sm);padding:6px 12px;color:var(--text);text-decoration:none;font-size:var(--fs-sm)}
+.psec .ph{font-size:18px;margin:0 0 12px;border-bottom:1px solid var(--border);padding-bottom:7px}
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .tb,.hd .icon,.cfd-modal,.cfd-tip,.toast{display:none!important}
+  body{opacity:1!important}
+  #cfd-app{display:none!important}
+  #cfd-print{display:block!important;max-width:none}
+  .pcover{min-height:88vh;justify-content:center;page-break-after:always}
+  .psec{page-break-before:always}
+  .ptab{page-break-inside:avoid}
+}
 .ft{margin-top:30px;padding-top:16px;border-top:1px solid var(--border);font-size:var(--fs-2xs);color:var(--muted-2);line-height:1.6}
 .cfd-tip{position:fixed;z-index:20;display:none;background:var(--surface);border:1px solid var(--border-2);border-radius:8px;padding:8px 10px;box-shadow:0 6px 24px rgba(0,0,0,.32);pointer-events:none}
 .cfd-tip .tip-h{font-size:var(--fs-2xs);color:var(--muted);margin-bottom:5px;white-space:nowrap}
@@ -651,8 +667,40 @@ DASHBOARD_JS = r"""
       toast("Exported "+name);
     } catch(e){ toast("Export not supported here"); }
   }
+  // ----- Full PDF report: a contents page with clickable jump links, then every
+  //       section (overview, each master, compare, coverage, timeline) -----
+  function printCoverageRows(){
+    var cov = (H.coverage && H.coverage.byCategory) || {};
+    var rows = cov[state.master] || [];
+    if (!rows.length) return '<p class="empty">No coverage data.</p>';
+    return '<div class="cov-rows">'+rows.map(function(r){
+      return '<div class="cov-row"><span class="cov-name" title="'+esc(r.key)+'">'+esc(r.key)+'</span>'
+        + covStacked(r) + '<span class="num">'+r.total+'</span></div>';
+    }).join("")+'</div>';
+  }
+  function buildPrintReport(){
+    var toc = [], secs = "";
+    function add(id, title, inner){
+      toc.push('<a class="ptab" href="#'+id+'">'+esc(title)+'</a>');
+      secs += '<section class="psec" id="'+id+'"><h2 class="ph">'+esc(title)+'</h2>'+inner+'</section>';
+    }
+    add("psec-overview", "Overview", overall());
+    H.masters.forEach(function(m){ add("psec-m-"+m.id, m.name, masterOverall(m)+heatmap(m)); });
+    add("psec-compare", "Compare by master", compareView());
+    add("psec-coverage", "Coverage by category", printCoverageRows());
+    add("psec-timeline", "Progress over time", timelineView());
+    return '<section class="pcover"><div class="pcover-ttl">'+esc(H.family)+'</div>'
+      + '<div class="pcover-sub">Color Flow report · '+esc(H.fileName)+' · v'+esc(H.version)+' · '+esc(H.generated)+'</div>'
+      + '<nav class="ptabs" aria-label="Contents">'+toc.join("")+'</nav></section>' + secs;
+  }
+  function printReport(){
+    var host = document.getElementById("cfd-print");
+    if (!host){ host = document.createElement("div"); host.id = "cfd-print"; document.body.appendChild(host); }
+    host.innerHTML = buildPrintReport();
+    try { window.print(); } catch(e){ toast("Print not supported here"); }
+  }
   function runExport(fmt){
-    if (fmt==="pdf"){ try { window.print(); } catch(e){ toast("Print not supported here"); } }
+    if (fmt==="pdf"){ printReport(); }
     else if (fmt==="csv"){ download(exportName("csv"), exportCSV(), "text/csv"); }
     else if (fmt==="json"){ download(exportName("json"), exportJSON(), "application/json"); }
   }
@@ -663,7 +711,7 @@ DASHBOARD_JS = r"""
       modal = document.createElement("div"); modal.id = "cfd-export-modal"; modal.className = "cfd-modal";
       modal.innerHTML = '<div class="cfd-modal-box" role="dialog" aria-label="Export report" aria-modal="true">'
         + '<div class="cfd-modal-h">Export report</div><div class="cfd-cards">'
-        + '<button type="button" class="cfd-card" data-fmt="pdf"><span class="cfd-card-ic">🖨</span><b>PDF</b><small>Print or save as PDF</small></button>'
+        + '<button type="button" class="cfd-card" data-fmt="pdf"><span class="cfd-card-ic">🖨</span><b>PDF</b><small>Full report · contents + all sections</small></button>'
         + '<button type="button" class="cfd-card" data-fmt="csv"><span class="cfd-card-ic">⤓</span><b>CSV</b><small>Per-step counts</small></button>'
         + '<button type="button" class="cfd-card" data-fmt="json"><span class="cfd-card-ic">{ }</span><b>JSON</b><small>Full summary</small></button>'
         + '</div></div>';
@@ -710,7 +758,7 @@ DASHBOARD_JS = r"""
       header() + overall() + toolbar() + '<div id="cfd-body"></div>'
       + '<footer class="ft">Color Font Dashboard · Color Flow — Hugo Jourdan<br>'+esc(H.generated)+'</footer>';
     bind(); update();
-    window.__cfdExport = { csv: exportCSV, json: exportJSON, rows: exportRows };
+    window.__cfdExport = { csv: exportCSV, json: exportJSON, rows: exportRows, printHTML: buildPrintReport };
     requestAnimationFrame(function(){ document.body.classList.add("ready"); });
   }
   if (document.readyState!=="loading") init();
