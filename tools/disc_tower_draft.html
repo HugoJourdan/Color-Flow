@@ -118,11 +118,11 @@ function buildField(counts){
   g.globalAlpha = 1;
   // colours fill to the hole (centre matches the sides); add just a touch of
   // darkening toward the middle for depth around the bore
-  const dk = g.createRadialGradient(cx,cy,0, cx,cy,R*0.62);
-  dk.addColorStop(0, "rgba(0,0,0,0.34)");
-  dk.addColorStop(0.55, "rgba(0,0,0,0.13)");
+  const dk = g.createRadialGradient(cx,cy,0, cx,cy,R*0.72);
+  dk.addColorStop(0, "rgba(0,0,0,0.58)");
+  dk.addColorStop(0.5, "rgba(0,0,0,0.26)");
   dk.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = dk; g.beginPath(); g.arc(cx,cy,R*0.62,0,7); g.fill();
+  g.fillStyle = dk; g.beginPath(); g.arc(cx,cy,R*0.72,0,7); g.fill();
   const blurred = document.createElement("canvas"); blurred.width = blurred.height = FS;
   const bg = blurred.getContext("2d");
   // soften the seams (lighter blur = sharper disc); HSL is already vivid so gentle boost
