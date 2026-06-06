@@ -867,6 +867,10 @@ class ColorFlow(PalettePlugin):
 		if signature == getattr(self, "_lastSignature", None):
 			return
 		self._lastSignature = signature
+		# A layer colour changed (or selection moved) — the cached per-step counts
+		# are derived from layer colours, so drop them and let Update_Plugin_UI
+		# recompute. (Nothing else invalidates them now the palette is display-only.)
+		self._invalidate_counts(masterId)
 		self.Update_Plugin_UI()
 
 	# Toggle a step: recompute the native layer colour (the saved source of truth).
