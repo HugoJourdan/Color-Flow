@@ -83,7 +83,7 @@ class ColorFlow(PalettePlugin):
 		self.lineSpacing = 20
 		self.shift = 10
 		self.barWidth = self.width+6
-		self.height = 20 * len([x for x in self.meaning.values() if x]) + 25
+		self.height = 19 * len([x for x in self.meaning.values() if x]) + 25
 		self.xPos = 0  # progress bar flush to the left edge (no margin)
 
 		self.paletteView = Window((self.width, self.height + 10))
@@ -137,12 +137,12 @@ class ColorFlow(PalettePlugin):
 		yPos = 25
 		for k in self.meaning.keys():
 			setattr(self.paletteView.frame, str(k)+"line", HorizontalLine((0, yPos, 0, 1)))
-			yPos += 20
+			yPos += 19
 		yPos = 36
 		for k, v in self.meaning.items():
 			if v:
-				setattr(self.paletteView.frame, str(k)+"colorTag", Box((0, yPos-self.shift-1, 3, 20), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
-				yPos += 20
+				setattr(self.paletteView.frame, str(k)+"colorTag", Box((0, yPos-self.shift-1, 6, 19), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
+				yPos += 19
 
 	# Open the Settings panel (reorder colours + choose which show).
 	@objc.python_method
@@ -165,7 +165,7 @@ class ColorFlow(PalettePlugin):
 				attr = str(i) + suffix
 				if hasattr(self.paletteView.frame, attr):
 					delattr(self.paletteView.frame, attr)
-		self.height = 20 * len([x for x in self.meaning.values() if x]) + 25
+		self.height = 19 * len([x for x in self.meaning.values() if x]) + 25
 		self._build_static_rows()
 		try:
 			self._set_palette_height(self.height, animated=True)
@@ -957,7 +957,7 @@ class ColorFlow(PalettePlugin):
 			return
 		tint = AppKit.NSColor.colorWithRed_green_blue_alpha_(0.16, 0.5, 0.96, 0.22)
 		line = AppKit.NSColor.colorWithRed_green_blue_alpha_(0.13, 0.45, 0.96, 1.0)
-		self.paletteView.frame.dragHighlight = Box((0, top, self.width, 20), fillColor=tint, cornerRadius=0, borderWidth=0)
+		self.paletteView.frame.dragHighlight = Box((0, top, self.width, 19), fillColor=tint, cornerRadius=0, borderWidth=0)
 		self.paletteView.frame.dropLine = Box((0, top, self.width, 2), fillColor=line, cornerRadius=0, borderWidth=0)
 
 	# Move the insertion line to the slot the dragged colour would drop into.
@@ -1101,33 +1101,33 @@ class ColorFlow(PalettePlugin):
 				barWidth = (self.barWidth / glyphCount * count) if glyphCount else 0
 				if getattr(self, "_focusColor", None) == color:
 					rgb = self.colorKeys[str(color)]
-					setattr(self.paletteView.frame, str(color)+"focus", Box((0, yPos-self.shift-1, self.width, 20), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.22), cornerRadius=0, borderWidth=0))
+					setattr(self.paletteView.frame, str(color)+"focus", Box((0, yPos-self.shift-1, self.width, 19), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.22), cornerRadius=0, borderWidth=0))
 
 				if selectedLayers:
 					check = all(state.get(color, False) for state in selStates)
 					if check:
 						rgb = self.colorKeys[str(color)]
-						setattr(self.paletteView.frame, str(color)+"hl", Box((0, yPos-self.shift-1, self.width, 20), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.16), cornerRadius=0, borderWidth=0))
+						setattr(self.paletteView.frame, str(color)+"hl", Box((0, yPos-self.shift-1, self.width, 19), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.16), cornerRadius=0, borderWidth=0))
 					if barWidth:
 						if check and firstColor == int(color):
 							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
 						else:
 							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.06)
-						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 20), fillColor=fill, cornerRadius=0, borderWidth=0))
+						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
 					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
 					self._attach_rename(checkbox, color)
 					self._make_count(color, count, yPos)
-					yPos += 20
+					yPos += 19
 				else:
 					if barWidth:
 						fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
-						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 20), fillColor=fill, cornerRadius=0, borderWidth=0))
+						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
 					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
 					self._attach_rename(checkbox, color)
 					self._make_count(color, count, yPos)
-					yPos += 20
+					yPos += 19
 			self._countBoxes = {}
 			for reviewColor in list(self._rowChecks.keys()):
 				countBox = getattr(self.paletteView.frame, str(reviewColor)+"count", None)
@@ -1299,6 +1299,7 @@ class ColorFlow(PalettePlugin):
 			label = getattr(self, "_rowChecks", {}).get(color)
 			if label is not None:
 				size = self._ns_button(label).font().pointSize()
+			size = max(8.0, size - 2.0)
 			textbox.getNSTextField().setFont_(AppKit.NSFont.monospacedDigitSystemFontOfSize_weight_(size, AppKit.NSFontWeightRegular))
 		except Exception:
 			pass
@@ -1706,7 +1707,7 @@ class ColorFlow(PalettePlugin):
 		self._eye_none = none_label
 		self._eye_mode = True
 		self._set_eye_button(True)
-		self.height = 20 * len(self._eye_rows) + 25
+		self.height = 19 * len(self._eye_rows) + 25
 		try:
 			self._set_palette_height(self.height, animated=True)
 		except Exception:
@@ -1748,7 +1749,7 @@ class ColorFlow(PalettePlugin):
 			key = str(index)
 			rgb = self.colorKeys.get(key, (0.5, 0.5, 0.5, 0.5))
 			alpha = 0.5 if visible else 0.12
-			setattr(self.paletteView.frame, key+"eyeTag", Box((0, yPos-self.shift-1, 3, 20), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], alpha), cornerRadius=0, borderWidth=0))
+			setattr(self.paletteView.frame, key+"eyeTag", Box((0, yPos-self.shift-1, 6, 19), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], alpha), cornerRadius=0, borderWidth=0))
 			shown = label or colornames.DEFAULT_LABELS.get(index, key)
 			textbox = TextBox((12, yPos-self.shift+2, -10, 20), shown, sizeStyle='small')
 			setattr(self.paletteView.frame, key+"eye", textbox)
@@ -1764,5 +1765,5 @@ class ColorFlow(PalettePlugin):
 				textbox._nsObject.addGestureRecognizer_(recognizer)
 			except Exception:
 				pass
-			yPos += 20
+			yPos += 19
 
