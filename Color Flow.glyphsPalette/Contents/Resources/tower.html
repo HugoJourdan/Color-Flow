@@ -127,6 +127,13 @@ function buildField(counts){
   // and the wrap seam into a soft favicon-like wheel
   bg.filter = "blur(13px) saturate(1.3) brightness(1.05)";
   bg.drawImage(off,0,0);
+  // clip the field to a circle so neither the disc nor its halo shows square
+  // corners (the halo draws this image unclipped)
+  bg.filter = "none";
+  bg.globalCompositeOperation = "destination-in";
+  bg.fillStyle = "#000";
+  bg.beginPath(); bg.arc(FS/2, FS/2, FS*0.5, 0, 7); bg.fill();
+  bg.globalCompositeOperation = "source-over";
   return blurred;
 }
 const FIELDS = MASTERS.map(m=>buildField(m.counts));
@@ -159,8 +166,8 @@ function paintDisc(g, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   g.save();
   g.translate(cx,cy); g.scale(1, ry/rx); g.rotate(rot);
   g.globalAlpha = 0.45;
-  g.filter = "blur(24px)";
-  const hr = rx*1.3;
+  g.filter = "blur(4px)";
+  const hr = rx*1.1;
   g.drawImage(fieldA, -hr, -hr, hr*2, hr*2);
   g.filter = "none";
   g.globalAlpha = 1;
@@ -251,19 +258,15 @@ const DISC_ALPHA = 0.95;                       // discs a touch translucent
 let discHits = [], hitCx = 0, hitRx = 0, hitRy = 0;   // disc hit-test geometry, set each render
 let downX = 0, downY = 0;                             // pointer-down point for click-vs-drag
 let trimVal = 0.6, opacityVal = 0.2;                  // non-selected discs: darken + fade
-let focusAmt = [];                                    // per-master trim amount (0..1), eased
+let dimT = 0;                                         // focus-mode amount (0..1), eased
 
 function render(){
   ctx.clearRect(0,0,W,H);
   const M = MASTERS.length;
   if (!M) return;                       // nothing to draw (no masters)
-  // ease each master's trim amount toward its target so focus changes animate
-  if (focusAmt.length !== M) focusAmt = new Array(M).fill(0);
-  for (let i=0;i<M;i++){
-    const target = (selected<0 || i===selected) ? 0 : 1;
-    focusAmt[i] += (target - focusAmt[i]) * 0.08;
-    if (Math.abs(target - focusAmt[i]) < 0.002) focusAmt[i] = target;
-  }
+  // ease focus mode in/out for a smooth transition
+  dimT += (((selected>=0)?1:0) - dimT) * 0.08;
+  if (Math.abs((((selected>=0)?1:0)) - dimT) < 0.002) dimT = (selected>=0)?1:0;
   const rx = 185, ry = rx*tilt;
   const N = (M-1)*perGap + 1;
   const dz = 52;                        // FIXED gap between discs
@@ -279,30 +282,60 @@ function render(){
   ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0,0,rx*1.05,0,7); ctx.fill();
   ctx.restore();
 
-  // draw bottom -> top so the TOP disc paints last and sits above the others.
-  // A selected master keeps its natural stack position — the disc above still
-  // overlaps it a bit; only the non-selected discs are trimmed (faded back).
+  // partition slices around the focused disc (bottom -> top) + record hit-test
+  const below = [], above = [];
+  let focusedN = -1;
   for (let n=N-1; n>=0; n--){
+    const mi = Math.round((M-1) - n/perGap);
+    discHits.push({cy: topY + n*dz, master: mi});
+    if (selected>=0 && mi===selected) focusedN = n;
+    else if (selected>=0 && mi < selected) below.push(n);
+    else above.push(n);                  // selected<0 -> every disc lands here
+  }
+
+  // paint one slice (drop shadow + disc) into context g at full opacity
+  function drawSliceInto(g, n, keepHole){
     const cy = topY + n*dz;
-    const p = (M-1) - n/perGap;          // last master on top, first at the base
+    const p = (M-1) - n/perGap;
     const lo = Math.max(0, Math.floor(p));
     const t = p - lo;
     const fA = FIELDS[lo], fB = FIELDS[Math.min(M-1, lo+1)];
-    discHits.push({cy: cy, master: Math.round(p)});   // record for click hit-test (top last)
-    // subtle drop shadow under each disc, just a bit
-    ctx.save();
-    ctx.translate(cx, cy + ry*0.5); ctx.scale(1, ry/rx);
-    const sh = ctx.createRadialGradient(0,0,0,0,0,rx);
+    g.save();
+    g.translate(cx, cy + ry*0.5); g.scale(1, ry/rx);
+    const sh = g.createRadialGradient(0,0,0,0,0,rx);
     sh.addColorStop(0, "rgba(0,0,0,0.07)");
     sh.addColorStop(0.7, "rgba(0,0,0,0.03)");
     sh.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
-    ctx.restore();
-    const mi = Math.round(p);
-    const amt = focusAmt[mi] || 0;                 // 0 = full focus, 1 = fully trimmed
-    const above = (selected>=0 && mi > selected);  // disc stacked above the focused one
-    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, (holeOn && !above) ? 1 : 0,
-             1 - amt*(1-opacityVal), amt*trimVal);
+    g.fillStyle = sh; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
+    g.restore();
+    paintDisc(g, fA, fB, t, cx, cy, rx, ry, rot, keepHole ? 1 : 0);
+  }
+
+  // composite a set of slices as ONE faded layer, so their mutual overlaps don't
+  // show through (each pixel fades once, not per-disc)
+  function paintGroup(slices, opacity, trim, keepHole){
+    if (!slices.length) return;
+    bctx.clearRect(0,0,W,H);
+    for (let k=0;k<slices.length;k++) drawSliceInto(bctx, slices[k], keepHole);
+    if (trim>0){
+      bctx.save();
+      bctx.globalCompositeOperation = "source-atop";   // darken only painted pixels
+      bctx.fillStyle = "rgba(0,0,0,"+trim+")";
+      bctx.fillRect(0,0,W,H);
+      bctx.restore();
+    }
+    ctx.save(); ctx.globalAlpha = opacity; ctx.drawImage(buf,0,0); ctx.restore();
+  }
+
+  if (dimT < 0.002){
+    // no focus: plain top-paints-last stack
+    for (let n=N-1;n>=0;n--) drawSliceInto(ctx, n, holeOn);
+  } else {
+    const groupOpacity = 1 - dimT*(1-opacityVal);
+    const groupTrim = dimT*trimVal;
+    paintGroup(below, groupOpacity, groupTrim, holeOn);                  // behind the focus
+    if (focusedN>=0) drawSliceInto(ctx, focusedN, holeOn);               // focused disc, full
+    paintGroup(above, groupOpacity, groupTrim, holeOn && selected<0);    // in front; no holes when focusing
   }
 }
 
@@ -339,6 +372,20 @@ document.getElementById("tilt").addEventListener("input", e=>{ tilt = +e.target.
 document.getElementById("slices").addEventListener("input", e=>{ perGap = +e.target.value; });
 document.getElementById("spin").addEventListener("change", e=>{ autospin = e.target.checked; });
 document.getElementById("hole").addEventListener("change", e=>{ holeOn = e.target.checked; });
+// up/down arrows navigate the focused master (up -> toward the top disc); Esc clears
+window.addEventListener("keydown", e=>{
+  const M = MASTERS.length; if (!M) return;
+  if (e.key==="ArrowUp" || e.key==="ArrowDown"){
+    const step = (e.key==="ArrowUp") ? 1 : -1;
+    selected = (selected<0) ? (step>0 ? 0 : M-1)
+                            : Math.max(0, Math.min(M-1, selected+step));
+    e.preventDefault();
+    document.getElementById("master").value = String(selected);
+  } else if (e.key==="Escape"){
+    selected = -1;
+    document.getElementById("master").value = "-1";
+  }
+});
 document.getElementById("trim").addEventListener("input", e=>{ trimVal = +e.target.value/100; document.getElementById("trimval").textContent = e.target.value; });
 document.getElementById("opacity").addEventListener("input", e=>{ opacityVal = +e.target.value/100; document.getElementById("opacityval").textContent = e.target.value; });
 (function(){
