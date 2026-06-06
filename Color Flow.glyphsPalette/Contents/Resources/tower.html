@@ -250,7 +250,7 @@ function render(){
   if (focusAmt.length !== M) focusAmt = new Array(M).fill(0);
   for (let i=0;i<M;i++){
     const target = (selected<0 || i===selected) ? 0 : 1;
-    focusAmt[i] += (target - focusAmt[i]) * 0.18;
+    focusAmt[i] += (target - focusAmt[i]) * 0.08;
     if (Math.abs(target - focusAmt[i]) < 0.002) focusAmt[i] = target;
   }
   const rx = 185, ry = rx*tilt;
