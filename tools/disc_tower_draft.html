@@ -169,7 +169,7 @@ function render(){
   // draw top -> bottom so the nearer (lower) discs paint over the higher ones
   for (let n=0; n<N; n++){
     const cy = topY + n*dz;
-    const p = n/perGap;                  // inverted: first master on top, last at the base
+    const p = (M-1) - n/perGap;          // last master on top, first at the base
     const lo = Math.max(0, Math.floor(p));
     const t = p - lo;
     const fA = FIELDS[lo], fB = FIELDS[Math.min(M-1, lo+1)];
@@ -178,7 +178,7 @@ function render(){
   // master name labels down the side
   ctx.fillStyle = "#888"; ctx.textAlign = "left";
   for (let i=0;i<M;i++){
-    const n = i*perGap;                  // master i sits at slice i*perGap (top -> bottom)
+    const n = (M-1-i)*perGap;            // master i sits at slice (M-1-i): last master on top
     const cy = topY + n*dz;
     ctx.fillText(MASTERS[i].name, cx+rx+16, cy+4);
     ctx.strokeStyle="rgba(0,0,0,.12)"; ctx.beginPath();
