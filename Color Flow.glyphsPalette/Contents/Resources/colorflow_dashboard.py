@@ -38,6 +38,7 @@ import colornames
 import colorflow_assets
 import glyphsvg
 import labelcolors
+import colorflow_recipes
 
 try:
     from GlyphsApp import Glyphs, Message  # type: ignore[import]
@@ -55,6 +56,10 @@ DEFAULTS_KEY = "com.hugojourdan.ColorFlow-DashboardSnapshot"
 # (settings_panel.py writes it, plugin.py:_free_mode reads it). Reading the same
 # key here guarantees the dashboard and palette can never disagree on the model.
 FREE_KEY = "com.hugojourdan.ColorFlow-FreeMode"
+
+# Opt-in workflow recipes (#5) live here as JSON; absent/empty = recipes off,
+# in which case the recipe-adjusted completion equals standard completion.
+RECIPES_KEY = "com.hugojourdan.ColorFlow-Recipes"
 
 
 # --------------------------------------------------------------------------- #
@@ -130,6 +135,24 @@ def free_mode() -> bool:
     if Glyphs is None:
         return False
     return bool(Glyphs.defaults[FREE_KEY])
+
+
+def load_recipes() -> list:
+    """Opt-in workflow recipes from ``Glyphs.defaults`` (JSON). ``[]`` when Glyphs
+    is absent or no recipes are set — the recipe-adjusted metric then equals the
+    standard one."""
+    if Glyphs is None:
+        return []
+    return colorflow_recipes.parse_recipes(Glyphs.defaults[RECIPES_KEY])
+
+
+def glyph_meta(font) -> dict:
+    """``{glyph_name: {category, script, subCategory, case}}`` for recipe matching."""
+    return {glyph.name: {"category": str(getattr(glyph, "category", None) or ""),
+                         "script": str(getattr(glyph, "script", None) or ""),
+                         "subCategory": str(getattr(glyph, "subCategory", None) or ""),
+                         "case": str(getattr(glyph, "case", None) or "")}
+            for glyph in font.glyphs}
 
 
 def _meaning_and_none(font) -> tuple[dict[str, str], str]:
@@ -590,6 +613,17 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
     }
     journeys = _glyph_journeys(history, dates, current, glyph_names, order, is_free)
 
+    recipes = load_recipes()
+    meta = glyph_meta(font)
+    metas = [meta.get(name, {}) for name in glyph_names]
+    recipe_completion = {}
+    for master in font.masters:
+        per_glyph = current.get(master.id, {})
+        colors = [None if per_glyph.get(name, colornames.NO_COLOR) == colornames.NO_COLOR
+                  else int(per_glyph.get(name)) for name in glyph_names]
+        recipe_completion[master.id] = colorflow_recipes.recipe_completion(
+            metas, colors, recipes, order, is_free)
+
     return {
         "family": font.familyName or "",
         "fileName": Path(font.filepath).name if font.filepath else (font.familyName or "Untitled"),
@@ -610,6 +644,8 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "trend": trend,
         "journeys": journeys,
         "lastEdit": glyph_last_edit(font, now),
+        "recipes": recipes,
+        "recipeCompletion": recipe_completion,
         "coverage": build_coverage(font, current, order, is_free),
         "changes": compute_changes(current, previous),
     }

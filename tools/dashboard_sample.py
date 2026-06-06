@@ -68,6 +68,9 @@ def _model(is_free: bool) -> dict:
         "trend": _trend(),
         "journeys": {"regular": {"A": [-1, 4, 8], "C": [-1, -1, 4]}, "bold": {}},
         "lastEdit": {"A": 2, "C": 30, "E": 1},
+        "recipes": [{"match": {"category": "Mark"}, "steps": ["6", "3"]}],
+        "recipeCompletion": {"regular": {"complete": 14, "total": len(SEQ)},
+                             "bold": {"complete": 11, "total": len(SEQ)}},
         "coverage": _coverage(),
         "changes": {"regular": {"A": [4, 8], "H": [6, 3]}},
     }

@@ -118,6 +118,8 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .seg{display:flex;height:8px;border-radius:5px;overflow:hidden;background:var(--track)}
 .seg>span{background:var(--accent)}
 .seg .soft{background:color-mix(in srgb,var(--accent) 35%,transparent)}
+.ov-recipe{margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
+.ov-recipe b{color:var(--text)}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
 .legend .lg{display:inline-flex;align-items:center;gap:5px}
 .legend i{width:8px;height:8px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
@@ -300,12 +302,19 @@ DASHBOARD_JS = r"""
     var head = (H.mode==="free" || !lastOrder)
       ? '<b>'+a.started+'/'+a.grand+'</b> labelled ('+startP+'%)'
       : '<b>'+a.completion+'/'+a.grand+'</b> complete ('+compP+'%) · '+a.started+'/'+a.grand+' started ('+startP+'%)';
+    var recipeLine = "";
+    if (H.recipes && H.recipes.length){
+      var recipeComplete = 0;
+      H.masters.forEach(function(m){ recipeComplete += (((H.recipeCompletion||{})[m.id])||{}).complete||0; });
+      recipeLine = '<div class="ov-recipe">Recipe-adjusted: <b>'+recipeComplete+'/'+a.grand+'</b> complete ('
+        + pct(recipeComplete,a.grand)+'%) · '+H.recipes.length+' recipe'+(H.recipes.length===1?"":"s")+'</div>';
+    }
     return '<section class="overall" aria-label="Overall totals">'
       + '<div class="ov-num"><span class="big">'+compP+'<small>%</small></span><span class="ov-sub">'+(H.mode==="free"?"labelled":"complete")+'</span></div>'
       + '<div class="ov-main"><div class="ov-head">'+head+'</div>'
       + '<div class="seg" role="img" aria-label="Overall '+compP+'% complete, '+startP+'% started">'
       + '<span style="width:'+compP+'%"></span><span class="soft" style="width:'+Math.max(0,startP-compP)+'%"></span></div>'
-      + '<div class="legend">'+legend+'</div></div></section>';
+      + '<div class="legend">'+legend+'</div>'+recipeLine+'</div></section>';
   }
 
   function rows(m){

@@ -552,6 +552,22 @@ def _outline_layer(color: int) -> _FakeLayerColor:
     return layer
 
 
+def test_build_model_recipe_completion_parity_without_recipes(tmp_path) -> None:
+    # No recipes (Glyphs absent) -> recipeCompletion.complete must equal the
+    # count of glyphs at the global final step, i.e. standard completion.
+    (tmp_path / "colorNames.txt").write_text("purple=A\nyellow=Done\n", encoding="utf-8")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(3)}),   # 3 = yellow = final step
+              _FakeGlyph("B", {"m1": _FakeLayerColor(3)}),
+              _FakeGlyph("C", {"m1": _FakeLayerColor(8)})]   # 8 = purple = not final
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs, filepath=str(tmp_path / "F.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["recipes"] == []
+    last = model["order"][-1]
+    standard_final = model["masters"][0]["counts"][last]
+    assert model["recipeCompletion"]["m1"]["complete"] == standard_final == 2
+
+
 def test_build_model_master_preview_and_favicon(tmp_path) -> None:
     (tmp_path / "colorNames.txt").write_text("yellow=Ready\nNone=Nothing\n", encoding="utf-8")
     glyphs = [_FakeGlyph("A", {"m1": _outline_layer(3)}),
