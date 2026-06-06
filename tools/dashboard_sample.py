@@ -103,7 +103,8 @@ def _trend() -> dict:
         "bold": {"velocityPerWeek": 7.0, "remaining": 12, "final": 6, "total": len(SEQ),
                  "etaIso": "2026-06-14", "bandDays": 4, "confidence": "med", "points": 3},
     }
-    return {"series": series, "forecast": forecast, "today": "2026-06-05"}
+    return {"series": series, "forecast": forecast, "today": "2026-06-05",
+            "streak": {"current": 3, "best": 5, "days": 3}}
 
 
 def main() -> None:

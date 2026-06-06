@@ -341,6 +341,28 @@ def forecast_master(series: list[dict], master_id: str, total: int, now: datetim
     return result
 
 
+def progress_streak(history: dict, order: list[str], is_free: bool) -> dict:
+    """A motivation streak (#17): how many consecutive *recorded days* ended with
+    more labelled glyphs than the day before. Same-day captures already collapse
+    to one entry per date, so each history entry is one work-day; calendar gaps
+    (days you never opened the font) don't break the streak, regressions do.
+    Returns ``{current, best, days}``."""
+    dates = sorted(history)
+    totals = [sum(_master_point(per_glyph, order, is_free)["started"]
+                  for per_glyph in history[date].values()) for date in dates]
+    progressed = [False] + [totals[i] > totals[i - 1] for i in range(1, len(totals))]
+    current = 0
+    for flag in reversed(progressed):
+        if not flag:
+            break
+        current += 1
+    best = run = 0
+    for flag in progressed:
+        run = run + 1 if flag else 0
+        best = max(best, run)
+    return {"current": current, "best": best, "days": len(dates)}
+
+
 # --------------------------------------------------------------------------- #
 # Full JSON model
 # --------------------------------------------------------------------------- #
@@ -531,6 +553,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
                      for master in font.masters},
         "dates": dates,
         "today": now.strftime("%Y-%m-%d"),
+        "streak": progress_streak(history, order, is_free),
     }
     journeys = _glyph_journeys(history, dates, current, glyph_names, order, is_free)
 

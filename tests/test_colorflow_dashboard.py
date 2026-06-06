@@ -358,6 +358,21 @@ def test_glyph_journeys_only_changed_unfinished_aligned_to_dates() -> None:
     assert db._glyph_journeys(history, [], current, ["A"], _FC_ORDER, is_free=False) == {}
 
 
+def test_progress_streak_counts_trailing_improving_days() -> None:
+    # started rises 2->4->5 (3 improving days), dips, then rises again for 2
+    history = _history([("2026-06-01", 2), ("2026-06-02", 4), ("2026-06-03", 5),
+                        ("2026-06-04", 3), ("2026-06-05", 6), ("2026-06-06", 7)])
+    streak = db.progress_streak(history, _FC_ORDER, is_free=False)
+    assert streak["current"] == 2     # last two days both improved (3->6->7)
+    assert streak["best"] == 2        # two runs of length 2 (06-02..03 and 06-05..06)
+    assert streak["days"] == 6
+
+
+def test_progress_streak_zero_when_last_day_regresses() -> None:
+    history = _history([("2026-06-01", 5), ("2026-06-02", 8), ("2026-06-03", 6)])
+    assert db.progress_streak(history, _FC_ORDER, is_free=False)["current"] == 0
+
+
 def test_coverage_groups_by_attribute_and_counts_per_group() -> None:
     letter_a = _FakeGlyph("A", {"m1": _FakeLayerColor(2)})       # at final step 2
     letter_b = _FakeGlyph("B", {"m1": _FakeLayerColor(0)})

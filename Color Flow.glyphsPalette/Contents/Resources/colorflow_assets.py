@@ -96,6 +96,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .hd .meta{font-size:var(--fs-sm);color:var(--muted-2)}
 .hd .sp{flex:1}
 .hd .mode{font-size:var(--fs-xs);color:var(--muted);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:4px 9px}
+.hd .streak{font-size:var(--fs-xs);color:var(--text);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:4px 9px}
 .icon{width:30px;height:28px;border:1px solid var(--border-2);border-radius:var(--r-sm);background:transparent;color:var(--muted);cursor:pointer}
 .icon:hover{color:var(--text)}
 .tb{position:sticky;top:57px;z-index:4;display:flex;align-items:center;gap:8px;padding:12px 0;background:var(--bg);border-bottom:1px solid var(--border);flex-wrap:wrap}
@@ -261,11 +262,19 @@ DASHBOARD_JS = r"""
     return { grand:grand, agg:agg, started:started, completion:completion };
   }
 
+  function streakBadge(){
+    var s = (H.trend && H.trend.streak) || {};
+    if (!s.current) return "";
+    var title = "Progress streak: "+s.current+" day"+(s.current===1?"":"s")+" in a row"
+      + (s.best>s.current ? " · best "+s.best : "");
+    return '<span class="streak" title="'+esc(title)+'">🔥 '+s.current+'</span>';
+  }
   function header(){
     return '<header class="hd"><span class="brand"></span>'
       + '<span class="fam">'+esc(H.family)+'</span>'
       + '<span class="meta">'+esc(H.fileName)+' · v'+esc(H.version)+'</span>'
       + '<span class="sp"></span>'
+      + streakBadge()
       + '<span class="mode">Mode · '+(H.mode==="free"?"Free":"Step")+'</span>'
       + '<button type="button" id="cfd-theme" class="icon" aria-label="Toggle light or dark theme">◐</button></header>';
   }
