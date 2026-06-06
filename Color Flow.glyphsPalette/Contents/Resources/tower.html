@@ -34,6 +34,10 @@
     <label><input id="spin" type="checkbox" checked> auto-spin</label>
     <label><input id="hole" type="checkbox" checked> uncolored hole</label>
   </div>
+  <div class="row">
+    <label>trim <input id="trim" type="range" min="0" max="100" value="50"> <span id="trimval">50</span></label>
+    <label>opacity <input id="opacity" type="range" min="0" max="100" value="50"> <span id="opacityval">50</span></label>
+  </div>
   <div class="hint">drag to rotate · one disc per master · colour = that master's label-colour mix, blurred like the favicon</div>
 </div>
 <script>
@@ -207,13 +211,23 @@ function paintDisc(g, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
 // draw a disc to the main canvas at the given opacity (1 = full). For opacity<1
 // the disc is rendered once into the offscreen buffer then composited, so it
 // fades uniformly (true translucency) instead of being veiled toward the bg.
-function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac, opacity){
-  if (opacity>=1){
+function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac, opacity, trim){
+  if (opacity>=1 && trim<=0){
     paintDisc(ctx, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac);
     return;
   }
   bctx.clearRect(0,0,W,H);
   paintDisc(bctx, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac);
+  if (trim>0){
+    // darken only the disc's own pixels (source-atop) — the hole and the area
+    // outside the disc stay untouched
+    bctx.save();
+    bctx.translate(cx,cy); bctx.scale(1, ry/rx);
+    bctx.globalCompositeOperation = "source-atop";
+    bctx.fillStyle = "rgba(0,0,0,"+trim+")";
+    bctx.beginPath(); bctx.arc(0,0,rx,0,7); bctx.fill();
+    bctx.restore();
+  }
   ctx.save();
   ctx.globalAlpha = opacity;
   ctx.drawImage(buf, 0, 0);
@@ -223,6 +237,9 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac, opacity){
 let rot = -0.5, dragging = false, lastX = 0, autospin = true;
 let tilt = 0.50, perGap = 1, holeOn = true, selected = -1;   // selected = -1 -> show all masters
 const DISC_ALPHA = 0.95;                       // discs a touch translucent
+let discHits = [], hitCx = 0, hitRx = 0, hitRy = 0;   // disc hit-test geometry, set each render
+let downX = 0, downY = 0;                             // pointer-down point for click-vs-drag
+let trimVal = 0.5, opacityVal = 0.5;                  // non-selected discs: darken + fade
 
 function render(){
   ctx.clearRect(0,0,W,H);
@@ -233,6 +250,7 @@ function render(){
   const dz = 52;                        // FIXED gap between discs
   const towerH = N>1 ? (N-1)*dz : 0;    // tower grows taller with more discs (gap stays)
   const cx = W/2, topY = (H-towerH)/2 + 20;
+  hitCx = cx; hitRx = rx; hitRy = ry; discHits = [];   // capture geometry for click hit-test
 
   // soft ground shadow
   ctx.save();
@@ -251,6 +269,7 @@ function render(){
     const lo = Math.max(0, Math.floor(p));
     const t = p - lo;
     const fA = FIELDS[lo], fB = FIELDS[Math.min(M-1, lo+1)];
+    discHits.push({cy: cy, master: Math.round(p)});   // record for click hit-test (top last)
     // subtle drop shadow under each disc, just a bit
     ctx.save();
     ctx.translate(cx, cy + ry*0.5); ctx.scale(1, ry/rx);
@@ -260,8 +279,9 @@ function render(){
     sh.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
     ctx.restore();
-    const opacity = (selected>=0 && Math.round(p)!==selected) ? 0.16 : 1;   // trim others via opacity
-    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0, opacity);
+    const other = (selected>=0 && Math.round(p)!==selected);
+    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0,
+             other ? opacityVal : 1, other ? trimVal : 0);
   }
 }
 
@@ -271,13 +291,35 @@ function loop(){
   requestAnimationFrame(loop);
 }
 
-cv.addEventListener("pointerdown", e=>{ dragging=true; lastX=e.clientX; cv.setPointerCapture(e.pointerId); });
+// which master's disc is under a canvas-space point — top-most disc wins
+// (discHits is pushed bottom-to-top, so the last match drawn on top is found first)
+function hitTest(px, py){
+  for (let i=discHits.length-1; i>=0; i--){
+    const d = discHits[i];
+    const ex = (px-hitCx)/hitRx, ey = (py-d.cy)/hitRy;
+    if (ex*ex + ey*ey <= 1) return d.master;
+  }
+  return -1;
+}
+cv.addEventListener("pointerdown", e=>{ dragging=true; lastX=e.clientX; downX=e.clientX; downY=e.clientY; cv.setPointerCapture(e.pointerId); });
 cv.addEventListener("pointermove", e=>{ if(dragging){ rot += (e.clientX-lastX)*0.01; lastX=e.clientX; }});
-cv.addEventListener("pointerup",   ()=>{ dragging=false; });
+cv.addEventListener("pointerup", e=>{
+  dragging=false;
+  if (Math.hypot(e.clientX-downX, e.clientY-downY) < 5){   // treat as a click, not a drag
+    const rect = cv.getBoundingClientRect();
+    const px = (e.clientX-rect.left) * (cv.width/rect.width);
+    const py = (e.clientY-rect.top) * (cv.height/rect.height);
+    const m = hitTest(px, py);
+    selected = (m===selected) ? -1 : m;   // click the focused disc (or empty) -> back to All
+    document.getElementById("master").value = String(selected);
+  }
+});
 document.getElementById("tilt").addEventListener("input", e=>{ tilt = +e.target.value/100; document.getElementById("tiltval").textContent = e.target.value; });
 document.getElementById("slices").addEventListener("input", e=>{ perGap = +e.target.value; });
 document.getElementById("spin").addEventListener("change", e=>{ autospin = e.target.checked; });
 document.getElementById("hole").addEventListener("change", e=>{ holeOn = e.target.checked; });
+document.getElementById("trim").addEventListener("input", e=>{ trimVal = +e.target.value/100; document.getElementById("trimval").textContent = e.target.value; });
+document.getElementById("opacity").addEventListener("input", e=>{ opacityVal = +e.target.value/100; document.getElementById("opacityval").textContent = e.target.value; });
 (function(){
   const sel = document.getElementById("master");
   const optAll = document.createElement("option"); optAll.value = "-1"; optAll.textContent = "All masters"; sel.appendChild(optAll);
