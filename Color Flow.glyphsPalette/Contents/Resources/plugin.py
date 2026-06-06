@@ -314,7 +314,7 @@ class ColorFlow(PalettePlugin):
 					_iv = AppKit.NSImageView.alloc().initWithFrame_(_f)
 					_iv.setImage_(_img)
 					_iv.setAnimates_(True)
-					_iv.setImageScaling_(AppKit.NSImageScaleAxesIndependently)
+					_iv.setImageScaling_(AppKit.NSImageScaleProportionallyUpOrDown)
 					_iv.setAutoresizingMask_(AppKit.NSViewWidthSizable)
 					_iv.setWantsLayer_(True)
 					_lyr = _iv.layer()
