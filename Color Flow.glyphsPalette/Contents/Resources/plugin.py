@@ -260,7 +260,9 @@ class ColorFlow(PalettePlugin):
 			popover.lcReset = Button((-34, 67, 22, 22), "􀎀", callback=self._label_colors_reset, sizeStyle='small')
 			for _btnName in ("lcImport", "lcExport", "lcReset"):
 				try:
-					self._ns_button(getattr(popover, _btnName)).setFont_(AppKit.NSFont.systemFontOfSize_(13.0))
+					_b = self._ns_button(getattr(popover, _btnName))
+					_b.setBordered_(False)
+					_b.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
 				except Exception:
 					pass
 			self._labelWells = []
