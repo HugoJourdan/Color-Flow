@@ -326,6 +326,11 @@ class ColorFlow(PalettePlugin):
 			except Exception:
 				import traceback
 				print("Color Flow [report gif] error:\n" + traceback.format_exc())
+			# Strip the blue AppKit focus ring (halo) from every control in the popover.
+			try:
+				self._strip_focus_rings(self._ns_button(popover.dashboard).superview())
+			except Exception:
+				pass
 			try:
 				popover.bind("did close", self._popover_did_close)
 			except Exception:
@@ -807,6 +812,21 @@ class ColorFlow(PalettePlugin):
 		if hasattr(check, "getNSButton"):
 			return check.getNSButton()
 		return check._nsObject
+
+	@objc.python_method
+	def _strip_focus_rings(self, view):
+		# Remove the blue AppKit focus ring (halo) from a view and every descendant.
+		# NSFocusRingTypeNone == 1.
+		try:
+			view.setFocusRingType_(1)
+		except Exception:
+			pass
+		try:
+			subviews = view.subviews()
+		except Exception:
+			return
+		for sub in subviews:
+			self._strip_focus_rings(sub)
 
 	# ObjC selector fired by the per-row double-click gesture recognizer.
 	def labelDoubleClicked_(self, sender):
