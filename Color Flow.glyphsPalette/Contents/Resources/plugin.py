@@ -302,14 +302,19 @@ class ColorFlow(PalettePlugin):
 			# (which bakes in its own button shape) provides the entire visual. The
 			# native bezel is removed and an NSImageView the exact size of the button
 			# sits just behind it, playing the GIF unclipped at its own aspect ratio.
-			# The borderless button on top draws only the label (dark, for contrast on
-			# the bright gradient) and stays the click target.
+			# The borderless button on top draws only the label (white, 100%, for
+			# contrast on the bright gradient) and stays the click target.
 			try:
 				_gif = os.path.join(os.path.dirname(__file__), "report-loading.gif")
 				_img = AppKit.NSImage.alloc().initWithContentsOfFile_(_gif)
 				if _img is not None:
 					_btn = self._ns_button(popover.dashboard)
 					_btn.setBordered_(False)
+					_titleAttrs = {AppKit.NSForegroundColorAttributeName: AppKit.NSColor.whiteColor()}
+					if _btn.font() is not None:
+						_titleAttrs[AppKit.NSFontAttributeName] = _btn.font()
+					_btn.setAttributedTitle_(AppKit.NSAttributedString.alloc().initWithString_attributes_(
+						_btn.title(), _titleAttrs))
 					_f = _btn.frame()
 					_iv = AppKit.NSImageView.alloc().initWithFrame_(_f)
 					_iv.setImage_(_img)
