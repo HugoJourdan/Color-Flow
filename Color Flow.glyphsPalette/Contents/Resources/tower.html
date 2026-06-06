@@ -375,6 +375,17 @@ function render(){
     if (focusedN>=0) drawSliceInto(ctx, focusedN, holeOn);
     paintGroup(above, opacityVal, trimVal, holeOn);
   }
+
+  // master names down the left, right-aligned just left of each disc; the focused
+  // name stays bright while trimmed ones dim with their disc
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  ctx.font = "600 13px -apple-system,BlinkMacSystemFont,sans-serif";
+  for (let i=0;i<M;i++){
+    const cy = topY + (M-1-i)*perGap*dz;
+    const amt = focusAmt[i] || 0;
+    ctx.fillStyle = "rgba(255,255,255," + (1 - amt*0.65) + ")";
+    ctx.fillText(MASTERS[i].name, cx - rx - 18, cy);
+  }
 }
 
 function loop(){
