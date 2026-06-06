@@ -228,25 +228,40 @@ class ColorFlow(PalettePlugin):
 	def _rainbow_menu_title(self):
 		return "Color Flow: Font Glyph Order"
 
-	# Action popover: the Dashboard and a Disable/Glyph/Layer segmented control
+	# Action popover: a Default/Layer/Glyph segmented control + label/colour
 	# for the Font Glyph Order grouping. Replaces the old ⋯ menu.
 	@objc.python_method
 	def Open_Action_Popover(self, sender):
 		try:
-			self._popover = FloatingWindow((220, 516), "Color Flow Settings")
+			button = self.dialog
+			if sender is not None:
+				if hasattr(sender, "_nsObject"):
+					try:
+						button = self._ns_button(sender)
+					except Exception:
+						button = self.dialog
+				elif hasattr(sender, "superview"):
+					button = sender
+			self._popover = Popover((220, 456), parentView=button,
+				preferredEdge='left', behavior='semitransient')
 			popover = self._popover
-			popover.dashboard = Button((12, 12, -12, 22), "Open Color Font Dashboard",
-				callback=self._popover_dashboard, sizeStyle='small')
-			popover.fgoLabel = TextBox((12, 46, -12, 16), "Font Glyph Order",
+			popover.fgoLabel = TextBox((12, 12, -12, 16), "Font Glyph Order",
 				sizeStyle='small')
-			popover.rainbow = SegmentedButton((12, 66, -12, 22),
-				[dict(title="Disable"), dict(title="Glyph"), dict(title="Layer")],
+			popover.rainbow = SegmentedButton((12, 32, -12, 22),
+				[dict(title="Default"), dict(title="Layer"), dict(title="Glyph")],
 				callback=self._popover_rainbow, sizeStyle='small')
 			popover.rainbow.set(self._rainbow_segment_index())
-			popover.lcSep = HorizontalLine((12, 96, -12, 1))
+			popover.lcSep = HorizontalLine((12, 62, -12, 1))
 			self._labelColorsEdited = False
-			popover.lcLabel = TextBox((12, 104, -90, 16), "Labels & Colours", sizeStyle='small')
-			popover.lcReset = Button((-82, 102, 70, 18), "Reset", callback=self._label_colors_reset, sizeStyle='mini')
+			popover.lcLabel = TextBox((12, 71, -96, 16), "Labels & Colours", sizeStyle='small')
+			popover.lcImport = Button((-86, 67, 22, 22), "􀈄", callback=self._import_profile, sizeStyle='small')
+			popover.lcExport = Button((-60, 67, 22, 22), "􀈂", callback=self._export_profile, sizeStyle='small')
+			popover.lcReset = Button((-34, 67, 22, 22), "􀎀", callback=self._label_colors_reset, sizeStyle='small')
+			for _btnName in ("lcImport", "lcExport", "lcReset"):
+				try:
+					self._ns_button(getattr(popover, _btnName)).setFont_(AppKit.NSFont.systemFontOfSize_(13.0))
+				except Exception:
+					pass
 			self._labelWells = []
 			self._labelFields = {}
 			rgbaList = labelcolors.read_label_colors()
@@ -257,7 +272,7 @@ class ColorFlow(PalettePlugin):
 			labelRows, _noneLabel = colornames.parse_settings(settingsText)
 			labelByIndex = {index: label for index, label, _visible in labelRows}
 			for index in range(12):
-				rowY = 128 + index * 26
+				rowY = 94 + index * 26
 				wellColor = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(*rgbaList[index])
 				well = ColorWell((12, rowY, 26, 22), callback=self._label_color_changed, color=wellColor)
 				setattr(popover, "lcWell%d" % index, well)
@@ -266,16 +281,12 @@ class ColorFlow(PalettePlugin):
 					callback=self._label_name_changed, continuous=False, sizeStyle='small')
 				setattr(popover, "lcField%d" % index, field)
 				self._labelFields[index] = field
-			profileY = 128 + 12 * 26 + 6
-			popover.profileSep = HorizontalLine((12, profileY, -12, 1))
-			popover.profileExport = Button((12, profileY + 8, 98, 22), "Export Profile…",
-				callback=self._export_profile, sizeStyle='small')
-			popover.profileImport = Button((114, profileY + 8, -12, 22), "Import Profile…",
-				callback=self._import_profile, sizeStyle='small')
-			popover.smartFilters = Button((12, profileY + 36, -12, 22), "Generate Smart Filters",
-				callback=self._generate_smart_filters, sizeStyle='small')
+			reportY = 94 + 12 * 26 + 6
+			popover.reportSep = HorizontalLine((12, reportY, -12, 1))
+			popover.dashboard = Button((12, reportY + 8, -12, 22), "Generate Colorflow Report",
+				callback=self._popover_dashboard, sizeStyle='small')
 			try:
-				popover.bind("close", self._popover_did_close)
+				popover.bind("did close", self._popover_did_close)
 			except Exception:
 				pass
 			popover.open()
@@ -283,13 +294,13 @@ class ColorFlow(PalettePlugin):
 			import traceback
 			print("Color Flow [popover] error:\n" + traceback.format_exc())
 
-	# Current grouping state -> segment index (0 Disable / 1 Glyph / 2 Layer).
+	# Current grouping state -> segment index (0 Default / 1 Layer / 2 Glyph).
 	@objc.python_method
 	def _rainbow_segment_index(self):
 		font = Glyphs.font
 		if font is None or not self.fontview.is_enabled(font):
 			return 0
-		return 1 if self.fontview.mode(font) == "Glyph" else 2
+		return 2 if self.fontview.mode(font) == "Glyph" else 1
 
 	# Popover closed and the user edited at least one label colour: prompt for the
 	# Glyphs restart its own views need (Color Flow already updated live).
@@ -489,9 +500,62 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def _popover_dashboard(self, sender):
 		self._close_popover()
-		self.Open_Color_Font_Dashboard(sender)
+		self._present_report_sheet()
 
-	# Disable / Glyph / Layer for the Font Glyph Order grouping (popover stays open
+	# Present a titled panel as a sheet on the palette window with an
+	# indeterminate progress bar, then build the report on the next runloop tick
+	# (so the sheet has painted) and dismiss the sheet when it opens.
+	@objc.python_method
+	def _present_report_sheet(self):
+		try:
+			parent = self.dialog.window() if self.dialog is not None else None
+			if parent is None:
+				self.Open_Color_Font_Dashboard(None)
+				return
+			rect = AppKit.NSMakeRect(0, 0, 300, 104)
+			panel = AppKit.NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+				rect, AppKit.NSWindowStyleMaskTitled, AppKit.NSBackingStoreBuffered, False)
+			panel.setTitle_("Color Flow")
+			content = panel.contentView()
+			label = AppKit.NSTextField.labelWithString_("Generating Color Flow report\u2026")
+			label.setFrame_(AppKit.NSMakeRect(20, 60, 260, 18))
+			content.addSubview_(label)
+			bar = AppKit.NSProgressIndicator.alloc().initWithFrame_(AppKit.NSMakeRect(20, 32, 260, 16))
+			bar.setStyle_(AppKit.NSProgressIndicatorStyleBar)
+			bar.setIndeterminate_(True)
+			bar.startAnimation_(None)
+			content.addSubview_(bar)
+			self._reportPanel = panel
+			parent.beginSheet_completionHandler_(panel, None)
+			self.performSelector_withObject_afterDelay_("runReportGeneration:", None, 0.1)
+		except Exception:
+			import traceback
+			print("Color Flow [report sheet] error:\n" + traceback.format_exc())
+			self.Open_Color_Font_Dashboard(None)
+
+	def runReportGeneration_(self, sender):
+		try:
+			self.Open_Color_Font_Dashboard(None)
+		finally:
+			self._dismiss_report_sheet()
+
+	@objc.python_method
+	def _dismiss_report_sheet(self):
+		panel = getattr(self, "_reportPanel", None)
+		if panel is None:
+			return
+		try:
+			parent = panel.sheetParent()
+			if parent is None and self.dialog is not None:
+				parent = self.dialog.window()
+			if parent is not None:
+				parent.endSheet_(panel)
+			panel.orderOut_(None)
+		except Exception:
+			pass
+		self._reportPanel = None
+
+	# Default / Layer / Glyph for the Font Glyph Order grouping (popover stays open
 	# so the source can be switched without reopening).
 	@objc.python_method
 	def _popover_rainbow(self, sender):
@@ -504,7 +568,7 @@ class ColorFlow(PalettePlugin):
 				if self.fontview.is_enabled(font):
 					self.fontview.disable(font)
 			else:
-				self.fontview.set_mode(font, "Glyph" if segment == 1 else "Layer")
+				self.fontview.set_mode(font, "Layer" if segment == 1 else "Glyph")
 				if not self.fontview.is_enabled(font):
 					self.fontview.enable(font)
 		except Exception:
@@ -570,7 +634,7 @@ class ColorFlow(PalettePlugin):
 
 	def openSettings_(self, sender):
 		try:
-			self.Open_Action_Popover(None)
+			self.Open_Action_Popover(sender)
 		except Exception:
 			import traceback
 			print("Color Flow [settings menu] error:\n" + traceback.format_exc())
@@ -935,7 +999,7 @@ class ColorFlow(PalettePlugin):
 		if checkbox is None:
 			return None
 		try:
-			return checkbox.getPosSize()[1] - 1
+			return checkbox.getPosSize()[1] - 3
 		except Exception:
 			return None
 
@@ -970,7 +1034,7 @@ class ColorFlow(PalettePlugin):
 		top = self._row_top(dst)
 		if top is None:
 			return
-		lineY = top + 22 if dst > src else top
+		lineY = top + 19 if dst > src else top
 		try:
 			self.paletteView.frame.dropLine.setPosSize((0, lineY, self.width, 2))
 		except Exception:
@@ -1442,14 +1506,14 @@ class ColorFlow(PalettePlugin):
 			ctrlY = (bounds.size.height - btn) / 2.0
 			gearX = bounds.size.width - pad - btn
 			eyeX = gearX - gap - btn
-			barWidth, barHeight = 52.0, 6.0
+			barWidth, barHeight = 60.0, 9.0
 			barX = bounds.size.width - pad - barWidth
 			barY = (bounds.size.height - barHeight) / 2.0
 			bar = AppKit.NSView.alloc().initWithFrame_(((barX, barY), (barWidth, barHeight)))
 			bar.setAutoresizingMask_(AppKit.NSViewMinXMargin)
 			bar.setWantsLayer_(True)
 			try:
-				bar.layer().setCornerRadius_(3.0)
+				bar.layer().setCornerRadius_(4.0)
 				bar.layer().setMasksToBounds_(True)
 				bar.layer().setBackgroundColor_(AppKit.NSColor.colorWithRed_green_blue_alpha_(0.5, 0.5, 0.5, 0.18).CGColor())
 			except Exception:
