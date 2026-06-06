@@ -164,13 +164,14 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   ctx.globalAlpha = 0.9;                                    // icy frost speckle
   ctx.drawImage(FROST, -rx,-rx, rx*2, rx*2);
   ctx.globalAlpha = 1;
-  const sheen = ctx.createLinearGradient(0,-rx,0,rx*0.35);  // specular sheen from above
-  sheen.addColorStop(0, "rgba(255,255,255,0.55)");
-  sheen.addColorStop(0.5, "rgba(255,255,255,0.10)");
-  sheen.addColorStop(1, "rgba(255,255,255,0)");
+  const sheen = ctx.createLinearGradient(0,-rx,0,rx);       // bright at BOTH edges so the
+  sheen.addColorStop(0,    "rgba(255,255,255,0.50)");       // front and back wash evenly
+  sheen.addColorStop(0.34, "rgba(255,255,255,0.05)");
+  sheen.addColorStop(0.66, "rgba(255,255,255,0.05)");
+  sheen.addColorStop(1,    "rgba(255,255,255,0.32)");
   ctx.fillStyle = sheen; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
-  const hot = ctx.createRadialGradient(-rx*0.25,-rx*0.45,0, -rx*0.25,-rx*0.45, rx*0.85);
-  hot.addColorStop(0, "rgba(255,255,255,0.45)");            // glossy hotspot
+  const hot = ctx.createRadialGradient(0,-rx*0.4,0, 0,-rx*0.4, rx*0.8);
+  hot.addColorStop(0, "rgba(255,255,255,0.26)");            // gentle, centred glossy hotspot
   hot.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = hot; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
   if (holeFrac>0){
