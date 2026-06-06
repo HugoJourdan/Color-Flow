@@ -128,6 +128,21 @@ function buildField(counts){
 const FIELDS = MASTERS.map(m=>buildField(m.counts));
 const HOLE = MASTERS.map(m=>m.uncolored/TOTAL);
 
+// Icy frost speckle, built once and reused on every disc (no per-frame flicker).
+const FROST = (function(){
+  const c = document.createElement("canvas"); c.width = c.height = FS;
+  const g = c.getContext("2d");
+  for (let k=0;k<1600;k++){
+    const x = Math.random()*FS, y = Math.random()*FS, r = Math.random()*1.6 + 0.3;
+    g.fillStyle = `rgba(255,255,255,${Math.random()*0.07})`;
+    g.beginPath(); g.arc(x,y,r,0,7); g.fill();
+  }
+  const out = document.createElement("canvas"); out.width = out.height = FS;
+  const og = out.getContext("2d");
+  og.filter = "blur(0.6px)"; og.drawImage(c,0,0);
+  return out;
+})();
+
 // crossfade two fields into a tinted disc; returns nothing, draws into ctx
 function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   const o = rx*1.14;            // overscan so the field's blurred rim is clipped away
@@ -144,13 +159,20 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   ctx.save();
   ctx.translate(cx,cy); ctx.scale(1, ry/rx);
   ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.clip();
-  ctx.fillStyle = "rgba(255,255,255,0.06)";                 // milky frost veil
+  ctx.fillStyle = "rgba(255,255,255,0.10)";                 // milky frost veil
   ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
-  const sheen = ctx.createLinearGradient(0,-rx,0,rx*0.3);   // specular highlight from above
-  sheen.addColorStop(0, "rgba(255,255,255,0.42)");
-  sheen.addColorStop(0.55, "rgba(255,255,255,0.06)");
+  ctx.globalAlpha = 0.9;                                    // icy frost speckle
+  ctx.drawImage(FROST, -rx,-rx, rx*2, rx*2);
+  ctx.globalAlpha = 1;
+  const sheen = ctx.createLinearGradient(0,-rx,0,rx*0.35);  // specular sheen from above
+  sheen.addColorStop(0, "rgba(255,255,255,0.55)");
+  sheen.addColorStop(0.5, "rgba(255,255,255,0.10)");
   sheen.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = sheen; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
+  const hot = ctx.createRadialGradient(-rx*0.25,-rx*0.45,0, -rx*0.25,-rx*0.45, rx*0.85);
+  hot.addColorStop(0, "rgba(255,255,255,0.45)");            // glossy hotspot
+  hot.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = hot; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
   if (holeFrac>0){
     const hr = rx*0.26;   // constant: same hole size on every disc
     ctx.globalCompositeOperation = "destination-out";
@@ -166,10 +188,10 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   ctx.save();
   ctx.translate(cx,cy); ctx.scale(1, ry/rx);
   const rim = ctx.createLinearGradient(0,-rx,0,rx);
-  rim.addColorStop(0, "rgba(255,255,255,0.55)");
-  rim.addColorStop(0.5, "rgba(255,255,255,0.07)");
-  rim.addColorStop(1, "rgba(0,0,0,0.14)");
-  ctx.strokeStyle = rim; ctx.lineWidth = 1.6;
+  rim.addColorStop(0, "rgba(255,255,255,0.75)");
+  rim.addColorStop(0.5, "rgba(255,255,255,0.10)");
+  rim.addColorStop(1, "rgba(0,0,0,0.18)");
+  ctx.strokeStyle = rim; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(0,0,rx*0.992,0,7); ctx.stroke();
   ctx.restore();
 }
