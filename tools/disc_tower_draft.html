@@ -28,7 +28,7 @@
 <div class="wrap">
   <canvas id="c" width="900" height="780"></canvas>
   <div class="row">
-    <label>tilt <input id="tilt" type="range" min="20" max="70" value="45"> <span id="tiltval">45</span></label>
+    <label>tilt <input id="tilt" type="range" min="20" max="70" value="50"> <span id="tiltval">50</span></label>
     <label>slices/gap <input id="slices" type="range" min="1" max="20" value="1"></label>
     <label><input id="spin" type="checkbox" checked> auto-spin</label>
     <label><input id="hole" type="checkbox" checked> uncolored hole</label>
@@ -158,13 +158,18 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   ctx.globalAlpha = 0.9;                                    // icy frost speckle
   ctx.drawImage(FROST, -rx,-rx, rx*2, rx*2);
   ctx.globalAlpha = 1;
-  // NON-directional gloss: a radially symmetric rim glow so the disc reads the
-  // SAME brightness front and back (no top/bottom sheen, no off-centre hotspot)
-  const gloss = ctx.createRadialGradient(0,0,rx*0.6, 0,0,rx);
-  gloss.addColorStop(0,    "rgba(255,255,255,0)");
-  gloss.addColorStop(0.85, "rgba(255,255,255,0.05)");
-  gloss.addColorStop(1,    "rgba(255,255,255,0.20)");
-  ctx.fillStyle = gloss; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
+  // directional light, brighter toward the BACK (top) edge — restored but at
+  // HALF the former intensity, so the back is only gently lighter than the front
+  const sheen = ctx.createLinearGradient(0,-rx,0,rx);
+  sheen.addColorStop(0,    "rgba(255,255,255,0.25)");      // back edge
+  sheen.addColorStop(0.34, "rgba(255,255,255,0.025)");
+  sheen.addColorStop(0.66, "rgba(255,255,255,0.025)");
+  sheen.addColorStop(1,    "rgba(255,255,255,0.16)");      // front edge
+  ctx.fillStyle = sheen; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
+  const hot = ctx.createRadialGradient(0,-rx*0.4,0, 0,-rx*0.4, rx*0.8);
+  hot.addColorStop(0, "rgba(255,255,255,0.13)");           // half-strength back hotspot
+  hot.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = hot; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
   if (holeFrac>0){
     const hr = rx*0.26;   // constant: same hole size on every disc
     ctx.globalCompositeOperation = "destination-out";
@@ -176,17 +181,21 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
     ctx.globalCompositeOperation = "source-over";
   }
   ctx.restore();
-  // 3) glassy rim — uniform all the way round (no top-bright/bottom-dark bias)
-  //    so the edge looks the same front and back
+  // 3) glassy rim — brighter at the BACK (top), darker at the front (bottom),
+  //    at half the former light intensity
   ctx.save();
   ctx.translate(cx,cy); ctx.scale(1, ry/rx);
-  ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 2;
+  const rim = ctx.createLinearGradient(0,-rx,0,rx);
+  rim.addColorStop(0, "rgba(255,255,255,0.375)");
+  rim.addColorStop(0.5, "rgba(255,255,255,0.05)");
+  rim.addColorStop(1, "rgba(0,0,0,0.18)");
+  ctx.strokeStyle = rim; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(0,0,rx*0.992,0,7); ctx.stroke();
   ctx.restore();
 }
 
 let rot = -0.5, dragging = false, lastX = 0, autospin = true;
-let tilt = 0.45, perGap = 1, holeOn = true;   // mid tilt + one disc per master by default
+let tilt = 0.50, perGap = 1, holeOn = true;   // tilt locked to 50 + one disc per master by default
 const DISC_ALPHA = 0.95;                       // discs a touch translucent
 
 function render(){
@@ -224,17 +233,24 @@ function render(){
     ctx.restore();
     drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0);   // uniform central bore on every disc
   }
-  // master name written ON each disc, centred on its visible front crescent
+  // master name ENGRAVED on each disc: drawn in the disc's own rotated + tilted
+  // frame so it lies flat on the surface and spins with the disc. Debossed look
+  // = a dark cut with a faint light highlight offset just below it.
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.font = "600 12px -apple-system,BlinkMacSystemFont,sans-serif";
+  ctx.font = "700 14px -apple-system,BlinkMacSystemFont,sans-serif";
   for (let i=0;i<M;i++){
     const n = (M-1-i)*perGap;            // master i sits at slice (M-1-i): last master on top
     const cy = topY + n*dz;
-    const ly = cy + ry - dz/2;           // middle of the front band exposed below the disc above
-    ctx.fillStyle = "rgba(0,0,0,0.55)";  // drop shadow for legibility on bright colours
-    ctx.fillText(MASTERS[i].name, cx, ly+1);
-    ctx.fillStyle = "#fff";
-    ctx.fillText(MASTERS[i].name, cx, ly);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(1, ry/rx);                 // foreshorten onto the tilted face
+    ctx.rotate(rot);                     // follow the disc's spin
+    const ty = -rx*0.52;                 // sit on the face, clear of the central hole
+    ctx.fillStyle = "rgba(255,255,255,0.30)";   // light edge below = engraved highlight
+    ctx.fillText(MASTERS[i].name, 0, ty + 1.5);
+    ctx.fillStyle = "rgba(0,0,0,0.50)";          // dark cut
+    ctx.fillText(MASTERS[i].name, 0, ty);
+    ctx.restore();
   }
 }
 
