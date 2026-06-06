@@ -152,21 +152,17 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
     ctx.globalCompositeOperation = "destination-out";
     const pg = ctx.createRadialGradient(0,0,0,0,0,hr);
     pg.addColorStop(0,"rgba(0,0,0,1)");
-    pg.addColorStop(0.82,"rgba(0,0,0,1)");
-    pg.addColorStop(1,"rgba(0,0,0,0)");      // feathered edge
+    pg.addColorStop(0.94,"rgba(0,0,0,1)");
+    pg.addColorStop(1,"rgba(0,0,0,0)");      // thin anti-alias edge only — no border
     ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(0,0,hr,0,7); ctx.fill();
     ctx.globalCompositeOperation = "source-over";
-    // faint inner-wall shadow for depth (not a fill)
-    ctx.lineWidth = Math.max(1.5, hr*0.14);
-    ctx.strokeStyle = "rgba(0,0,0,.10)";
-    ctx.beginPath(); ctx.arc(0,0,hr*0.92,0,7); ctx.stroke();
   }
   ctx.restore();
 }
 
 let rot = -0.5, dragging = false, lastX = 0, autospin = true;
 let tilt = 0.20, perGap = 1, holeOn = true;   // minimum tilt + one disc per master by default
-const DISC_ALPHA = 0.82;                       // discs a bit translucent (see-through stack)
+const DISC_ALPHA = 0.95;                       // discs a touch translucent
 
 function render(){
   ctx.clearRect(0,0,W,H);
@@ -192,6 +188,15 @@ function render(){
     const lo = Math.max(0, Math.floor(p));
     const t = p - lo;
     const fA = FIELDS[lo], fB = FIELDS[Math.min(M-1, lo+1)];
+    // subtle drop shadow under each disc, just a bit
+    ctx.save();
+    ctx.translate(cx, cy + ry*0.5); ctx.scale(1, ry/rx);
+    const sh = ctx.createRadialGradient(0,0,0,0,0,rx);
+    sh.addColorStop(0, "rgba(0,0,0,0.13)");
+    sh.addColorStop(0.7, "rgba(0,0,0,0.06)");
+    sh.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
+    ctx.restore();
     drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0);   // uniform central bore on every disc
   }
   // master name labels down the side
