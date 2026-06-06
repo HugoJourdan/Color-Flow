@@ -85,7 +85,7 @@ body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains M
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
 @media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}}
-#cfd-app{max-width:980px;margin:0 auto;padding:0 20px 60px}
+#cfd-app{max-width:1180px;margin:0 auto;padding:0 20px 60px}
 .hd{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:14px 0;background:var(--bg);border-bottom:1px solid var(--border)}
 .hd .fam-logo{height:22px;width:auto;color:var(--text);display:block}
 .hd .fam{font-weight:600}
@@ -163,9 +163,10 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cmp{border-collapse:collapse;width:100%;font-size:var(--fs-row)}
 .cmp caption{text-align:left;color:var(--muted-2);font-size:var(--fs-xs);padding-bottom:8px}
 .cmp th,.cmp td{border:1px solid var(--border);padding:7px 10px;text-align:left}
-.cmp thead th{color:var(--muted);font-weight:600}
+.cmp thead th{color:var(--muted);font-weight:600;text-align:center}
+.cmp thead th .dot{margin:0}
 .cmp tbody th{font-weight:500}
-.cmp tbody th .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.cmp th .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .cmp td{position:relative}
 .cmp .cmpbar{position:absolute;left:0;top:0;bottom:0;border-radius:0;opacity:.28}
 .cmp .cmpn{position:relative}
@@ -177,8 +178,9 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cov-rows{margin:6px 0 4px}
 .cov-row{display:flex;align-items:center;gap:12px;font-size:var(--fs-row);padding:9px 0;border-top:1px solid var(--track)}
 .cov-name{width:120px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cov-bar{flex:1;display:flex;height:16px;border-radius:5px;overflow:hidden;background:var(--track);min-width:0}
-.cov-bar>span{display:block;height:100%}
+.cov-bar{flex:1;display:flex;height:18px;border-radius:5px;overflow:hidden;background:var(--track);min-width:0}
+.cov-bar>span{display:flex;align-items:center;justify-content:center;height:100%;min-width:0;overflow:hidden}
+.cov-bar .cov-pct{font-size:var(--fs-2xs);line-height:1;color:#fff;mix-blend-mode:difference;white-space:nowrap;padding:0 2px}
 .cov-bar .cov-none{background:var(--c-none)}
 .cov-row .num{width:auto;min-width:48px;text-align:right;color:var(--muted)}
 .timeline{margin-top:14px}
@@ -373,7 +375,6 @@ DASHBOARD_JS = r"""
     var noneW = pct(none, total);
     if (noneW) segParts += '<span class="seg-none" style="width:'+noneW+'%" title="'+esc(H.noneLabel)+'"></span>';
     return '<section class="overall master-overall" aria-label="'+esc(m.name+" totals")+'">'
-      + '<div class="ov-num">'+ring(compP)+'</div>'
       + '<div class="ov-main"><div class="ov-head">'+head+'</div>'
       + '<div class="seg" role="img" aria-label="'+esc(m.name+" colour distribution")+'">'+segParts+'</div>'
       + '<div class="legend">'+legend+'</div>'+recipeLine+'</div></section>';
@@ -384,7 +385,7 @@ DASHBOARD_JS = r"""
     for (var i=0;i<H.glyphNames.length;i++){
       items.push([H.glyphNames[i], m.keys[i], i]);
     }
-    var cap = 500, shown = items.slice(0,cap);
+    var shown = items;   // every glyph (no cap); letterforms come from H.paths
     var paths = (H.paths && H.paths[m.id]) || {};
     var ch = (H.changes && H.changes[m.id]) || {};
     function cellHTML(it){
@@ -409,7 +410,7 @@ DASHBOARD_JS = r"""
       return '<div class="cat"><div class="cat-h">'+esc(c)+' <span class="cat-n">'+groups[c].length+'</span></div>'
         + '<div class="grid" aria-label="'+esc(c)+'">'+groups[c].map(cellHTML).join("")+'</div></div>';
     }).join("");
-    var more = items.length>cap ? '<span class="more">… +'+(items.length-cap)+' more</span>' : "";
+    var more = "";
     var empty = items.length===0 ? '<p class="empty">No glyphs.</p>' : "";
     var toggle = Object.keys(ch).length ? '<button type="button" class="ba-toggle chip" aria-pressed="'+state.before+'" title="Toggle the cell colours between before and after the last run">'+(state.before?"Before":"After")+'</button>' : '';
     return '<section class="heat"><div class="heat-h"><span>Per-glyph · '+items.length
@@ -444,16 +445,21 @@ DASHBOARD_JS = r"""
     return masterTabs()+'<div class="panel" role="tabpanel">'+masterOverall(m)+heatmap(m)+'</div>';
   }
   function covStacked(r){
-    // a left-aligned stacked bar of the colours actually set in this group
+    // a left-aligned stacked bar of the colours actually set in this group, each
+    // segment labelled with its share (shown only when the segment is wide enough)
     var dist = r.dist || {};
+    function seg(w, bg, cls, title){
+      var label = w >= 7 ? '<span class="cov-pct">'+Math.round(w)+'%</span>' : '';
+      return '<span'+(cls?' class="'+cls+'"':'')+' style="width:'+w+'%;background:'+bg+'" title="'+title+'">'+label+'</span>';
+    }
     var segs = H.order.map(function(k){
       var c = dist[k] || 0;
       if (!c) return "";
       var w = r.total ? (c/r.total*100) : 0;
-      return '<span style="width:'+w+'%;background:var(--c'+k+')" title="'+esc(labelFor(parseInt(k,10))+": "+c)+'"></span>';
+      return seg(w, 'var(--c'+k+')', '', esc(labelFor(parseInt(k,10))+": "+c));
     }).join("");
     var uncolored = r.uncolored || 0;
-    if (uncolored) segs += '<span class="cov-none" style="width:'+(r.total?uncolored/r.total*100:0)+'%" title="'+esc(H.noneLabel+": "+uncolored)+'"></span>';
+    if (uncolored) segs += seg(r.total?uncolored/r.total*100:0, 'var(--c-none)', 'cov-none', esc(H.noneLabel+": "+uncolored));
     return '<div class="cov-bar" role="img" aria-label="'+esc(r.key+": colour distribution")+'">'+segs+'</div>';
   }
   function coverageView(){
@@ -509,8 +515,8 @@ DASHBOARD_JS = r"""
     // columns = steps (+None); rows = masters. The master name shows only on
     // hovering its Aa preview (title), not as visible text.
     var head = '<th scope="col">Master</th>'+H.steps.map(function(s){
-      return '<th scope="col"><span class="dot" style="background:var('+varFor(s.key)+')"></span>'+esc(s.label)+'</th>';
-    }).join("")+'<th scope="col"><span class="dot" style="background:var(--c-none)"></span>'+esc(H.noneLabel)+'</th>';
+      return '<th scope="col" title="'+esc(s.label)+'" aria-label="'+esc(s.label)+'"><span class="dot" style="background:var('+varFor(s.key)+')"></span></th>';
+    }).join("")+'<th scope="col" title="'+esc(H.noneLabel)+'" aria-label="'+esc(H.noneLabel)+'"><span class="dot" style="background:var(--c-none)"></span></th>';
     var body = H.masters.map(function(m){
       var pv = m.preview;
       var aa = (pv && pv.d) ? '<svg class="cmp-aa" viewBox="'+esc(pv.vb)+'" preserveAspectRatio="xMidYMid meet"><path d="'+esc(pv.d)+'" fill="currentColor"/></svg>' : esc(m.name);
