@@ -35,6 +35,7 @@ from datetime import datetime
 from pathlib import Path
 import colornames
 import colorflow_assets
+import glyphsvg
 import labelcolors
 
 try:
@@ -201,6 +202,44 @@ def save_snapshot(font, snapshot: dict) -> None:
 # Full JSON model
 # --------------------------------------------------------------------------- #
 
+def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free: bool,
+                   masters: list, upm: float) -> dict:
+    """Per-master ``{glyph_name: svg_d}`` for the heatmap's *unfinished* glyphs
+    (capped), and stamp each master dict with its ascender/descender. Only the
+    likely-shown glyphs are rendered so big fonts stay light + fast."""
+    order_set = set(order)
+    last = order[-1] if order else None
+    cap = 300
+    by_id = {entry["id"]: entry for entry in masters}
+    paths: dict = {}
+    for master in font.masters:
+        master_id = master.id
+        entry = by_id.get(master_id)
+        if entry is not None:
+            entry["asc"] = float(getattr(master, "ascender", upm * 0.8) or 0.0)
+            entry["desc"] = float(getattr(master, "descender", -upm * 0.2) or 0.0)
+        per_glyph = current.get(master_id, {})
+        shown: dict = {}
+        produced = 0
+        for name in glyph_names:
+            if produced >= cap:
+                break
+            key = per_glyph.get(name)
+            finished = (str(key) in order_set) if is_free else (str(key) == last)
+            if finished:
+                continue
+            try:
+                layer = font.glyphs[name].layers[master_id]
+            except Exception:
+                layer = None
+            outline = glyphsvg.layer_svg_path(layer) if layer is not None else ""
+            if outline:
+                shown[name] = outline
+                produced += 1
+        paths[master_id] = shown
+    return paths
+
+
 def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
     """The full data model the JS app renders. Pure aside from reading the
     font's colorNames.txt (via _meaning_and_none) — the same source the palette
@@ -228,6 +267,9 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
             "uncolored": uncolored_count(colors, order),
         })
 
+    upm = float(getattr(font, "upm", 1000) or 1000)
+    paths = _outline_paths(font, current, glyph_names, order, is_free, masters, upm)
+
     return {
         "family": font.familyName or "",
         "fileName": Path(font.filepath).name if font.filepath else (font.familyName or "Untitled"),
@@ -242,6 +284,9 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "masters": masters,
         "colors": {str(index): labelcolors.hex_for(rgba)
                    for index, rgba in enumerate(labelcolors.read_label_colors())},
+        "upm": upm,
+        "filePath": font.filepath or "",
+        "paths": paths,
         "changes": compute_changes(current, previous),
     }
 

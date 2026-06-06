@@ -122,9 +122,11 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .heat-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
 .heat-h .hint{color:var(--muted-2)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(15px,1fr));gap:4px}
-.cell{aspect-ratio:1;border:0;padding:0;border-radius:3px;cursor:pointer;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.cell{aspect-ratio:1;border:0;padding:0;border-radius:3px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}
 .cell.copied{outline:2px solid var(--ok);outline-offset:1px}
+.cell.glyph{background:var(--surface-2)}
+.cell svg{width:100%;height:100%;display:block}
 .more{display:inline-block;margin-top:8px;font-size:var(--fs-xs);color:var(--muted-2)}
 .empty{font-size:var(--fs-sm);color:var(--muted-2)}
 .changes{margin-top:14px}
@@ -264,10 +266,14 @@ DASHBOARD_JS = r"""
       items.push([name,k]);
     }
     var cap = 500, shown = items.slice(0,cap);
+    var paths = (H.paths && H.paths[m.id]) || {};
     var cells = shown.map(function(it){
-      var lab = labelFor(it[1]);
-      return '<button type="button" class="cell" style="background:var('+varFor(it[1])+')" '
-        + 'title="'+esc(it[0]+" — "+lab)+'" aria-label="'+esc(it[0]+", "+lab+" (copy name)")+'" data-g="'+esc(it[0])+'"></button>';
+      var name = it[0], key = it[1], lab = labelFor(key);
+      var href = "glyphsapp://show/?path=" + encodeURIComponent(H.filePath || "")
+        + "&glyph=" + encodeURIComponent(name) + "&layer=" + encodeURIComponent(m.id);
+      var d = paths[name];
+      var inner = d ? '<svg viewBox="0 ' + (-m.asc) + ' ' + H.upm + ' ' + (m.asc - m.desc) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(d) + '" fill="var(' + varFor(key) + ')"/></svg>' : '';
+      return '<a class="cell' + (d ? ' glyph' : '') + '" href="' + href + '"' + (d ? '' : ' style="background:var(' + varFor(key) + ')"') + ' title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
     }).join("");
     var more = items.length>cap ? '<span class="more">… +'+(items.length-cap)+' more</span>' : "";
     var empty = items.length===0 ? '<p class="empty">No glyphs match.</p>' : "";
@@ -349,7 +355,6 @@ DASHBOARD_JS = r"""
     });
     document.getElementById("cfd-body").addEventListener("click", function(e){
       var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); update(); return; }
-      var cell = e.target.closest(".cell"); if (cell){ copy(cell.getAttribute("data-g"), cell); }
     });
   }
   function init(){

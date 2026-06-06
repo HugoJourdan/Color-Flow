@@ -311,3 +311,16 @@ def test_build_model_includes_label_colors_as_hex(tmp_path) -> None:
     model = db.build_model(font, datetime(2026, 6, 5), current, current)
     assert set(model["colors"].keys()) == {str(index) for index in range(12)}
     assert model["colors"]["0"] == labelcolors.hex_for(labelcolors.DEFAULTS[0])
+
+
+def test_build_model_includes_outline_metrics_and_paths(tmp_path) -> None:
+    (tmp_path / "colorNames.txt").write_text("red=R\n", encoding="utf-8")
+    font = _FakeFont([_FakeMaster("m1", "R")], [_FakeGlyph("A", {"m1": _FakeLayerColor(0)})],
+                     filepath=str(tmp_path / "F.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["upm"] == 1000.0
+    assert model["filePath"] == str(tmp_path / "F.glyphs")
+    assert model["paths"] == {"m1": {}}   # fake font has no real layers -> no outlines
+    assert model["masters"][0]["asc"] == 800.0
+    assert model["masters"][0]["desc"] == -200.0
