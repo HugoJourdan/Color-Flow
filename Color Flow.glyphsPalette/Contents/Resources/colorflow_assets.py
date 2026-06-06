@@ -277,7 +277,9 @@ DASHBOARD_JS = r"""
       + '<button type="button" id="cfd-sort" class="chip">↕ Sort: workflow</button>'
       + '<button type="button" id="cfd-trend" class="chip" aria-pressed="false">📈 Trend</button>'
       + '<button type="button" id="cfd-coverage" class="chip" aria-pressed="false">🗂 Coverage</button>'
-      + '<button type="button" id="cfd-compare" class="chip" aria-pressed="false">▤ Compare</button></div>';
+      + '<button type="button" id="cfd-compare" class="chip" aria-pressed="false">▤ Compare</button>'
+      + '<button type="button" id="cfd-csv" class="chip" title="Download per-step counts as CSV">⇩ CSV</button>'
+      + '<button type="button" id="cfd-json" class="chip" title="Download the summary as JSON">⇩ JSON</button></div>';
   }
   function overall(){
     var a = aggregate(), compP = pct(a.completion,a.grand), startP = pct(a.started,a.grand);
@@ -523,6 +525,55 @@ DASHBOARD_JS = r"""
     else fallback();
   }
 
+  // ----- Status export: CSV / JSON for stakeholders + trackers (#22) -----
+  function exportRows(){
+    var rows = [];
+    H.masters.forEach(function(m){
+      H.steps.forEach(function(s){
+        var c = countFor(m, s.key);
+        rows.push({master:m.name, step:s.key, label:s.label, count:c, total:H.glyphTotal, pct:pct(c,H.glyphTotal)});
+      });
+      rows.push({master:m.name, step:"None", label:H.noneLabel, count:m.uncolored, total:H.glyphTotal, pct:pct(m.uncolored,H.glyphTotal)});
+    });
+    return rows;
+  }
+  function csvCell(value){
+    var s = String(value==null ? "" : value);
+    return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  }
+  function exportCSV(){
+    var lines = [["Family",H.family],["File",H.fileName],["Version",H.version],["Mode",H.mode],
+                 ["Generated",H.generated],["Glyphs",H.glyphTotal]]
+      .map(function(r){ return csvCell(r[0])+","+csvCell(r[1]); });
+    lines.push("", ["Master","Step","Label","Count","Total","Percent"].join(","));
+    exportRows().forEach(function(r){
+      lines.push([r.master,r.step,r.label,r.count,r.total,r.pct].map(csvCell).join(","));
+    });
+    return lines.join("\n");
+  }
+  function exportJSON(){
+    return JSON.stringify({
+      family:H.family, fileName:H.fileName, version:H.version, mode:H.mode,
+      generated:H.generated, glyphTotal:H.glyphTotal, steps:H.steps,
+      masters:H.masters.map(function(m){
+        return { id:m.id, name:m.name, counts:m.counts, uncolored:m.uncolored,
+                 started:startedOf(m), total:H.glyphTotal };
+      })
+    }, null, 2);
+  }
+  function exportName(ext){
+    return H.generated+"_"+String(H.family||"font").replace(/[^\w.-]+/g,"-")+"_Color-Flow."+ext;
+  }
+  function download(name, text, type){
+    try {
+      var url = URL.createObjectURL(new Blob([text], {type:type}));
+      var a = document.createElement("a"); a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 0);
+      toast("Exported "+name);
+    } catch(e){ toast("Export not supported here"); }
+  }
+
   function bind(){
     document.getElementById("cfd-theme").addEventListener("click", function(){
       state.theme = state.theme==="dark" ? "light" : "dark";
@@ -534,6 +585,8 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-compare").addEventListener("click", function(){ state.view = state.view==="compare" ? "tabs" : "compare"; update(); });
     document.getElementById("cfd-trend").addEventListener("click", function(){ state.view = state.view==="trend" ? "tabs" : "trend"; update(); });
     document.getElementById("cfd-coverage").addEventListener("click", function(){ state.view = state.view==="coverage" ? "tabs" : "coverage"; update(); });
+    document.getElementById("cfd-csv").addEventListener("click", function(){ download(exportName("csv"), exportCSV(), "text/csv"); });
+    document.getElementById("cfd-json").addEventListener("click", function(){ download(exportName("json"), exportJSON(), "application/json"); });
     var s = document.getElementById("cfd-search");
     s.addEventListener("input", function(){ state.q = s.value; update(); });
     document.addEventListener("keydown", function(e){
@@ -558,6 +611,7 @@ DASHBOARD_JS = r"""
       header() + toolbar() + overall() + '<div id="cfd-body"></div>'
       + '<footer class="ft">Color Font Dashboard · Color Flow — Hugo Jourdan<br>'+esc(H.generated)+'</footer>';
     bind(); update();
+    window.__cfdExport = { csv: exportCSV, json: exportJSON, rows: exportRows };
     requestAnimationFrame(function(){ document.body.classList.add("ready"); });
   }
   if (document.readyState!=="loading") init();
