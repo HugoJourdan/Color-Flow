@@ -106,6 +106,8 @@ class ColorFlow(PalettePlugin):
 		# Separator lines + colour tags (depend on the meaning order/visibility).
 		# Per-row widgets (label / bar / count) are built by Update_Plugin_UI.
 		self._rowChecks = {}
+		self._focusColor = None
+		self._countBoxes = {}
 		self._build_static_rows()
 
 		# # Select a master if none is selected
@@ -163,7 +165,7 @@ class ColorFlow(PalettePlugin):
 	def reload_after_settings(self):
 		self.meaning = self.Load_Meaning()
 		for i in range(12):
-			for suffix in ("line", "colorTag", "", "box", "count", "hl", "eye", "eyeTag", "eyeLine"):
+			for suffix in ("line", "colorTag", "", "box", "count", "hl", "focus", "eye", "eyeTag", "eyeLine"):
 				attr = str(i) + suffix
 				if hasattr(self.paletteView.frame, attr):
 					delattr(self.paletteView.frame, attr)
@@ -1006,7 +1008,7 @@ class ColorFlow(PalettePlugin):
 			firstColor = selectedLayers[0].color if selectedLayers else None
 
 			for color, meaning in self.meaning.items():
-				for suffix in ("", "box", "count", "hl"):
+				for suffix in ("", "box", "count", "hl", "focus"):
 					attr = str(color) + suffix
 					if hasattr(self.paletteView.frame, attr):
 						delattr(self.paletteView.frame, attr)
@@ -1014,6 +1016,9 @@ class ColorFlow(PalettePlugin):
 					continue
 				count = counts[color] if color in counts else 0
 				barWidth = (self.barWidth / glyphCount * count) if glyphCount else 0
+				if getattr(self, "_focusColor", None) == color:
+					rgb = self.colorKeys[str(color)]
+					setattr(self.paletteView.frame, str(color)+"focus", Box((0, yPos-self.shift-1, self.width, 22), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.22), cornerRadius=0, borderWidth=0))
 
 				if selectedLayers:
 					check = all(state.get(color, False) for state in selStates)
@@ -1046,10 +1051,79 @@ class ColorFlow(PalettePlugin):
 					else:
 						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+3-self.shift, -6, 20), f"{count}/{glyphCount}", alignment="right", sizeStyle='small'))
 					yPos += 22
+			self._countBoxes = {}
+			for reviewColor in list(self._rowChecks.keys()):
+				countBox = getattr(self.paletteView.frame, str(reviewColor)+"count", None)
+				if countBox is None:
+					continue
+				self._countBoxes[reviewColor] = countBox
+				try:
+					recognizer = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "countClicked:")
+					recognizer.setNumberOfClicksRequired_(1)
+					self._ns_button(countBox).addGestureRecognizer_(recognizer)
+				except Exception:
+					pass
 			self._build_meta_strip(order, glyphCount, masterId)
 		except Exception:
 			import traceback
 			print("Color Flow [Update_Plugin_UI] error:\n" + traceback.format_exc())
+
+	# Review Queue + Focus (#10, #11): single-click a step's count badge to
+	# focus that step (row highlight) and open exactly its glyphs in a new Edit
+	# tab to walk through them; click again to clear focus.
+	def countClicked_(self, sender):
+		try:
+			color = self._color_for_count(sender)
+			if color is None:
+				return
+			self._focusColor = None if getattr(self, "_focusColor", None) == color else color
+			self.Update_Plugin_UI()
+			if self._focusColor is not None:
+				self._open_step_tab(color)
+		except Exception:
+			import traceback
+			print("Color Flow [review] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _color_for_count(self, recognizer):
+		view = recognizer.view()
+		for color, box in getattr(self, "_countBoxes", {}).items():
+			try:
+				if self._ns_button(box) == view:
+					return color
+			except Exception:
+				continue
+		return None
+
+	@objc.python_method
+	def _glyphs_for_step(self, color, masterId, order):
+		names = []
+		for glyph in self.font.glyphs:
+			layer = glyph.layers[masterId]
+			state = self._layer_state(layer, order) if layer is not None else {}
+			if state.get(color):
+				names.append(glyph.name)
+		return names
+
+	@objc.python_method
+	def _open_step_tab(self, color):
+		font = self.font
+		if font is None:
+			return
+		try:
+			masterId = font.selectedFontMaster.id
+		except Exception:
+			return
+		order = list(self.meaning.keys())
+		names = self._glyphs_for_step(color, masterId, order)
+		if not names:
+			Message("No glyphs at \u201c%s\u201d." % self.meaning.get(color, str(color)), title="Color Flow")
+			return
+		try:
+			font.newTab("/" + "/".join(names))
+		except Exception:
+			import traceback
+			print("Color Flow [open tab] error:\n" + traceback.format_exc())
 
 	# Top strip: a fire progress-streak badge (#17) and a thin 100%-stacked
 	# whole-master progress ribbon (#23), drawn in the top band above the rows so
