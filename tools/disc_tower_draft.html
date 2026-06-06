@@ -116,14 +116,8 @@ function buildField(counts){
     g.beginPath(); g.arc(bx,by,rad,0,7); g.fill();
   });
   g.globalAlpha = 1;
-  // clean white hub around the centre — like a CD-ROM / the favicon's white
-  // centre — so the colours don't swirl into a point in the middle
-  const innerR = R*0.46;
-  const ig = g.createRadialGradient(cx,cy,0, cx,cy,innerR);
-  ig.addColorStop(0, "#ffffff");
-  ig.addColorStop(0.5, "#ffffff");
-  ig.addColorStop(1, "rgba(255,255,255,0)");
-  g.fillStyle = ig; g.beginPath(); g.arc(cx,cy,innerR,0,7); g.fill();
+  // (no white hub — the colours fill all the way to the hole so the centre
+  // reads the same as the sides; the muddy conic singularity sits inside the bore)
   const blurred = document.createElement("canvas"); blurred.width = blurred.height = FS;
   const bg = blurred.getContext("2d");
   // soften the seams; HSL is already vivid so only a gentle boost
