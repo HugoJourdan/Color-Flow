@@ -196,8 +196,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .ov-ring .ov-ring-track{stroke:var(--track)}
 .ov-ring .ov-ring-arc{stroke:var(--accent)}
 .ov-ring-t{fill:var(--text);font-size:17px;font-weight:600}
-.cmp-aa{display:block;height:20px;width:auto;margin:0 auto;color:var(--text)}
-.cmp-mname{display:block;font-size:var(--fs-2xs);color:var(--muted);font-weight:400;margin-top:3px;white-space:nowrap}
+.cmp tbody th[scope="row"]{white-space:nowrap;font-weight:600;color:var(--text)}
 .cfd-modal{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.5)}
 .cfd-modal-box{background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:18px 20px;box-shadow:0 18px 60px rgba(0,0,0,.45);max-width:440px;width:calc(100% - 40px)}
 .cfd-modal-h{font-size:var(--fs-base);font-weight:600;margin-bottom:14px}
@@ -531,14 +530,12 @@ DASHBOARD_JS = r"""
     return '<section class="timeline"><div class="tl-legend">'+legend+'</div>'+chart+foot+'</section>';
   }
   function compareView(){
-    // columns = steps (+None); rows = masters. The master name shows only on
-    // hovering its Aa preview (title), not as visible text.
+    // columns = steps (+None); rows = masters, labelled by the master name.
     var head = '<th scope="col">Master</th>'+H.steps.map(function(s){
       return '<th scope="col" title="'+esc(s.label)+'" aria-label="'+esc(s.label)+'"><span class="dot" style="background:var('+varFor(s.key)+')"></span></th>';
     }).join("")+'<th scope="col" title="'+esc(H.noneLabel)+'" aria-label="'+esc(H.noneLabel)+'"><span class="dot" style="background:var(--c-none)"></span></th>';
     var body = H.masters.map(function(m){
-      var pv = m.preview;
-      var aa = (pv && pv.d) ? '<svg class="cmp-aa" viewBox="'+esc(pv.vb)+'" preserveAspectRatio="xMidYMid meet"><path d="'+esc(pv.d)+'" fill="currentColor"/></svg>' : esc(m.name);
+      var aa = esc(m.name);
       var cells = H.steps.map(function(s){
         var p = pct(countFor(m,s.key),H.glyphTotal);
         return '<td><span class="cmpbar" style="width:'+p+'%;background:var('+varFor(s.key)+')"></span><span class="cmpn">'+p+'%</span></td>';
