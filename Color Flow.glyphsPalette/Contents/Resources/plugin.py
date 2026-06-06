@@ -298,47 +298,6 @@ class ColorFlow(PalettePlugin):
 			popover.reportSep = HorizontalLine((12, reportY, -12, 1))
 			popover.dashboard = Button((12, reportY + 8, -12, 22), "Generate Colorflow Report",
 				callback=self._popover_dashboard, sizeStyle='small')
-			# Animated loading-bar GIF as a thick BORDER around the report button. The
-			# button keeps its default background + label; an NSImageView playing the GIF
-			# sits just behind it, larger all round, and is masked to a rounded RING band
-			# (even-odd CAShapeLayer) so the gradient shows only in the border — never as
-			# slivers behind the label (which a plain cornerRadius would leak past the
-			# small-button bezel).
-			try:
-				import Quartz
-				_gif = os.path.join(os.path.dirname(__file__), "report-loading.gif")
-				_img = AppKit.NSImage.alloc().initWithContentsOfFile_(_gif)
-				if _img is not None:
-					_btn = self._ns_button(popover.dashboard)
-					_bw = 4.0  # border thickness
-					_f = _btn.frame()
-					_W = _f.size.width + 2.0 * _bw
-					_H = _f.size.height + 2.0 * _bw
-					_ring = AppKit.NSMakeRect(_f.origin.x - _bw, _f.origin.y - _bw, _W, _H)
-					_iv = AppKit.NSImageView.alloc().initWithFrame_(_ring)
-					_iv.setImage_(_img)
-					_iv.setAnimates_(True)
-					_iv.setImageScaling_(AppKit.NSImageScaleAxesIndependently)
-					_iv.setAutoresizingMask_(AppKit.NSViewWidthSizable)
-					_iv.setWantsLayer_(True)
-					_iv.layer().setMasksToBounds_(True)
-					# Ring = outer pill minus inner pill (the button-sized hole).
-					_outer = AppKit.NSMakeRect(0.0, 0.0, _W, _H)
-					_inner = AppKit.NSMakeRect(_bw, _bw, _f.size.width, _f.size.height)
-					_rOuter = _H / 2.0
-					_rInner = _f.size.height / 2.0
-					_path = Quartz.CGPathCreateMutable()
-					Quartz.CGPathAddRoundedRect(_path, None, _outer, _rOuter, _rOuter)
-					Quartz.CGPathAddRoundedRect(_path, None, _inner, _rInner, _rInner)
-					_mask = Quartz.CAShapeLayer.layer()
-					_mask.setPath_(_path)
-					_mask.setFillRule_(Quartz.kCAFillRuleEvenOdd)
-					_iv.layer().setMask_(_mask)
-					_btn.superview().addSubview_positioned_relativeTo_(_iv, AppKit.NSWindowBelow, _btn)
-					self._reportGifView = _iv
-			except Exception:
-				import traceback
-				print("Color Flow [report gif] error:\n" + traceback.format_exc())
 			try:
 				popover.bind("did close", self._popover_did_close)
 			except Exception:
