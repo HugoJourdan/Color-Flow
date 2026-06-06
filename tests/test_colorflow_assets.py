@@ -49,3 +49,18 @@ def test_embed_model_is_parseable_and_neutralises_script_breakout() -> None:
     # the payload between the tags round-trips back to the original model
     payload = block.split(">", 1)[1].rsplit("<", 1)[0]
     assert json.loads(payload) == model
+
+
+def test_color_overrides_injected_after_base_css() -> None:
+    model = _model()
+    model["colors"] = {"0": "#abcdef", "11": "#123456"}
+    html = assets.build_html(model)
+    assert "--c0:#abcdef;" in html
+    assert "--c11:#123456;" in html
+    # the override must come AFTER the base stylesheet so it wins
+    assert html.index("--c0:#abcdef") > html.index(assets.DASHBOARD_CSS[:20].strip())
+
+
+def test_color_overrides_absent_without_colors() -> None:
+    assert assets._color_overrides({}) == ""
+    assert assets._color_overrides({"colors": {}}) == ""

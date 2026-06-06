@@ -35,6 +35,7 @@ from datetime import datetime
 from pathlib import Path
 import colornames
 import colorflow_assets
+import labelcolors
 
 try:
     from GlyphsApp import Glyphs, Message  # type: ignore[import]
@@ -239,6 +240,8 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "noneLabel": none_text,
         "glyphNames": glyph_names,
         "masters": masters,
+        "colors": {str(index): labelcolors.hex_for(rgba)
+                   for index, rgba in enumerate(labelcolors.read_label_colors())},
         "changes": compute_changes(current, previous),
     }
 

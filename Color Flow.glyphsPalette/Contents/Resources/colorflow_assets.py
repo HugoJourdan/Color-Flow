@@ -21,13 +21,25 @@ def embed_model(model: dict) -> str:
     return f'<script type="application/json" id="cfd-model">{payload}</script>'
 
 
+def _color_overrides(model: dict) -> str:
+    """A ``:root`` ``--cN`` override built from the model's per-colour hexes, so the
+    report follows the user's Glyphs label colours. Placed after the base stylesheet
+    so it wins; the ``--cN`` swatch vars are shared by both themes, so this covers
+    light and dark. Empty when the model carries no colours."""
+    colors = model.get("colors") or {}
+    if not colors:
+        return ""
+    rules = "".join(f"--c{key}:{value};" for key, value in sorted(colors.items()))
+    return f"<style>:root{{{rules}}}</style>"
+
+
 def build_html(model: dict) -> str:
     """Assemble the complete, self-contained dashboard page from a model."""
     title = xesc(f'{model["generated"]}_{model.get("family") or ""}_Color-Flow-Dashboard')
     return (
         '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        f"<title>{title}</title><style>{DASHBOARD_CSS}</style></head>"
+        f"<title>{title}</title><style>{DASHBOARD_CSS}</style>{_color_overrides(model)}</head>"
         '<body><div id="cfd-app"></div>'
         '<noscript>This report needs JavaScript — please open it in a modern browser.</noscript>'
         f"{embed_model(model)}"
