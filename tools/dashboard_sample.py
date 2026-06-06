@@ -67,7 +67,24 @@ def _model(is_free: bool) -> dict:
         "favicon": outline,
         "trend": _trend(),
         "journeys": {"regular": {"A": [-1, 4, 8], "C": [-1, -1, 4]}, "bold": {}},
+        "coverage": _coverage(),
         "changes": {"regular": {"A": [4, 8], "H": [6, 3]}},
+    }
+
+
+def _coverage() -> dict:
+    def script_rows(bump: int) -> list:
+        return [
+            {"key": "latin", "total": 16, "final": 8 + bump, "started": 12, "uncolored": 4, "counts": {}},
+            {"key": "punctuation", "total": 6, "final": 2, "started": 4, "uncolored": 2, "counts": {}},
+        ]
+    category_rows = [
+        {"key": "Letter", "total": 18, "final": 10, "started": 15, "uncolored": 3, "counts": {}},
+        {"key": "Punctuation", "total": 4, "final": 1, "started": 2, "uncolored": 2, "counts": {}},
+    ]
+    return {
+        "byScript": {"regular": script_rows(2), "bold": script_rows(0)},
+        "byCategory": {"regular": category_rows, "bold": category_rows},
     }
 
 

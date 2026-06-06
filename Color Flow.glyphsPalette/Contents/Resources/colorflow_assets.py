@@ -164,6 +164,14 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cmp td{position:relative}
 .cmp .cmpbar{position:absolute;left:0;top:0;bottom:0;border-radius:0;opacity:.28}
 .cmp .cmpn{position:relative}
+.cov{margin-top:6px}
+.cov-h{display:flex;align-items:center;gap:12px;margin:10px 0 4px}
+.cov-title{font-size:var(--fs-sm);color:var(--muted)}
+.cov-switch{margin-left:auto;display:flex;gap:6px}
+.cov-switch .chip.on{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.cov-rows{margin:6px 0 4px}
+.cov-row{display:flex;align-items:center;gap:12px;font-size:var(--fs-row);padding:9px 0;border-top:1px solid var(--track)}
+.cov-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trend{display:flex;flex-direction:column;gap:16px;margin-top:14px}
 .trend-empty{margin-top:20px}
 .tcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
@@ -208,6 +216,7 @@ DASHBOARD_JS = r"""
   var state = {
     master: H.masters.length ? H.masters[0].id : null,
     view: "tabs", before: false, q: "", unfinishedOnly: true, sort: "workflow",
+    coverGroup: "byScript",
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
 
@@ -267,6 +276,7 @@ DASHBOARD_JS = r"""
       + '<button type="button" id="cfd-unfinished" class="chip" aria-pressed="'+state.unfinishedOnly+'">◦ Unfinished only</button>'
       + '<button type="button" id="cfd-sort" class="chip">↕ Sort: workflow</button>'
       + '<button type="button" id="cfd-trend" class="chip" aria-pressed="false">📈 Trend</button>'
+      + '<button type="button" id="cfd-coverage" class="chip" aria-pressed="false">🗂 Coverage</button>'
       + '<button type="button" id="cfd-compare" class="chip" aria-pressed="false">▤ Compare</button></div>';
   }
   function overall(){
@@ -341,7 +351,7 @@ DASHBOARD_JS = r"""
     }).join("");
     return '<details class="changes"><summary>Changed since last run ('+names.length+')</summary><div class="chgwrap">'+blocks+'</div></details>';
   }
-  function tabsView(){
+  function masterTabs(){
     var tabs = H.masters.map(function(m){
       var on = m.id===state.master, pv = m.preview;
       var label = (pv && pv.d)
@@ -350,8 +360,27 @@ DASHBOARD_JS = r"""
       return '<button type="button" role="tab" aria-selected="'+on+'" class="tab'+(on?" on":"")
         +'" data-m="'+esc(m.id)+'" title="'+esc(m.name)+'" aria-label="'+esc(m.name)+'">'+label+'</button>';
     }).join("");
+    return '<div class="tabs" role="tablist">'+tabs+'</div>';
+  }
+  function tabsView(){
     var m = masterById(state.master);
-    return '<div class="tabs" role="tablist">'+tabs+'</div><div class="panel" role="tabpanel">'+rows(m)+heatmap(m)+'</div>';
+    return masterTabs()+'<div class="panel" role="tabpanel">'+rows(m)+heatmap(m)+'</div>';
+  }
+  function coverageView(){
+    var cov = (H.coverage && H.coverage[state.coverGroup]) || {};
+    var rows2 = cov[state.master] || [];
+    var goalVar = "--c"+(lastOrder!=null?lastOrder:0);
+    var head = '<div class="cov-h"><span class="cov-title">Coverage by '+(state.coverGroup==="byScript"?"script":"category")+'</span>'
+      + '<span class="cov-switch">'
+      + '<button type="button" class="chip'+(state.coverGroup==="byScript"?" on":"")+'" data-cg="byScript" aria-pressed="'+(state.coverGroup==="byScript")+'">Script</button>'
+      + '<button type="button" class="chip'+(state.coverGroup==="byCategory"?" on":"")+'" data-cg="byCategory" aria-pressed="'+(state.coverGroup==="byCategory")+'">Category</button></span></div>';
+    var body = rows2.length ? rows2.map(function(r){
+      var p = pct(r.final, r.total);
+      return '<div class="cov-row"><span class="cov-name">'+esc(r.key)+'</span>'
+        + bar(r.final, r.total, goalVar, r.key+": "+r.final+" of "+r.total+" complete ("+p+"%)")
+        + '<span class="num">'+r.final+'/'+r.total+'</span><span class="pc">'+p+'%</span></div>';
+    }).join("") : '<p class="empty">No glyphs.</p>';
+    return masterTabs()+'<section class="cov"><div class="panel">'+head+'<div class="cov-rows">'+body+'</div></div></section>';
   }
   function compareView(){
     var head = '<th scope="col">Step</th>'+H.masters.map(function(m){ return '<th scope="col">'+esc(m.name)+'</th>'; }).join("");
@@ -424,7 +453,10 @@ DASHBOARD_JS = r"""
   }
 
   function renderBody(){
-    return state.view==="compare" ? compareView() : state.view==="trend" ? trendView() : tabsView();
+    return state.view==="compare" ? compareView()
+      : state.view==="trend" ? trendView()
+      : state.view==="coverage" ? coverageView()
+      : tabsView();
   }
 
   // ----- Per-glyph step-journey sparkline on heatmap hover (#12) -----
@@ -471,6 +503,7 @@ DASHBOARD_JS = r"""
     document.documentElement.setAttribute("data-theme", state.theme);
     var cmp = document.getElementById("cfd-compare"); if (cmp) cmp.setAttribute("aria-pressed", state.view==="compare");
     var trd = document.getElementById("cfd-trend"); if (trd) trd.setAttribute("aria-pressed", state.view==="trend");
+    var cov = document.getElementById("cfd-coverage"); if (cov) cov.setAttribute("aria-pressed", state.view==="coverage");
     var uf = document.getElementById("cfd-unfinished"); if (uf) uf.setAttribute("aria-pressed", state.unfinishedOnly);
     var sb = document.getElementById("cfd-sort"); if (sb) sb.textContent = "↕ Sort: "+(state.sort==="progress"?"progress":"workflow");
   }
@@ -500,6 +533,7 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-sort").addEventListener("click", function(){ state.sort = state.sort==="workflow" ? "progress" : "workflow"; update(); });
     document.getElementById("cfd-compare").addEventListener("click", function(){ state.view = state.view==="compare" ? "tabs" : "compare"; update(); });
     document.getElementById("cfd-trend").addEventListener("click", function(){ state.view = state.view==="trend" ? "tabs" : "trend"; update(); });
+    document.getElementById("cfd-coverage").addEventListener("click", function(){ state.view = state.view==="coverage" ? "tabs" : "coverage"; update(); });
     var s = document.getElementById("cfd-search");
     s.addEventListener("input", function(){ state.q = s.value; update(); });
     document.addEventListener("keydown", function(e){
@@ -514,6 +548,7 @@ DASHBOARD_JS = r"""
     });
     bodyEl.addEventListener("click", function(e){
       var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); update(); return; }
+      var cg = e.target.closest("[data-cg]"); if (cg){ state.coverGroup = cg.getAttribute("data-cg"); update(); return; }
       var ba = e.target.closest(".ba-toggle");
       if (ba){ e.preventDefault(); state.before = !state.before; ba.setAttribute("aria-pressed", state.before); ba.textContent = state.before ? "Before" : "After"; applyBeforeAfter(); return; }
     });

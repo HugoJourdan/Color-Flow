@@ -358,6 +358,25 @@ def test_glyph_journeys_only_changed_unfinished_aligned_to_dates() -> None:
     assert db._glyph_journeys(history, [], current, ["A"], _FC_ORDER, is_free=False) == {}
 
 
+def test_coverage_groups_by_attribute_and_counts_per_group() -> None:
+    letter_a = _FakeGlyph("A", {"m1": _FakeLayerColor(2)})       # at final step 2
+    letter_b = _FakeGlyph("B", {"m1": _FakeLayerColor(0)})
+    comma = _FakeGlyph("comma", {"m1": _FakeLayerColor(2)})
+    for glyph, script, category in ((letter_a, "latin", "Letter"), (letter_b, "latin", "Letter"),
+                                    (comma, None, "Punctuation")):
+        glyph.script, glyph.category = script, category
+    font = _FakeFont([_FakeMaster("m1", "R")], [letter_a, letter_b, comma])
+    current = db.build_master_glyph_colors(font)
+
+    assert db._glyph_groups(font, "script") == {"latin": ["A", "B"], "Other": ["comma"]}
+    cov = db.build_coverage(font, current, _FC_ORDER, is_free=False)
+    by_script = {row["key"]: row for row in cov["byScript"]["m1"]}
+    assert cov["byScript"]["m1"][0]["key"] == "latin"          # largest group first
+    assert by_script["latin"]["total"] == 2 and by_script["latin"]["final"] == 1  # only A reached step 2
+    by_cat = {row["key"]: row for row in cov["byCategory"]["m1"]}
+    assert by_cat["Letter"]["total"] == 2 and by_cat["Punctuation"]["total"] == 1
+
+
 class _FakeLayerColor:
     def __init__(self, color: int | None, width: float = 500.0) -> None:
         self.color = color

@@ -417,6 +417,49 @@ def _favicon(font) -> dict:
     return glyphsvg.layer_outline(layer) if layer is not None else {}
 
 
+def _glyph_groups(font, attr: str) -> dict[str, list[str]]:
+    """``{group_value: [glyph_name]}`` grouping all glyphs by a per-glyph
+    attribute (``script`` or ``category``); a missing/blank value -> ``"Other"``."""
+    groups: dict[str, list[str]] = {}
+    for glyph in font.glyphs:
+        value = getattr(glyph, attr, None) or "Other"
+        groups.setdefault(str(value), []).append(glyph.name)
+    return groups
+
+
+def _coverage_for(current: dict, groups: dict[str, list[str]], order: list[str],
+                  is_free: bool) -> dict[str, list[dict]]:
+    """Per-master coverage rows for one grouping: each row is a group's
+    ``{key, total, final, started, uncolored, counts}`` using the SAME mode-aware
+    counting as the palette/dashboard, restricted to that group's glyphs. Rows are
+    sorted largest group first."""
+    last = order[-1] if order else None
+    result: dict[str, list[dict]] = {}
+    for master_id, per_glyph in current.items():
+        rows = []
+        for group, names in groups.items():
+            colors = snapshot_to_colors({name: per_glyph.get(name, colornames.NO_COLOR)
+                                         for name in names})
+            counts = master_counts(colors, order, is_free)
+            total = len(names)
+            started = total - uncolored_count(colors, order)
+            final = started if (is_free or last is None) else counts.get(last, 0)
+            rows.append({"key": group, "total": total, "final": final, "started": started,
+                         "uncolored": total - started, "counts": counts})
+        rows.sort(key=lambda row: (-row["total"], row["key"]))
+        result[master_id] = rows
+    return result
+
+
+def build_coverage(font, current: dict, order: list[str], is_free: bool) -> dict:
+    """Completion broken down by Unicode script and by glyph category, per master
+    — the data behind the dashboard's Coverage view (#13)."""
+    return {
+        "byScript": _coverage_for(current, _glyph_groups(font, "script"), order, is_free),
+        "byCategory": _coverage_for(current, _glyph_groups(font, "category"), order, is_free),
+    }
+
+
 def _glyph_journeys(history: dict, dates: list, current: dict, glyph_names: list,
                     order: list, is_free: bool, cap: int = 400) -> dict:
     """Per-master ``{glyph_name: [key_per_date]}`` for the heatmap drill-down
@@ -510,6 +553,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "favicon": _favicon(font),
         "trend": trend,
         "journeys": journeys,
+        "coverage": build_coverage(font, current, order, is_free),
         "changes": compute_changes(current, previous),
     }
 
