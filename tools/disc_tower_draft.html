@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Color Flow — master color tower (draft)</title>
+<!--
+  Standalone prototype of the "Color Tower" visualizer: one disc per master,
+  stacked isometrically, each disc a blurred blend of that master's label-colour
+  distribution. Self-contained (no network, no deps) so it mirrors the report's
+  constraints. Open directly in a browser. The data model below mirrors the real
+  colorflow_dashboard model (COLORS = --c0..--c11; each master: counts[] + uncolored)
+  so this maps straight onto production. See the implementation plan in
+  docs/superpowers/plans/ for wiring this in as a real "Tower" view.
+-->
+<style>
+  html,body{margin:0;height:100%;background:#ececec;color:#444;
+    font:13px/1.5 -apple-system,BlinkMacSystemFont,"JetBrains Mono",monospace;
+    display:grid;place-items:center}
+  .wrap{text-align:center}
+  canvas{cursor:grab}
+  canvas:active{cursor:grabbing}
+  .hint{margin-top:10px;color:#999}
+  .row{margin-top:8px;display:flex;gap:14px;justify-content:center;align-items:center;color:#777}
+  label{display:inline-flex;gap:6px;align-items:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <canvas id="c" width="900" height="780"></canvas>
+  <div class="row">
+    <label>tilt <input id="tilt" type="range" min="20" max="70" value="42"></label>
+    <label>slices/gap <input id="slices" type="range" min="1" max="20" value="12"></label>
+    <label><input id="spin" type="checkbox" checked> auto-spin</label>
+    <label><input id="hole" type="checkbox" checked> uncolored hole</label>
+  </div>
+  <div class="hint">drag to rotate · one disc per master · colour = that master's label-colour mix, blurred like the favicon</div>
+</div>
+<script>
+// ---------------------------------------------------------------------------
+// Fake model — mirrors the real colorflow_dashboard model shape so this maps
+// straight onto production: COLORS = the 12 label hexes (--c0..--c11), and each
+// master carries a per-label `counts` array + an `uncolored` tally.
+// ---------------------------------------------------------------------------
+const COLORS = ["#f97e55","#ffbe68","#ba9d6d","#fff157","#c1ec8a","#6bab59",
+                "#64a5ef","#576ef1","#a962e7","#e77eb4","#c5c5c5","#5f5f5f"];
+const TOTAL = 60; // glyphs per master (for hole sizing)
+const MASTERS = [
+  {name:"Thin",    counts:[2,1,0,3,1,0,1,0,0,0,5,2], uncolored:45},
+  {name:"Light",   counts:[5,3,1,6,3,2,3,1,1,1,3,1], uncolored:30},
+  {name:"Regular", counts:[8,6,2,9,6,4,6,3,3,2,2,1], uncolored:8},
+  {name:"Bold",    counts:[12,9,4,12,9,7,10,6,5,4,1,0], uncolored:3},
+  {name:"Black",   counts:[16,12,6,15,12,10,13,9,8,6,0,0], uncolored:0},
+];
+
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const W = cv.width, H = cv.height;
+
+function hexA(hex,a){
+  const n = parseInt(hex.slice(1),16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+
+// Build one master's blurred colour disc on an offscreen canvas. Each label
+// colour is a soft radial blob placed at its position on the colour wheel,
+// sized by its share of the master; a final blur pass gives the favicon look.
+// Count-weighted average colour of a master — the disc's colour-only base fill
+// (no white), so sparse masters read as their hue, not as a pale wash.
+function avgHex(counts){
+  let r=0, g=0, b=0, sum=0;
+  counts.forEach((cnt,i)=>{
+    if (!cnt) return;
+    const n = parseInt(COLORS[i].slice(1),16);
+    r += ((n>>16)&255)*cnt; g += ((n>>8)&255)*cnt; b += (n&255)*cnt; sum += cnt;
+  });
+  if (!sum) return "#c8c8cc";
+  return `rgb(${Math.round(r/sum)},${Math.round(g/sum)},${Math.round(b/sum)})`;
+}
+
+const FS = 320;
+function buildField(counts){
+  const off = document.createElement("canvas"); off.width = off.height = FS;
+  const g = off.getContext("2d");
+  const cx = FS/2, cy = FS/2, R = FS*0.46;
+  const sum = counts.reduce((a,b)=>a+b,0) || 1;
+  // colour-only base: the master's average hue fills the whole disc (no white,
+  // no transparent gaps for the page to show through)
+  g.fillStyle = avgHex(counts);
+  g.beginPath(); g.arc(cx,cy,R,0,7); g.fill();
+  // overlay each label colour as a vivid radial blob at its wheel position
+  counts.forEach((cnt,i)=>{
+    if (!cnt) return;
+    const share = cnt/sum;
+    const ang = (i/12)*Math.PI*2 - Math.PI/2;
+    const rr = R*0.5;
+    const bx = cx+Math.cos(ang)*rr, by = cy+Math.sin(ang)*rr;
+    const rad = R*(0.45 + 0.85*share);
+    const grd = g.createRadialGradient(bx,by,0,bx,by,rad);
+    grd.addColorStop(0, COLORS[i]);
+    grd.addColorStop(1, hexA(COLORS[i],0));
+    g.globalAlpha = 0.85;
+    g.fillStyle = grd;
+    g.beginPath(); g.arc(bx,by,rad,0,7); g.fill();
+  });
+  g.globalAlpha = 1;
+  const blurred = document.createElement("canvas"); blurred.width = blurred.height = FS;
+  const bg = blurred.getContext("2d");
+  bg.filter = "blur(26px)"; bg.drawImage(off,0,0);
+  return blurred;
+}
+const FIELDS = MASTERS.map(m=>buildField(m.counts));
+const HOLE = MASTERS.map(m=>m.uncolored/TOTAL);
+
+// crossfade two fields into a tinted disc; returns nothing, draws into ctx
+function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.scale(1, ry/rx);
+  ctx.rotate(rot);
+  ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.clip();
+  ctx.globalAlpha = 1;          ctx.drawImage(fieldA,-rx,-rx,rx*2,rx*2);
+  if (fieldB && t>0){ ctx.globalAlpha = t; ctx.drawImage(fieldB,-rx,-rx,rx*2,rx*2); }
+  ctx.globalAlpha = 1;
+  if (holeFrac>0){
+    const hr = rx*0.26;   // constant: same hole size on every disc
+    // REAL hole: erase the disc pixels (destination-out) so it's see-through —
+    // page behind when spread out, the discs below when stacked (a real well).
+    ctx.globalCompositeOperation = "destination-out";
+    const pg = ctx.createRadialGradient(0,0,0,0,0,hr);
+    pg.addColorStop(0,"rgba(0,0,0,1)");
+    pg.addColorStop(0.82,"rgba(0,0,0,1)");
+    pg.addColorStop(1,"rgba(0,0,0,0)");      // feathered edge
+    ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(0,0,hr,0,7); ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+    // faint inner-wall shadow for depth (not a fill)
+    ctx.lineWidth = Math.max(1.5, hr*0.14);
+    ctx.strokeStyle = "rgba(0,0,0,.10)";
+    ctx.beginPath(); ctx.arc(0,0,hr*0.92,0,7); ctx.stroke();
+  }
+  ctx.restore();
+  // front-edge shading to fake disc thickness
+  ctx.save();
+  ctx.translate(cx,cy); ctx.scale(1, ry/rx);
+  ctx.beginPath(); ctx.arc(0,0,rx,0.05*Math.PI,0.95*Math.PI);
+  ctx.strokeStyle = "rgba(0,0,0,.10)"; ctx.lineWidth = 3; ctx.stroke();
+  ctx.restore();
+}
+
+let rot = -0.5, dragging = false, lastX = 0, autospin = true;
+let tilt = 0.42, perGap = 12, holeOn = true;
+
+function render(){
+  ctx.clearRect(0,0,W,H);
+  const M = MASTERS.length;
+  const rx = 185, ry = rx*tilt;
+  const N = (M-1)*perGap + 1;
+  const towerH = 330;
+  const dz = towerH/(N-1);
+  const cx = W/2, topY = (H-towerH)/2 + 20;
+
+  // soft ground shadow
+  ctx.save();
+  ctx.translate(cx, topY+towerH+ry*0.6); ctx.scale(1,tilt);
+  const sg = ctx.createRadialGradient(0,0,0,0,0,rx);
+  sg.addColorStop(0,"rgba(0,0,0,.18)"); sg.addColorStop(1,"rgba(0,0,0,0)");
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0,0,rx*1.05,0,7); ctx.fill();
+  ctx.restore();
+
+  // draw top -> bottom so the nearer (lower) discs paint over the higher ones
+  for (let n=0; n<N; n++){
+    const cy = topY + n*dz;
+    const p = n/perGap;                  // inverted: first master on top, last at the base
+    const lo = Math.max(0, Math.floor(p));
+    const t = p - lo;
+    const fA = FIELDS[lo], fB = FIELDS[Math.min(M-1, lo+1)];
+    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0);   // uniform central bore on every disc
+  }
+  // master name labels down the side
+  ctx.fillStyle = "#888"; ctx.textAlign = "left";
+  for (let i=0;i<M;i++){
+    const n = i*perGap;                  // master i sits at slice i*perGap (top -> bottom)
+    const cy = topY + n*dz;
+    ctx.fillText(MASTERS[i].name, cx+rx+16, cy+4);
+    ctx.strokeStyle="rgba(0,0,0,.12)"; ctx.beginPath();
+    ctx.moveTo(cx+rx*0.7, cy); ctx.lineTo(cx+rx+12, cy); ctx.stroke();
+  }
+}
+
+function loop(){
+  if (autospin && !dragging) rot += 0.004;
+  render();
+  requestAnimationFrame(loop);
+}
+
+cv.addEventListener("pointerdown", e=>{ dragging=true; lastX=e.clientX; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener("pointermove", e=>{ if(dragging){ rot += (e.clientX-lastX)*0.01; lastX=e.clientX; }});
+cv.addEventListener("pointerup",   ()=>{ dragging=false; });
+document.getElementById("tilt").addEventListener("input", e=>{ tilt = +e.target.value/100; });
+document.getElementById("slices").addEventListener("input", e=>{ perGap = +e.target.value; });
+document.getElementById("spin").addEventListener("change", e=>{ autospin = e.target.checked; });
+document.getElementById("hole").addEventListener("change", e=>{ holeOn = e.target.checked; });
+loop();
+</script>
+</body>
+</html>
