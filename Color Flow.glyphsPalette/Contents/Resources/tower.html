@@ -240,11 +240,19 @@ const DISC_ALPHA = 0.95;                       // discs a touch translucent
 let discHits = [], hitCx = 0, hitRx = 0, hitRy = 0;   // disc hit-test geometry, set each render
 let downX = 0, downY = 0;                             // pointer-down point for click-vs-drag
 let trimVal = 0.5, opacityVal = 0.2;                  // non-selected discs: darken + fade
+let focusAmt = [];                                    // per-master trim amount (0..1), eased
 
 function render(){
   ctx.clearRect(0,0,W,H);
   const M = MASTERS.length;
   if (!M) return;                       // nothing to draw (no masters)
+  // ease each master's trim amount toward its target so focus changes animate
+  if (focusAmt.length !== M) focusAmt = new Array(M).fill(0);
+  for (let i=0;i<M;i++){
+    const target = (selected<0 || i===selected) ? 0 : 1;
+    focusAmt[i] += (target - focusAmt[i]) * 0.18;
+    if (Math.abs(target - focusAmt[i]) < 0.002) focusAmt[i] = target;
+  }
   const rx = 185, ry = rx*tilt;
   const N = (M-1)*perGap + 1;
   const dz = 52;                        // FIXED gap between discs
@@ -279,9 +287,9 @@ function render(){
     sh.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
     ctx.restore();
-    const other = (selected>=0 && Math.round(p)!==selected);
+    const amt = focusAmt[Math.round(p)] || 0;     // 0 = full focus, 1 = fully trimmed
     drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0,
-             other ? opacityVal : 1, other ? trimVal : 0);
+             1 - amt*(1-opacityVal), amt*trimVal);
   }
 }
 
