@@ -1849,8 +1849,10 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _open_tower(self, sender):
-		# Build the per-master colour-disc model for the current font and show the
-		# Color Tower visualizer (tower.html) in its own WKWebView window.
+		# Build the per-master colour-disc model for the current font, then show
+		# the Color Tower visualizer. Prefer the native SceneKit (Apple 3D) build;
+		# fall back to the self-contained WebView page (tower.html) if SceneKit is
+		# unavailable or errors.
 		try:
 			import importlib
 			import colorflow_tower
@@ -1862,11 +1864,75 @@ class ColorFlow(PalettePlugin):
 			if len(font.glyphs) == 0:
 				Message("No glyphs to visualize.", "Color Tower")
 				return
-			html = colorflow_tower.build_html_for_font(font)
-			self._present_tower_window(html, font)
+			model = colorflow_tower.tower_model(font)
+			scene = None
+			try:
+				import colorflow_tower_scene
+				importlib.reload(colorflow_tower_scene)
+				if colorflow_tower_scene._SCENEKIT_AVAILABLE:
+					scene = colorflow_tower_scene.build_scene(model)
+			except Exception:
+				import traceback
+				print("Color Flow [tower scene] error:\n" + traceback.format_exc())
+				scene = None
+			if scene is not None:
+				self._present_tower_scene_window(scene, font)
+			else:
+				self._present_tower_window(colorflow_tower.build_html(model), font)
 		except Exception:
 			import traceback
 			print("Color Flow [tower] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _present_tower_scene_window(self, scene, font):
+		import SceneKit
+		# Close any tower window from a previous click before opening a fresh one.
+		old = getattr(self, "_towerWindow", None)
+		if old is not None:
+			try:
+				old.close()
+			except Exception:
+				pass
+		style = (AppKit.NSWindowStyleMaskTitled | AppKit.NSWindowStyleMaskClosable
+			| AppKit.NSWindowStyleMaskResizable | AppKit.NSWindowStyleMaskMiniaturizable)
+		rect = AppKit.NSMakeRect(0, 0, 560, 680)
+		scn_view = SceneKit.SCNView.alloc().initWithFrame_options_(rect, None)
+		scn_view.setScene_(scene)
+		scn_view.setAllowsCameraControl_(True)        # drag to orbit, scroll to zoom
+		scn_view.setAutoenablesDefaultLighting_(False)
+		try:
+			scn_view.setAntialiasingMode_(2)          # SCNAntialiasingModeMultisampling4X
+		except Exception:
+			pass
+		try:
+			scn_view.setBackgroundColor_(AppKit.NSColor.colorWithCalibratedWhite_alpha_(0.92, 1.0))
+		except Exception:
+			pass
+		try:
+			scn_view.setDelegate_(None)               # no Python render delegate (GIL x SCN deadlock)
+		except Exception:
+			pass
+		try:
+			scn_view.setPlaying_(True)                # run the native SCNAction auto-rotate
+		except Exception:
+			pass
+		scn_view.setAutoresizingMask_(18)             # width + height sizable
+		window = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+			rect, style, AppKit.NSBackingStoreBuffered, False)
+		title = "Color Tower"
+		try:
+			if font is not None and font.familyName:
+				title = "Color Tower — %s" % font.familyName
+		except Exception:
+			pass
+		window.setTitle_(title)
+		window.setReleasedWhenClosed_(False)
+		window.setContentView_(scn_view)
+		window.center()
+		window.makeKeyAndOrderFront_(None)
+		# Retain so the window and its scene view aren't reclaimed immediately.
+		self._towerWindow = window
+		self._towerSceneView = scn_view
 
 	@objc.python_method
 	def _present_tower_window(self, html, font):
