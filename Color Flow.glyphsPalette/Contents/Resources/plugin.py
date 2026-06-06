@@ -83,7 +83,7 @@ class ColorFlow(PalettePlugin):
 		self.lineSpacing = 20
 		self.shift = 10
 		self.barWidth = self.width+6
-		self.height = 19 * len([x for x in self.meaning.values() if x]) + 8
+		self.height = 46
 		self.xPos = 0  # progress bar flush to the left edge (no margin)
 
 		self.paletteView = Window((self.width, self.height + 10))
@@ -131,6 +131,7 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _build_static_rows(self):
+		return  # palette body is a single bar now, not per-step rows
 		yPos = 6
 		for k in self.meaning.keys():
 			setattr(self.paletteView.frame, str(k)+"line", HorizontalLine((0, yPos, 0, 1)))
@@ -162,7 +163,7 @@ class ColorFlow(PalettePlugin):
 				attr = str(i) + suffix
 				if hasattr(self.paletteView.frame, attr):
 					delattr(self.paletteView.frame, attr)
-		self.height = 19 * len([x for x in self.meaning.values() if x]) + 8
+		self.height = 46
 		self._build_static_rows()
 		try:
 			self._set_palette_height(self.height, animated=True)
@@ -1070,79 +1071,17 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def Update_Plugin_UI(self):
 		try:
-			for attr in getattr(self, "_metaAttrs", []):
+			for attr in getattr(self, "_metaAttrs", []) + getattr(self, "_bodyAttrs", []):
 				if hasattr(self.paletteView.frame, attr):
 					delattr(self.paletteView.frame, attr)
 			self._metaAttrs = []
+			self._bodyAttrs = []
 			if not self.font or not self.meaning or getattr(self, "_eye_mode", False):
 				return
-			self._rowChecks = {}
-			yPos = 17
 			masterId = self.font.selectedFontMaster.id
-			counts = self._counts(masterId)
-			glyphCount = len(self.font.glyphs)
 			order = list(self.meaning.keys())
-
-			selectedLayers = self.font.selectedLayers or []
-			selStates = [self._layer_state(layer, order) for layer in selectedLayers]
-			firstColor = selectedLayers[0].color if selectedLayers else None
-
-			for color, meaning in self.meaning.items():
-				for suffix in ("", "box", "count", "hl", "focus"):
-					attr = str(color) + suffix
-					if hasattr(self.paletteView.frame, attr):
-						delattr(self.paletteView.frame, attr)
-				if not meaning:
-					continue
-				count = counts[color] if color in counts else 0
-				barWidth = (self.barWidth / glyphCount * count) if glyphCount else 0
-				if getattr(self, "_focusColor", None) == color:
-					rgb = self.colorKeys[str(color)]
-					setattr(self.paletteView.frame, str(color)+"focus", Box((0, yPos-self.shift-1, self.width, 19), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.22), cornerRadius=0, borderWidth=0))
-
-				if selectedLayers:
-					check = all(state.get(color, False) for state in selStates)
-					if check:
-						rgb = self.colorKeys[str(color)]
-						setattr(self.paletteView.frame, str(color)+"hl", Box((0, yPos-self.shift-1, self.width, 19), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.16), cornerRadius=0, borderWidth=0))
-					if barWidth:
-						if check and firstColor == int(color):
-							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
-						else:
-							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.06)
-						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
-					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
-					setattr(self.paletteView.frame, str(color), checkbox)
-					self._attach_rename(checkbox, color)
-					self._make_count(color, count, yPos)
-					yPos += 19
-				else:
-					if barWidth:
-						fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
-						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
-					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
-					setattr(self.paletteView.frame, str(color), checkbox)
-					self._attach_rename(checkbox, color)
-					self._make_count(color, count, yPos)
-					yPos += 19
-			self._countBoxes = {}
-			for reviewColor in list(self._rowChecks.keys()):
-				countBox = getattr(self.paletteView.frame, str(reviewColor)+"count", None)
-				if countBox is None:
-					continue
-				self._countBoxes[reviewColor] = countBox
-				try:
-					recognizer = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "countClicked:")
-					recognizer.setNumberOfClicksRequired_(1)
-					view = self._ns_button(countBox)
-					view.addGestureRecognizer_(recognizer)
-					area = AppKit.NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
-						view.bounds(),
-						AppKit.NSTrackingCursorUpdate | AppKit.NSTrackingActiveInKeyWindow | AppKit.NSTrackingMouseEnteredAndExited,
-						self, None)
-					view.addTrackingArea_(area)
-				except Exception:
-					pass
+			glyphCount = len(self.font.glyphs)
+			self._build_body_bar(order, glyphCount, masterId)
 			self._build_meta_strip(order, glyphCount, masterId)
 			self._update_title_bar()
 		except Exception:
@@ -1453,17 +1392,18 @@ class ColorFlow(PalettePlugin):
 		if bar is None or not self.font or not self.meaning:
 			return
 		try:
-			masterId = self.font.selectedFontMaster.id
 			order = list(self.meaning.keys())
-			glyphCount = len(self.font.glyphs)
-			if not glyphCount:
-				return
 			for sub in list(bar.subviews()):
 				sub.removeFromSuperview()
 			colors = []
-			for glyph in self.font.glyphs:
-				layer = glyph.layers[masterId]
-				colors.append(layer.color if layer is not None else None)
+			for master in self.font.masters:
+				mid = master.id
+				for glyph in self.font.glyphs:
+					layer = glyph.layers[mid]
+					colors.append(layer.color if layer is not None else None)
+			total = len(colors)
+			if not total:
+				return
 			exclusive = colornames.single_counts_from_colors(colors, order)
 			width = bar.bounds().size.width
 			height = bar.bounds().size.height
@@ -1472,7 +1412,7 @@ class ColorFlow(PalettePlugin):
 				count = exclusive.get(key, 0)
 				if not count:
 					continue
-				segWidth = width / glyphCount * count
+				segWidth = width / total * count
 				rgb = self.colorKeys.get(str(key), (0.5, 0.5, 0.5, 0.5))
 				seg = AppKit.NSView.alloc().initWithFrame_(((xPos, 0.0), (segWidth, height)))
 				seg.setWantsLayer_(True)
@@ -1484,6 +1424,53 @@ class ColorFlow(PalettePlugin):
 				xPos += segWidth
 		except Exception:
 			pass
+
+	# Palette body: a single stacked colour bar for the SELECTED master (replaces
+	# the per-step rows). Each segment is one step, sized by its glyph count, with
+	# a label-and-count tooltip. Per-step detail lives in eye mode + the dashboard.
+	@objc.python_method
+	def _build_body_bar(self, order, glyphCount, masterId):
+		frame = self.paletteView.frame
+		attrs = []
+		if not glyphCount:
+			self._bodyAttrs = attrs
+			return
+		try:
+			masterName = self.font.selectedFontMaster.name or ""
+		except Exception:
+			masterName = ""
+		frame.cfBodyLabel = TextBox((4, 4, -4, 14), masterName, sizeStyle='small')
+		attrs.append("cfBodyLabel")
+		colors = []
+		for glyph in self.font.glyphs:
+			layer = glyph.layers[masterId]
+			colors.append(layer.color if layer is not None else None)
+		exclusive = colornames.single_counts_from_colors(colors, order)
+		barY, barH = 24, 16
+		usable = self.width - 8
+		setattr(frame, "cfBodyTrack", Box((4, barY, usable, barH),
+			fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(0.5, 0.5, 0.5, 0.14),
+			cornerRadius=4, borderWidth=0))
+		attrs.append("cfBodyTrack")
+		xPos = 4.0
+		for key in order:
+			count = exclusive.get(key, 0)
+			if not count:
+				continue
+			segWidth = usable / glyphCount * count
+			rgb = self.colorKeys.get(str(key), (0.5, 0.5, 0.5, 0.5))
+			name = "cfBody" + str(key)
+			box = Box((xPos, barY, segWidth + 0.01, barH),
+				fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.9),
+				cornerRadius=0, borderWidth=0)
+			setattr(frame, name, box)
+			try:
+				self._ns_button(box).setToolTip_("%s \u00b7 %d" % (self.meaning.get(str(key), str(key)), count))
+			except Exception:
+				pass
+			attrs.append(name)
+			xPos += segWidth
+		self._bodyAttrs = attrs
 
 	# Top strip: a fire progress-streak badge (#17) and a thin 100%-stacked
 	# whole-master progress ribbon (#23), drawn in the top band above the rows so
