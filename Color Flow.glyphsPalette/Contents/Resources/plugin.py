@@ -236,7 +236,7 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def Open_Action_Popover(self, sender):
 		try:
-			self._popover = FloatingWindow((220, 250), "Color Flow Settings")
+			self._popover = FloatingWindow((220, 516), "Color Flow Settings")
 			popover = self._popover
 			popover.dashboard = Button((12, 12, -12, 22), "Open Color Font Dashboard",
 				callback=self._popover_dashboard, sizeStyle='small')
@@ -248,22 +248,34 @@ class ColorFlow(PalettePlugin):
 			popover.rainbow.set(self._rainbow_segment_index())
 			popover.lcSep = HorizontalLine((12, 96, -12, 1))
 			self._labelColorsEdited = False
-			popover.lcLabel = TextBox((12, 104, -90, 16), "Label Colors", sizeStyle='small')
+			popover.lcLabel = TextBox((12, 104, -90, 16), "Labels & Colours", sizeStyle='small')
 			popover.lcReset = Button((-82, 102, 70, 18), "Reset", callback=self._label_colors_reset, sizeStyle='mini')
 			self._labelWells = []
+			self._labelFields = {}
 			rgbaList = labelcolors.read_label_colors()
+			try:
+				settingsText = colornames.read_color_names(colornames.get_key_file(self._font_dir(Glyphs.font))) or colornames.DEFAULT_COLOR_NAMES
+			except Exception:
+				settingsText = colornames.DEFAULT_COLOR_NAMES
+			labelRows, _noneLabel = colornames.parse_settings(settingsText)
+			labelByIndex = {index: label for index, label, _visible in labelRows}
 			for index in range(12):
+				rowY = 128 + index * 26
 				wellColor = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(*rgbaList[index])
-				well = ColorWell((12 + (index % 6) * 33, 124 + (index // 6) * 26, 30, 22),
-					callback=self._label_color_changed, color=wellColor)
+				well = ColorWell((12, rowY, 26, 22), callback=self._label_color_changed, color=wellColor)
 				setattr(popover, "lcWell%d" % index, well)
 				self._labelWells.append(well)
-			popover.profileSep = HorizontalLine((12, 184, -12, 1))
-			popover.profileExport = Button((12, 192, 98, 22), "Export Profile…",
+				field = EditText((44, rowY, -12, 22), labelByIndex.get(index, ""),
+					callback=self._label_name_changed, continuous=False, sizeStyle='small')
+				setattr(popover, "lcField%d" % index, field)
+				self._labelFields[index] = field
+			profileY = 128 + 12 * 26 + 6
+			popover.profileSep = HorizontalLine((12, profileY, -12, 1))
+			popover.profileExport = Button((12, profileY + 8, 98, 22), "Export Profile…",
 				callback=self._export_profile, sizeStyle='small')
-			popover.profileImport = Button((114, 192, -12, 22), "Import Profile…",
+			popover.profileImport = Button((114, profileY + 8, -12, 22), "Import Profile…",
 				callback=self._import_profile, sizeStyle='small')
-			popover.smartFilters = Button((12, 220, -12, 22), "Generate Smart Filters",
+			popover.smartFilters = Button((12, profileY + 36, -12, 22), "Generate Smart Filters",
 				callback=self._generate_smart_filters, sizeStyle='small')
 			try:
 				popover.bind("close", self._popover_did_close)
@@ -321,6 +333,38 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [label colour] error:\n" + traceback.format_exc())
+
+	# Rename workflow labels from the settings window: gather all 12 fields and
+	# rewrite colorNames.txt (a non-empty field = visible, empty = hidden),
+	# preserving the colour order + the None label.
+	@objc.python_method
+	def _label_name_changed(self, sender):
+		try:
+			font = Glyphs.font
+			path = colornames.get_key_file(self._font_dir(font))
+			text = colornames.read_color_names(path) or colornames.DEFAULT_COLOR_NAMES
+			rows, noneLabel = colornames.parse_settings(text)
+			fields = getattr(self, "_labelFields", {})
+			newRows = []
+			for index, label, visible in rows:
+				field = fields.get(index)
+				if field is not None:
+					newLabel = field.get().strip()
+					newRows.append((index, newLabel, bool(newLabel)))
+				else:
+					newRows.append((index, label, visible))
+			colornames.write_color_names(path, colornames.render_settings(newRows, noneLabel))
+			self.meaning = self.Load_Meaning()
+			self._lastSignature = None
+			self.Update_Plugin_UI()
+			try:
+				if getattr(self, "fontview", None) and font is not None and self.fontview.is_enabled(font):
+					self.fontview.maybe_rebuild(font)
+			except Exception:
+				pass
+		except Exception:
+			import traceback
+			print("Color Flow [rename label] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _label_colors_reset(self, sender):
@@ -801,19 +845,11 @@ class ColorFlow(PalettePlugin):
 	def _attach_rename(self, checkbox, color):
 		self._rowChecks[color] = checkbox
 		button = self._ns_button(checkbox)
-		try:
-			recognizer = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "labelDoubleClicked:")
-			recognizer.setNumberOfClicksRequired_(2)
-			button.addGestureRecognizer_(recognizer)
-		except Exception:
-			pass
+		# Single-click a row opens that step's glyphs (rename now lives in
+		# Edit ▸ Color Flow settings, not on the palette).
 		try:
 			singleClick = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "rowClicked:")
 			singleClick.setNumberOfClicksRequired_(1)
-			try:
-				singleClick.requireGestureRecognizerToFail_(recognizer)
-			except Exception:
-				pass
 			button.addGestureRecognizer_(singleClick)
 		except Exception:
 			pass
