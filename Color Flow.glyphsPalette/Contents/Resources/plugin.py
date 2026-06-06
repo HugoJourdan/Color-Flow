@@ -228,7 +228,7 @@ class ColorFlow(PalettePlugin):
 	def Open_Action_Popover(self, sender):
 		try:
 			button = self._ns_button(sender)
-			self._popover = Popover((220, 214), parentView=button,
+			self._popover = Popover((220, 184), parentView=button,
 				preferredEdge='bottom', behavior='semitransient')
 			popover = self._popover
 			popover.dashboard = Button((12, 12, -12, 22), "Open Color Font Dashboard",
@@ -240,7 +240,9 @@ class ColorFlow(PalettePlugin):
 				callback=self._popover_rainbow, sizeStyle='small')
 			popover.rainbow.set(self._rainbow_segment_index())
 			popover.lcSep = HorizontalLine((12, 96, -12, 1))
-			popover.lcLabel = TextBox((12, 104, -12, 16), "Label Colors", sizeStyle='small')
+			self._labelColorsEdited = False
+			popover.lcLabel = TextBox((12, 104, -90, 16), "Label Colors", sizeStyle='small')
+			popover.lcReset = Button((-82, 102, 70, 18), "Reset", callback=self._label_colors_reset, sizeStyle='mini')
 			self._labelWells = []
 			rgbaList = labelcolors.read_label_colors()
 			for index in range(12):
@@ -249,10 +251,10 @@ class ColorFlow(PalettePlugin):
 					callback=self._label_color_changed, color=wellColor)
 				setattr(popover, "lcWell%d" % index, well)
 				self._labelWells.append(well)
-			popover.lcReset = Button((12, 180, 70, 18), "Reset",
-				callback=self._label_colors_reset, sizeStyle='mini')
-			popover.lcNote = TextBox((90, 181, -12, 28),
-				"Restart Glyphs to update its own views.", sizeStyle='mini')
+			try:
+				popover.bind("did close", self._popover_did_close)
+			except Exception:
+				pass
 			popover.open()
 		except Exception:
 			import traceback
@@ -265,6 +267,15 @@ class ColorFlow(PalettePlugin):
 		if font is None or not self.fontview.is_enabled(font):
 			return 0
 		return 1 if self.fontview.mode(font) == "Glyph" else 2
+
+	# Popover closed and the user edited at least one label colour: prompt for the
+	# Glyphs restart its own views need (Color Flow already updated live).
+	@objc.python_method
+	def _popover_did_close(self, sender):
+		if getattr(self, "_labelColorsEdited", False):
+			self._labelColorsEdited = False
+			Message("Restart Glyphs for the new label colours to take effect in its "
+				"own Font and Edit views. Color Flow already updated.", title="Color Flow")
 
 	@objc.python_method
 	def _close_popover(self):
@@ -290,6 +301,7 @@ class ColorFlow(PalettePlugin):
 			if len(colors) == 12:
 				labelcolors.write_label_colors(colors)
 				labelcolors.refresh_app_label_colors(colors)
+				self._labelColorsEdited = True
 				self.colorKeys = self._label_color_keys()
 				self.reload_after_settings()
 		except Exception:
