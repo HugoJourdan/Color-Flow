@@ -83,7 +83,7 @@ class ColorFlow(PalettePlugin):
 		self.lineSpacing = 20
 		self.shift = 10
 		self.barWidth = self.width+6
-		self.height = 19 * len([x for x in self.meaning.values() if x]) + 25
+		self.height = 19 * len([x for x in self.meaning.values() if x]) + 8
 		self.xPos = 0  # progress bar flush to the left edge (no margin)
 
 		self.paletteView = Window((self.width, self.height + 10))
@@ -95,9 +95,6 @@ class ColorFlow(PalettePlugin):
 		self._eye_rows = None
 		self._eye_none = ""
 		self._eyeRowViews = {}
-		self.paletteView.frame.eyeButton = Button((self.width-50, 1, 22, 17),
-			"👁", callback=self._toggle_eye_mode, sizeStyle='small')
-		self._set_eye_button(False)
 
 		# Separator lines + colour tags (depend on the meaning order/visibility).
 		# Per-row widgets (label / bar / count) are built by Update_Plugin_UI.
@@ -134,11 +131,11 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _build_static_rows(self):
-		yPos = 25
+		yPos = 6
 		for k in self.meaning.keys():
 			setattr(self.paletteView.frame, str(k)+"line", HorizontalLine((0, yPos, 0, 1)))
 			yPos += 19
-		yPos = 36
+		yPos = 17
 		for k, v in self.meaning.items():
 			if v:
 				setattr(self.paletteView.frame, str(k)+"colorTag", Box((0, yPos-self.shift-1, 6, 19), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
@@ -165,7 +162,7 @@ class ColorFlow(PalettePlugin):
 				attr = str(i) + suffix
 				if hasattr(self.paletteView.frame, attr):
 					delattr(self.paletteView.frame, attr)
-		self.height = 19 * len([x for x in self.meaning.values() if x]) + 25
+		self.height = 19 * len([x for x in self.meaning.values() if x]) + 8
 		self._build_static_rows()
 		try:
 			self._set_palette_height(self.height, animated=True)
@@ -1080,7 +1077,7 @@ class ColorFlow(PalettePlugin):
 			if not self.font or not self.meaning or getattr(self, "_eye_mode", False):
 				return
 			self._rowChecks = {}
-			yPos = 36
+			yPos = 17
 			masterId = self.font.selectedFontMaster.id
 			counts = self._counts(masterId)
 			glyphCount = len(self.font.glyphs)
@@ -1299,7 +1296,7 @@ class ColorFlow(PalettePlugin):
 			label = getattr(self, "_rowChecks", {}).get(color)
 			if label is not None:
 				size = self._ns_button(label).font().pointSize()
-			size = max(8.0, size - 2.0)
+			size = max(8.0, size - 1.0)
 			textbox.getNSTextField().setFont_(AppKit.NSFont.monospacedDigitSystemFontOfSize_weight_(size, AppKit.NSFontWeightRegular))
 		except Exception:
 			pass
@@ -1311,6 +1308,16 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [header eye] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _sync_header_eye(self):
+		eye = getattr(self, "_titleEye", None)
+		if eye is None:
+			return
+		try:
+			eye.setHidden_(bool(self.dialog.isHiddenOrHasHiddenAncestor()))
+		except Exception:
+			pass
 
 	# Inject a colour bar into the palette SECTION HEADER (#23). Done deferred so
 	# the palette is docked first, then the whole window is searched for the title.
@@ -1403,10 +1410,13 @@ class ColorFlow(PalettePlugin):
 			if header is None:
 				return
 			bounds = header.bounds()
+			eyeSize = 16.0
 			barWidth, barHeight = 40.0, 6.0
-			xPos = bounds.size.width - barWidth - 10.0
-			yPos = (bounds.size.height - barHeight) / 2.0
-			bar = AppKit.NSView.alloc().initWithFrame_(((xPos, yPos), (barWidth, barHeight)))
+			eyeX = bounds.size.width - 8.0 - eyeSize
+			eyeY = (bounds.size.height - eyeSize) / 2.0
+			barX = eyeX - 6.0 - barWidth
+			barY = (bounds.size.height - barHeight) / 2.0
+			bar = AppKit.NSView.alloc().initWithFrame_(((barX, barY), (barWidth, barHeight)))
 			bar.setAutoresizingMask_(AppKit.NSViewMinXMargin)
 			bar.setWantsLayer_(True)
 			try:
@@ -1417,9 +1427,6 @@ class ColorFlow(PalettePlugin):
 				pass
 			header.addSubview_(bar)
 			self._titleBar = bar
-			eyeSize = 18.0
-			eyeX = xPos - 6.0 - eyeSize
-			eyeY = (bounds.size.height - eyeSize) / 2.0
 			eye = AppKit.NSButton.alloc().initWithFrame_(((eyeX, eyeY), (eyeSize, eyeSize)))
 			eye.setBordered_(False)
 			eye.setAutoresizingMask_(AppKit.NSViewMinXMargin)
@@ -1435,10 +1442,7 @@ class ColorFlow(PalettePlugin):
 				pass
 			header.addSubview_(eye)
 			self._titleEye = eye
-			try:
-				self._ns_button(self.paletteView.frame.eyeButton).setHidden_(True)
-			except Exception:
-				pass
+			self._sync_header_eye()
 		except Exception:
 			import traceback
 			print("Color Flow [title bar] error:\n" + traceback.format_exc())
@@ -1488,15 +1492,6 @@ class ColorFlow(PalettePlugin):
 	def _build_meta_strip(self, order, glyphCount, masterId):
 		frame = self.paletteView.frame
 		attrs = []
-		try:
-			import colorflow_dashboard
-			streak = colorflow_dashboard.progress_streak(
-				colorflow_dashboard.load_history(self.font), order, self._free_mode())
-			if streak.get("current"):
-				frame.cfStreak = TextBox((4, 2, 80, 15), "\U0001F525 %d" % streak["current"], sizeStyle='small')
-				attrs.append("cfStreak")
-		except Exception:
-			pass
 		self._metaAttrs = attrs
 
 	# UPDATEINTERFACE handler: cheap dirty-check on selection + layer colours.
@@ -1506,6 +1501,10 @@ class ColorFlow(PalettePlugin):
 			self.font = self._windowController.documentFont()
 		if not self.font:
 			return
+		try:
+			self._sync_header_eye()
+		except Exception:
+			pass
 
 		try:
 			grouping = getattr(self, "fontview", None)
@@ -1713,7 +1712,7 @@ class ColorFlow(PalettePlugin):
 			image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, None)
 			nsbutton = getattr(self, "_titleEye", None)
 			if nsbutton is None:
-				nsbutton = self._ns_button(self.paletteView.frame.eyeButton)
+				return
 			nsbutton.setBordered_(False)
 			if image is not None:
 				nsbutton.setImage_(image)
@@ -1738,7 +1737,7 @@ class ColorFlow(PalettePlugin):
 		self._eye_none = none_label
 		self._eye_mode = True
 		self._set_eye_button(True)
-		self.height = 19 * len(self._eye_rows) + 25
+		self.height = 19 * len(self._eye_rows) + 8
 		try:
 			self._set_palette_height(self.height, animated=True)
 		except Exception:
@@ -1775,7 +1774,7 @@ class ColorFlow(PalettePlugin):
 				if hasattr(self.paletteView.frame, attr):
 					delattr(self.paletteView.frame, attr)
 		self._eyeRowViews = {}
-		yPos = 36
+		yPos = 17
 		for index, label, visible in (self._eye_rows or []):
 			key = str(index)
 			rgb = self.colorKeys.get(key, (0.5, 0.5, 0.5, 0.5))
