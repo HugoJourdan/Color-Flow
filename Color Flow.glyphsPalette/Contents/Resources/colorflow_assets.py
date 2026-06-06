@@ -164,6 +164,26 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cmp td{position:relative}
 .cmp .cmpbar{position:absolute;left:0;top:0;bottom:0;border-radius:0;opacity:.28}
 .cmp .cmpn{position:relative}
+.trend{display:flex;flex-direction:column;gap:16px;margin-top:14px}
+.trend-empty{margin-top:20px}
+.tcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.tcard-h{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.tname{font-weight:600}
+.tstats{display:flex;gap:18px;flex-wrap:wrap;margin-left:auto;font-size:var(--fs-sm)}
+.tstat{display:flex;flex-direction:column;line-height:1.25}
+.tstat i{font-style:normal;font-size:var(--fs-2xs);color:var(--muted-2);text-transform:uppercase;letter-spacing:.05em}
+.tstat.teta{min-width:150px}
+.tconf{font-size:var(--fs-2xs);padding:1px 5px;border-radius:4px;border:1px solid var(--border-2);color:var(--muted)}
+.tconf.high{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 60%,var(--border-2))}
+.tconf.low,.tconf.none{color:var(--muted-2)}
+.tchart{width:100%;height:auto;display:block;margin-top:2px}
+.tchart .tline{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.tchart circle{fill:var(--accent)}
+.tchart .tgoal{stroke:var(--border-2);stroke-width:1;stroke-dasharray:3 3}
+.tchart .tproj{stroke:var(--ok);stroke-width:1.5;stroke-dasharray:4 3;fill:none}
+.tchart .teta{fill:var(--ok)}
+.tchart .tband{fill:color-mix(in srgb,var(--ok) 14%,transparent)}
+.tfoot{display:flex;justify-content:space-between;font-size:var(--fs-2xs);color:var(--muted-2);margin-top:6px}
 .ft{margin-top:30px;padding-top:16px;border-top:1px solid var(--border);font-size:var(--fs-2xs);color:var(--muted-2);line-height:1.6}
 .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);background:var(--surface);border:1px solid var(--border-2);color:var(--text);border-radius:var(--r-sm);padding:8px 14px;font-size:var(--fs-sm);opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -242,6 +262,7 @@ DASHBOARD_JS = r"""
       + '<input id="cfd-search" type="search" placeholder="Search glyphs…" aria-label="Search glyphs" autocomplete="off"><kbd>/</kbd></label>'
       + '<button type="button" id="cfd-unfinished" class="chip" aria-pressed="'+state.unfinishedOnly+'">◦ Unfinished only</button>'
       + '<button type="button" id="cfd-sort" class="chip">↕ Sort: workflow</button>'
+      + '<button type="button" id="cfd-trend" class="chip" aria-pressed="false">📈 Trend</button>'
       + '<button type="button" id="cfd-compare" class="chip" aria-pressed="false">▤ Compare</button></div>';
   }
   function overall(){
@@ -341,7 +362,66 @@ DASHBOARD_JS = r"""
     body += '<tr class="none"><th scope="row"><span class="dot" style="background:var(--c-none)"></span>'+esc(H.noneLabel)+'</th>'+noneTds+'</tr>';
     return '<div class="cmp-wrap"><table class="cmp"><caption>Step completion by master</caption><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
   }
-  function renderBody(){ return state.view==="compare" ? compareView() : tabsView(); }
+  // ----- Trend: burndown + velocity + hedged finish-date forecast (#1) -----
+  function trendStats(fc){
+    var eta;
+    if (fc.confidence==="done") eta = '<b>done</b>';
+    else if (fc.etaIso) eta = '≈ <b>'+esc(fc.etaIso)+'</b> ±'+fc.bandDays+'d <span class="tconf '+esc(fc.confidence)+'">'+esc(fc.confidence)+'</span>';
+    else eta = '<span class="muted">no estimate yet</span>';
+    return '<span class="tstats">'
+      + '<span class="tstat"><i>Velocity</i>'+(fc.velocityPerWeek||0)+'/wk</span>'
+      + '<span class="tstat"><i>Remaining</i>'+(fc.remaining!=null?fc.remaining:"—")+'</span>'
+      + '<span class="tstat"><i>Complete</i>'+(fc.final!=null?fc.final:0)+'/'+(fc.total!=null?fc.total:0)+'</span>'
+      + '<span class="tstat teta"><i>Forecast</i>'+eta+'</span></span>';
+  }
+  function trendChart(pts, fc){
+    var W=640, H=150, pl=8, pr=8, ptop=10, pb=14, iw=W-pl-pr, ih=H-ptop-pb;
+    var total = (fc && fc.total) || pts.reduce(function(mx,o){ return Math.max(mx,o.mp.total); },1) || 1;
+    var t0 = new Date(pts[0].date).getTime();
+    function dayOff(d){ return (new Date(d).getTime()-t0)/86400000; }
+    var lastOff = Math.max(1, dayOff(pts[pts.length-1].date));
+    var etaOff = (fc && fc.etaIso) ? dayOff(fc.etaIso) : null;
+    var xmax = Math.max(lastOff, etaOff||0) || 1;
+    function X(off){ return pl + off/xmax*iw; }
+    function Y(v){ return ptop + ih - (v/total*ih); }
+    var poly = pts.map(function(o){ return X(dayOff(o.date)).toFixed(1)+","+Y(o.mp.final).toFixed(1); }).join(" ");
+    var dots = pts.map(function(o){ return '<circle cx="'+X(dayOff(o.date)).toFixed(1)+'" cy="'+Y(o.mp.final).toFixed(1)+'" r="2.5"/>'; }).join("");
+    var goalY = Y(total).toFixed(1);
+    var proj = "";
+    if (etaOff!=null && fc.confidence!=="done" && fc.confidence!=="none"){
+      var lx=X(lastOff).toFixed(1), ly=Y(pts[pts.length-1].mp.final).toFixed(1), ex=X(etaOff).toFixed(1);
+      var band = fc.bandDays ? Math.abs(X(etaOff+fc.bandDays)-X(etaOff)) : 0;
+      proj = (band ? '<rect class="tband" x="'+(ex-band).toFixed(1)+'" y="'+ptop+'" width="'+(2*band).toFixed(1)+'" height="'+ih+'"/>' : "")
+        + '<line class="tproj" x1="'+lx+'" y1="'+ly+'" x2="'+ex+'" y2="'+goalY+'"/>'
+        + '<circle class="teta" cx="'+ex+'" cy="'+goalY+'" r="3"/>';
+    }
+    return '<svg class="tchart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Completion over time toward the goal">'
+      + '<line class="tgoal" x1="'+pl+'" y1="'+goalY+'" x2="'+(W-pr)+'" y2="'+goalY+'"/>'
+      + proj + '<polyline class="tline" points="'+poly+'"/>' + dots + '</svg>';
+  }
+  function masterTrendCard(m, pts, fc){
+    var total = (fc && fc.total) || 0;
+    var foot = '<div class="tfoot"><span>'+esc(pts[0].date)+'</span><span>'+total+' goal</span><span>'+esc(pts[pts.length-1].date)+'</span></div>';
+    return '<section class="tcard"><div class="tcard-h"><span class="tname">'+esc(m.name)+'</span>'+trendStats(fc)+'</div>'
+      + trendChart(pts, fc) + foot + '</section>';
+  }
+  function trendView(){
+    var series = (H.trend && H.trend.series) || [];
+    if (series.length < 2){
+      return '<section class="trend-empty"><p class="empty">Not enough history yet. Color Flow records a snapshot every time you save the font; the burndown and finish-date forecast appear once there are at least two days of history.</p></section>';
+    }
+    var fcs = (H.trend && H.trend.forecast) || {};
+    var cards = H.masters.map(function(m){
+      var pts = series.map(function(p){ return { date:p.date, mp:p.masters[m.id] }; })
+                      .filter(function(o){ return o.mp; });
+      return pts.length ? masterTrendCard(m, pts, fcs[m.id] || {}) : "";
+    }).join("");
+    return '<div class="trend">'+cards+'</div>';
+  }
+
+  function renderBody(){
+    return state.view==="compare" ? compareView() : state.view==="trend" ? trendView() : tabsView();
+  }
 
   // Animate the heatmap cells between their last-run ("before") and current
   // ("after") colours by updating the cell background in place so the CSS
@@ -360,6 +440,7 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-body").innerHTML = renderBody();
     document.documentElement.setAttribute("data-theme", state.theme);
     var cmp = document.getElementById("cfd-compare"); if (cmp) cmp.setAttribute("aria-pressed", state.view==="compare");
+    var trd = document.getElementById("cfd-trend"); if (trd) trd.setAttribute("aria-pressed", state.view==="trend");
     var uf = document.getElementById("cfd-unfinished"); if (uf) uf.setAttribute("aria-pressed", state.unfinishedOnly);
     var sb = document.getElementById("cfd-sort"); if (sb) sb.textContent = "↕ Sort: "+(state.sort==="progress"?"progress":"workflow");
   }
@@ -388,6 +469,7 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-unfinished").addEventListener("click", function(){ state.unfinishedOnly = !state.unfinishedOnly; update(); });
     document.getElementById("cfd-sort").addEventListener("click", function(){ state.sort = state.sort==="workflow" ? "progress" : "workflow"; update(); });
     document.getElementById("cfd-compare").addEventListener("click", function(){ state.view = state.view==="compare" ? "tabs" : "compare"; update(); });
+    document.getElementById("cfd-trend").addEventListener("click", function(){ state.view = state.view==="trend" ? "tabs" : "trend"; update(); });
     var s = document.getElementById("cfd-search");
     s.addEventListener("input", function(){ state.q = s.value; update(); });
     document.addEventListener("keydown", function(e){

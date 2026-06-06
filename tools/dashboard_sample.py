@@ -65,8 +65,27 @@ def _model(is_free: bool) -> dict:
         "colors": {str(index): "#888888" for index in range(12)},
         "filePath": "/fonts/Acme.glyphs", "paths": paths,
         "favicon": outline,
+        "trend": _trend(),
         "changes": {"regular": {"A": [4, 8], "H": [6, 3]}},
     }
+
+
+def _trend() -> dict:
+    dates = ["2026-06-01", "2026-06-03", "2026-06-05"]
+    series = []
+    for index, date in enumerate(dates):
+        masters = {}
+        for master in ("regular", "bold"):
+            final = 4 + index * 3 if master == "regular" else 2 + index * 2
+            masters[master] = {"final": final, "started": final + 2, "total": len(SEQ)}
+        series.append({"date": date, "masters": masters})
+    forecast = {
+        "regular": {"velocityPerWeek": 10.5, "remaining": 6, "final": 10, "total": len(SEQ),
+                    "etaIso": "2026-06-09", "bandDays": 2, "confidence": "high", "points": 3},
+        "bold": {"velocityPerWeek": 7.0, "remaining": 12, "final": 6, "total": len(SEQ),
+                 "etaIso": "2026-06-14", "bandDays": 4, "confidence": "med", "points": 3},
+    }
+    return {"series": series, "forecast": forecast, "today": "2026-06-05"}
 
 
 def main() -> None:

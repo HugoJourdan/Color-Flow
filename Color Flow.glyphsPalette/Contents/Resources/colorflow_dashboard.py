@@ -448,6 +448,14 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
 
     paths = _outline_paths(font, current, glyph_names, order, is_free)
 
+    series = history_series(load_history(font), order, is_free)
+    trend = {
+        "series": series,
+        "forecast": {master.id: forecast_master(series, master.id, glyph_total, now, is_free)
+                     for master in font.masters},
+        "today": now.strftime("%Y-%m-%d"),
+    }
+
     return {
         "family": font.familyName or "",
         "fileName": Path(font.filepath).name if font.filepath else (font.familyName or "Untitled"),
@@ -465,6 +473,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "filePath": font.filepath or "",
         "paths": paths,
         "favicon": _favicon(font),
+        "trend": trend,
         "changes": compute_changes(current, previous),
     }
 
