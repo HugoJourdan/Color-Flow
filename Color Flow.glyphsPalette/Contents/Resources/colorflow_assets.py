@@ -9,7 +9,6 @@ no dependencies. The model is the single source of truth the JS app renders.
 from __future__ import annotations
 
 import json
-from urllib.parse import quote
 from xml.sax.saxutils import escape as xesc
 
 
@@ -35,17 +34,18 @@ def _color_overrides(model: dict) -> str:
 
 
 def _favicon_link(model: dict) -> str:
-    """A ``<link rel="icon">`` carrying the bundled brand favicon (the Color Flow
-    colour wheel SVG) as an inline SVG data URI. Empty when the model has none."""
+    """A ``<link rel="icon">`` carrying the bundled brand favicon as a self-contained
+    ``data:`` URI (built by the model). Empty when the model has none. The URI is
+    safe to embed unquoted: base64 PNG and URL-encoded SVG contain no ``"``."""
     favicon = model.get("favicon")
     if not favicon:
         return ""
-    return f'<link rel="icon" href="data:image/svg+xml,{quote(favicon)}">'
+    return f'<link rel="icon" href="{favicon}">'
 
 
 def build_html(model: dict) -> str:
     """Assemble the complete, self-contained dashboard page from a model."""
-    title = xesc(f'Colorflow Dashboard - {model.get("family") or "Untitled"}')
+    title = xesc(f'CF - {model.get("family") or "Untitled"}')
     return (
         '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'

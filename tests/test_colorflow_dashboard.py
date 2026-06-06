@@ -601,8 +601,8 @@ def test_build_model_master_preview_and_favicon(tmp_path) -> None:
     preview = model["masters"][0]["preview"]
     assert preview["d"] and preview["vb"]
     assert "M500" in preview["d"]            # the "a" is shifted right by the "A" advance (500)
-    # the favicon is the bundled brand colour-wheel SVG, not font-derived
-    assert isinstance(model["favicon"], str) and "<svg" in model["favicon"]
+    # the favicon is the bundled brand image as a self-contained data: URI (PNG)
+    assert isinstance(model["favicon"], str) and model["favicon"].startswith("data:image/")
 
 
 def test_build_model_preview_empty_without_outlines(tmp_path) -> None:

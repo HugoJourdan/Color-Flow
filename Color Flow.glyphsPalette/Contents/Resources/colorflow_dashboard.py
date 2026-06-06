@@ -29,12 +29,14 @@ The data layer imports nothing from Glyphs so it stays unit-testable; only
 
 from __future__ import annotations
 
+import base64
 import re
 import tempfile
 import webbrowser
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import cast
+from urllib.parse import quote
 import colornames
 import colorflow_assets
 import glyphsvg
@@ -492,14 +494,21 @@ def _family_logo(font) -> dict:
     return glyphsvg.layers_outline(layers)
 
 
-def _favicon_svg() -> str:
-    """The bundled brand favicon (the Color Flow colour wheel) as minified SVG
-    markup, read from ``favicon.svg`` beside this module. ``""`` when missing."""
+def _favicon_data_uri() -> str:
+    """The bundled brand favicon as a self-contained ``data:`` URI. Prefers
+    ``favicon.png`` (base64) and falls back to ``favicon.svg`` (URL-encoded)
+    beside this module. ``""`` when neither file is present."""
+    here = Path(__file__).parent
     try:
-        text = (Path(__file__).parent / "favicon.svg").read_text(encoding="utf-8")
+        png = (here / "favicon.png").read_bytes()
+        return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+    except OSError:
+        pass
+    try:
+        text = (here / "favicon.svg").read_text(encoding="utf-8")
     except OSError:
         return ""
-    return re.sub(r">\s+<", "><", text).strip()
+    return "data:image/svg+xml," + quote(re.sub(r">\s+<", "><", text).strip())
 
 
 def _glyph_groups(font, attr: str) -> dict[str, list[str]]:
@@ -682,7 +691,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
                    for index, rgba in enumerate(labelcolors.read_label_colors())},
         "filePath": font.filepath or "",
         "paths": paths,
-        "favicon": _favicon_svg(),
+        "favicon": _favicon_data_uri(),
         "logo": _family_logo(font),
         "trend": trend,
         "journeys": journeys,

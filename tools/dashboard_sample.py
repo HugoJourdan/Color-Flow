@@ -67,7 +67,7 @@ def _model(is_free: bool) -> dict:
         "masters": masters,
         "colors": {str(index): "#888888" for index in range(12)},
         "filePath": "/fonts/Acme.glyphs", "paths": paths,
-        "favicon": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 45"><circle cx="22" cy="22" r="20" fill="#6e7bff"/></svg>',
+        "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
         "logo": {"d": "M0 0L100 0L100 -700L0 -700ZM200 0L360 0L360 -500L200 -500Z", "vb": "0 -740 360 780"},
         "trend": _trend(),
         "journeys": {"regular": {"A": [-1, 4, 8], "C": [-1, -1, 4]}, "bold": {}},
