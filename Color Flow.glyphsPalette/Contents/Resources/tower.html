@@ -13,14 +13,14 @@
   docs/superpowers/plans/ for wiring this in as a real "Tower" view.
 -->
 <style>
-  html,body{margin:0;height:100%;background:#ececec;color:#444;
+  html,body{margin:0;height:100%;background:#000;color:#bbb;
     font:13px/1.5 -apple-system,BlinkMacSystemFont,"JetBrains Mono",monospace;
     display:grid;place-items:center}
   .wrap{text-align:center}
   canvas{cursor:grab}
   canvas:active{cursor:grabbing}
-  .hint{margin-top:10px;color:#999}
-  .row{margin-top:8px;display:flex;gap:14px;justify-content:center;align-items:center;color:#777}
+  .hint{margin-top:10px;color:#777}
+  .row{margin-top:8px;display:flex;gap:14px;justify-content:center;align-items:center;color:#999}
   label{display:inline-flex;gap:6px;align-items:center}
 </style>
 </head>
@@ -203,7 +203,7 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac, dim){
     ctx.save();
     ctx.translate(cx,cy); ctx.scale(1, ry/rx);
     ctx.beginPath(); ctx.arc(0,0,rx,0,7);
-    ctx.fillStyle = "rgba(236,236,236,"+dim+")";   // #ececec page background
+    ctx.fillStyle = "rgba(0,0,0,"+dim+")";   // fade toward the black page background
     ctx.fill();
     ctx.restore();
   }
