@@ -200,6 +200,10 @@ class ColorFlow(PalettePlugin):
 			Glyphs.addCallback(self.drawHUD, DRAWFOREGROUND)
 		except Exception:
 			pass
+		try:
+			Glyphs.addCallback(self.drawFontView, DRAWFONTVIEW)
+		except Exception:
+			pass
 		self.font = Glyphs.font
 		self.init = False
 		self.update(self._windowController)
@@ -1124,6 +1128,34 @@ class ColorFlow(PalettePlugin):
 					cornerRadius=2, borderWidth=0))
 				attrs.append(name)
 		self._matrixAttrs = attrs
+
+	# Font-View ambient progress (#21): a small dot in the final-step colour on
+	# glyphs that have reached the last workflow step, drawn via DRAWFONTVIEW so
+	# you can scan completion across the whole font overview.
+	@objc.python_method
+	def drawFontView(self, layer, info):
+		try:
+			if layer is None or not self.meaning:
+				return
+			order = list(self.meaning.keys())
+			if not order or str(layer.color) != order[-1]:
+				return
+			rgb = self.colorKeys.get(order[-1], (0.3, 0.7, 0.3, 0.5))
+			AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 1.0).set()
+			try:
+				asc = layer.master.ascender
+			except Exception:
+				asc = 800
+			try:
+				advance = layer.width
+			except Exception:
+				advance = 500
+			radius = 55.0
+			rect = ((advance - radius * 1.6, asc - radius * 0.4), (radius, radius))
+			AppKit.NSBezierPath.bezierPathWithOvalInRect_(rect).fill()
+		except Exception:
+			import traceback
+			print("Color Flow [font view] error:\n" + traceback.format_exc())
 
 	# Edit-View step HUD (#7): a small constant-size badge over the active glyph
 	# showing its current workflow step, drawn via the DRAWFOREGROUND callback.
