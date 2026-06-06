@@ -267,29 +267,23 @@ let discHits = [], hitCx = 0, hitRx = 0, hitRy = 0;   // disc hit-test geometry,
 let downX = 0, downY = 0;                             // pointer-down point for click-vs-drag
 let trimVal = 0.6, opacityVal = 0.2;                  // non-selected discs: darken + fade
 let focusAmt = [];                                   // per-master trim amount (0..1), eased
-let pulse = [], prevSelected = -1;                   // per-master turn-on flare on focus
 
 function render(){
   ctx.clearRect(0,0,W,H);
   const M = MASTERS.length;
   if (!M) return;                       // nothing to draw (no masters)
-  // ease each master's trim amount (0 = focused/full, 1 = trimmed); track whether
-  // a transition is in progress so switching/entering/leaving focus animates
+  // ease each master's trim amount (0 = focused/full, 1 = trimmed), ASYMMETRICALLY:
+  // turning OFF (losing focus) snaps instantly; turning ON (gaining focus) ramps
+  // slowly — so on a switch the previous disc cuts out and the next lights up gently
   if (focusAmt.length !== M) focusAmt = new Array(M).fill(0);
-  if (pulse.length !== M) pulse = new Array(M).fill(0);
-  if (selected !== prevSelected){
-    if (selected >= 0) pulse[selected] = 1;   // flash the newly focused disc "on"
-    prevSelected = selected;
-  }
-  let animating = false, anyTrim = false;
   for (let i=0;i<M;i++){
     const target = (selected<0 || i===selected) ? 0 : 1;
-    focusAmt[i] += (target - focusAmt[i]) * 0.16;
-    if (Math.abs(target - focusAmt[i]) < 0.003) focusAmt[i] = target;
-    else animating = true;
-    pulse[i] *= 0.88;                          // decay the turn-on flare
-    if (pulse[i] > 0.01) animating = true;     // keep rendering while it fades
-    if (focusAmt[i] > 0.003) anyTrim = true;
+    if (target > focusAmt[i]){
+      focusAmt[i] = target;                              // off: instant
+    } else {
+      focusAmt[i] += (target - focusAmt[i]) * 0.07;      // on: slow ramp
+      if (focusAmt[i] - target < 0.003) focusAmt[i] = target;
+    }
   }
   const rx = 185, ry = rx*tilt;
   const N = (M-1)*perGap + 1;
@@ -352,7 +346,7 @@ function render(){
   }
 
   // draw one slice straight to the main canvas; opacity/trim/glow derive from the
-  // master's eased focus amount + its turn-on pulse, so a focused disc lights up
+  // master's eased focus amount, so a focused disc lights up as it ramps on
   function drawDiscSlice(n){
     const cy = topY + n*dz;
     const p = (M-1) - n/perGap;
@@ -361,7 +355,7 @@ function render(){
     const fA = FIELDS[lo], fB = FIELDS[Math.min(M-1, lo+1)];
     const mi = Math.round(p);
     const amt = focusAmt[mi] || 0;                       // 0 = focused, 1 = trimmed
-    const glow = (1 - amt) * (1 + (pulse[mi] || 0) * 1.2);   // flare while turning on
+    const glow = 1 - amt;                                // ramps up as the disc turns on
     ctx.save();
     ctx.translate(cx, cy + ry*0.5); ctx.scale(1, ry/rx);
     const sh = ctx.createRadialGradient(0,0,0,0,0,rx);
@@ -374,15 +368,16 @@ function render(){
              1 - amt*(1-opacityVal), amt*trimVal, glow);
   }
 
-  if (!animating && selected>=0){
-    // settled focus: trimmed discs composited as one faded layer (no overlap
-    // show-through); the focused disc is buffered so its hole reveals below
+  if (selected>=0){
+    // focused (incl. during the slow turn-on): the off discs snap to trimmed, so
+    // composite them as ONE faded layer the whole time -> their mutual overlap
+    // never pops; only the focused disc eases/lights up, buffered so its hole
+    // reveals the discs below
     paintGroup(below, opacityVal, trimVal, holeOn);
     if (focusedN>=0) drawDiscSlice(focusedN);
     paintGroup(above, opacityVal, trimVal, holeOn);
   } else {
-    // no focus or mid-transition: per-disc so holes show below and the focused
-    // disc cross-fades / lights up
+    // no focus (incl. the slow ramp back to all-full): plain per-disc stack
     for (let n=N-1;n>=0;n--) drawDiscSlice(n);
   }
 
