@@ -408,10 +408,11 @@ DASHBOARD_JS = r"""
       var wasKey = (ch[name] != null) ? ch[name][0] : key;
       var nowVar = varFor(key), wasVar = varFor(wasKey);
       var showVar = state.before ? wasVar : nowVar;
-      // keep slashes literal (encodeURI, not encodeURIComponent) so Glyphs resolves
-      // the path — otherwise it falls back to the frontmost font + current master,
-      // ignoring the layer (master) we asked for.
-      var href = "glyphsapp://show/?path=" + encodeURI(H.filePath || "")
+      // Fully percent-encode the path (encodeURIComponent → slashes become %2F),
+      // exactly as the handbook example does. With literal slashes Glyphs misparses
+      // the path and falls back to the frontmost font + active master, ignoring the
+      // layer (master) we asked for. layer == master id selects the master layer.
+      var href = "glyphsapp://show/?path=" + encodeURIComponent(H.filePath || "")
         + "&glyph=" + encodeURIComponent(name) + "&layer=" + encodeURIComponent(m.id);
       var p = paths[name];
       var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '"/></svg>' : '';
