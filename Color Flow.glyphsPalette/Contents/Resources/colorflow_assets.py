@@ -72,7 +72,7 @@ html,body{margin:0}
 body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains Mono","JetBrainsMono Nerd Font",ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace,"Apple Color Emoji";
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
-@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}}
+@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell,.cell svg path{transition:none}}
 #cfd-app{max-width:980px;margin:0 auto;padding:0 20px 60px}
 .hd{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:14px 0;background:var(--bg);border-bottom:1px solid var(--border)}
 .hd .brand{width:10px;height:10px;border-radius:3px;background:var(--accent)}
@@ -119,14 +119,16 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .row .num{width:54px;text-align:right;color:var(--muted)}
 .row .pc{width:40px;text-align:right}
 .heat{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
-.heat-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
+.heat-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.heat-h .ba-toggle{margin-left:auto;flex:none}
 .heat-h .hint{color:var(--muted-2)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(15px,1fr));gap:4px}
-.cell{aspect-ratio:1;border:0;padding:0;border-radius:3px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.cell{aspect-ratio:1;border:0;padding:0;border-radius:3px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}
 .cell.copied{outline:2px solid var(--ok);outline-offset:1px}
 .cell.glyph{background:var(--surface-2)}
 .cell svg{width:100%;height:100%;display:block}
+.cell svg path{transition:fill .45s ease}
 .more{display:inline-block;margin-top:8px;font-size:var(--fs-xs);color:var(--muted-2)}
 .empty{font-size:var(--fs-sm);color:var(--muted-2)}
 .changes{margin-top:14px}
@@ -165,7 +167,7 @@ DASHBOARD_JS = r"""
   var prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
   var state = {
     master: H.masters.length ? H.masters[0].id : null,
-    view: "tabs", q: "", unfinishedOnly: true, sort: "workflow",
+    view: "tabs", before: false, q: "", unfinishedOnly: true, sort: "workflow",
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
 
@@ -267,18 +269,23 @@ DASHBOARD_JS = r"""
     }
     var cap = 500, shown = items.slice(0,cap);
     var paths = (H.paths && H.paths[m.id]) || {};
+    var ch = (H.changes && H.changes[m.id]) || {};
     var cells = shown.map(function(it){
       var name = it[0], key = it[1], lab = labelFor(key);
+      var wasKey = (ch[name] != null) ? ch[name][0] : key;
+      var nowVar = varFor(key), wasVar = varFor(wasKey);
+      var showVar = state.before ? wasVar : nowVar;
       var href = "glyphsapp://show/?path=" + encodeURIComponent(H.filePath || "")
         + "&glyph=" + encodeURIComponent(name) + "&layer=" + encodeURIComponent(m.id);
       var p = paths[name];
-      var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '" fill="var(' + varFor(key) + ')"/></svg>' : '';
-      return '<a class="cell' + (p ? ' glyph' : '') + '" href="' + href + '"' + (p ? '' : ' style="background:var(' + varFor(key) + ')"') + ' title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
+      var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '" fill="var(' + showVar + ')"/></svg>' : '';
+      return '<a class="cell' + (p ? ' glyph' : '') + '" href="' + href + '" data-now="' + nowVar + '" data-was="' + wasVar + '"' + (p ? '' : ' style="background:var(' + showVar + ')"') + ' title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
     }).join("");
     var more = items.length>cap ? '<span class="more">… +'+(items.length-cap)+' more</span>' : "";
     var empty = items.length===0 ? '<p class="empty">No glyphs match.</p>' : "";
-    return '<section class="heat"><div class="heat-h">Per-glyph · '+items.length+(state.unfinishedOnly?" unfinished":"")
-      + ' <span class="hint">hover for name · click to open</span></div>'
+    var toggle = Object.keys(ch).length ? '<button type="button" class="ba-toggle chip" aria-pressed="'+state.before+'" title="Toggle the cell colours between before and after the last run">'+(state.before?"Before":"After")+'</button>' : '';
+    return '<section class="heat"><div class="heat-h"><span>Per-glyph · '+items.length+(state.unfinishedOnly?" unfinished":"")
+      + ' <span class="hint">hover for name · click to open</span></span>'+toggle+'</div>'
       + '<div class="grid" aria-label="Per-glyph colours">'+cells+'</div>'+more+empty+'</section>';
   }
   function changes(m){
@@ -299,7 +306,7 @@ DASHBOARD_JS = r"""
       return '<button type="button" role="tab" aria-selected="'+on+'" class="tab'+(on?" on":"")+'" data-m="'+esc(m.id)+'">'+esc(m.name)+'</button>';
     }).join("");
     var m = masterById(state.master);
-    return '<div class="tabs" role="tablist">'+tabs+'</div><div class="panel" role="tabpanel">'+rows(m)+heatmap(m)+changes(m)+'</div>';
+    return '<div class="tabs" role="tablist">'+tabs+'</div><div class="panel" role="tabpanel">'+rows(m)+heatmap(m)+'</div>';
   }
   function compareView(){
     var head = '<th scope="col">Step</th>'+H.masters.map(function(m){ return '<th scope="col">'+esc(m.name)+'</th>'; }).join("");
@@ -315,6 +322,20 @@ DASHBOARD_JS = r"""
     return '<div class="cmp-wrap"><table class="cmp"><caption>Step completion by master</caption><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
   }
   function renderBody(){ return state.view==="compare" ? compareView() : tabsView(); }
+
+  // Animate the heatmap cells between their last-run ("before") and current
+  // ("after") colours by updating fills in place so the CSS transition runs.
+  function applyBeforeAfter(){
+    var cells = document.querySelectorAll(".heat .cell");
+    for (var i=0;i<cells.length;i++){
+      var cell = cells[i];
+      var v = state.before ? cell.getAttribute("data-was") : cell.getAttribute("data-now");
+      if (!v) continue;
+      var path = cell.querySelector("path");
+      if (path) path.setAttribute("fill", "var("+v+")");
+      else cell.style.background = "var("+v+")";
+    }
+  }
 
   function update(){
     document.getElementById("cfd-body").innerHTML = renderBody();
@@ -355,6 +376,8 @@ DASHBOARD_JS = r"""
     });
     document.getElementById("cfd-body").addEventListener("click", function(e){
       var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); update(); return; }
+      var ba = e.target.closest(".ba-toggle");
+      if (ba){ e.preventDefault(); state.before = !state.before; ba.setAttribute("aria-pressed", state.before); ba.textContent = state.before ? "Before" : "After"; applyBeforeAfter(); return; }
     });
   }
   function init(){
