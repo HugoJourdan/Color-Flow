@@ -255,14 +255,24 @@ class ColorFlow(PalettePlugin):
 			popover.lcSep = HorizontalLine((12, 62, -12, 1))
 			self._labelColorsEdited = False
 			popover.lcLabel = TextBox((12, 71, -96, 16), "Labels & Colours", sizeStyle='small')
-			popover.lcImport = Button((-86, 67, 22, 22), "􀈄", callback=self._import_profile, sizeStyle='small')
-			popover.lcExport = Button((-60, 67, 22, 22), "􀈂", callback=self._export_profile, sizeStyle='small')
-			popover.lcReset = Button((-34, 67, 22, 22), "􀎀", callback=self._label_colors_reset, sizeStyle='small')
-			for _btnName in ("lcImport", "lcExport", "lcReset"):
+			popover.lcImport = Button((-86, 67, 22, 22), "", callback=self._import_profile, sizeStyle='small')
+			popover.lcExport = Button((-60, 67, 22, 22), "", callback=self._export_profile, sizeStyle='small')
+			popover.lcReset = Button((-34, 67, 22, 22), "", callback=self._label_colors_reset, sizeStyle='small')
+			# Borderless SF-Symbol icons via NSImage (NOT the symbol font as a title);
+			# the literal glyph is only a fallback if the named image is unavailable.
+			for _name, _sym, _fallback in (("lcImport", "square.and.arrow.down", "􀈄"),
+					("lcExport", "square.and.arrow.up", "􀈂"),
+					("lcReset", "arrow.counterclockwise", "􀎀")):
 				try:
-					_b = self._ns_button(getattr(popover, _btnName))
+					_b = self._ns_button(getattr(popover, _name))
 					_b.setBordered_(False)
-					_b.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
+					_img = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(_sym, None)
+					if _img is not None:
+						_b.setImage_(_img)
+						_b.setImageScaling_(AppKit.NSImageScaleProportionallyDown)
+					else:
+						_b.setTitle_(_fallback)
+						_b.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
 				except Exception:
 					pass
 			self._labelWells = []
