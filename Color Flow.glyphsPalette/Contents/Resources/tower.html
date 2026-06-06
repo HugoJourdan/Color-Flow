@@ -234,10 +234,9 @@ function paintDisc(g, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
 // the disc is rendered once into the offscreen buffer then composited, so it
 // fades uniformly (true translucency) instead of being veiled toward the bg.
 function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac, opacity, trim){
-  if (opacity>=1 && trim<=0){
-    paintDisc(ctx, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac);
-    return;
-  }
+  // always render via the buffer (even at full opacity) so the punched hole is
+  // transparent in the disc layer and the composite reveals the discs BELOW
+  // through it — a see-through tunnel — instead of erasing down to the background
   bctx.clearRect(0,0,W,H);
   paintDisc(bctx, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac);
   if (trim>0){
@@ -359,8 +358,8 @@ function render(){
   }
 
   if (!anyTrim){
-    // nothing trimmed: plain top-paints-last stack
-    for (let n=N-1;n>=0;n--) drawSliceInto(ctx, n, holeOn);
+    // nothing trimmed: plain stack (each disc buffered so its hole shows below)
+    for (let n=N-1;n>=0;n--) drawDiscSlice(n, 1, 0);
   } else if (animating){
     // mid-transition: per-disc fade so the old/new focused discs cross-fade
     // (brief overlap among moving discs is fine)
@@ -369,22 +368,26 @@ function render(){
       drawDiscSlice(n, 1 - amt*(1-opacityVal), amt*trimVal);
     }
   } else {
-    // settled focus: composite the trimmed discs as one faded layer so their
-    // mutual overlaps don't show through
+    // settled focus: trimmed discs composited as one faded layer (no overlap
+    // show-through); the focused disc is buffered so its hole reveals below
     paintGroup(below, opacityVal, trimVal, holeOn);
-    if (focusedN>=0) drawSliceInto(ctx, focusedN, holeOn);
+    if (focusedN>=0) drawDiscSlice(focusedN, 1, 0);
     paintGroup(above, opacityVal, trimVal, holeOn);
   }
 
-  // master names down the left, right-aligned just left of each disc; the focused
-  // name stays bright while trimmed ones dim with their disc
+  // master names down the left, right-aligned just left of each disc; foreshortened
+  // to share the disc's inclination. Focused name bright; trimmed ones dim.
   ctx.textAlign = "right"; ctx.textBaseline = "middle";
   ctx.font = "600 13px -apple-system,BlinkMacSystemFont,sans-serif";
   for (let i=0;i<M;i++){
     const cy = topY + (M-1-i)*perGap*dz;
     const amt = focusAmt[i] || 0;
+    ctx.save();
+    ctx.translate(cx - rx - 18, cy);
+    ctx.scale(1, tilt);                       // align with the disc's inclination
     ctx.fillStyle = "rgba(255,255,255," + (1 - amt*0.65) + ")";
-    ctx.fillText(MASTERS[i].name, cx - rx - 18, cy);
+    ctx.fillText(MASTERS[i].name, 0, 0);
+    ctx.restore();
   }
 }
 
