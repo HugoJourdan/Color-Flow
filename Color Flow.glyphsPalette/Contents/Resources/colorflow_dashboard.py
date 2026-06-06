@@ -458,8 +458,9 @@ def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free:
         master_id = master.id
         shown: dict = {}
         if produced < budget:
-            # A single em box per master (ascender..descender) shared by every cell,
-            # so glyphs render at their true relative sizes (a shorter than A).
+            # A single square em box per master (side = ascender..descender span)
+            # shared by every cell, so glyphs render at their true relative sizes
+            # (a shorter than A) while each sits centred in its cell.
             ascender = getattr(master, "ascender", None)
             descender = getattr(master, "descender", None)
             ascender = float(ascender) if ascender is not None else upm * 0.75
@@ -467,7 +468,6 @@ def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free:
             em_height = ascender - descender
             if em_height <= 0:
                 em_height = upm
-            em_top = -ascender
             for name in glyph_names:
                 if produced >= budget:
                     break
@@ -475,7 +475,7 @@ def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free:
                     layer = font.glyphs[name].layers[master_id]
                 except Exception:
                     layer = None
-                outline = glyphsvg.layer_outline_em(layer, em_top, em_height) if layer is not None else {}
+                outline = glyphsvg.layer_outline_em(layer, em_height) if layer is not None else {}
                 if outline:
                     shown[name] = outline
                     produced += 1

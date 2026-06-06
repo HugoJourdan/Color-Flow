@@ -97,10 +97,11 @@ def test_layers_outline_empty_when_no_outline() -> None:
 
 def test_layer_outline_em_uses_shared_box_centred_on_glyph() -> None:
     bezier = _FakeBezier([(0, [(100, 0)]), (1, [(500, 0)]), (1, [(500, 700)]), (3, [])])
-    outline = glyphsvg.layer_outline_em(_FakeLayer(bezier), em_top=-750.0, em_height=1000.0)
+    outline = glyphsvg.layer_outline_em(_FakeLayer(bezier), em_height=1000.0)
     assert outline["d"] == "M100 0L500 0L500 -700Z"
-    # square box of side em_height, centred on the glyph's x-centre (300): 300-500=-200
-    assert outline["vb"] == "-200 -750 1000 1000"
+    # square box of side em_height centred on the glyph's ink in BOTH axes.
+    # x-centre 300 -> 300-500=-200; y-centre 350 -> flipped -350-500=-850
+    assert outline["vb"] == "-200 -850 1000 1000"
 
 
 def test_layer_outline_em_empty_without_path() -> None:
@@ -108,4 +109,4 @@ def test_layer_outline_em_empty_without_path() -> None:
         drawBezierPath = None
         bezierPath = None
 
-    assert glyphsvg.layer_outline_em(_NoPath(), -750.0, 1000.0) == {}
+    assert glyphsvg.layer_outline_em(_NoPath(), 1000.0) == {}

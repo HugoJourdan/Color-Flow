@@ -108,22 +108,25 @@ def layer_outline(layer) -> dict:
     return {"d": d, "vb": view_box(elements)}
 
 
-def layer_outline_em(layer, em_top: float, em_height: float) -> dict:
+def layer_outline_em(layer, em_height: float) -> dict:
     """``{"d", "vb"}`` for a cell glyph using a SHARED square viewBox (side
-    ``em_height``) centred horizontally on the glyph and aligned to the font
-    baseline, so every cell scales identically and glyphs keep their real relative
-    sizes ("a" is shorter than "A") instead of each filling its cell.
+    ``em_height``) centred on the glyph's ink in BOTH axes, so every cell scales
+    identically (glyphs keep their real relative sizes — "a" is shorter than "A")
+    while each glyph sits perfectly centred in its cell.
 
-    ``em_top`` is the flipped-Y top of the box (``-ascender``); ``em_height`` is the
-    ascender-to-descender span. ``{}`` when the layer has no outline."""
+    ``em_height`` is the ascender-to-descender span (the constant scale). ``{}``
+    when the layer has no outline."""
     elements = _layer_elements(layer)
     d = svg_path_d(elements)
     if not d:
         return {}
     xs = [x for _kind, points in elements for x, _y in points]
+    ys = [y for _kind, points in elements for _x, y in points]
     center_x = (min(xs) + max(xs)) / 2.0 if xs else 0.0
+    center_y = (min(ys) + max(ys)) / 2.0 if ys else 0.0
     box_x = center_x - em_height / 2.0
-    return {"d": d, "vb": f"{_num(box_x)} {_num(em_top)} {_num(em_height)} {_num(em_height)}"}
+    box_y = -center_y - em_height / 2.0  # flipped Y: SVG y = -font y
+    return {"d": d, "vb": f"{_num(box_x)} {_num(box_y)} {_num(em_height)} {_num(em_height)}"}
 
 
 def layers_outline(layers_with_offsets: list) -> dict:
