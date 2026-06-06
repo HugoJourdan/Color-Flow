@@ -73,6 +73,13 @@ def hex_list() -> list[str]:
     return [hex_for(rgba) for rgba in read_label_colors()]
 
 
+def _ns_color(rgba: tuple) -> object:
+    """``(r, g, b[, a])`` -> a clamped device ``NSColor`` (callers ensure Glyphs)."""
+    assert NSColor is not None
+    values = (tuple(rgba) + (1.0,))[:4]
+    return NSColor.colorWithDeviceRed_green_blue_alpha_(*(_clamp(v) for v in values))
+
+
 def write_label_colors(colors: list) -> bool:
     """Persist twelve ``(r, g, b, a)`` tuples to ``Glyphs.defaults['LabelColors']``
     as NSArchiver-archived ``NSColor`` objects (how Glyphs stores them). Returns
@@ -81,11 +88,47 @@ def write_label_colors(colors: list) -> bool:
         return False
     archived = NSMutableArray.new()
     for rgba in colors:
-        values = (tuple(rgba) + (1.0,))[:4]
-        color = NSColor.colorWithDeviceRed_green_blue_alpha_(*(_clamp(v) for v in values))
-        archived.addObject_(NSArchiver.archivedDataWithRootObject_(color))
+        archived.addObject_(NSArchiver.archivedDataWithRootObject_(_ns_color(rgba)))
     Glyphs.defaults[DEFAULTS_KEY] = archived
     return True
+
+
+def refresh_app_label_colors(colors: list) -> None:
+    """Best-effort: make the *running* Glyphs pick up new label colours without a
+    restart, for its own Font / Edit views.
+
+    Glyphs caches ``+[GSGlyphsInfo labelColors]`` with no public setter/reset, so
+    this is undocumented and fully guarded. It tries, in order: a private reload
+    selector (if any exists), mutating the cached colour array in place, then a
+    redraw. It silently no-ops if none of that is supported — Color Flow's own
+    palette + dashboard already read the colours directly, so they update either
+    way; only Glyphs' native drawing depends on this working."""
+    if Glyphs is None or NSColor is None:
+        return
+    try:
+        import objc
+        info = objc.lookUpClass("GSGlyphsInfo")
+    except Exception:
+        info = None
+    if info is not None:
+        for selector_name in ("reloadLabelColors", "resetLabelColors", "clearLabelColors"):
+            method = getattr(info, selector_name, None)
+            if method is not None:
+                try:
+                    method()
+                except Exception:
+                    pass
+        try:
+            cached = info.labelColors()
+            if cached is not None and hasattr(cached, "replaceObjectAtIndex_withObject_"):
+                for index in range(min(len(cached), len(colors))):
+                    cached.replaceObjectAtIndex_withObject_(index, _ns_color(colors[index]))
+        except Exception:
+            pass
+    try:
+        Glyphs.redraw()
+    except Exception:
+        pass
 
 
 def reset_label_colors() -> None:

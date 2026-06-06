@@ -38,3 +38,8 @@ def test_write_and_reset_are_no_ops_without_glyphs(monkeypatch) -> None:
     monkeypatch.setattr(lc, "Glyphs", None)
     assert lc.write_label_colors(lc.DEFAULTS) is False
     lc.reset_label_colors()  # must not raise
+
+
+def test_refresh_app_label_colors_is_no_op_without_glyphs(monkeypatch) -> None:
+    monkeypatch.setattr(lc, "Glyphs", None)
+    lc.refresh_app_label_colors(lc.DEFAULTS)  # must not raise
