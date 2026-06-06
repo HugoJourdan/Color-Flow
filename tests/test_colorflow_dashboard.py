@@ -344,6 +344,20 @@ def test_master_point_free_mode_final_equals_started() -> None:
     assert point["final"] == point["started"] == 2 and point["total"] == 3
 
 
+def test_glyph_journeys_only_changed_unfinished_aligned_to_dates() -> None:
+    dates = ["2026-06-01", "2026-06-02"]
+    history = {
+        "2026-06-01": {"m1": {"A": cc.NO_COLOR, "B": 1, "C": 0}},
+        "2026-06-02": {"m1": {"A": 1, "B": 1, "C": 2}},
+    }
+    current = {"m1": {"A": 1, "B": 1, "C": 2}}   # C is at the final step (2) -> finished
+    journeys = db._glyph_journeys(history, dates, current, ["A", "B", "C"], _FC_ORDER, is_free=False)
+    assert journeys["m1"]["A"] == [cc.NO_COLOR, 1]   # changed + unfinished -> included, date-aligned
+    assert "B" not in journeys["m1"]                 # flat journey -> nothing to show
+    assert "C" not in journeys["m1"]                 # finished -> excluded
+    assert db._glyph_journeys(history, [], current, ["A"], _FC_ORDER, is_free=False) == {}
+
+
 class _FakeLayerColor:
     def __init__(self, color: int | None, width: float = 500.0) -> None:
         self.color = color

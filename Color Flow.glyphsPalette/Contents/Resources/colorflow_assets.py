@@ -185,6 +185,10 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .tchart .tband{fill:color-mix(in srgb,var(--ok) 14%,transparent)}
 .tfoot{display:flex;justify-content:space-between;font-size:var(--fs-2xs);color:var(--muted-2);margin-top:6px}
 .ft{margin-top:30px;padding-top:16px;border-top:1px solid var(--border);font-size:var(--fs-2xs);color:var(--muted-2);line-height:1.6}
+.cfd-tip{position:fixed;z-index:20;display:none;background:var(--surface);border:1px solid var(--border-2);border-radius:8px;padding:8px 10px;box-shadow:0 6px 24px rgba(0,0,0,.32);pointer-events:none}
+.cfd-tip .tip-h{font-size:var(--fs-2xs);color:var(--muted);margin-bottom:5px;white-space:nowrap}
+.cfd-tip .spark{display:block}
+.cfd-tip .spark rect{box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);background:var(--surface);border:1px solid var(--border-2);color:var(--text);border-radius:var(--r-sm);padding:8px 14px;font-size:var(--fs-sm);opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 button:focus-visible,input:focus-visible,summary:focus-visible,.cell:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -316,7 +320,7 @@ DASHBOARD_JS = r"""
         + "&glyph=" + encodeURIComponent(name) + "&layer=" + encodeURIComponent(m.id);
       var p = paths[name];
       var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '"/></svg>' : '';
-      return '<a class="cell' + (p ? ' glyph' : '') + '" href="' + href + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:var(' + showVar + ')" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
+      return '<a class="cell' + (p ? ' glyph' : '') + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:var(' + showVar + ')" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
     }).join("");
     var more = items.length>cap ? '<span class="more">… +'+(items.length-cap)+' more</span>' : "";
     var empty = items.length===0 ? '<p class="empty">No glyphs match.</p>' : "";
@@ -423,6 +427,31 @@ DASHBOARD_JS = r"""
     return state.view==="compare" ? compareView() : state.view==="trend" ? trendView() : tabsView();
   }
 
+  // ----- Per-glyph step-journey sparkline on heatmap hover (#12) -----
+  function sparkline(journey){
+    var n = journey.length, gap = 2, bw = 9, h = 18, w = n*bw + (n-1)*gap;
+    var rects = journey.map(function(k,i){
+      var v = k===-1 ? "--c-none" : "--c"+k;
+      return '<rect x="'+(i*(bw+gap))+'" y="0" width="'+bw+'" height="'+h+'" rx="2" fill="var('+v+')"/>';
+    }).join("");
+    return '<svg class="spark" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true">'+rects+'</svg>';
+  }
+  function journeyFor(name){
+    return H.journeys && H.journeys[state.master] && H.journeys[state.master][name];
+  }
+  function showTip(name, x, y){
+    var journey = journeyFor(name);
+    if (!journey){ hideTip(); return; }
+    var tip = document.getElementById("cfd-tip");
+    if (!tip){ tip = document.createElement("div"); tip.id = "cfd-tip"; tip.className = "cfd-tip"; document.body.appendChild(tip); }
+    tip.innerHTML = '<div class="tip-h">'+esc(name)+' · step journey</div>'+sparkline(journey);
+    tip.style.display = "block";
+    var left = Math.min(x+14, window.innerWidth - tip.offsetWidth - 8);
+    tip.style.left = Math.max(8, left)+"px";
+    tip.style.top = Math.max(8, y - tip.offsetHeight - 12)+"px";
+  }
+  function hideTip(){ var tip = document.getElementById("cfd-tip"); if (tip) tip.style.display = "none"; }
+
   // Animate the heatmap cells between their last-run ("before") and current
   // ("after") colours by updating the cell background in place so the CSS
   // transition runs. The glyph drawn on top keeps its fixed ink colour.
@@ -437,6 +466,7 @@ DASHBOARD_JS = r"""
   }
 
   function update(){
+    hideTip();
     document.getElementById("cfd-body").innerHTML = renderBody();
     document.documentElement.setAttribute("data-theme", state.theme);
     var cmp = document.getElementById("cfd-compare"); if (cmp) cmp.setAttribute("aria-pressed", state.view==="compare");
@@ -475,7 +505,14 @@ DASHBOARD_JS = r"""
     document.addEventListener("keydown", function(e){
       if (e.key==="/" && document.activeElement!==s){ e.preventDefault(); s.focus(); }
     });
-    document.getElementById("cfd-body").addEventListener("click", function(e){
+    var bodyEl = document.getElementById("cfd-body");
+    bodyEl.addEventListener("mouseover", function(e){
+      var cell = e.target.closest(".heat .cell"); if (cell) showTip(cell.getAttribute("data-glyph"), e.clientX, e.clientY);
+    });
+    bodyEl.addEventListener("mouseout", function(e){
+      if (e.target.closest(".heat .cell")) hideTip();
+    });
+    bodyEl.addEventListener("click", function(e){
       var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); update(); return; }
       var ba = e.target.closest(".ba-toggle");
       if (ba){ e.preventDefault(); state.before = !state.before; ba.setAttribute("aria-pressed", state.before); ba.textContent = state.before ? "Before" : "After"; applyBeforeAfter(); return; }

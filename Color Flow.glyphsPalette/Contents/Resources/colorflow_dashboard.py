@@ -417,6 +417,37 @@ def _favicon(font) -> dict:
     return glyphsvg.layer_outline(layer) if layer is not None else {}
 
 
+def _glyph_journeys(history: dict, dates: list, current: dict, glyph_names: list,
+                    order: list, is_free: bool, cap: int = 400) -> dict:
+    """Per-master ``{glyph_name: [key_per_date]}`` for the heatmap drill-down
+    sparkline — only *unfinished* glyphs whose step actually *changed* over the
+    recorded dates (a flat journey has nothing to show), capped for big fonts.
+    Each list is aligned to ``dates`` (oldest-first); missing dates read as
+    uncoloured."""
+    if not dates:
+        return {}
+    order_set = set(order)
+    last = order[-1] if order else None
+    journeys: dict = {}
+    for master_id, per_glyph in current.items():
+        shown: dict = {}
+        produced = 0
+        for name in glyph_names:
+            if produced >= cap:
+                break
+            key = per_glyph.get(name)
+            finished = (str(key) in order_set) if is_free else (str(key) == last)
+            if finished:
+                continue
+            journey = [history.get(date, {}).get(master_id, {}).get(name, colornames.NO_COLOR)
+                       for date in dates]
+            if len(set(journey)) > 1:   # changed at least once -> worth a sparkline
+                shown[name] = journey
+                produced += 1
+        journeys[master_id] = shown
+    return journeys
+
+
 def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
     """The full data model the JS app renders. Pure aside from reading the
     font's colorNames.txt (via _meaning_and_none) — the same source the palette
@@ -448,13 +479,17 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
 
     paths = _outline_paths(font, current, glyph_names, order, is_free)
 
-    series = history_series(load_history(font), order, is_free)
+    history = load_history(font)
+    series = history_series(history, order, is_free)
+    dates = [point["date"] for point in series]
     trend = {
         "series": series,
         "forecast": {master.id: forecast_master(series, master.id, glyph_total, now, is_free)
                      for master in font.masters},
+        "dates": dates,
         "today": now.strftime("%Y-%m-%d"),
     }
+    journeys = _glyph_journeys(history, dates, current, glyph_names, order, is_free)
 
     return {
         "family": font.familyName or "",
@@ -474,6 +509,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "paths": paths,
         "favicon": _favicon(font),
         "trend": trend,
+        "journeys": journeys,
         "changes": compute_changes(current, previous),
     }
 

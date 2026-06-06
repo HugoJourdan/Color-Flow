@@ -66,6 +66,7 @@ def _model(is_free: bool) -> dict:
         "filePath": "/fonts/Acme.glyphs", "paths": paths,
         "favicon": outline,
         "trend": _trend(),
+        "journeys": {"regular": {"A": [-1, 4, 8], "C": [-1, -1, 4]}, "bold": {}},
         "changes": {"regular": {"A": [4, 8], "H": [6, 3]}},
     }
 
