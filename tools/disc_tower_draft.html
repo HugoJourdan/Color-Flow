@@ -136,27 +136,47 @@ const HOLE = MASTERS.map(m=>m.uncolored/TOTAL);
 
 // crossfade two fields into a tinted disc; returns nothing, draws into ctx
 function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
-  ctx.save();
-  ctx.translate(cx,cy);
-  ctx.scale(1, ry/rx);
-  ctx.rotate(rot);
-  ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.clip();
   const o = rx*1.14;            // overscan so the field's blurred rim is clipped away
+  // 1) colour field — rotates with the spin
+  ctx.save();
+  ctx.translate(cx,cy); ctx.scale(1, ry/rx); ctx.rotate(rot);
+  ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.clip();
   ctx.globalAlpha = DISC_ALPHA;            ctx.drawImage(fieldA,-o,-o,o*2,o*2);
   if (fieldB && t>0){ ctx.globalAlpha = DISC_ALPHA*t; ctx.drawImage(fieldB,-o,-o,o*2,o*2); }
-  ctx.globalAlpha = 1;          // full strength for the hole punch below
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  // 2) frosted-glass treatment — fixed light (NOT rotated): milky veil + top
+  //    specular sheen, then punch the hole through everything
+  ctx.save();
+  ctx.translate(cx,cy); ctx.scale(1, ry/rx);
+  ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.clip();
+  ctx.fillStyle = "rgba(255,255,255,0.06)";                 // milky frost veil
+  ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
+  const sheen = ctx.createLinearGradient(0,-rx,0,rx*0.3);   // specular highlight from above
+  sheen.addColorStop(0, "rgba(255,255,255,0.42)");
+  sheen.addColorStop(0.55, "rgba(255,255,255,0.06)");
+  sheen.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = sheen; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
   if (holeFrac>0){
     const hr = rx*0.26;   // constant: same hole size on every disc
-    // REAL hole: erase the disc pixels (destination-out) so it's see-through —
-    // page behind when spread out, the discs below when stacked (a real well).
     ctx.globalCompositeOperation = "destination-out";
     const pg = ctx.createRadialGradient(0,0,0,0,0,hr);
     pg.addColorStop(0,"rgba(0,0,0,1)");
     pg.addColorStop(0.94,"rgba(0,0,0,1)");
-    pg.addColorStop(1,"rgba(0,0,0,0)");      // thin anti-alias edge only — no border
+    pg.addColorStop(1,"rgba(0,0,0,0)");      // thin anti-alias edge — no border
     ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(0,0,hr,0,7); ctx.fill();
     ctx.globalCompositeOperation = "source-over";
   }
+  ctx.restore();
+  // 3) glassy rim — bright at the top, dark at the bottom (fixed light)
+  ctx.save();
+  ctx.translate(cx,cy); ctx.scale(1, ry/rx);
+  const rim = ctx.createLinearGradient(0,-rx,0,rx);
+  rim.addColorStop(0, "rgba(255,255,255,0.55)");
+  rim.addColorStop(0.5, "rgba(255,255,255,0.07)");
+  rim.addColorStop(1, "rgba(0,0,0,0.14)");
+  ctx.strokeStyle = rim; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(0,0,rx*0.992,0,7); ctx.stroke();
   ctx.restore();
 }
 
