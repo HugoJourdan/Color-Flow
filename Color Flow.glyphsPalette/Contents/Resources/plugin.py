@@ -1305,6 +1305,13 @@ class ColorFlow(PalettePlugin):
 			pass
 		setattr(self.paletteView.frame, str(color)+"count", textbox)
 
+	def headerEyeClicked_(self, sender):
+		try:
+			self._toggle_eye_mode(sender)
+		except Exception:
+			import traceback
+			print("Color Flow [header eye] error:\n" + traceback.format_exc())
+
 	# Inject a colour bar into the palette SECTION HEADER (#23). Done deferred so
 	# the palette is docked first, then the whole window is searched for the title.
 	def deferredHeaderSetup_(self, sender):
@@ -1396,7 +1403,7 @@ class ColorFlow(PalettePlugin):
 			if header is None:
 				return
 			bounds = header.bounds()
-			barWidth, barHeight = 55.0, 6.0
+			barWidth, barHeight = 40.0, 6.0
 			xPos = bounds.size.width - barWidth - 10.0
 			yPos = (bounds.size.height - barHeight) / 2.0
 			bar = AppKit.NSView.alloc().initWithFrame_(((xPos, yPos), (barWidth, barHeight)))
@@ -1410,6 +1417,28 @@ class ColorFlow(PalettePlugin):
 				pass
 			header.addSubview_(bar)
 			self._titleBar = bar
+			eyeSize = 18.0
+			eyeX = xPos - 6.0 - eyeSize
+			eyeY = (bounds.size.height - eyeSize) / 2.0
+			eye = AppKit.NSButton.alloc().initWithFrame_(((eyeX, eyeY), (eyeSize, eyeSize)))
+			eye.setBordered_(False)
+			eye.setAutoresizingMask_(AppKit.NSViewMinXMargin)
+			eye.setTarget_(self)
+			eye.setAction_("headerEyeClicked:")
+			try:
+				eyeImg = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_("eye", None)
+				if eyeImg is not None:
+					eye.setImage_(eyeImg)
+				else:
+					eye.setTitle_("\U0001F441")
+			except Exception:
+				pass
+			header.addSubview_(eye)
+			self._titleEye = eye
+			try:
+				self._ns_button(self.paletteView.frame.eyeButton).setHidden_(True)
+			except Exception:
+				pass
 		except Exception:
 			import traceback
 			print("Color Flow [title bar] error:\n" + traceback.format_exc())
@@ -1682,7 +1711,9 @@ class ColorFlow(PalettePlugin):
 		try:
 			name = "eye.slash" if on else "eye"
 			image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, None)
-			nsbutton = self._ns_button(self.paletteView.frame.eyeButton)
+			nsbutton = getattr(self, "_titleEye", None)
+			if nsbutton is None:
+				nsbutton = self._ns_button(self.paletteView.frame.eyeButton)
 			nsbutton.setBordered_(False)
 			if image is not None:
 				nsbutton.setImage_(image)
