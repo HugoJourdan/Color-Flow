@@ -151,12 +151,6 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
     ctx.beginPath(); ctx.arc(0,0,hr*0.92,0,7); ctx.stroke();
   }
   ctx.restore();
-  // front-edge shading to fake disc thickness
-  ctx.save();
-  ctx.translate(cx,cy); ctx.scale(1, ry/rx);
-  ctx.beginPath(); ctx.arc(0,0,rx,0.05*Math.PI,0.95*Math.PI);
-  ctx.strokeStyle = "rgba(0,0,0,.10)"; ctx.lineWidth = 3; ctx.stroke();
-  ctx.restore();
 }
 
 let rot = -0.5, dragging = false, lastX = 0, autospin = true;
