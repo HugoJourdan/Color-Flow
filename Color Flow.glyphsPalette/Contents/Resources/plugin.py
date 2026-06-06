@@ -254,10 +254,10 @@ class ColorFlow(PalettePlugin):
 			popover.rainbow.set(self._rainbow_segment_index())
 			popover.lcSep = HorizontalLine((12, 62, -12, 1))
 			self._labelColorsEdited = False
-			popover.lcLabel = TextBox((12, 71, -96, 16), "Labels & Colours", sizeStyle='small')
-			popover.lcImport = Button((-86, 67, 22, 22), "", callback=self._import_profile, sizeStyle='small')
-			popover.lcExport = Button((-60, 67, 22, 22), "", callback=self._export_profile, sizeStyle='small')
-			popover.lcReset = Button((-34, 67, 22, 22), "", callback=self._label_colors_reset, sizeStyle='small')
+			popover.lcLabel = TextBox((12, 70, -84, 16), "Labels & Colours", sizeStyle='small')
+			popover.lcImport = Button((-76, 68, 20, 20), "", callback=self._import_profile, sizeStyle='small')
+			popover.lcExport = Button((-53, 68, 20, 20), "", callback=self._export_profile, sizeStyle='small')
+			popover.lcReset = Button((-30, 68, 20, 20), "", callback=self._label_colors_reset, sizeStyle='small')
 			# Borderless SF-Symbol icons via NSImage (NOT the symbol font as a title);
 			# the literal glyph is only a fallback if the named image is unavailable.
 			for _name, _sym, _fallback in (("lcImport", "square.and.arrow.down", "􀈄"),
