@@ -105,6 +105,17 @@ class ColorFlow(PalettePlugin):
 		# Needed to display the palette plugin
 		self.dialog = self.paletteView.frame.getNSView()
 
+		# Drive the palette height with an animatable height constraint so growing /
+		# shrinking (e.g. entering/leaving eye mode) slides instead of snapping.
+		# Glyphs pins the view's width + position; we own the height.
+		try:
+			self.dialog.setTranslatesAutoresizingMaskIntoConstraints_(False)
+			self._heightConstraint = AppKit.NSLayoutConstraint.constraintWithItem_attribute_relatedBy_toItem_attribute_multiplier_constant_(
+				self.dialog, AppKit.NSLayoutAttributeHeight, AppKit.NSLayoutRelationEqual, None, 0, 1.0, self.height)
+			self.dialog.addConstraint_(self._heightConstraint)
+		except Exception:
+			self._heightConstraint = None
+
 	# Separator lines + colour tags from the current meaning (order + visibility).
 	@objc.python_method
 	def _build_static_rows(self):
@@ -142,8 +153,7 @@ class ColorFlow(PalettePlugin):
 		self.height = 22 * len([x for x in self.meaning.values() if x]) + 25
 		self._build_static_rows()
 		try:
-			self.paletteView.frame.setPosSize((0, 0, self.width, self.height))
-			self.paletteView.setPosSize((0, 0, self.width, self.height + 10))
+			self._set_palette_height(self.height, animated=True)
 		except Exception:
 			pass
 		self._lastSignature = None
@@ -995,6 +1005,28 @@ class ColorFlow(PalettePlugin):
 			import traceback
 			print("Color Flow [eye click] error:\n" + traceback.format_exc())
 
+	# Animate the palette height via the height constraint's animator proxy (the
+	# technique the Glyphs team documents for smooth palette resizing). Falls back
+	# to a direct, un-animated resize if the constraint could not be created.
+	@objc.python_method
+	def _set_palette_height(self, height, animated=True):
+		self.height = height
+		constraint = getattr(self, "_heightConstraint", None)
+		if constraint is None:
+			try:
+				self.paletteView.frame.setPosSize((0, 0, self.width, height))
+				self.paletteView.setPosSize((0, 0, self.width, height + 10))
+			except Exception:
+				pass
+			return
+		if animated:
+			AppKit.NSAnimationContext.beginGrouping()
+			AppKit.NSAnimationContext.currentContext().setDuration_(0.22)
+			constraint.animator().setConstant_(height)
+			AppKit.NSAnimationContext.endGrouping()
+		else:
+			constraint.setConstant_(height)
+
 	@objc.python_method
 	def _toggle_eye_mode(self, sender):
 		try:
@@ -1030,8 +1062,7 @@ class ColorFlow(PalettePlugin):
 		self._set_eye_button(True)
 		self.height = 22 * len(self._eye_rows) + 25
 		try:
-			self.paletteView.frame.setPosSize((0, 0, self.width, self.height))
-			self.paletteView.setPosSize((0, 0, self.width, self.height + 10))
+			self._set_palette_height(self.height, animated=True)
 		except Exception:
 			pass
 		self._build_eye_mode_ui()
