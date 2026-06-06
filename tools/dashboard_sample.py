@@ -44,12 +44,15 @@ def _counts(keys: list[int], is_free: bool) -> dict[str, int]:
 
 
 def _model(is_free: bool) -> dict:
+    preview = {"d": "M40 -700L300 -700L300 -100L40 -100ZM360 -640L600 -640L600 -100L360 -100Z",
+               "vb": "0 -740 640 680"}
     masters = []
     for offset, name in ((0, "Regular"), (5, "Bold")):
         keys = [SEQ[(i + offset) % len(SEQ)] for i in range(len(SEQ))]
         uncolored = sum(1 for k in keys if k == -1)
         masters.append({"id": name.lower(), "name": name, "keys": keys,
-                        "counts": _counts(keys, is_free), "uncolored": uncolored})
+                        "counts": _counts(keys, is_free), "uncolored": uncolored,
+                        "preview": preview})
     outline = {"d": "M120 -700L520 -700L520 -100L120 -100Z", "vb": "80 -740 480 680"}
     paths = {master["id"]: {name: outline for name, key in zip(NAMES, master["keys"])
                             if key != -1} for master in masters}
@@ -61,6 +64,7 @@ def _model(is_free: bool) -> dict:
         "glyphNames": NAMES, "masters": masters,
         "colors": {str(index): "#888888" for index in range(12)},
         "filePath": "/fonts/Acme.glyphs", "paths": paths,
+        "favicon": outline,
         "changes": {"regular": {"A": [4, 8], "H": [6, 3]}},
     }
 

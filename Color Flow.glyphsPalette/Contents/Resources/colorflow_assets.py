@@ -9,7 +9,11 @@ no dependencies. The model is the single source of truth the JS app renders.
 from __future__ import annotations
 
 import json
+from urllib.parse import quote
 from xml.sax.saxutils import escape as xesc
+
+# Fill for the favicon "a" — the brand accent, so it reads on any browser tab.
+FAVICON_FILL = "#6e7bff"
 
 
 def embed_model(model: dict) -> str:
@@ -33,13 +37,25 @@ def _color_overrides(model: dict) -> str:
     return f"<style>:root{{{rules}}}</style>"
 
 
+def _favicon_link(model: dict) -> str:
+    """A ``<link rel="icon">`` carrying the model's favicon outline (the Regular
+    master's "a") as an inline SVG data URI. Empty when the model has no favicon."""
+    favicon = model.get("favicon") or {}
+    if not favicon.get("d"):
+        return ""
+    svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'
+           f'{favicon["vb"]}"><path d="{favicon["d"]}" fill="{FAVICON_FILL}"/></svg>')
+    return f'<link rel="icon" href="data:image/svg+xml,{quote(svg)}">'
+
+
 def build_html(model: dict) -> str:
     """Assemble the complete, self-contained dashboard page from a model."""
     title = xesc(f'{model["generated"]}_{model.get("family") or ""}_Color-Flow-Dashboard')
     return (
         '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        f"<title>{title}</title><style>{DASHBOARD_CSS}</style>{_color_overrides(model)}</head>"
+        f"<title>{title}</title>{_favicon_link(model)}"
+        f"<style>{DASHBOARD_CSS}</style>{_color_overrides(model)}</head>"
         '<body><div id="cfd-app"></div>'
         '<noscript>This report needs JavaScript — please open it in a modern browser.</noscript>'
         f"{embed_model(model)}"
@@ -52,7 +68,7 @@ DASHBOARD_CSS = """
 :root{
   --bg:#0a0b0e;--surface:#0e1014;--surface-2:#101217;--border:#1c1f26;--border-2:#23262e;
   --text:#e6e8ec;--muted:#9aa0ab;--muted-2:#6b7280;--accent:#6e7bff;--ok:#3fb950;
-  --track:#15171c;--swatch-outline:rgba(255,255,255,.10);
+  --track:#15171c;--swatch-outline:rgba(255,255,255,.10);--glyph-ink:rgba(0,0,0,.74);
   --c-none-a:#0e1116;--c-none-b:#3a3f4a;
   --c0:#f97e55;--c1:#ffbe68;--c2:#ba9d6d;--c3:#fff157;--c4:#c1ec8a;--c5:#6bab59;
   --c6:#64a5ef;--c7:#576ef1;--c8:#a962e7;--c9:#e77eb4;--c10:#c5c5c5;--c11:#5f5f5f;
@@ -72,7 +88,7 @@ html,body{margin:0}
 body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains Mono","JetBrainsMono Nerd Font",ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace,"Apple Color Emoji";
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
-@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell,.cell svg path{transition:none}}
+@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}}
 #cfd-app{max-width:980px;margin:0 auto;padding:0 20px 60px}
 .hd{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:14px 0;background:var(--bg);border-bottom:1px solid var(--border)}
 .hd .brand{width:10px;height:10px;border-radius:3px;background:var(--accent)}
@@ -108,6 +124,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .tab{font:var(--fs-sm) inherit;background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted-2);padding:8px 0;cursor:pointer;white-space:nowrap}
 .tab:hover{color:var(--text)}
 .tab.on{color:var(--text);border-bottom-color:var(--accent)}
+.tab .tabsvg{display:block;height:26px;width:auto;color:inherit}
 .rows{margin:6px 0 4px}
 .row{display:flex;align-items:center;gap:12px;font-size:var(--fs-row);padding:9px 0;border-top:1px solid var(--track)}
 .row .dot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
@@ -122,13 +139,12 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .heat-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:10px}
 .heat-h .ba-toggle{margin-left:auto;flex:none}
 .heat-h .hint{color:var(--muted-2)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(15px,1fr));gap:4px}
-.cell{aspect-ratio:1;border:0;padding:0;border-radius:3px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:6px}
+.cell{aspect-ratio:1;border:0;padding:0;border-radius:5px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}
 .cell.copied{outline:2px solid var(--ok);outline-offset:1px}
-.cell.glyph{background:var(--surface-2)}
-.cell svg{width:100%;height:100%;display:block}
-.cell svg path{transition:fill .45s ease}
+.cell svg{width:100%;height:100%;display:block;padding:3px}
+.cell svg path{fill:var(--glyph-ink)}
 .more{display:inline-block;margin-top:8px;font-size:var(--fs-xs);color:var(--muted-2)}
 .empty{font-size:var(--fs-sm);color:var(--muted-2)}
 .changes{margin-top:14px}
@@ -278,8 +294,8 @@ DASHBOARD_JS = r"""
       var href = "glyphsapp://show/?path=" + encodeURIComponent(H.filePath || "")
         + "&glyph=" + encodeURIComponent(name) + "&layer=" + encodeURIComponent(m.id);
       var p = paths[name];
-      var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '" fill="var(' + showVar + ')"/></svg>' : '';
-      return '<a class="cell' + (p ? ' glyph' : '') + '" href="' + href + '" data-now="' + nowVar + '" data-was="' + wasVar + '"' + (p ? '' : ' style="background:var(' + showVar + ')"') + ' title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
+      var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '"/></svg>' : '';
+      return '<a class="cell' + (p ? ' glyph' : '') + '" href="' + href + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:var(' + showVar + ')" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
     }).join("");
     var more = items.length>cap ? '<span class="more">… +'+(items.length-cap)+' more</span>' : "";
     var empty = items.length===0 ? '<p class="empty">No glyphs match.</p>' : "";
@@ -302,8 +318,12 @@ DASHBOARD_JS = r"""
   }
   function tabsView(){
     var tabs = H.masters.map(function(m){
-      var on = m.id===state.master;
-      return '<button type="button" role="tab" aria-selected="'+on+'" class="tab'+(on?" on":"")+'" data-m="'+esc(m.id)+'">'+esc(m.name)+'</button>';
+      var on = m.id===state.master, pv = m.preview;
+      var label = (pv && pv.d)
+        ? '<svg class="tabsvg" viewBox="'+esc(pv.vb)+'" preserveAspectRatio="xMidYMid meet"><path d="'+esc(pv.d)+'" fill="currentColor"/></svg>'
+        : esc(m.name);
+      return '<button type="button" role="tab" aria-selected="'+on+'" class="tab'+(on?" on":"")
+        +'" data-m="'+esc(m.id)+'" title="'+esc(m.name)+'" aria-label="'+esc(m.name)+'">'+label+'</button>';
     }).join("");
     var m = masterById(state.master);
     return '<div class="tabs" role="tablist">'+tabs+'</div><div class="panel" role="tabpanel">'+rows(m)+heatmap(m)+'</div>';
@@ -324,16 +344,15 @@ DASHBOARD_JS = r"""
   function renderBody(){ return state.view==="compare" ? compareView() : tabsView(); }
 
   // Animate the heatmap cells between their last-run ("before") and current
-  // ("after") colours by updating fills in place so the CSS transition runs.
+  // ("after") colours by updating the cell background in place so the CSS
+  // transition runs. The glyph drawn on top keeps its fixed ink colour.
   function applyBeforeAfter(){
     var cells = document.querySelectorAll(".heat .cell");
     for (var i=0;i<cells.length;i++){
       var cell = cells[i];
       var v = state.before ? cell.getAttribute("data-was") : cell.getAttribute("data-now");
       if (!v) continue;
-      var path = cell.querySelector("path");
-      if (path) path.setAttribute("fill", "var("+v+")");
-      else cell.style.background = "var("+v+")";
+      cell.style.background = "var("+v+")";
     }
   }
 

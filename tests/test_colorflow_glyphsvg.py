@@ -76,3 +76,20 @@ def test_layer_outline_empty_without_path() -> None:
         bezierPath = None
 
     assert glyphsvg.layer_outline(_NoPath()) == {}
+
+
+def test_layers_outline_offsets_and_combines() -> None:
+    a = _FakeLayer(_FakeBezier([(0, [(0, 0)]), (1, [(100, 0)]), (3, [])]))
+    b = _FakeLayer(_FakeBezier([(0, [(0, 0)]), (1, [(100, 0)]), (3, [])]))
+    outline = glyphsvg.layers_outline([(a, 0.0), (b, 100.0)])
+    # second glyph is shifted right by 100 units; both share the one viewBox
+    assert outline["d"] == "M0 0L100 0ZM100 0L200 0Z"
+    assert outline["vb"] == "-40 -40 280 80"
+
+
+def test_layers_outline_empty_when_no_outline() -> None:
+    class _NoPath:
+        drawBezierPath = None
+        bezierPath = None
+
+    assert glyphsvg.layers_outline([(_NoPath(), 0.0)]) == {}

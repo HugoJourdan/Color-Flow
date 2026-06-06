@@ -106,3 +106,18 @@ def layer_outline(layer) -> dict:
     if not d:
         return {}
     return {"d": d, "vb": view_box(elements)}
+
+
+def layers_outline(layers_with_offsets: list) -> dict:
+    """Combine several layers, each shifted by an x advance, into one
+    ``{"d", "vb"}`` — e.g. an "Aa" preview for a master tab. ``layers_with_offsets``
+    is ``[(layer, dx), ...]``; ``dx`` is added to every x so glyphs sit side by
+    side. Returns ``{}`` when none of the layers has an outline."""
+    combined: list = []
+    for layer, dx in layers_with_offsets:
+        for kind, points in _layer_elements(layer):
+            combined.append((kind, [(x + dx, y) for x, y in points]))
+    d = svg_path_d(combined)
+    if not d:
+        return {}
+    return {"d": d, "vb": view_box(combined)}

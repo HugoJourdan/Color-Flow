@@ -37,6 +37,16 @@ class _FakeMaster:
         self.name = name
 
 
+class _FakeGlyphs(list):
+    """Mirrors ``GSFont.glyphs``: int indexing + iteration like a list, plus
+    name indexing (``font.glyphs["A"]``) that returns ``None`` when absent."""
+
+    def __getitem__(self, key) -> object:
+        if isinstance(key, str):
+            return next((glyph for glyph in self if glyph.name == key), None)
+        return super().__getitem__(key)
+
+
 class _FakeFont:
     versionMajor = 2
     versionMinor = 5
@@ -44,7 +54,7 @@ class _FakeFont:
     def __init__(self, masters: list, glyphs: list | None = None,
                  filepath: str = "/fonts/Acme.glyphs", family: str = "Acme Sans") -> None:
         self.masters = masters
-        self.glyphs = glyphs if glyphs is not None else []
+        self.glyphs = _FakeGlyphs(glyphs if glyphs is not None else [])
         self.filepath = filepath
         self.familyName = family
 
@@ -215,8 +225,9 @@ def test_coerce_snapshot_stringifies_and_ints() -> None:
 
 
 class _FakeLayerColor:
-    def __init__(self, color: int | None) -> None:
+    def __init__(self, color: int | None, width: float = 500.0) -> None:
         self.color = color
+        self.width = width
 
 
 # --------------------------------------------------------------------------- #
@@ -321,3 +332,51 @@ def test_build_model_includes_outline_metrics_and_paths(tmp_path) -> None:
     model = db.build_model(font, datetime(2026, 6, 5), current, current)
     assert model["filePath"] == str(tmp_path / "F.glyphs")
     assert model["paths"] == {"m1": {}}   # fake font has no real layers -> no outlines
+
+
+class _BezPoint:
+    def __init__(self, x: float, y: float) -> None:
+        self.x = x
+        self.y = y
+
+
+class _BezPath:
+    def __init__(self, elements: list) -> None:
+        self._elements = elements
+
+    def elementCount(self) -> int:
+        return len(self._elements)
+
+    def elementAtIndex_associatedPoints_(self, index: int):
+        element_type, points = self._elements[index]
+        return element_type, [_BezPoint(x, y) for x, y in points]
+
+
+def _outline_layer(color: int) -> _FakeLayerColor:
+    layer = _FakeLayerColor(color)
+    layer.drawBezierPath = _BezPath([(0, [(0, 0)]), (1, [(400, 0)]), (1, [(400, 700)]), (3, [])])
+    return layer
+
+
+def test_build_model_master_preview_and_favicon(tmp_path) -> None:
+    (tmp_path / "colorNames.txt").write_text("yellow=Ready\nNone=Nothing\n", encoding="utf-8")
+    glyphs = [_FakeGlyph("A", {"m1": _outline_layer(3)}),
+              _FakeGlyph("a", {"m1": _outline_layer(3)})]
+    font = _FakeFont([_FakeMaster("m1", "Regular")], glyphs, filepath=str(tmp_path / "F.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+
+    preview = model["masters"][0]["preview"]
+    assert preview["d"] and preview["vb"]
+    assert "M500" in preview["d"]            # the "a" is shifted right by the "A" advance (500)
+    assert model["favicon"]["d"] and model["favicon"]["vb"]
+
+
+def test_build_model_preview_and_favicon_empty_without_outlines(tmp_path) -> None:
+    (tmp_path / "colorNames.txt").write_text("red=R\n", encoding="utf-8")
+    font = _FakeFont([_FakeMaster("m1", "R")], [_FakeGlyph("A", {"m1": _FakeLayerColor(0)})],
+                     filepath=str(tmp_path / "F.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["masters"][0]["preview"] == {}
+    assert model["favicon"] == {}

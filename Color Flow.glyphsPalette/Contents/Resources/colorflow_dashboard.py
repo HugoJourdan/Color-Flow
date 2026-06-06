@@ -234,6 +234,46 @@ def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free:
     return paths
 
 
+def _master_layers(font, master_id: str, names: tuple) -> list:
+    """``[(layer, dx)]`` for the named glyphs on one master, each offset by the
+    running advance width so they sit side by side. Missing glyphs/layers are
+    skipped. Used to preview a master's design (e.g. "Aa") on its tab."""
+    layers: list = []
+    advance = 0.0
+    for name in names:
+        glyph = font.glyphs[name]
+        if glyph is None:
+            continue
+        layer = glyph.layers[master_id]
+        if layer is None:
+            continue
+        layers.append((layer, advance))
+        advance += layer.width
+    return layers
+
+
+def _master_previews(font) -> dict:
+    """Per-master ``{"d", "vb"}`` outline of "Aa" for the master-tab preview, so
+    each tab shows that master's actual letterforms (weight/width) instead of a
+    plain name. ``{}`` for any master whose A/a have no outline."""
+    return {master.id: glyphsvg.layers_outline(_master_layers(font, master.id, ("A", "a")))
+            for master in font.masters}
+
+
+def _favicon(font) -> dict:
+    """The lowercase ``a`` of the Regular master (or the first master) as a tight
+    ``{"d", "vb"}`` outline, used for the page favicon. ``{}`` when unavailable."""
+    if not font.masters:
+        return {}
+    glyph = font.glyphs["a"]
+    if glyph is None:
+        return {}
+    master = next((m for m in font.masters if (m.name or "").lower() == "regular"),
+                  font.masters[0])
+    layer = glyph.layers[master.id]
+    return glyphsvg.layer_outline(layer) if layer is not None else {}
+
+
 def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
     """The full data model the JS app renders. Pure aside from reading the
     font's colorNames.txt (via _meaning_and_none) — the same source the palette
@@ -249,6 +289,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
     glyph_total = len(font.glyphs)
     glyph_names = list(current[font.masters[0].id].keys()) if font.masters else []
 
+    previews = _master_previews(font)
     masters = []
     for master in font.masters:
         per_glyph = current.get(master.id, {})
@@ -259,6 +300,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
             "keys": [per_glyph.get(name, colornames.NO_COLOR) for name in glyph_names],
             "counts": master_counts(colors, order, is_free),
             "uncolored": uncolored_count(colors, order),
+            "preview": previews.get(master.id, {}),
         })
 
     paths = _outline_paths(font, current, glyph_names, order, is_free)
@@ -279,6 +321,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
                    for index, rgba in enumerate(labelcolors.read_label_colors())},
         "filePath": font.filepath or "",
         "paths": paths,
+        "favicon": _favicon(font),
         "changes": compute_changes(current, previous),
     }
 
