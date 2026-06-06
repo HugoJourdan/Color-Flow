@@ -249,7 +249,7 @@ function render(){
     sh.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
     ctx.restore();
-    const dim = (selected>=0 && Math.round(p)!==selected) ? 0.66 : 0;   // trim the others
+    const dim = (selected>=0 && Math.round(p)!==selected) ? 0.85 : 0;   // trim the others
     drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0, dim);
   }
 }
