@@ -1249,14 +1249,36 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [header eye] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _sync_header_eye(self):
-		eye = getattr(self, "_titleEye", None)
-		if eye is None:
+	def _is_collapsed(self):
+		try:
+			view = self.dialog
+			if view is None or view.window() is None:
+				return True
+			if view.isHiddenOrHasHiddenAncestor():
+				return True
+			return view.visibleRect().size.height < 2.0
+		except Exception:
+			return False
+
+	@objc.python_method
+	def _sync_header(self):
+		bar = getattr(self, "_titleBar", None)
+		if bar is None:
 			return
 		try:
-			eye.setHidden_(bool(self.dialog.isHiddenOrHasHiddenAncestor()))
+			collapsed = self._is_collapsed()
+			bar.setHidden_(not collapsed)
+			eye = getattr(self, "_titleEye", None)
+			if eye is not None:
+				eye.setHidden_(collapsed)
+			gear = getattr(self, "_titleGear", None)
+			if gear is not None:
+				gear.setHidden_(collapsed)
 		except Exception:
 			pass
+
+	def headerTick_(self, sender):
+		self._sync_header()
 
 	# Inject a colour bar into the palette SECTION HEADER (#23). Done deferred so
 	# the palette is docked first, then the whole window is searched for the title.
@@ -1264,6 +1286,9 @@ class ColorFlow(PalettePlugin):
 		try:
 			self._inject_title_bar()
 			self._update_title_bar()
+			if getattr(self, "_headerTimer", None) is None:
+				from Foundation import NSTimer
+				self._headerTimer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(0.5, self, "headerTick:", None, True)
 		except Exception:
 			import traceback
 			print("Color Flow [header setup] error:\n" + traceback.format_exc())
@@ -1349,11 +1374,14 @@ class ColorFlow(PalettePlugin):
 			if header is None:
 				return
 			bounds = header.bounds()
-			eyeSize = 16.0
-			barWidth, barHeight = 40.0, 6.0
-			eyeX = bounds.size.width - 8.0 - eyeSize
-			eyeY = (bounds.size.height - eyeSize) / 2.0
-			barX = eyeX - 6.0 - barWidth
+			btn = 16.0
+			pad = 8.0
+			gap = 4.0
+			ctrlY = (bounds.size.height - btn) / 2.0
+			gearX = bounds.size.width - pad - btn
+			eyeX = gearX - gap - btn
+			barWidth, barHeight = 52.0, 6.0
+			barX = bounds.size.width - pad - barWidth
 			barY = (bounds.size.height - barHeight) / 2.0
 			bar = AppKit.NSView.alloc().initWithFrame_(((barX, barY), (barWidth, barHeight)))
 			bar.setAutoresizingMask_(AppKit.NSViewMinXMargin)
@@ -1366,7 +1394,7 @@ class ColorFlow(PalettePlugin):
 				pass
 			header.addSubview_(bar)
 			self._titleBar = bar
-			eye = AppKit.NSButton.alloc().initWithFrame_(((eyeX, eyeY), (eyeSize, eyeSize)))
+			eye = AppKit.NSButton.alloc().initWithFrame_(((eyeX, ctrlY), (btn, btn)))
 			eye.setBordered_(False)
 			eye.setAutoresizingMask_(AppKit.NSViewMinXMargin)
 			eye.setTarget_(self)
@@ -1381,7 +1409,22 @@ class ColorFlow(PalettePlugin):
 				pass
 			header.addSubview_(eye)
 			self._titleEye = eye
-			self._sync_header_eye()
+			gear = AppKit.NSButton.alloc().initWithFrame_(((gearX, ctrlY), (btn, btn)))
+			gear.setBordered_(False)
+			gear.setAutoresizingMask_(AppKit.NSViewMinXMargin)
+			gear.setTarget_(self)
+			gear.setAction_("openSettings:")
+			try:
+				gearImg = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_("gearshape", None)
+				if gearImg is not None:
+					gear.setImage_(gearImg)
+				else:
+					gear.setTitle_("\u2699")
+			except Exception:
+				pass
+			header.addSubview_(gear)
+			self._titleGear = gear
+			self._sync_header()
 		except Exception:
 			import traceback
 			print("Color Flow [title bar] error:\n" + traceback.format_exc())
@@ -1489,7 +1532,7 @@ class ColorFlow(PalettePlugin):
 		if not self.font:
 			return
 		try:
-			self._sync_header_eye()
+			self._sync_header()
 		except Exception:
 			pass
 
@@ -1623,6 +1666,11 @@ class ColorFlow(PalettePlugin):
 	def __del__(self):
 		# Delete callbacks when Glyphs quits, otherwise it'll crash :(
 		Glyphs.removeCallback(self.update)
+		try:
+			if getattr(self, "_headerTimer", None) is not None:
+				self._headerTimer.invalidate()
+		except Exception:
+			pass
 		# Remove the Rainbow Font View menu item this instance added.
 		self._teardown_rainbow_menu()
 		self._teardown_settings_menu()
