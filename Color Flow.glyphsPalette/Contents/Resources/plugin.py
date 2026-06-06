@@ -1006,6 +1006,7 @@ class ColorFlow(PalettePlugin):
 			counts = self._counts(masterId)
 			glyphCount = len(self.font.glyphs)
 			order = list(self.meaning.keys())
+			self._update_palette_title(counts, glyphCount, order)
 
 			selectedLayers = self.font.selectedLayers or []
 			selStates = [self._layer_state(layer, order) for layer in selectedLayers]
@@ -1203,6 +1204,21 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [open tab] error:\n" + traceback.format_exc())
+
+	# Whole-master completion as a tiny text bar in the palette title, so it's
+	# visible even when the palette section is collapsed (#23). Glyphs' title is
+	# read-only text + has no header-view hook, so this is a text bar, not a view.
+	@objc.python_method
+	def _update_palette_title(self, counts, glyphCount, order):
+		try:
+			last = order[-1] if order else None
+			done = counts.get(last, 0) if last is not None else 0
+			pct = int(round(done / glyphCount * 100)) if glyphCount else 0
+			filled = max(0, min(5, int(round(pct / 20.0))))
+			bar = "\u25b0" * filled + "\u25b1" * (5 - filled)
+			self.name = "Color Flow %s %d%%" % (bar, pct)
+		except Exception:
+			pass
 
 	# Top strip: a fire progress-streak badge (#17) and a thin 100%-stacked
 	# whole-master progress ribbon (#23), drawn in the top band above the rows so
