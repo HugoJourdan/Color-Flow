@@ -287,8 +287,10 @@ function render(){
     sh.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
     ctx.restore();
-    const amt = focusAmt[Math.round(p)] || 0;     // 0 = full focus, 1 = fully trimmed
-    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0,
+    const mi = Math.round(p);
+    const amt = focusAmt[mi] || 0;                 // 0 = full focus, 1 = fully trimmed
+    const above = (selected>=0 && mi > selected);  // disc stacked above the focused one
+    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, (holeOn && !above) ? 1 : 0,
              1 - amt*(1-opacityVal), amt*trimVal);
   }
 }
