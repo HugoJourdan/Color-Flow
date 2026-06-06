@@ -28,7 +28,7 @@
 <div class="wrap">
   <canvas id="c" width="900" height="780"></canvas>
   <div class="row">
-    <label>tilt <input id="tilt" type="range" min="20" max="70" value="45"></label>
+    <label>tilt <input id="tilt" type="range" min="20" max="70" value="45"> <span id="tiltval">45</span></label>
     <label>slices/gap <input id="slices" type="range" min="1" max="20" value="1"></label>
     <label><input id="spin" type="checkbox" checked> auto-spin</label>
     <label><input id="hole" type="checkbox" checked> uncolored hole</label>
@@ -158,16 +158,13 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   ctx.globalAlpha = 0.9;                                    // icy frost speckle
   ctx.drawImage(FROST, -rx,-rx, rx*2, rx*2);
   ctx.globalAlpha = 1;
-  const sheen = ctx.createLinearGradient(0,-rx,0,rx);       // bright at BOTH edges so the
-  sheen.addColorStop(0,    "rgba(255,255,255,0.50)");       // front and back wash evenly
-  sheen.addColorStop(0.34, "rgba(255,255,255,0.05)");
-  sheen.addColorStop(0.66, "rgba(255,255,255,0.05)");
-  sheen.addColorStop(1,    "rgba(255,255,255,0.32)");
-  ctx.fillStyle = sheen; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
-  const hot = ctx.createRadialGradient(0,-rx*0.4,0, 0,-rx*0.4, rx*0.8);
-  hot.addColorStop(0, "rgba(255,255,255,0.26)");            // gentle, centred glossy hotspot
-  hot.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = hot; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
+  // NON-directional gloss: a radially symmetric rim glow so the disc reads the
+  // SAME brightness front and back (no top/bottom sheen, no off-centre hotspot)
+  const gloss = ctx.createRadialGradient(0,0,rx*0.6, 0,0,rx);
+  gloss.addColorStop(0,    "rgba(255,255,255,0)");
+  gloss.addColorStop(0.85, "rgba(255,255,255,0.05)");
+  gloss.addColorStop(1,    "rgba(255,255,255,0.20)");
+  ctx.fillStyle = gloss; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
   if (holeFrac>0){
     const hr = rx*0.26;   // constant: same hole size on every disc
     ctx.globalCompositeOperation = "destination-out";
@@ -179,14 +176,11 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
     ctx.globalCompositeOperation = "source-over";
   }
   ctx.restore();
-  // 3) glassy rim — bright at the top, dark at the bottom (fixed light)
+  // 3) glassy rim — uniform all the way round (no top-bright/bottom-dark bias)
+  //    so the edge looks the same front and back
   ctx.save();
   ctx.translate(cx,cy); ctx.scale(1, ry/rx);
-  const rim = ctx.createLinearGradient(0,-rx,0,rx);
-  rim.addColorStop(0, "rgba(255,255,255,0.75)");
-  rim.addColorStop(0.5, "rgba(255,255,255,0.10)");
-  rim.addColorStop(1, "rgba(0,0,0,0.18)");
-  ctx.strokeStyle = rim; ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(0,0,rx*0.992,0,7); ctx.stroke();
   ctx.restore();
 }
@@ -230,14 +224,17 @@ function render(){
     ctx.restore();
     drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0);   // uniform central bore on every disc
   }
-  // master name labels down the side
-  ctx.fillStyle = "#888"; ctx.textAlign = "left";
+  // master name written ON each disc, centred on its visible front crescent
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.font = "600 12px -apple-system,BlinkMacSystemFont,sans-serif";
   for (let i=0;i<M;i++){
     const n = (M-1-i)*perGap;            // master i sits at slice (M-1-i): last master on top
     const cy = topY + n*dz;
-    ctx.fillText(MASTERS[i].name, cx+rx+16, cy+4);
-    ctx.strokeStyle="rgba(0,0,0,.12)"; ctx.beginPath();
-    ctx.moveTo(cx+rx*0.7, cy); ctx.lineTo(cx+rx+12, cy); ctx.stroke();
+    const ly = cy + ry - dz/2;           // middle of the front band exposed below the disc above
+    ctx.fillStyle = "rgba(0,0,0,0.55)";  // drop shadow for legibility on bright colours
+    ctx.fillText(MASTERS[i].name, cx, ly+1);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(MASTERS[i].name, cx, ly);
   }
 }
 
@@ -250,7 +247,7 @@ function loop(){
 cv.addEventListener("pointerdown", e=>{ dragging=true; lastX=e.clientX; cv.setPointerCapture(e.pointerId); });
 cv.addEventListener("pointermove", e=>{ if(dragging){ rot += (e.clientX-lastX)*0.01; lastX=e.clientX; }});
 cv.addEventListener("pointerup",   ()=>{ dragging=false; });
-document.getElementById("tilt").addEventListener("input", e=>{ tilt = +e.target.value/100; });
+document.getElementById("tilt").addEventListener("input", e=>{ tilt = +e.target.value/100; document.getElementById("tiltval").textContent = e.target.value; });
 document.getElementById("slices").addEventListener("input", e=>{ perGap = +e.target.value; });
 document.getElementById("spin").addEventListener("change", e=>{ autospin = e.target.checked; });
 document.getElementById("hole").addEventListener("change", e=>{ holeOn = e.target.checked; });
