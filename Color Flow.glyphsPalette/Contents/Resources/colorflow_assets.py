@@ -147,8 +147,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cell{aspect-ratio:1;border:0;padding:0;border-radius:5px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}
 .cell.copied{outline:2px solid var(--ok);outline-offset:1px}
-.cell.recent{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 2px var(--accent)}
-.cell svg{width:100%;height:100%;display:block;padding:3px}
+.cell svg{width:100%;height:100%;display:block;padding:3px;transform:scale(.9)}
 .cell svg path{fill:var(--glyph-ink)}
 .more{display:inline-block;margin-top:8px;font-size:var(--fs-xs);color:var(--muted-2)}
 .empty{font-size:var(--fs-sm);color:var(--muted-2)}
@@ -249,7 +248,7 @@ DASHBOARD_JS = r"""
   var state = {
     master: H.masters.length ? H.masters[0].id : null,
     view: "tabs", before: false, sort: "workflow",
-    coverGroup: "byCategory", recent: false,
+    coverGroup: "byCategory",
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
 
@@ -322,7 +321,7 @@ DASHBOARD_JS = r"""
   }
   function toolbar(){
     return '<div class="tb">'
-      + '<button type="button" id="cfd-recent" class="chip" aria-pressed="false" title="Ring glyphs edited in the last 7 days">🕑 Recent</button>'
+      + '<button type="button" id="cfd-overview" class="chip" aria-pressed="true" title="Back to the overview">⌂ Overview</button>'
       + '<button type="button" id="cfd-coverage" class="chip" aria-pressed="false">🗂 Coverage</button>'
       + '<button type="button" id="cfd-timeline" class="chip" aria-pressed="false">📈 Timeline</button>'
       + '<button type="button" id="cfd-compare" class="chip" aria-pressed="false">▤ Compare</button>'
@@ -415,16 +414,15 @@ DASHBOARD_JS = r"""
       var href = "glyphsapp://show/?path=" + encodeURI(H.filePath || "")
         + "&glyph=" + encodeURIComponent(name) + "&layer=" + encodeURIComponent(m.id);
       var p = paths[name];
-      var recentCls = (state.recent && H.lastEdit && H.lastEdit[name] != null && H.lastEdit[name] <= 7) ? ' recent' : '';
       var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '"/></svg>' : '';
-      return '<a class="cell' + (p ? ' glyph' : '') + recentCls + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:color-mix(in srgb,var(' + showVar + ') 25%,transparent)" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
+      return '<a class="cell' + (p ? ' glyph' : '') + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:color-mix(in srgb,var(' + showVar + ') 25%,transparent)" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
     }
     // group cells by glyph category, Font-View style
     var groups = {}, seen = [];
     shown.forEach(function(it){ var c = cats[it[2]] || "Other"; if (!groups[c]){ groups[c]=[]; seen.push(c); } groups[c].push(it); });
     // order categories like the Glyphs Font View (Letter first); glyphs within a
     // category keep font order. Unknown categories fall after, in first-appearance order.
-    var pref = ["Letter","Number","Punctuation","Symbol","Separator","Mark","Other"];
+    var pref = ["Letter","Number","Punctuation","Mark","Separator","Symbol","Other"];
     seen.sort(function(a,b){ var ia=pref.indexOf(a); ia=ia<0?pref.length:ia; var ib=pref.indexOf(b); ib=ib<0?pref.length:ib; return ia-ib; });
     var sections = seen.map(function(c){
       return '<div class="cat"><div class="cat-h">'+esc(c)+' <span class="cat-n">'+groups[c].length+'</span></div>'
@@ -604,7 +602,7 @@ DASHBOARD_JS = r"""
     var cmp = document.getElementById("cfd-compare"); if (cmp) cmp.setAttribute("aria-pressed", state.view==="compare");
     var cov = document.getElementById("cfd-coverage"); if (cov) cov.setAttribute("aria-pressed", state.view==="coverage");
     var tl = document.getElementById("cfd-timeline"); if (tl) tl.setAttribute("aria-pressed", state.view==="timeline");
-    var rc = document.getElementById("cfd-recent"); if (rc) rc.setAttribute("aria-pressed", state.recent);
+    var ov = document.getElementById("cfd-overview"); if (ov) ov.setAttribute("aria-pressed", state.view==="tabs");
     var sb = document.getElementById("cfd-sort"); if (sb) sb.textContent = "↕ Sort: "+(state.sort==="progress"?"progress":"workflow");
   }
 
@@ -735,7 +733,7 @@ DASHBOARD_JS = r"""
       try { localStorage.setItem("cfd-theme", state.theme); } catch(e){}
       document.documentElement.setAttribute("data-theme", state.theme);
     });
-    document.getElementById("cfd-recent").addEventListener("click", function(){ state.recent = !state.recent; update(); });
+    document.getElementById("cfd-overview").addEventListener("click", function(){ state.view = "tabs"; update(); });
     document.getElementById("cfd-compare").addEventListener("click", function(){ state.view = state.view==="compare" ? "tabs" : "compare"; update(); });
     document.getElementById("cfd-coverage").addEventListener("click", function(){ state.view = state.view==="coverage" ? "tabs" : "coverage"; update(); });
     document.getElementById("cfd-timeline").addEventListener("click", function(){ state.view = state.view==="timeline" ? "tabs" : "timeline"; update(); });

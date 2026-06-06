@@ -399,7 +399,7 @@ def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free:
     masters: early masters draw their full glyph set, then it stops, so fonts with
     very many masters keep the report a sane size. ``current``/``order``/``is_free``
     are kept for signature stability."""
-    budget = 15000   # global ceiling on emitted outlines (≈ glyphs × early masters)
+    budget = 100000   # global ceiling on emitted outlines, generous so every master draws
     upm = float(getattr(font, "upm", None) or 1000.0)
     paths: dict = {}
     produced = 0
