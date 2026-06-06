@@ -298,6 +298,27 @@ class ColorFlow(PalettePlugin):
 			popover.reportSep = HorizontalLine((12, reportY, -12, 1))
 			popover.dashboard = Button((12, reportY + 8, -12, 22), "Generate Colorflow Report",
 				callback=self._popover_dashboard, sizeStyle='small')
+			# Animated loading-bar GIF behind the report button: a borderless button
+			# (clear background) over an NSImageView that plays the GIF, label on top.
+			try:
+				_gif = os.path.join(os.path.dirname(__file__), "report-loading.gif")
+				_img = AppKit.NSImage.alloc().initWithContentsOfFile_(_gif)
+				if _img is not None:
+					_btn = self._ns_button(popover.dashboard)
+					_btn.setBordered_(False)
+					_iv = AppKit.NSImageView.alloc().initWithFrame_(_btn.frame())
+					_iv.setImage_(_img)
+					_iv.setAnimates_(True)
+					_iv.setImageScaling_(AppKit.NSImageScaleAxesIndependently)
+					_iv.setAutoresizingMask_(AppKit.NSViewWidthSizable)
+					_iv.setWantsLayer_(True)
+					_iv.layer().setCornerRadius_(4.0)
+					_iv.layer().setMasksToBounds_(True)
+					_btn.superview().addSubview_positioned_relativeTo_(_iv, AppKit.NSWindowBelow, _btn)
+					self._reportGifView = _iv
+			except Exception:
+				import traceback
+				print("Color Flow [report gif] error:\n" + traceback.format_exc())
 			try:
 				popover.bind("did close", self._popover_did_close)
 			except Exception:
