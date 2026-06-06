@@ -29,6 +29,7 @@ from GlyphsApp import *
 import colornames
 import labelcolors
 import colorflow_profile
+import colorflow_filters
 # Font-View colour grouping engine (the merged Rainbow FontView half).
 import fontview
 
@@ -229,7 +230,7 @@ class ColorFlow(PalettePlugin):
 	def Open_Action_Popover(self, sender):
 		try:
 			button = self._ns_button(sender)
-			self._popover = Popover((220, 222), parentView=button,
+			self._popover = Popover((220, 250), parentView=button,
 				preferredEdge='bottom', behavior='semitransient')
 			popover = self._popover
 			popover.dashboard = Button((12, 12, -12, 22), "Open Color Font Dashboard",
@@ -257,6 +258,8 @@ class ColorFlow(PalettePlugin):
 				callback=self._export_profile, sizeStyle='small')
 			popover.profileImport = Button((114, 192, -12, 22), "Import Profile…",
 				callback=self._import_profile, sizeStyle='small')
+			popover.smartFilters = Button((12, 220, -12, 22), "Generate Smart Filters",
+				callback=self._generate_smart_filters, sizeStyle='small')
 			try:
 				popover.bind("did close", self._popover_did_close)
 			except Exception:
@@ -412,6 +415,30 @@ class ColorFlow(PalettePlugin):
 		self.reload_after_settings()
 		Message("Imported Color Flow profile. Restart Glyphs if the label colours do not "
 			"update in its own Font and Edit views.", title="Color Flow")
+
+	@objc.python_method
+	def _generate_smart_filters(self, sender):
+		# Build a "Color Flow" smart-filter group (one filter per visible step +
+		# None) and merge it into the font's Filters parameter. Filters match the
+		# GLYPH colour — Glyphs has no per-master layer-colour predicate.
+		try:
+			font = Glyphs.font
+			if font is None:
+				Message("Open a font first.", title="Color Flow")
+				return
+			meaning = self.Load_Meaning()
+			steps = [(int(index), label)
+				for index, label in colornames.visible_labels(meaning).items()]
+			text = colornames.read_color_names(colornames.get_key_file(self._font_dir(font)))
+			none_label = colornames.parse_settings(text)[1] or "None"
+			group = colorflow_filters.build_filter_group(steps, none_label)
+			existing = [dict(entry) for entry in (font.customParameters["Filters"] or [])]
+			font.customParameters["Filters"] = colorflow_filters.merge_into_filters(existing, group)
+			Message("Added the “Color Flow” smart-filter group to the sidebar "
+				"(filters by glyph colour).", title="Color Flow")
+		except Exception:
+			import traceback
+			print("Color Flow [smart filters] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _popover_dashboard(self, sender):
