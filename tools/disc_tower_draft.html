@@ -211,7 +211,7 @@ function render(){
   const M = MASTERS.length;
   const rx = 185, ry = rx*tilt;
   const N = (M-1)*perGap + 1;
-  const towerH = 330;
+  const towerH = 210;   // tighter stack -> each disc layer reads thinner
   const dz = towerH/(N-1);
   const cx = W/2, topY = (H-towerH)/2 + 20;
 
