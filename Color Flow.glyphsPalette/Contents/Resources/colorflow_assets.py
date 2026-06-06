@@ -165,9 +165,9 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .chg .sw{width:11px;height:11px;border-radius:3px;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .chg .arr{color:var(--muted-2)}
 .cmp-wrap{overflow-x:auto;margin-top:8px}
-.cmp{border-collapse:collapse;width:100%;font-size:var(--fs-row)}
+.cmp{border-collapse:collapse;width:100%;font-size:var(--fs-xs)}
 .cmp caption{text-align:left;color:var(--muted-2);font-size:var(--fs-xs);padding-bottom:8px}
-.cmp th,.cmp td{border:1px solid var(--border);padding:5px 10px;text-align:left}
+.cmp th,.cmp td{border:1px solid var(--border);padding:4px 10px;text-align:left}
 .cmp thead th:first-child,.cmp tbody th[scope="row"]{width:1%;white-space:nowrap}
 .cmp thead th{color:var(--muted);font-weight:600;text-align:center}
 .cmp thead th .dot{margin:0}
