@@ -358,6 +358,32 @@ def test_glyph_journeys_only_changed_unfinished_aligned_to_dates() -> None:
     assert db._glyph_journeys(history, [], current, ["A"], _FC_ORDER, is_free=False) == {}
 
 
+class _FakeNSDate:
+    def __init__(self, timestamp: float) -> None:
+        self._timestamp = timestamp
+
+    def timeIntervalSince1970(self) -> float:
+        return self._timestamp
+
+
+def test_days_ago_from_datetime_and_nsdate() -> None:
+    now = datetime(2026, 6, 10)
+    assert db._days_ago(datetime(2026, 6, 4), now) == 6                 # plain datetime
+    nsdate = _FakeNSDate(datetime(2026, 6, 8).timestamp())
+    assert db._days_ago(nsdate, now) == 2                               # NSDate-like
+    assert db._days_ago(None, now) is None                             # absent -> None
+    assert db._days_ago(datetime(2026, 6, 20), now) == 0               # future clamps to 0
+
+
+def test_glyph_last_edit_is_sparse() -> None:
+    edited = _FakeGlyph("A", {"m1": _FakeLayerColor(0)})
+    edited.lastChange = _FakeNSDate(datetime(2026, 6, 7).timestamp())
+    never = _FakeGlyph("B", {"m1": _FakeLayerColor(0)})   # no lastChange attr
+    font = _FakeFont([_FakeMaster("m1", "R")], [edited, never])
+    result = db.glyph_last_edit(font, datetime(2026, 6, 10))
+    assert result == {"A": 3}                              # B omitted (no timestamp)
+
+
 def test_progress_streak_counts_trailing_improving_days() -> None:
     # started rises 2->4->5 (3 improving days), dips, then rises again for 2
     history = _history([("2026-06-01", 2), ("2026-06-02", 4), ("2026-06-03", 5),

@@ -67,6 +67,7 @@ def _model(is_free: bool) -> dict:
         "favicon": outline,
         "trend": _trend(),
         "journeys": {"regular": {"A": [-1, 4, 8], "C": [-1, -1, 4]}, "bold": {}},
+        "lastEdit": {"A": 2, "C": 30, "E": 1},
         "coverage": _coverage(),
         "changes": {"regular": {"A": [4, 8], "H": [6, 3]}},
     }

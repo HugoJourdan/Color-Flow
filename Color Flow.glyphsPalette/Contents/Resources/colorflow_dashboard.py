@@ -33,6 +33,7 @@ import tempfile
 import webbrowser
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import cast
 import colornames
 import colorflow_assets
 import glyphsvg
@@ -513,6 +514,38 @@ def _glyph_journeys(history: dict, dates: list, current: dict, glyph_names: list
     return journeys
 
 
+def _days_ago(value, now: datetime) -> int | None:
+    """Whole days between ``value`` (a Glyphs ``lastChange`` NSDate or a
+    ``datetime``) and ``now``; ``None`` when absent/unreadable. Glyphs' per-glyph
+    ``lastChange`` is often disabled in foundry setups, hence the tolerant None."""
+    if value is None:
+        return None
+    edited = None
+    timestamp = getattr(value, "timeIntervalSince1970", None)
+    if callable(timestamp):
+        try:
+            edited = datetime.fromtimestamp(cast(float, timestamp()))
+        except Exception:
+            edited = None
+    if edited is None and isinstance(value, datetime):
+        edited = value
+    if edited is None:
+        return None
+    return max(0, (now - edited).days)
+
+
+def glyph_last_edit(font, now: datetime) -> dict:
+    """``{glyph_name: days_since_edit}`` for glyphs that carry a ``lastChange``.
+    Per-GLYPH only (Glyphs has no per-layer timestamp), and sparse — glyphs whose
+    timestamp is missing/disabled are simply absent."""
+    result = {}
+    for glyph in font.glyphs:
+        days = _days_ago(getattr(glyph, "lastChange", None), now)
+        if days is not None:
+            result[glyph.name] = days
+    return result
+
+
 def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
     """The full data model the JS app renders. Pure aside from reading the
     font's colorNames.txt (via _meaning_and_none) — the same source the palette
@@ -576,6 +609,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "favicon": _favicon(font),
         "trend": trend,
         "journeys": journeys,
+        "lastEdit": glyph_last_edit(font, now),
         "coverage": build_coverage(font, current, order, is_free),
         "changes": compute_changes(current, previous),
     }
