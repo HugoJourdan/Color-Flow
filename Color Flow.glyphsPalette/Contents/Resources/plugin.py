@@ -306,13 +306,19 @@ class ColorFlow(PalettePlugin):
 				if _img is not None:
 					_btn = self._ns_button(popover.dashboard)
 					_btn.setBordered_(False)
+					_para = AppKit.NSMutableParagraphStyle.alloc().init()
+					_para.setAlignment_(AppKit.NSTextAlignmentCenter)
+					_btn.setAttributedTitle_(AppKit.NSAttributedString.alloc().initWithString_attributes_(
+						_btn.title(), {AppKit.NSForegroundColorAttributeName: AppKit.NSColor.colorWithCalibratedWhite_alpha_(0.12, 1.0),
+							AppKit.NSFontAttributeName: _btn.font(),
+							AppKit.NSParagraphStyleAttributeName: _para}))
 					_iv = AppKit.NSImageView.alloc().initWithFrame_(_btn.frame())
 					_iv.setImage_(_img)
 					_iv.setAnimates_(True)
 					_iv.setImageScaling_(AppKit.NSImageScaleAxesIndependently)
 					_iv.setAutoresizingMask_(AppKit.NSViewWidthSizable)
 					_iv.setWantsLayer_(True)
-					_iv.layer().setCornerRadius_(4.0)
+					_iv.layer().setCornerRadius_(_iv.frame().size.height / 2.0)
 					_iv.layer().setMasksToBounds_(True)
 					_btn.superview().addSubview_positioned_relativeTo_(_iv, AppKit.NSWindowBelow, _btn)
 					self._reportGifView = _iv
