@@ -1461,6 +1461,7 @@ class ColorFlow(PalettePlugin):
 			eye.setAutoresizingMask_(AppKit.NSViewMinXMargin)
 			eye.setTarget_(self)
 			eye.setAction_("headerEyeClicked:")
+			eye.setImageScaling_(AppKit.NSImageScaleProportionallyDown)
 			try:
 				eyeImg = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_("eye", None)
 				if eyeImg is not None:
@@ -1476,6 +1477,7 @@ class ColorFlow(PalettePlugin):
 			gear.setAutoresizingMask_(AppKit.NSViewMinXMargin)
 			gear.setTarget_(self)
 			gear.setAction_("openSettings:")
+			gear.setImageScaling_(AppKit.NSImageScaleProportionallyDown)
 			try:
 				gearImg = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_("gearshape", None)
 				if gearImg is not None:
@@ -1497,18 +1499,17 @@ class ColorFlow(PalettePlugin):
 		if bar is None or not self.font or not self.meaning:
 			return
 		try:
+			masterId = self.font.selectedFontMaster.id
 			order = list(self.meaning.keys())
+			glyphCount = len(self.font.glyphs)
+			if not glyphCount:
+				return
 			for sub in list(bar.subviews()):
 				sub.removeFromSuperview()
 			colors = []
-			for master in self.font.masters:
-				mid = master.id
-				for glyph in self.font.glyphs:
-					layer = glyph.layers[mid]
-					colors.append(layer.color if layer is not None else None)
-			total = len(colors)
-			if not total:
-				return
+			for glyph in self.font.glyphs:
+				layer = glyph.layers[masterId]
+				colors.append(layer.color if layer is not None else None)
 			exclusive = colornames.single_counts_from_colors(colors, order)
 			width = bar.bounds().size.width
 			height = bar.bounds().size.height
@@ -1517,7 +1518,7 @@ class ColorFlow(PalettePlugin):
 				count = exclusive.get(key, 0)
 				if not count:
 					continue
-				segWidth = width / total * count
+				segWidth = width / glyphCount * count
 				rgb = self.colorKeys.get(str(key), (0.5, 0.5, 0.5, 0.5))
 				seg = AppKit.NSView.alloc().initWithFrame_(((xPos, 0.0), (segWidth, height)))
 				seg.setWantsLayer_(True)
