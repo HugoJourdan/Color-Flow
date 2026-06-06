@@ -254,10 +254,10 @@ class ColorFlow(PalettePlugin):
 			popover.rainbow.set(self._rainbow_segment_index())
 			popover.lcSep = HorizontalLine((12, 62, -12, 1))
 			self._labelColorsEdited = False
-			popover.lcLabel = TextBox((12, 70, -84, 16), "Labels & Colours", sizeStyle='small')
-			popover.lcImport = Button((-76, 68, 20, 20), "", callback=self._import_profile, sizeStyle='small')
-			popover.lcExport = Button((-53, 68, 20, 20), "", callback=self._export_profile, sizeStyle='small')
-			popover.lcReset = Button((-30, 68, 20, 20), "", callback=self._label_colors_reset, sizeStyle='small')
+			popover.lcLabel = TextBox((12, 71, -84, 14), "Labels & Colours", sizeStyle='small')
+			popover.lcImport = Button((-78, 68, 20, 20), "", callback=self._import_profile, sizeStyle='small')
+			popover.lcExport = Button((-55, 68, 20, 20), "", callback=self._export_profile, sizeStyle='small')
+			popover.lcReset = Button((-32, 68, 20, 20), "", callback=self._label_colors_reset, sizeStyle='small')
 			# Borderless SF-Symbol icons via NSImage (NOT the symbol font as a title);
 			# the literal glyph is only a fallback if the named image is unavailable.
 			for _name, _sym, _fallback in (("lcImport", "square.and.arrow.down", "􀈄"),
@@ -319,7 +319,7 @@ class ColorFlow(PalettePlugin):
 					_iv.setImageScaling_(AppKit.NSImageScaleAxesIndependently)
 					_iv.setAutoresizingMask_(AppKit.NSViewWidthSizable)
 					_iv.setWantsLayer_(True)
-					_iv.layer().setCornerRadius_(_iv.frame().size.height)
+					_iv.layer().setCornerRadius_(_iv.frame().size.height / 2.0)
 					_iv.layer().setMasksToBounds_(True)
 					_btn.superview().addSubview_positioned_relativeTo_(_iv, AppKit.NSWindowBelow, _btn)
 					self._reportGifView = _iv
