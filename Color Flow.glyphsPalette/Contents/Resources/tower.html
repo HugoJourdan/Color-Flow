@@ -394,7 +394,7 @@ function render(){
 }
 
 function loop(){
-  if (autospin && !dragging) rot += 0.004;
+  if (autospin && !dragging) rot += 0.008;
   render();
   requestAnimationFrame(loop);
 }
