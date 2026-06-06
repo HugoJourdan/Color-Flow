@@ -84,3 +84,21 @@ def test_build_html_embeds_favicon_and_glyph_ink_token() -> None:
     assert 'rel="icon"' in html                 # favicon link present in <head>
     assert "--glyph-ink:" in html               # constant ink for glyph fills
     assert ".tabsvg" in html                    # master-tab Aa preview styling
+
+
+def test_dashboard_css_has_fill_on_load_and_focus_styles() -> None:
+    css = assets.DASHBOARD_CSS
+    assert "@keyframes segGrow" in css                          # bars fill on load
+    assert ".seg.intro>span" in css
+    assert ".seg>span.off" in css                               # dim the OTHER segments
+    assert "box-shadow:inset 0 0 0 2px var(--text)" not in css  # white border removed
+    assert ".cell.dim" not in css                               # glyph dim removed
+    assert ".heat.fading" in css                                # crossfade recompose
+
+
+def test_dashboard_js_routes_focus_through_setfocus() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function setFocus(" in js
+    assert "__cfdNoAnim" in js
+    assert "items.filter(matchesFocus)" in js                   # recompose to selected colour
+    assert "introDone" in js                                    # one-shot fill flag

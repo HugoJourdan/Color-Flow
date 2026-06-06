@@ -84,7 +84,7 @@ html,body{margin:0}
 body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains Mono",monospace;
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
-@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}}
+@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro>span{animation:none}.heat,.heat.fading{transition:none;opacity:1}}
 #cfd-app{max-width:1180px;margin:0 auto;padding:0 20px 60px}
 .hd{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:14px 0;background:var(--bg);border-bottom:1px solid var(--border)}
 .hd .fam-logo{height:22px;width:auto;color:var(--text);display:block}
@@ -113,10 +113,13 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .ov-head{font-size:var(--fs-sm);color:var(--muted);margin-bottom:8px}
 .ov-head b{color:var(--text)}
 .seg{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--track)}
-.seg>span{display:block;height:100%}
+.seg>span{display:block;height:100%;transform-origin:left center;transition:opacity .2s ease}
 .seg .seg-none{background:var(--c-none)}
 .segc{cursor:pointer}
-.seg>span.on{box-shadow:inset 0 0 0 2px var(--text)}
+.seg>span.off{opacity:.28}
+.seg>span.on{filter:saturate(1.18)}
+@keyframes segGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.seg.intro>span{animation:segGrow .4s ease backwards;animation-delay:calc(var(--i,0)*45ms)}
 .ov-recipe{margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
 .ov-recipe b{color:var(--text)}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
@@ -138,7 +141,8 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .row .num{display:none}
 .row .pc{width:38px;text-align:right;flex:none}
 @media (max-width:720px){.rows{grid-template-columns:1fr}}
-.heat{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
+.heat{margin-top:14px;border-top:1px solid var(--border);padding-top:12px;transition:opacity .2s ease}
+.heat.fading{opacity:0}
 .heat-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .heat-h .ba-toggle{flex:none}
 .heat-h .hint{color:var(--muted-2)}
@@ -150,7 +154,6 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cat-n{color:var(--muted-2)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:3px}
 .cell{aspect-ratio:1;border:0;padding:0;border-radius:5px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease,opacity .2s ease;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
-.cell.dim{opacity:.12}
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}
 .cell.copied{outline:2px solid var(--ok);outline-offset:1px}
 .cell svg{width:100%;height:100%;display:block;padding:3px;transform:scale(.9)}
@@ -257,6 +260,9 @@ DASHBOARD_JS = r"""
     coverGroup: "byCategory", glyphSort: "category", focus: null,
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
+  // One-shot: the colour bars animate-fill only on the first render, not on
+  // every re-render (tab switch, focus, before/after). Flipped true after init.
+  var introDone = false;
 
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
     return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
@@ -273,11 +279,12 @@ DASHBOARD_JS = r"""
   }
   // A clickable segment of a stacked colour bar. Clicking it focuses every glyph
   // with that colour in the heatmap and dims the rest (state.focus). key -1 = None.
-  function segSpan(key,w,lab){
+  function segSpan(key,w,lab,idx){
     if (!w) return "";
     var on = state.focus===key;
-    return '<span class="segc'+(on?" on":"")+'" data-fkey="'+key+'" style="width:'+w
-      + '%;background:var('+varFor(key)+')" title="'+esc(lab)+' — click to focus these glyphs"></span>';
+    var off = state.focus!==null && !on;   // a colour is focused and it isn't this one
+    return '<span class="segc'+(on?" on":"")+(off?" off":"")+'" data-fkey="'+key+'" style="width:'+w
+      + '%;background:var('+varFor(key)+');--i:'+(idx||0)+'" title="'+esc(lab)+' — click to focus these glyphs"></span>';
   }
   function countFor(m,k){ return k===-1 ? m.uncolored : (m.counts[String(k)]||0); }
   function startedOf(m){ return H.glyphTotal - m.uncolored; }
@@ -364,13 +371,13 @@ DASHBOARD_JS = r"""
         + pct(recipeComplete,a.grand)+'%) · '+H.recipes.length+' recipe'+(H.recipes.length===1?"":"s")+'</div>';
     }
     var ex = aggExclusive();
-    var segParts = H.steps.map(function(s){
-      return segSpan(s.key, pct(ex.dist[String(s.key)]||0, a.grand), s.label);
-    }).join("") + segSpan(-1, pct(ex.none, a.grand), H.noneLabel);
+    var segParts = H.steps.map(function(s,i){
+      return segSpan(s.key, pct(ex.dist[String(s.key)]||0, a.grand), s.label, i);
+    }).join("") + segSpan(-1, pct(ex.none, a.grand), H.noneLabel, H.steps.length);
     return '<section class="overall" aria-label="Overall totals">'
       + '<div class="ov-num">'+ring(compP)+'</div>'
       + '<div class="ov-main"><div class="ov-head">'+head+'</div>'
-      + '<div class="seg" role="img" aria-label="Colour distribution across the font">'+segParts+'</div>'
+      + '<div class="seg'+(introDone?"":" intro")+'" role="img" aria-label="Colour distribution across the font">'+segParts+'</div>'
       + '<div class="legend">'+legend+'</div>'+recipeLine+'</div></section>';
   }
 
@@ -394,12 +401,12 @@ DASHBOARD_JS = r"""
     }
     var dist={}, none=0;
     (m.keys||[]).forEach(function(k){ var sk=String(k); if (k===-1 || H.order.indexOf(sk)===-1) none++; else dist[sk]=(dist[sk]||0)+1; });
-    var segParts = H.steps.map(function(s){
-      return segSpan(s.key, pct(dist[String(s.key)]||0, total), s.label);
-    }).join("") + segSpan(-1, pct(none, total), H.noneLabel);
+    var segParts = H.steps.map(function(s,i){
+      return segSpan(s.key, pct(dist[String(s.key)]||0, total), s.label, i);
+    }).join("") + segSpan(-1, pct(none, total), H.noneLabel, H.steps.length);
     return '<section class="overall master-overall" aria-label="'+esc(m.name+" totals")+'">'
       + '<div class="ov-main"><div class="ov-head">'+head+'</div>'
-      + '<div class="seg" role="img" aria-label="'+esc(m.name+" colour distribution")+'">'+segParts+'</div>'
+      + '<div class="seg'+(introDone?"":" intro")+'" role="img" aria-label="'+esc(m.name+" colour distribution")+'">'+segParts+'</div>'
       + '<div class="legend">'+legend+'</div>'+recipeLine+'</div></section>';
   }
   function heatmap(m){
@@ -408,7 +415,14 @@ DASHBOARD_JS = r"""
     for (var i=0;i<H.glyphNames.length;i++){
       items.push([H.glyphNames[i], m.keys[i], i]);
     }
-    var shown = items;   // every glyph (no cap); letterforms come from H.paths
+    function matchesFocus(it){
+      var k = it[1];
+      var fk = (k===-1 || H.order.indexOf(String(k))===-1) ? -1 : k;
+      return fk === state.focus;
+    }
+    // When a colour is focused, show ONLY its glyphs; the grid recomposes (packed).
+    // Otherwise every glyph (no cap); letterforms come from H.paths.
+    var shown = (state.focus===null) ? items : items.filter(matchesFocus);
     var paths = (H.paths && H.paths[m.id]) || {};
     var ch = (H.changes && H.changes[m.id]) || {};
     function cellHTML(it){
@@ -416,9 +430,6 @@ DASHBOARD_JS = r"""
       var wasKey = (ch[name] != null) ? ch[name][0] : key;
       var nowVar = varFor(key), wasVar = varFor(wasKey);
       var showVar = state.before ? wasVar : nowVar;
-      // colour focus: dim every cell whose colour isn't the focused one (-1 = None)
-      var fkey = (key===-1 || H.order.indexOf(String(key))===-1) ? -1 : key;
-      var dim = state.focus!==null && fkey!==state.focus;
       // Fully percent-encode the path (encodeURIComponent → slashes become %2F),
       // exactly as the handbook example does. With literal slashes Glyphs misparses
       // the path and falls back to the frontmost font + active master, ignoring the
@@ -427,7 +438,7 @@ DASHBOARD_JS = r"""
         + "&glyph=" + encodeURIComponent(name) + "&layer=" + encodeURIComponent(m.id);
       var p = paths[name];
       var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '"/></svg>' : '';
-      return '<a class="cell' + (p ? ' glyph' : '') + (dim ? ' dim' : '') + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:color-mix(in srgb,var(' + showVar + ') 25%,transparent)" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
+      return '<a class="cell' + (p ? ' glyph' : '') + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:color-mix(in srgb,var(' + showVar + ') 25%,transparent)" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
     }
     var sections;
     if (state.glyphSort === "font"){
@@ -628,6 +639,22 @@ DASHBOARD_JS = r"""
     if (gbar) gbar.outerHTML = overall();
   }
 
+  // Set the focused colour and crossfade the heatmap: fade the current grid out,
+  // re-render to the recomposed (packed) set, fade it back in. Skips the animation
+  // when there's no heatmap, for reduced-motion users, or under the test hook.
+  function setFocus(fk){
+    var heat = document.querySelector(".heat");
+    var instant = !heat || window.__cfdNoAnim ||
+      (window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
+    if (instant){ state.focus = fk; update(); return; }
+    heat.classList.add("fading");
+    setTimeout(function(){
+      state.focus = fk; update();
+      var nh = document.querySelector(".heat");
+      if (nh){ nh.classList.add("fading"); requestAnimationFrame(function(){ nh.classList.remove("fading"); }); }
+    }, 200);
+  }
+
   var toastTimer;
   function toast(msg){
     var t = document.getElementById("cfd-toast");
@@ -761,7 +788,7 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-timeline").addEventListener("click", function(){ state.view = state.view==="timeline" ? "tabs" : "timeline"; update(); });
     document.getElementById("cfd-export").addEventListener("click", openExport);
     document.addEventListener("keydown", function(e){
-      if (e.key==="Escape"){ closeExport(); if (state.focus!==null){ state.focus = null; update(); } }
+      if (e.key==="Escape"){ closeExport(); if (state.focus!==null){ setFocus(null); } }
     });
     var bodyEl = document.getElementById("cfd-body");
     bodyEl.addEventListener("mouseover", function(e){
@@ -774,7 +801,7 @@ DASHBOARD_JS = r"""
       var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); update(); return; }
       var cg = e.target.closest("[data-cg]"); if (cg){ state.coverGroup = cg.getAttribute("data-cg"); update(); return; }
       var gs = e.target.closest("[data-gsort]"); if (gs){ state.glyphSort = gs.getAttribute("data-gsort"); update(); return; }
-      var fc = e.target.closest("[data-fclear]"); if (fc){ state.focus = null; update(); return; }
+      var fc = e.target.closest("[data-fclear]"); if (fc){ setFocus(null); return; }
       var ba = e.target.closest(".ba-toggle");
       if (ba){ e.preventDefault(); state.before = !state.before; ba.setAttribute("aria-pressed", state.before); ba.textContent = state.before ? "Before" : "After"; applyBeforeAfter(); return; }
     });
@@ -784,8 +811,7 @@ DASHBOARD_JS = r"""
       var seg = e.target.closest("[data-fkey]");
       if (!seg) return;
       var fk = parseInt(seg.getAttribute("data-fkey"),10);
-      state.focus = (state.focus===fk) ? null : fk;
-      update();
+      setFocus(state.focus===fk ? null : fk);
     });
   }
   function init(){
@@ -794,7 +820,9 @@ DASHBOARD_JS = r"""
       + '<footer class="ft">Color Font Dashboard · Color Flow — Hugo Jourdan<br>'+esc(H.generated)+'</footer>';
     bind(); update();
     window.__cfdExport = { csv: exportCSV, json: exportJSON, rows: exportRows, printHTML: buildPrintReport };
-    requestAnimationFrame(function(){ document.body.classList.add("ready"); });
+    // After the first paint the bars have run their fill animation once; stop
+    // tagging them ".intro" so later re-renders don't re-animate.
+    requestAnimationFrame(function(){ document.body.classList.add("ready"); introDone = true; });
   }
   if (document.readyState!=="loading") init();
   else document.addEventListener("DOMContentLoaded", init);
