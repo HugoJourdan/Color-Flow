@@ -36,7 +36,7 @@
   </div>
   <div class="row">
     <label>trim <input id="trim" type="range" min="0" max="100" value="50"> <span id="trimval">50</span></label>
-    <label>opacity <input id="opacity" type="range" min="0" max="100" value="50"> <span id="opacityval">50</span></label>
+    <label>opacity <input id="opacity" type="range" min="0" max="100" value="20"> <span id="opacityval">20</span></label>
   </div>
   <div class="hint">drag to rotate · one disc per master · colour = that master's label-colour mix, blurred like the favicon</div>
 </div>
@@ -239,7 +239,7 @@ let tilt = 0.50, perGap = 1, holeOn = true, selected = -1;   // selected = -1 ->
 const DISC_ALPHA = 0.95;                       // discs a touch translucent
 let discHits = [], hitCx = 0, hitRx = 0, hitRy = 0;   // disc hit-test geometry, set each render
 let downX = 0, downY = 0;                             // pointer-down point for click-vs-drag
-let trimVal = 0.5, opacityVal = 0.5;                  // non-selected discs: darken + fade
+let trimVal = 0.5, opacityVal = 0.2;                  // non-selected discs: darken + fade
 
 function render(){
   ctx.clearRect(0,0,W,H);
@@ -280,7 +280,8 @@ function render(){
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
     ctx.restore();
     const other = (selected>=0 && Math.round(p)!==selected);
-    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0,
+    const hf = (holeOn && !other) ? 1 : 0;   // non-focused discs drop their hole
+    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, hf,
              other ? opacityVal : 1, other ? trimVal : 0);
   }
 }
