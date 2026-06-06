@@ -399,9 +399,20 @@ def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free:
     entry carries a tight per-glyph viewBox. ``current``/``order``/``is_free`` are
     kept for signature stability."""
     cap = 500   # matches the heatmap's per-master cell cap so every shown cell draws
+    upm = float(getattr(font, "upm", None) or 1000.0)
     paths: dict = {}
     for master in font.masters:
         master_id = master.id
+        # A single em box per master (ascender..descender) shared by every cell, so
+        # glyphs render at their true relative sizes instead of each filling the cell.
+        ascender = getattr(master, "ascender", None)
+        descender = getattr(master, "descender", None)
+        ascender = float(ascender) if ascender is not None else upm * 0.75
+        descender = float(descender) if descender is not None else -upm * 0.25
+        em_height = ascender - descender
+        if em_height <= 0:
+            em_height = upm
+        em_top = -ascender
         shown: dict = {}
         produced = 0
         for name in glyph_names:
@@ -411,7 +422,7 @@ def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free:
                 layer = font.glyphs[name].layers[master_id]
             except Exception:
                 layer = None
-            outline = glyphsvg.layer_outline(layer) if layer is not None else {}
+            outline = glyphsvg.layer_outline_em(layer, em_top, em_height) if layer is not None else {}
             if outline:
                 shown[name] = outline
                 produced += 1
@@ -443,6 +454,40 @@ def _master_previews(font) -> dict:
     plain name. ``{}`` for any master whose A/a have no outline."""
     return {master.id: glyphsvg.layers_outline(_master_layers(font, master.id, ("A", "a")))
             for master in font.masters}
+
+
+def _logo_master(font):
+    """The master to draw the header logo with: Regular, else Bold, else the first."""
+    if not font.masters:
+        return None
+    for target in ("regular", "bold"):
+        for master in font.masters:
+            if (master.name or "").lower() == target:
+                return master
+    return font.masters[0]
+
+
+def _family_logo(font) -> dict:
+    """The family name set in the font's own glyphs (via :func:`_logo_master`) as a
+    single ``{"d", "vb"}`` outline, so the report header shows the typeface in
+    itself. ``{}`` when it can't be drawn (no master / name / matching glyphs)."""
+    master = _logo_master(font)
+    name = (font.familyName or "") if font is not None else ""
+    if master is None or not name:
+        return {}
+    upm = float(getattr(font, "upm", None) or 1000.0)
+    space = upm * 0.28
+    layers: list = []
+    advance = 0.0
+    for char in name:
+        glyph = None if char == " " else font.glyphs[char]
+        layer = glyph.layers[master.id] if glyph is not None else None
+        if layer is None:
+            advance += space
+            continue
+        layers.append((layer, advance))
+        advance += (getattr(layer, "width", 0) or 0)
+    return glyphsvg.layers_outline(layers)
 
 
 def _favicon_svg() -> str:
@@ -636,6 +681,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "filePath": font.filepath or "",
         "paths": paths,
         "favicon": _favicon_svg(),
+        "logo": _family_logo(font),
         "trend": trend,
         "journeys": journeys,
         "lastEdit": glyph_last_edit(font, now),

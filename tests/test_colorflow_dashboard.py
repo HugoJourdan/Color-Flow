@@ -552,6 +552,28 @@ def _outline_layer(color: int) -> _FakeLayerColor:
     return layer
 
 
+def test_logo_master_prefers_regular_then_bold_then_first() -> None:
+    thin, bold, reg = _FakeMaster("t", "Thin"), _FakeMaster("b", "Bold"), _FakeMaster("r", "Regular")
+    assert db._logo_master(_FakeFont([thin, bold, reg], [])).id == "r"
+    assert db._logo_master(_FakeFont([thin, bold], [])).id == "b"
+    assert db._logo_master(_FakeFont([thin], [])).id == "t"
+    assert db._logo_master(_FakeFont([], [])) is None
+
+
+def test_family_logo_renders_family_with_chosen_master() -> None:
+    glyphs = [_FakeGlyph("A", {"m1": _outline_layer(3)}),
+              _FakeGlyph("a", {"m1": _outline_layer(3)})]
+    font = _FakeFont([_FakeMaster("m1", "Regular")], glyphs, family="Aa")
+    logo = db._family_logo(font)
+    assert logo["d"] and logo["vb"]
+    assert "M500" in logo["d"]   # the "a" is shifted right by the "A" advance (500)
+
+
+def test_family_logo_empty_without_matching_glyphs() -> None:
+    font = _FakeFont([_FakeMaster("m1", "Regular")], [], family="Zz")
+    assert db._family_logo(font) == {}
+
+
 def test_build_model_recipe_completion_parity_without_recipes(tmp_path) -> None:
     # No recipes (Glyphs absent) -> recipeCompletion.complete must equal the
     # count of glyphs at the global final step, i.e. standard completion.

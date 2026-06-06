@@ -80,13 +80,14 @@ html[data-theme=light]{
 }
 *{box-sizing:border-box}
 html,body{margin:0}
+*{font-family:"JetBrains Mono",monospace}
 body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains Mono",monospace;
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
 @media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}}
 #cfd-app{max-width:980px;margin:0 auto;padding:0 20px 60px}
 .hd{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:14px 0;background:var(--bg);border-bottom:1px solid var(--border)}
-.hd .brand{width:10px;height:10px;border-radius:3px;background:var(--accent)}
+.hd .fam-logo{height:22px;width:auto;color:var(--text);display:block}
 .hd .fam{font-weight:600}
 .hd .meta{font-size:var(--fs-sm);color:var(--muted-2)}
 .hd .sp{flex:1}
@@ -103,6 +104,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .chip:hover{color:var(--text)}
 .chip[aria-pressed=true]{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
 .overall{display:flex;align-items:center;gap:22px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:16px 0}
+.master-overall{margin-top:8px}
 .ov-num{display:flex;align-items:center;justify-content:center}
 .ov-num .big{font-size:var(--fs-big);font-weight:650;letter-spacing:-.02em;line-height:1}
 .ov-num .big small{font-size:var(--fs-big-sm);color:var(--muted-2)}
@@ -141,7 +143,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cat:first-child{margin-top:0}
 .cat-h{font-size:var(--fs-xs);color:var(--muted);margin:14px 0 6px;display:flex;align-items:center;gap:6px}
 .cat-n{color:var(--muted-2)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:3px}
 .cell{aspect-ratio:1;border:0;padding:0;border-radius:5px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}
 .cell.copied{outline:2px solid var(--ok);outline-offset:1px}
@@ -229,7 +231,7 @@ DASHBOARD_JS = r"""
   var state = {
     master: H.masters.length ? H.masters[0].id : null,
     view: "tabs", before: false, sort: "workflow",
-    coverGroup: "byScript", recent: false,
+    coverGroup: "byCategory", recent: false,
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
 
@@ -291,8 +293,10 @@ DASHBOARD_JS = r"""
     return '<span class="streak" title="'+esc(title)+'">🔥 '+s.current+'</span>';
   }
   function header(){
-    return '<header class="hd"><span class="brand"></span>'
-      + '<span class="fam">'+esc(H.family)+'</span>'
+    var fam = (H.logo && H.logo.d)
+      ? '<svg class="fam-logo" viewBox="'+esc(H.logo.vb)+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="'+esc(H.family)+'"><path d="'+esc(H.logo.d)+'" fill="currentColor"/></svg>'
+      : '<span class="fam">'+esc(H.family)+'</span>';
+    return '<header class="hd">'+fam
       + '<span class="meta">'+esc(H.fileName)+' · v'+esc(H.version)+'</span>'
       + '<span class="sp"></span>'
       + streakBadge()
@@ -300,7 +304,6 @@ DASHBOARD_JS = r"""
   }
   function toolbar(){
     return '<div class="tb">'
-      + '<button type="button" id="cfd-sort" class="chip">↕ Sort: workflow</button>'
       + '<button type="button" id="cfd-recent" class="chip" aria-pressed="false" title="Ring glyphs edited in the last 7 days">🕑 Recent</button>'
       + '<button type="button" id="cfd-coverage" class="chip" aria-pressed="false">🗂 Coverage</button>'
       + '<button type="button" id="cfd-timeline" class="chip" aria-pressed="false">📈 Timeline</button>'
@@ -309,7 +312,7 @@ DASHBOARD_JS = r"""
   }
   function ring(p){
     var r=26, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(100,p))/100);
-    return '<svg class="ov-ring" width="66" height="66" viewBox="0 0 66 66" role="img" aria-label="'+p+'% complete">'
+    return '<svg class="ov-ring" width="66" height="66" viewBox="0 0 66 66" role="progressbar" aria-valuenow="'+p+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+p+'% complete">'
       + '<circle class="ov-ring-track" cx="33" cy="33" r="'+r+'" fill="none" stroke-width="6"/>'
       + '<circle class="ov-ring-arc" cx="33" cy="33" r="'+r+'" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 33 33)"/>'
       + '<text class="ov-ring-t" x="33" y="34" text-anchor="middle" dominant-baseline="central">'+p+'%</text></svg>';
@@ -320,8 +323,8 @@ DASHBOARD_JS = r"""
       return '<span class="lg" title="'+esc(s.label)+'"><i style="background:var('+varFor(s.key)+')"></i>'+pct(a.agg[String(s.key)]||0,a.grand)+'%</span>';
     }).join("");
     var head = (H.mode==="free" || !lastOrder)
-      ? '<b>'+a.started+'/'+a.grand+'</b> ('+startP+'%)'
-      : '<b>'+a.completion+'/'+a.grand+'</b> complete ('+compP+'%) · '+a.started+'/'+a.grand+' started ('+startP+'%)';
+      ? '<b>'+a.started+'/'+a.grand+'</b>'
+      : '<b>'+a.completion+'/'+a.grand+'</b> complete · '+a.started+'/'+a.grand+' started ('+startP+'%)';
     var recipeLine = "";
     if (H.recipes && H.recipes.length){
       var recipeComplete = 0;
@@ -343,20 +346,37 @@ DASHBOARD_JS = r"""
       + '<div class="legend">'+legend+'</div>'+recipeLine+'</div></section>';
   }
 
-  function rows(m){
-    var html = stepsSorted(m).map(function(s){
-      var c = countFor(m,s.key), p = pct(c,H.glyphTotal), done = H.glyphTotal>0 && c>=H.glyphTotal;
-      return '<div class="row'+(done?' done':'')+'"><span class="dot" style="background:var('+varFor(s.key)+')"></span>'
-        + '<span class="rl">'+esc(s.label)+(done?' <span class="chk" aria-label="complete">✓</span>':'')+'</span>'
-        + bar(c,H.glyphTotal,varFor(s.key),s.label+': '+c+' of '+H.glyphTotal+' ('+p+'%)')
-        + '<span class="num">'+c+'/'+H.glyphTotal+'</span><span class="pc">'+p+'%</span></div>';
+  // The selected master rendered like the overall card (ring + stacked bar +
+  // legend), but scoped to this one master instead of the whole font.
+  function masterOverall(m){
+    var total = H.glyphTotal;
+    var started = total - m.uncolored;
+    var completion = (H.mode==="free" || !lastOrder) ? started : (countFor(m,lastOrder)||0);
+    var compP = pct(completion,total), startP = pct(started,total);
+    var legend = stepsSorted(m).map(function(s){
+      return '<span class="lg" title="'+esc(s.label)+'"><i style="background:var('+varFor(s.key)+')"></i>'+pct(countFor(m,s.key)||0,total)+'%</span>';
     }).join("");
-    var un = m.uncolored, up = pct(un,H.glyphTotal);
-    html += '<div class="row none"><span class="dot" style="background:var(--c-none)"></span>'
-      + '<span class="rl">'+esc(H.noneLabel)+'</span>'
-      + bar(un,H.glyphTotal,"--c-none",H.noneLabel+': '+un+' of '+H.glyphTotal+' ('+up+'%)')
-      + '<span class="num">'+un+'/'+H.glyphTotal+'</span><span class="pc">'+up+'%</span></div>';
-    return '<div class="rows">'+html+'</div>';
+    var head = (H.mode==="free" || !lastOrder)
+      ? '<b>'+started+'/'+total+'</b>'
+      : '<b>'+completion+'/'+total+'</b> complete · '+started+'/'+total+' started ('+startP+'%)';
+    var recipeLine = "";
+    if (H.recipes && H.recipes.length){
+      var rc = ((H.recipeCompletion||{})[m.id])||{};
+      if (rc.complete != null) recipeLine = '<div class="ov-recipe">Recipe-adjusted: <b>'+rc.complete+'/'+total+'</b> complete ('+pct(rc.complete,total)+'%)</div>';
+    }
+    var dist={}, none=0;
+    (m.keys||[]).forEach(function(k){ var sk=String(k); if (k===-1 || H.order.indexOf(sk)===-1) none++; else dist[sk]=(dist[sk]||0)+1; });
+    var segParts = H.steps.map(function(s){
+      var w = pct(dist[String(s.key)]||0, total);
+      return w ? '<span style="width:'+w+'%;background:var('+varFor(s.key)+')" title="'+esc(s.label)+'"></span>' : "";
+    }).join("");
+    var noneW = pct(none, total);
+    if (noneW) segParts += '<span class="seg-none" style="width:'+noneW+'%" title="'+esc(H.noneLabel)+'"></span>';
+    return '<section class="overall master-overall" aria-label="'+esc(m.name+" totals")+'">'
+      + '<div class="ov-num">'+ring(compP)+'</div>'
+      + '<div class="ov-main"><div class="ov-head">'+head+'</div>'
+      + '<div class="seg" role="img" aria-label="'+esc(m.name+" colour distribution")+'">'+segParts+'</div>'
+      + '<div class="legend">'+legend+'</div>'+recipeLine+'</div></section>';
   }
   function heatmap(m){
     var cats = H.categories || [];
@@ -385,8 +405,6 @@ DASHBOARD_JS = r"""
     // group cells by glyph category, Font-View style
     var groups = {}, seen = [];
     shown.forEach(function(it){ var c = cats[it[2]] || "Other"; if (!groups[c]){ groups[c]=[]; seen.push(c); } groups[c].push(it); });
-    var pref = ["Letter","Number","Punctuation","Symbol","Mark","Separator","Other"];
-    seen.sort(function(a,b){ var ia=pref.indexOf(a); ia=ia<0?pref.length:ia; var ib=pref.indexOf(b); ib=ib<0?pref.length:ib; return ia-ib || (a<b?-1:a>b?1:0); });
     var sections = seen.map(function(c){
       return '<div class="cat"><div class="cat-h">'+esc(c)+' <span class="cat-n">'+groups[c].length+'</span></div>'
         + '<div class="grid" aria-label="'+esc(c)+'">'+groups[c].map(cellHTML).join("")+'</div></div>';
@@ -423,7 +441,7 @@ DASHBOARD_JS = r"""
   }
   function tabsView(){
     var m = masterById(state.master);
-    return masterTabs()+'<div class="panel" role="tabpanel">'+rows(m)+heatmap(m)+'</div>';
+    return masterTabs()+'<div class="panel" role="tabpanel">'+masterOverall(m)+heatmap(m)+'</div>';
   }
   function covStacked(r){
     // a left-aligned stacked bar of the colours actually set in this group
@@ -488,20 +506,22 @@ DASHBOARD_JS = r"""
     return '<section class="timeline"><div class="tl-legend">'+legend+'</div>'+chart+foot+'</section>';
   }
   function compareView(){
-    var head = '<th scope="col">Step</th>'+H.masters.map(function(m){
+    // columns = steps (+None); rows = masters. The master name shows only on
+    // hovering its Aa preview (title), not as visible text.
+    var head = '<th scope="col">Master</th>'+H.steps.map(function(s){
+      return '<th scope="col"><span class="dot" style="background:var('+varFor(s.key)+')"></span>'+esc(s.label)+'</th>';
+    }).join("")+'<th scope="col"><span class="dot" style="background:var(--c-none)"></span>'+esc(H.noneLabel)+'</th>';
+    var body = H.masters.map(function(m){
       var pv = m.preview;
-      var aa = (pv && pv.d) ? '<svg class="cmp-aa" viewBox="'+esc(pv.vb)+'" preserveAspectRatio="xMidYMid meet"><path d="'+esc(pv.d)+'" fill="currentColor"/></svg>' : '';
-      return '<th scope="col">'+aa+'<span class="cmp-mname">'+esc(m.name)+'</span></th>';
-    }).join("");
-    var body = H.steps.map(function(s){
-      var tds = H.masters.map(function(m){
+      var aa = (pv && pv.d) ? '<svg class="cmp-aa" viewBox="'+esc(pv.vb)+'" preserveAspectRatio="xMidYMid meet"><path d="'+esc(pv.d)+'" fill="currentColor"/></svg>' : esc(m.name);
+      var cells = H.steps.map(function(s){
         var p = pct(countFor(m,s.key),H.glyphTotal);
         return '<td><span class="cmpbar" style="width:'+p+'%;background:var('+varFor(s.key)+')"></span><span class="cmpn">'+p+'%</span></td>';
       }).join("");
-      return '<tr><th scope="row"><span class="dot" style="background:var('+varFor(s.key)+')"></span>'+esc(s.label)+'</th>'+tds+'</tr>';
+      var np = pct(m.uncolored,H.glyphTotal);
+      cells += '<td><span class="cmpbar" style="width:'+np+'%;background:var(--c-none)"></span><span class="cmpn">'+np+'%</span></td>';
+      return '<tr><th scope="row" class="cmp-m" title="'+esc(m.name)+'" aria-label="'+esc(m.name)+'">'+aa+'</th>'+cells+'</tr>';
     }).join("");
-    var noneTds = H.masters.map(function(m){ return '<td><span class="cmpn">'+pct(m.uncolored,H.glyphTotal)+'%</span></td>'; }).join("");
-    body += '<tr class="none"><th scope="row"><span class="dot" style="background:var(--c-none)"></span>'+esc(H.noneLabel)+'</th>'+noneTds+'</tr>';
     return '<div class="cmp-wrap"><table class="cmp"><caption>Step completion by master</caption><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
   }
   function renderBody(){
@@ -658,7 +678,6 @@ DASHBOARD_JS = r"""
       document.documentElement.setAttribute("data-theme", state.theme);
     });
     document.getElementById("cfd-recent").addEventListener("click", function(){ state.recent = !state.recent; update(); });
-    document.getElementById("cfd-sort").addEventListener("click", function(){ state.sort = state.sort==="workflow" ? "progress" : "workflow"; update(); });
     document.getElementById("cfd-compare").addEventListener("click", function(){ state.view = state.view==="compare" ? "tabs" : "compare"; update(); });
     document.getElementById("cfd-coverage").addEventListener("click", function(){ state.view = state.view==="coverage" ? "tabs" : "coverage"; update(); });
     document.getElementById("cfd-timeline").addEventListener("click", function(){ state.view = state.view==="timeline" ? "tabs" : "timeline"; update(); });
@@ -682,7 +701,7 @@ DASHBOARD_JS = r"""
   }
   function init(){
     document.getElementById("cfd-app").innerHTML =
-      header() + toolbar() + overall() + '<div id="cfd-body"></div>'
+      header() + overall() + toolbar() + '<div id="cfd-body"></div>'
       + '<footer class="ft">Color Font Dashboard · Color Flow — Hugo Jourdan<br>'+esc(H.generated)+'</footer>';
     bind(); update();
     window.__cfdExport = { csv: exportCSV, json: exportJSON, rows: exportRows };
