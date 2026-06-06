@@ -232,9 +232,8 @@ function render(){
   ctx.restore();
 
   // draw bottom -> top so the TOP disc paints last and sits above the others.
-  // When a master is selected, its disc is deferred and painted last so it stays
-  // fully visible while the rest are trimmed (faded toward the background).
-  const deferred = [];
+  // A selected master keeps its natural stack position — the disc above still
+  // overlaps it a bit; only the non-selected discs are trimmed (faded back).
   for (let n=N-1; n>=0; n--){
     const cy = topY + n*dz;
     const p = (M-1) - n/perGap;          // last master on top, first at the base
@@ -250,13 +249,8 @@ function render(){
     sh.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
     ctx.restore();
-    if (selected>=0 && Math.round(p)===selected){ deferred.push([fA, fB, t, cy]); continue; }
-    const dim = (selected>=0) ? 0.66 : 0;   // trim the non-selected discs
+    const dim = (selected>=0 && Math.round(p)!==selected) ? 0.66 : 0;   // trim the others
     drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0, dim);
-  }
-  // selected disc(s) on top, fully visible
-  for (let d=0; d<deferred.length; d++){
-    drawDisc(deferred[d][0], deferred[d][1], deferred[d][2], cx, deferred[d][3], rx, ry, rot, holeOn ? 1 : 0, 0);
   }
 }
 
