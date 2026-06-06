@@ -298,28 +298,25 @@ class ColorFlow(PalettePlugin):
 			popover.reportSep = HorizontalLine((12, reportY, -12, 1))
 			popover.dashboard = Button((12, reportY + 8, -12, 22), "Generate Colorflow Report",
 				callback=self._popover_dashboard, sizeStyle='small')
-			# Animated loading-bar GIF behind the report button: a borderless button
-			# (clear background) over an NSImageView that plays the GIF, label on top.
+			# Animated loading-bar GIF as a thin BORDER around the report button: the
+			# button keeps its default background + label; an NSImageView playing the GIF
+			# sits just behind it, a few px larger all round, so only a ring shows.
 			try:
 				_gif = os.path.join(os.path.dirname(__file__), "report-loading.gif")
 				_img = AppKit.NSImage.alloc().initWithContentsOfFile_(_gif)
 				if _img is not None:
 					_btn = self._ns_button(popover.dashboard)
-					_btn.setBordered_(False)
-					_para = AppKit.NSMutableParagraphStyle.alloc().init()
-					_para.setAlignment_(AppKit.NSTextAlignmentCenter)
-					_lblFont = AppKit.NSFont.systemFontOfSize_weight_(_btn.font().pointSize(), AppKit.NSFontWeightMedium)
-					_btn.setAttributedTitle_(AppKit.NSAttributedString.alloc().initWithString_attributes_(
-						_btn.title(), {AppKit.NSForegroundColorAttributeName: AppKit.NSColor.whiteColor(),
-							AppKit.NSFontAttributeName: _lblFont,
-							AppKit.NSParagraphStyleAttributeName: _para}))
-					_iv = AppKit.NSImageView.alloc().initWithFrame_(_btn.frame())
+					_bw = 3.0
+					_f = _btn.frame()
+					_ring = AppKit.NSMakeRect(_f.origin.x - _bw, _f.origin.y - _bw,
+						_f.size.width + 2 * _bw, _f.size.height + 2 * _bw)
+					_iv = AppKit.NSImageView.alloc().initWithFrame_(_ring)
 					_iv.setImage_(_img)
 					_iv.setAnimates_(True)
 					_iv.setImageScaling_(AppKit.NSImageScaleAxesIndependently)
 					_iv.setAutoresizingMask_(AppKit.NSViewWidthSizable)
 					_iv.setWantsLayer_(True)
-					_iv.layer().setCornerRadius_(_iv.frame().size.height / 2.0)
+					_iv.layer().setCornerRadius_(_ring.size.height / 2.0)
 					_iv.layer().setMasksToBounds_(True)
 					_btn.superview().addSubview_positioned_relativeTo_(_iv, AppKit.NSWindowBelow, _btn)
 					self._reportGifView = _iv
