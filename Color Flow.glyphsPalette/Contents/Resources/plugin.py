@@ -358,7 +358,7 @@ class ColorFlow(PalettePlugin):
 			font = Glyphs.font
 			family = (font.familyName if font is not None else "") or "Color Flow profile"
 			profile = self._live_profile(font, self._font_dir(font), name=family)
-			path = GetSaveFile("Export Color Flow profile", "workflow.colorflow", ["colorflow"])
+			path = GetSaveFile("Export Color Flow profile", "Color-Flow-Profile.json", ["json"])
 			if not path:
 				return
 			with open(path, "w", encoding="utf-8") as handle:
@@ -371,7 +371,7 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def _import_profile(self, sender):
 		try:
-			path = GetOpenFile("Import Color Flow profile", False, ["colorflow"])
+			path = GetOpenFile("Import Color Flow profile", False, ["json", "colorflow"])
 			if not path:
 				return
 			with open(path, "r", encoding="utf-8") as handle:
@@ -1064,7 +1064,13 @@ class ColorFlow(PalettePlugin):
 				try:
 					recognizer = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "countClicked:")
 					recognizer.setNumberOfClicksRequired_(1)
-					self._ns_button(countBox).addGestureRecognizer_(recognizer)
+					view = self._ns_button(countBox)
+					view.addGestureRecognizer_(recognizer)
+					area = AppKit.NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
+						view.bounds(),
+						AppKit.NSTrackingCursorUpdate | AppKit.NSTrackingActiveInKeyWindow | AppKit.NSTrackingMouseEnteredAndExited,
+						self, None)
+					view.addTrackingArea_(area)
 				except Exception:
 					pass
 			self._build_meta_strip(order, glyphCount, masterId)
@@ -1137,6 +1143,13 @@ class ColorFlow(PalettePlugin):
 	# Review Queue + Focus (#10, #11): single-click a step's count badge to
 	# focus that step (row highlight) and open exactly its glyphs in a new Edit
 	# tab to walk through them; click again to clear focus.
+	# Pointing-hand cursor while hovering a clickable count badge (#10/#11).
+	def cursorUpdate_(self, event):
+		try:
+			AppKit.NSCursor.pointingHandCursor().set()
+		except Exception:
+			pass
+
 	def countClicked_(self, sender):
 		try:
 			color = self._color_for_count(sender)
