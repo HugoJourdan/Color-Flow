@@ -82,10 +82,10 @@ function buildField(counts){
   const g = off.getContext("2d");
   const cx = FS/2, cy = FS/2, R = FS*0.46;
   const sum = counts.reduce((a,b)=>a+b,0) || 1;
-  // colour-only base: the master's average hue fills the whole disc (no white,
-  // no transparent gaps for the page to show through)
+  // colour-only base: the master's average hue fills the ENTIRE field (opaque),
+  // so the disc is 100% opaque — no white, no transparent gaps, no faded rim
   g.fillStyle = avgHex(counts);
-  g.beginPath(); g.arc(cx,cy,R,0,7); g.fill();
+  g.fillRect(0,0,FS,FS);
   // overlay each label colour as a vivid radial blob at its wheel position
   counts.forEach((cnt,i)=>{
     if (!cnt) return;
@@ -117,8 +117,9 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   ctx.scale(1, ry/rx);
   ctx.rotate(rot);
   ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.clip();
-  ctx.globalAlpha = 1;          ctx.drawImage(fieldA,-rx,-rx,rx*2,rx*2);
-  if (fieldB && t>0){ ctx.globalAlpha = t; ctx.drawImage(fieldB,-rx,-rx,rx*2,rx*2); }
+  const o = rx*1.14;            // overscan so the field's blurred rim is clipped away
+  ctx.globalAlpha = 1;          ctx.drawImage(fieldA,-o,-o,o*2,o*2);
+  if (fieldB && t>0){ ctx.globalAlpha = t; ctx.drawImage(fieldB,-o,-o,o*2,o*2); }
   ctx.globalAlpha = 1;
   if (holeFrac>0){
     const hr = rx*0.26;   // constant: same hole size on every disc
