@@ -1539,14 +1539,14 @@ class ColorFlow(PalettePlugin):
 			ctrlY = (bounds.size.height - btn) / 2.0
 			gearX = bounds.size.width - pad - btn
 			eyeX = gearX - gap - btn
-			barWidth, barHeight = 60.0, 9.0
+			barWidth, barHeight = 84.0, 6.0
 			barX = bounds.size.width - pad - barWidth
 			barY = (bounds.size.height - barHeight) / 2.0
 			bar = AppKit.NSView.alloc().initWithFrame_(((barX, barY), (barWidth, barHeight)))
 			bar.setAutoresizingMask_(AppKit.NSViewMinXMargin)
 			bar.setWantsLayer_(True)
 			try:
-				bar.layer().setCornerRadius_(4.0)
+				bar.layer().setCornerRadius_(3.0)
 				bar.layer().setMasksToBounds_(True)
 				bar.layer().setBackgroundColor_(AppKit.NSColor.colorWithRed_green_blue_alpha_(0.5, 0.5, 0.5, 0.18).CGColor())
 			except Exception:
