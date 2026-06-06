@@ -86,6 +86,11 @@ body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains M
 body.ready{opacity:1;transition:opacity .35s ease}
 @media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro>span{animation:none}.heat,.heat.fading{transition:none;opacity:1}}
 #cfd-app{max-width:1180px;margin:0 auto;padding:0 20px 60px}
+#cfd-main{display:flex;gap:24px;align-items:flex-start}
+#cfd-tower{position:sticky;top:14px;flex:0 0 240px;width:240px}
+#cfd-tower canvas{display:block;width:240px;height:560px;cursor:pointer}
+#cfd-body{flex:1 1 auto;min-width:0}
+@media (max-width:780px){#cfd-main{flex-direction:column}#cfd-tower{position:static;width:100%;flex:0 0 auto}#cfd-tower canvas{margin:0 auto}}
 .hd{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:14px 0;background:var(--bg);border-bottom:1px solid var(--border)}
 .hd .fam-logo{height:22px;width:auto;color:var(--text);display:block}
 .hd .fam{font-weight:600}
@@ -494,7 +499,7 @@ DASHBOARD_JS = r"""
   }
   function tabsView(){
     var m = masterById(state.master);
-    return masterTabs()+'<div class="panel" role="tabpanel">'+masterOverall(m)+heatmap(m)+'</div>';
+    return '<div class="panel" role="tabpanel">'+masterOverall(m)+heatmap(m)+'</div>';
   }
   function covStacked(r){
     // a left-aligned stacked bar of the colours actually set in this group, each
@@ -525,7 +530,7 @@ DASHBOARD_JS = r"""
       return '<div class="cov-row"><span class="cov-name" title="'+esc(r.key)+'">'+esc(r.key)+'</span>'
         + covStacked(r) + '<span class="num">'+r.total+'</span></div>';
     }).join("") : '<p class="empty">No glyphs.</p>';
-    return masterTabs()+'<section class="cov"><div class="panel">'+head+'<div class="cov-rows">'+body+'</div></div></section>';
+    return '<section class="cov"><div class="panel">'+head+'<div class="cov-rows">'+body+'</div></div></section>';
   }
   // ----- Timeline: completion over time, one line per master -----
   function masterHue(i){ return Math.round((i*137.508) % 360); }
@@ -814,11 +819,148 @@ DASHBOARD_JS = r"""
       setFocus(state.focus===fk ? null : fk);
     });
   }
+  // ----- Color Tower: one disc per master, the master navigator -------------
+  // A persistent canvas in the left sidebar. Each disc is a blurred wheel of that
+  // master's label-colour distribution; the focused (current) master lights up,
+  // the rest are trimmed. Clicking a disc selects that master. Auto-spins.
+  function initTower(){
+    var cv = document.getElementById("cfd-tower-cv");
+    if (!cv || !cv.getContext || !H.masters.length) return;
+    var ctx = cv.getContext("2d");
+    if (!ctx) return;                       // headless / no-canvas env: skip
+    var W = cv.width, Hc = cv.height, FS = 320;
+    var DISC_ALPHA = 0.95, tilt = 0.5, trimVal = 0.6, opacityVal = 0.2;
+    var rot = -0.5, focusAmt = [];
+    function hueHsl(i){ return "hsl(" + Math.round((i/12)*360) + ",100%,55%)"; }
+    function countsOf(m){
+      var c = [0,0,0,0,0,0,0,0,0,0,0,0], keys = m.keys || [];
+      for (var i=0;i<keys.length;i++){ var k=keys[i]; if (k>=0 && k<12) c[k]++; }
+      return c;
+    }
+    function buildField(counts){
+      var off=document.createElement("canvas"); off.width=off.height=FS;
+      var g=off.getContext("2d"), cx=FS/2, cy=FS/2, R=FS*0.46, sum=0, i;
+      for (i=0;i<12;i++) sum+=counts[i];
+      if (!sum){ g.fillStyle="hsl(0,0%,82%)"; g.fillRect(0,0,FS,FS); }
+      else {
+        var acc=0, stops=[];
+        for (i=0;i<12;i++){ if(!counts[i]) continue; stops.push([acc+(counts[i]/sum)/2,i]); acc+=counts[i]/sum; }
+        var filled=false;
+        try {
+          var base=g.createConicGradient(-Math.PI/2,cx,cy);
+          for (i=0;i<stops.length;i++) base.addColorStop(stops[i][0],hueHsl(stops[i][1]));
+          base.addColorStop(1,hueHsl(stops[0][1]));
+          g.fillStyle=base; g.fillRect(0,0,FS,FS); filled=true;
+        } catch(e){ filled=false; }
+        if (!filled){ var a=-Math.PI/2;
+          for (i=0;i<12;i++){ if(!counts[i]) continue; var a1=a+(counts[i]/sum)*Math.PI*2;
+            g.fillStyle=hueHsl(i); g.beginPath(); g.moveTo(cx,cy); g.arc(cx,cy,R*1.25,a,a1); g.closePath(); g.fill(); a=a1; } }
+      }
+      var dk=g.createRadialGradient(cx,cy,0,cx,cy,R*0.72);
+      dk.addColorStop(0,"rgba(0,0,0,0.58)"); dk.addColorStop(0.5,"rgba(0,0,0,0.26)"); dk.addColorStop(1,"rgba(0,0,0,0)");
+      g.fillStyle=dk; g.beginPath(); g.arc(cx,cy,R*0.72,0,7); g.fill();
+      var bl=document.createElement("canvas"); bl.width=bl.height=FS; var bg=bl.getContext("2d");
+      bg.filter="blur(13px) saturate(1.3) brightness(1.05)"; bg.drawImage(off,0,0);
+      bg.filter="none"; bg.globalCompositeOperation="destination-in";
+      bg.fillStyle="#000"; bg.beginPath(); bg.arc(FS/2,FS/2,FS*0.5,0,7); bg.fill();
+      bg.globalCompositeOperation="source-over";
+      return bl;
+    }
+    var FIELDS = H.masters.map(function(m){ return buildField(countsOf(m)); });
+    var FROST = (function(){
+      var c=document.createElement("canvas"); c.width=c.height=FS; var g=c.getContext("2d");
+      for (var k=0;k<1600;k++){ var x=Math.random()*FS,y=Math.random()*FS,r=Math.random()*1.6+0.3;
+        g.fillStyle="rgba(255,255,255,"+(Math.random()*0.07)+")"; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); }
+      var o=document.createElement("canvas"); o.width=o.height=FS; var og=o.getContext("2d");
+      og.filter="blur(0.6px)"; og.drawImage(c,0,0); return o;
+    })();
+    var buf=document.createElement("canvas"); buf.width=W; buf.height=Hc; var bctx=buf.getContext("2d");
+
+    function paintDisc(g,fA,cx,cy,rx,ry,holeFrac,glow){
+      if (glow===undefined) glow=1; var o=rx*1.14;
+      g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.rotate(rot);
+      var halo=[[1.006,3,0.22],[1.025,6,0.14],[1.06,12,0.08]];
+      for (var h=0;h<halo.length;h++){ g.globalAlpha=halo[h][2]*glow; g.filter="blur("+halo[h][1]+"px)"; var hh=rx*halo[h][0]; g.drawImage(fA,-hh,-hh,hh*2,hh*2); }
+      g.filter="none"; g.globalAlpha=1; g.restore();
+      g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.rotate(rot);
+      g.beginPath(); g.arc(0,0,rx,0,7); g.clip();
+      if (glow>1) g.filter="brightness("+(1+(glow-1)*0.7)+")";
+      g.globalAlpha=DISC_ALPHA; g.drawImage(fA,-o,-o,o*2,o*2);
+      g.filter="none"; g.globalAlpha=1; g.restore();
+      g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.beginPath(); g.arc(0,0,rx,0,7); g.clip();
+      g.fillStyle="rgba(255,255,255,0.10)"; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
+      g.globalAlpha=0.9; g.drawImage(FROST,-rx,-rx,rx*2,rx*2); g.globalAlpha=1;
+      var sheen=g.createLinearGradient(0,-rx,0,rx);
+      sheen.addColorStop(0,"rgba(255,255,255,0.25)"); sheen.addColorStop(0.34,"rgba(255,255,255,0.025)");
+      sheen.addColorStop(0.66,"rgba(255,255,255,0.025)"); sheen.addColorStop(1,"rgba(255,255,255,0.16)");
+      g.fillStyle=sheen; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
+      var hot=g.createRadialGradient(0,-rx*0.4,0,0,-rx*0.4,rx*0.8);
+      hot.addColorStop(0,"rgba(255,255,255,0.13)"); hot.addColorStop(1,"rgba(255,255,255,0)");
+      g.fillStyle=hot; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
+      if (holeFrac>0){ var hr=rx*0.26; g.globalCompositeOperation="destination-out";
+        var pg=g.createRadialGradient(0,0,0,0,0,hr); pg.addColorStop(0,"rgba(0,0,0,1)"); pg.addColorStop(0.94,"rgba(0,0,0,1)"); pg.addColorStop(1,"rgba(0,0,0,0)");
+        g.fillStyle=pg; g.beginPath(); g.arc(0,0,hr,0,7); g.fill(); g.globalCompositeOperation="source-over"; }
+      g.restore();
+      g.save(); g.translate(cx,cy); g.scale(1,ry/rx);
+      var rim=g.createLinearGradient(0,-rx,0,rx); rim.addColorStop(0,"rgba(255,255,255,0.375)"); rim.addColorStop(0.5,"rgba(255,255,255,0.05)"); rim.addColorStop(1,"rgba(0,0,0,0.18)");
+      g.strokeStyle=rim; g.lineWidth=2; g.beginPath(); g.arc(0,0,rx*0.992,0,7); g.stroke(); g.restore();
+    }
+    function shadowInto(g,cx,cy,rx,ry){
+      g.save(); g.translate(cx,cy+ry*0.5); g.scale(1,ry/rx);
+      var sh=g.createRadialGradient(0,0,0,0,0,rx); sh.addColorStop(0,"rgba(0,0,0,0.07)"); sh.addColorStop(0.7,"rgba(0,0,0,0.03)"); sh.addColorStop(1,"rgba(0,0,0,0)");
+      g.fillStyle=sh; g.beginPath(); g.arc(0,0,rx,0,7); g.fill(); g.restore();
+    }
+    var geo={rx:0,ry:0,cx:0,topY:0,dz:0};
+    function selIndex(){ for (var i=0;i<H.masters.length;i++){ if (H.masters[i].id===state.master) return i; } return 0; }
+    function render(){
+      ctx.clearRect(0,0,W,Hc);
+      var M=H.masters.length; if (!M) return;
+      var sel=selIndex();
+      if (focusAmt.length!==M){ focusAmt=[]; for (var z=0;z<M;z++) focusAmt[z]=(z===sel?0:1); }
+      for (var i=0;i<M;i++){ var target=(i===sel)?0:1;
+        if (target>focusAmt[i]) focusAmt[i]=target;                       // off: instant
+        else { focusAmt[i]+=(target-focusAmt[i])*0.07; if (focusAmt[i]-target<0.003) focusAmt[i]=target; } }
+      var rx=Math.min(92, W*0.42), ry=rx*tilt;
+      var topY=ry+16, botPad=ry+12, avail=Hc-topY-botPad;
+      var dz=M>1?Math.min(58, avail/(M-1)):0, towerH=(M-1)*dz, cx=W/2;
+      geo={rx:rx,ry:ry,cx:cx,topY:topY,dz:dz};
+      ctx.save(); ctx.translate(cx,topY+towerH+ry*0.6); ctx.scale(1,tilt);
+      var sg=ctx.createRadialGradient(0,0,0,0,0,rx); sg.addColorStop(0,"rgba(0,0,0,.10)"); sg.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(0,0,rx*1.05,0,7); ctx.fill(); ctx.restore();
+      function group(idxs){
+        if (!idxs.length) return;
+        bctx.clearRect(0,0,W,Hc);
+        for (var k=0;k<idxs.length;k++){ var ii=idxs[k], cyy=topY+ii*dz; shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,0); }
+        bctx.save(); bctx.globalCompositeOperation="source-atop"; bctx.fillStyle="rgba(0,0,0,"+trimVal+")"; bctx.fillRect(0,0,W,Hc); bctx.restore();
+        ctx.save(); ctx.globalAlpha=opacityVal; ctx.drawImage(buf,0,0); ctx.restore();
+      }
+      function focusDisc(ii){ var amt=focusAmt[ii], cyy=topY+ii*dz;
+        shadowInto(ctx,cx,cyy,rx,ry);
+        bctx.clearRect(0,0,W,Hc); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,1-amt);
+        var trim=amt*trimVal; if (trim>0){ bctx.save(); bctx.globalCompositeOperation="source-atop"; bctx.fillStyle="rgba(0,0,0,"+trim+")"; bctx.fillRect(0,0,W,Hc); bctx.restore(); }
+        ctx.save(); ctx.globalAlpha=1-amt*(1-opacityVal); ctx.drawImage(buf,0,0); ctx.restore();
+      }
+      var below=[], above=[];
+      for (var n=M-1;n>=0;n--){ if (n>sel) below.push(n); else if (n<sel) above.push(n); }
+      group(below); focusDisc(sel); group(above);
+    }
+    function loop(){ rot+=0.008; render(); requestAnimationFrame(loop); }
+    cv.addEventListener("click", function(e){
+      var rect=cv.getBoundingClientRect();
+      var px=(e.clientX-rect.left)*(W/rect.width), py=(e.clientY-rect.top)*(Hc/rect.height);
+      for (var i=0;i<H.masters.length;i++){ var cy=geo.topY+i*geo.dz;
+        var ex=(px-geo.cx)/geo.rx, ey=(py-cy)/geo.ry;
+        if (ex*ex+ey*ey<=1){ state.master=H.masters[i].id; state.view="tabs"; update(); return; } }
+    });
+    loop();
+  }
+
   function init(){
     document.getElementById("cfd-app").innerHTML =
-      header() + overall() + toolbar() + '<div id="cfd-body"></div>'
+      header() + overall() + toolbar()
+      + '<div id="cfd-main"><aside id="cfd-tower" aria-label="Masters"><canvas id="cfd-tower-cv" width="240" height="560"></canvas></aside><div id="cfd-body"></div></div>'
       + '<footer class="ft">Color Font Dashboard · Color Flow — Hugo Jourdan<br>'+esc(H.generated)+'</footer>';
-    bind(); update();
+    bind(); update(); initTower();
     window.__cfdExport = { csv: exportCSV, json: exportJSON, rows: exportRows, printHTML: buildPrintReport };
     // After the first paint the bars have run their fill animation once; stop
     // tagging them ".intro" so later re-renders don't re-animate.

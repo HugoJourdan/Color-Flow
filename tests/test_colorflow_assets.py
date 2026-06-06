@@ -96,6 +96,15 @@ def test_dashboard_css_has_fill_on_load_and_focus_styles() -> None:
     assert ".heat.fading" in css                                # crossfade recompose
 
 
+def test_build_html_has_tower_master_navigator() -> None:
+    html = assets.build_html(_model())
+    assert 'id="cfd-tower"' in html              # persistent sidebar nav container
+    assert 'id="cfd-tower-cv"' in html           # the tower canvas
+    assert "function initTower(" in html         # tower bootstrap
+    assert "#cfd-main{display:flex" in html      # sidebar + body layout
+    assert "bind(); update(); initTower();" in html
+
+
 def test_dashboard_js_routes_focus_through_setfocus() -> None:
     js = assets.DASHBOARD_JS
     assert "function setFocus(" in js
