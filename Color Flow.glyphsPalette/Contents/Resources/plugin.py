@@ -1264,6 +1264,38 @@ class ColorFlow(PalettePlugin):
 	# HEADER (visible even when collapsed). Glyphs has no public hook for this, so
 	# we walk up from the palette view to the header NSView and add a subview. May
 	# break across Glyphs versions; fully guarded so it can never crash the palette.
+	# One-time diagnostic: print the palette view tree to the Macro panel so the
+	# header-injection target can be identified precisely. Remove once placed.
+	@objc.python_method
+	def _dump_view_hierarchy(self):
+		if getattr(self, "_dumpedHierarchy", False):
+			return
+		self._dumpedHierarchy = True
+		try:
+			lines = ["Color Flow [header dump] palette view tree (leaf -> root):"]
+			view = getattr(self, "dialog", None)
+			depth = 0
+			while view is not None and depth < 9:
+				kids = []
+				try:
+					for sub in view.subviews():
+						text = ""
+						if sub.isKindOfClass_(AppKit.NSTextField):
+							try:
+								text = "='%s'" % str(sub.stringValue())
+							except Exception:
+								text = ""
+						kids.append(sub.className() + text)
+				except Exception:
+					pass
+				lines.append("  L%d %s -> [%s]" % (depth, view.className(), ", ".join(kids)))
+				view = view.superview()
+				depth += 1
+			print("\n".join(lines))
+		except Exception:
+			import traceback
+			print("Color Flow [header dump] error:\n" + traceback.format_exc())
+
 	@objc.python_method
 	def _find_title_field(self):
 		view = getattr(self, "dialog", None)
@@ -1289,6 +1321,7 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _inject_title_bar(self):
+		self._dump_view_hierarchy()
 		if getattr(self, "_titleBar", None) is not None:
 			return
 		try:
