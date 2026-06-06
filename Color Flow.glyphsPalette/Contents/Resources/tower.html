@@ -280,8 +280,7 @@ function render(){
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
     ctx.restore();
     const other = (selected>=0 && Math.round(p)!==selected);
-    const hf = (holeOn && !other) ? 1 : 0;   // non-focused discs drop their hole
-    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, hf,
+    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0,
              other ? opacityVal : 1, other ? trimVal : 0);
   }
 }
