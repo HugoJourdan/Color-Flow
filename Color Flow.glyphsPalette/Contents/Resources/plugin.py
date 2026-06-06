@@ -188,6 +188,10 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def start(self):
 		Glyphs.addCallback(self.update, UPDATEINTERFACE)
+		try:
+			Glyphs.addCallback(self.contextMenuHandler, CONTEXTMENUCALLBACK)
+		except Exception:
+			pass
 		self.font = Glyphs.font
 		self.init = False
 		self.update(self._windowController)
@@ -1067,6 +1071,68 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [Update_Plugin_UI] error:\n" + traceback.format_exc())
+
+	# Right-click “Set workflow step” on the Font/Edit-View selection (#6).
+	# The callback signature for a palette is not firmly documented, so the handler
+	# finds the NSMenu among whatever args Glyphs passes and is fully guarded.
+	@objc.python_method
+	def contextMenuHandler(self, *args):
+		try:
+			if not self.meaning:
+				return
+			menu = None
+			for candidate in args:
+				if candidate is not None and hasattr(candidate, "addItem_"):
+					menu = candidate
+					break
+			if menu is None:
+				return
+			submenu = AppKit.NSMenu.alloc().initWithTitle_("Color Flow")
+			for color, label in self.meaning.items():
+				if not label:
+					continue
+				item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(label, "setStepFromMenu:", "")
+				item.setTarget_(self)
+				item.setRepresentedObject_(str(color))
+				submenu.addItem_(item)
+			submenu.addItem_(NSMenuItem.separatorItem())
+			clearItem = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Clear colour", "setStepFromMenu:", "")
+			clearItem.setTarget_(self)
+			clearItem.setRepresentedObject_("none")
+			submenu.addItem_(clearItem)
+			parent = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Color Flow", None, "")
+			parent.setSubmenu_(submenu)
+			menu.addItem_(parent)
+		except Exception:
+			import traceback
+			print("Color Flow [context menu] error:\n" + traceback.format_exc())
+
+	def setStepFromMenu_(self, sender):
+		try:
+			raw = sender.representedObject()
+			self._apply_step_to_selection(None if raw == "none" else int(raw))
+		except Exception:
+			import traceback
+			print("Color Flow [set step] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _apply_step_to_selection(self, color):
+		font = Glyphs.font
+		if font is None:
+			return
+		layers = font.selectedLayers or []
+		try:
+			font.disableUpdateInterface()
+		except Exception:
+			pass
+		try:
+			for layer in layers:
+				layer.color = color
+		finally:
+			try:
+				font.enableUpdateInterface()
+			except Exception:
+				pass
 
 	# Review Queue + Focus (#10, #11): single-click a step's count badge to
 	# focus that step (row highlight) and open exactly its glyphs in a new Edit
