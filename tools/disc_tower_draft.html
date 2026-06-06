@@ -59,6 +59,10 @@ function hexA(hex,a){
   const n = parseInt(hex.slice(1),16);
   return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
 }
+// Vivid full-spectrum hue per label slot — the SAME palette as the favicon and
+// the button GIF (a full HSL rainbow wheel), not the muted Glyphs label hexes.
+function hueHsl(i){ return `hsl(${Math.round((i/12)*360)},100%,55%)`; }
+function hueHsla(i,a){ return `hsla(${Math.round((i/12)*360)},100%,55%,${a})`; }
 
 // Build one master's blurred colour disc on an offscreen canvas. Each label
 // colour is a soft radial blob placed at its position on the colour wheel,
@@ -82,41 +86,40 @@ function buildField(counts){
   const g = off.getContext("2d");
   const cx = FS/2, cy = FS/2, R = FS*0.46;
   const sum = counts.reduce((a,b)=>a+b,0) || 1;
-  // vivid base: a conic sweep through every present label colour (full hue ring),
-  // opaque so the disc is 100% and never muddy/grey
+  // base: smooth conic rainbow in the favicon / button-GIF vivid HSL palette,
+  // each present hue placed at its true wheel angle (a full wheel when all 12
+  // colours are present). Opaque, never muddy/grey.
   const present = [];
-  counts.forEach((c,i)=>{ if (c>0) present.push(COLORS[i]); });
-  if (!present.length) present.push("#cfcfd4");
-  let base;
-  try {
-    base = g.createConicGradient(-Math.PI/2, cx, cy);
-    present.forEach((hex,k)=>{
-      base.addColorStop(k/present.length, hex);
-      base.addColorStop((k+1)/present.length - 0.001, hex);
-    });
-    base.addColorStop(1, present[0]);
-  } catch (e) { base = present[0]; }
-  g.fillStyle = base; g.fillRect(0,0,FS,FS);
-  // bias the mix toward real proportions with vivid, fully-opaque radial blobs
+  counts.forEach((c,i)=>{ if (c>0) present.push(i); });
+  if (!present.length){
+    g.fillStyle = "hsl(0,0%,82%)"; g.fillRect(0,0,FS,FS);
+  } else {
+    let base;
+    try {
+      base = g.createConicGradient(-Math.PI/2, cx, cy);
+      present.forEach(idx=>{ base.addColorStop(idx/12, hueHsl(idx)); });
+      base.addColorStop(1, hueHsl(present[0]));
+    } catch (e) { base = hueHsl(present[0]); }
+    g.fillStyle = base; g.fillRect(0,0,FS,FS);
+  }
+  // bias toward real proportions with vivid radial blobs at each hue's angle
   counts.forEach((cnt,i)=>{
     if (!cnt) return;
     const share = cnt/sum;
     const ang = (i/12)*Math.PI*2 - Math.PI/2;
-    const rr = R*0.5;
-    const bx = cx+Math.cos(ang)*rr, by = cy+Math.sin(ang)*rr;
+    const bx = cx+Math.cos(ang)*R*0.5, by = cy+Math.sin(ang)*R*0.5;
     const rad = R*(0.5 + 0.9*share);
     const grd = g.createRadialGradient(bx,by,0,bx,by,rad);
-    grd.addColorStop(0, COLORS[i]);
-    grd.addColorStop(1, hexA(COLORS[i],0));
-    g.globalAlpha = 1;
-    g.fillStyle = grd;
+    grd.addColorStop(0, hueHsl(i));
+    grd.addColorStop(1, hueHsla(i,0));
+    g.globalAlpha = 1; g.fillStyle = grd;
     g.beginPath(); g.arc(bx,by,rad,0,7); g.fill();
   });
   g.globalAlpha = 1;
   const blurred = document.createElement("canvas"); blurred.width = blurred.height = FS;
   const bg = blurred.getContext("2d");
-  // soften the conic seams + crank saturation & brightness for the super-colourful look
-  bg.filter = "blur(20px) saturate(1.9) brightness(1.12)";
+  // soften the seams; HSL is already vivid so only a gentle boost
+  bg.filter = "blur(20px) saturate(1.25) brightness(1.06)";
   bg.drawImage(off,0,0);
   return blurred;
 }
