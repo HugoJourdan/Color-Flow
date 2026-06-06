@@ -184,6 +184,16 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cov-bar>span{display:block;height:100%}
 .cov-bar .cov-none{background:var(--c-none)}
 .cov-row .num{width:auto;min-width:48px;text-align:right;color:var(--muted)}
+.timeline{margin-top:14px}
+.tl-empty{margin-top:20px}
+.tl-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
+.tl-lg{display:inline-flex;align-items:center;gap:5px}
+.tl-lg i{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.tl-chart{width:100%;height:auto;display:block;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
+.tl-line{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.tl-grid{stroke:var(--track);stroke-width:1}
+.tl-axis{fill:var(--muted-2);font-size:10px}
+.tl-foot{display:flex;justify-content:space-between;font-size:var(--fs-2xs);color:var(--muted-2);margin-top:6px}
 .ov-ring{display:block}
 .ov-ring .ov-ring-track{stroke:var(--track)}
 .ov-ring .ov-ring-arc{stroke:var(--accent)}
@@ -299,6 +309,7 @@ DASHBOARD_JS = r"""
       + '<button type="button" id="cfd-sort" class="chip">↕ Sort: workflow</button>'
       + '<button type="button" id="cfd-recent" class="chip" aria-pressed="false" title="Ring glyphs edited in the last 7 days">🕑 Recent</button>'
       + '<button type="button" id="cfd-coverage" class="chip" aria-pressed="false">🗂 Coverage</button>'
+      + '<button type="button" id="cfd-timeline" class="chip" aria-pressed="false">📈 Timeline</button>'
       + '<button type="button" id="cfd-compare" class="chip" aria-pressed="false">▤ Compare</button>'
       + '<button type="button" id="cfd-export" class="chip" title="Export the report as PDF, CSV or JSON">⤓ Export Report</button></div>';
   }
@@ -448,6 +459,42 @@ DASHBOARD_JS = r"""
     }).join("") : '<p class="empty">No glyphs.</p>';
     return masterTabs()+'<section class="cov"><div class="panel">'+head+'<div class="cov-rows">'+body+'</div></div></section>';
   }
+  // ----- Timeline: completion over time, one line per master -----
+  function masterHue(i){ return Math.round((i*137.508) % 360); }
+  function timelineView(){
+    var series = (H.trend && H.trend.series) || [];
+    if (series.length < 2){
+      return '<section class="tl-empty"><p class="empty">Not enough history yet. Color Flow saves a snapshot each time you save the font; this timeline fills in as days of history accumulate.</p></section>';
+    }
+    var W=680, Ht=200, pl=30, pr=12, ptop=12, pb=8, iw=W-pl-pr, ih=Ht-ptop-pb;
+    var t0 = new Date(series[0].date).getTime();
+    function dayOff(d){ return (new Date(d).getTime()-t0)/86400000; }
+    var lastOff = Math.max(1, dayOff(series[series.length-1].date));
+    function X(o){ return pl + o/lastOff*iw; }
+    function Y(p){ return ptop + ih - p/100*ih; }
+    var grid = [0,25,50,75,100].map(function(g){
+      var y = Y(g).toFixed(1);
+      return '<line class="tl-grid" x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'"/>'
+        + '<text class="tl-axis" x="'+(pl-5)+'" y="'+(parseFloat(y)+3).toFixed(1)+'" text-anchor="end">'+g+'</text>';
+    }).join("");
+    var lines = "", legend = "";
+    H.masters.forEach(function(m, i){
+      var col = "hsl("+masterHue(i)+",70%,55%)";
+      var pts = series.map(function(p){
+        var mp = p.masters[m.id]; if (!mp) return null;
+        var c = mp.total ? mp.final/mp.total*100 : 0;
+        return { x:X(dayOff(p.date)), y:Y(c), pc:c, date:p.date };
+      }).filter(Boolean);
+      if (!pts.length) return;
+      var poly = pts.map(function(o){ return o.x.toFixed(1)+","+o.y.toFixed(1); }).join(" ");
+      var dots = pts.map(function(o){ return '<circle cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="2.5" fill="'+col+'"><title>'+esc(m.name+" · "+o.date+" · "+Math.round(o.pc)+"%")+'</title></circle>'; }).join("");
+      lines += '<polyline class="tl-line" points="'+poly+'" stroke="'+col+'"/>'+dots;
+      legend += '<span class="tl-lg"><i style="background:'+col+'"></i>'+esc(m.name)+' '+Math.round(pts[pts.length-1].pc)+'%</span>';
+    });
+    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" aria-label="Completion over time per master">'+grid+lines+'</svg>';
+    var foot = '<div class="tl-foot"><span>'+esc(series[0].date)+'</span><span>'+esc(series[series.length-1].date)+'</span></div>';
+    return '<section class="timeline"><div class="tl-legend">'+legend+'</div>'+chart+foot+'</section>';
+  }
   function compareView(){
     var head = '<th scope="col">Step</th>'+H.masters.map(function(m){
       var pv = m.preview;
@@ -468,6 +515,7 @@ DASHBOARD_JS = r"""
   function renderBody(){
     return state.view==="compare" ? compareView()
       : state.view==="coverage" ? coverageView()
+      : state.view==="timeline" ? timelineView()
       : tabsView();
   }
 
@@ -517,6 +565,7 @@ DASHBOARD_JS = r"""
     document.documentElement.setAttribute("data-theme", state.theme);
     var cmp = document.getElementById("cfd-compare"); if (cmp) cmp.setAttribute("aria-pressed", state.view==="compare");
     var cov = document.getElementById("cfd-coverage"); if (cov) cov.setAttribute("aria-pressed", state.view==="coverage");
+    var tl = document.getElementById("cfd-timeline"); if (tl) tl.setAttribute("aria-pressed", state.view==="timeline");
     var uf = document.getElementById("cfd-unfinished"); if (uf) uf.setAttribute("aria-pressed", state.unfinishedOnly);
     var rc = document.getElementById("cfd-recent"); if (rc) rc.setAttribute("aria-pressed", state.recent);
     var sb = document.getElementById("cfd-sort"); if (sb) sb.textContent = "↕ Sort: "+(state.sort==="progress"?"progress":"workflow");
@@ -622,6 +671,7 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-sort").addEventListener("click", function(){ state.sort = state.sort==="workflow" ? "progress" : "workflow"; update(); });
     document.getElementById("cfd-compare").addEventListener("click", function(){ state.view = state.view==="compare" ? "tabs" : "compare"; update(); });
     document.getElementById("cfd-coverage").addEventListener("click", function(){ state.view = state.view==="coverage" ? "tabs" : "coverage"; update(); });
+    document.getElementById("cfd-timeline").addEventListener("click", function(){ state.view = state.view==="timeline" ? "tabs" : "timeline"; update(); });
     document.getElementById("cfd-export").addEventListener("click", openExport);
     document.addEventListener("keydown", function(e){
       if (e.key==="Escape"){ closeExport(); }
