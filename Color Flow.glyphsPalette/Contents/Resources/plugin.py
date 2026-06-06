@@ -99,6 +99,7 @@ class ColorFlow(PalettePlugin):
 		# Separator lines + colour tags (depend on the meaning order/visibility).
 		# Per-row widgets (label / bar / count) are built by Update_Plugin_UI.
 		self._rowChecks = {}
+		self._rowOverlays = {}
 		self._focusColor = None
 		self._countBoxes = {}
 		self._build_static_rows()
@@ -158,7 +159,7 @@ class ColorFlow(PalettePlugin):
 	def reload_after_settings(self):
 		self.meaning = self.Load_Meaning()
 		for i in range(12):
-			for suffix in ("line", "colorTag", "", "box", "count", "hl", "focus", "eye", "eyeTag", "eyeLine"):
+			for suffix in ("line", "colorTag", "", "box", "count", "hl", "focus", "click", "eye", "eyeTag", "eyeLine"):
 				attr = str(i) + suffix
 				if hasattr(self.paletteView.frame, attr):
 					delattr(self.paletteView.frame, attr)
@@ -904,34 +905,51 @@ class ColorFlow(PalettePlugin):
 	# built checkbox and remember which colour it is (widgets rebuild each refresh).
 	@objc.python_method
 	def _attach_rename(self, checkbox, color):
+		# Register the row's label for drop-target geometry only. Row interaction
+		# (open-tab click + drag-reorder) lives on a full-width transparent overlay
+		# added after the count, so the WHOLE row responds — see _attach_row_overlay.
 		self._rowChecks[color] = checkbox
-		button = self._ns_button(checkbox)
-		# Single-click a row opens that step's glyphs (rename now lives in
-		# Edit ▸ Color Flow settings, not on the palette).
+
+	# A transparent, full-width overlay laid over each row (above the bar, label
+	# and count) so a click anywhere on the row opens that step's tab and a drag
+	# reorders it. The label/count underneath stay visible.
+	@objc.python_method
+	def _attach_row_overlay(self, color, yPos):
+		overlay = Group((0, yPos - self.shift - 1, self.width, 19))
+		setattr(self.paletteView.frame, str(color) + "click", overlay)
+		self._rowOverlays[color] = overlay
+		view = overlay._nsObject
 		try:
-			singleClick = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "rowClicked:")
-			singleClick.setNumberOfClicksRequired_(1)
-			button.addGestureRecognizer_(singleClick)
+			click = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "rowClicked:")
+			click.setNumberOfClicksRequired_(1)
+			view.addGestureRecognizer_(click)
 		except Exception:
 			pass
-		# NOTE: do NOT set a Python attribute on the recognizer (e.g.
-		# pan._cf_color) — PyObjC framework objects have no __dict__, so it
-		# raises AttributeError and (when wrapped in try/except) silently
-		# prevents the gesture from ever being attached. The colour is resolved
-		# in colorDragged_ by matching the recognizer's view, exactly like the
-		# double-click handler does.
 		try:
 			pan = NSPanGestureRecognizer.alloc().initWithTarget_action_(self, "colorDragged:")
-			button.addGestureRecognizer_(pan)
+			view.addGestureRecognizer_(pan)
 		except Exception:
-			import traceback
-			print("Color Flow [attach pan] error:\n" + traceback.format_exc())
+			pass
+		try:
+			area = AppKit.NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
+				view.bounds(),
+				AppKit.NSTrackingCursorUpdate | AppKit.NSTrackingActiveInKeyWindow,
+				self, None)
+			view.addTrackingArea_(area)
+		except Exception:
+			pass
 
 	# Resolve which colour-row a gesture recognizer is attached to (its view is
 	# the row's checkbox NSButton).
 	@objc.python_method
 	def _color_for_recognizer(self, recognizer):
 		view = recognizer.view()
+		for color, overlay in getattr(self, "_rowOverlays", {}).items():
+			try:
+				if overlay._nsObject == view:
+					return color
+			except Exception:
+				pass
 		for color, checkbox in getattr(self, "_rowChecks", {}).items():
 			if self._ns_button(checkbox) == view:
 				return color
@@ -1142,6 +1160,7 @@ class ColorFlow(PalettePlugin):
 			if not self.font or not self.meaning or getattr(self, "_eye_mode", False):
 				return
 			self._rowChecks = {}
+			self._rowOverlays = {}
 			yPos = 13
 			masterId = self.font.selectedFontMaster.id
 			counts = self._counts(masterId)
@@ -1153,7 +1172,7 @@ class ColorFlow(PalettePlugin):
 			firstColor = selectedLayers[0].color if selectedLayers else None
 
 			for color, meaning in self.meaning.items():
-				for suffix in ("", "box", "count", "hl", "focus"):
+				for suffix in ("", "box", "count", "hl", "focus", "click"):
 					attr = str(color) + suffix
 					if hasattr(self.paletteView.frame, attr):
 						delattr(self.paletteView.frame, attr)
@@ -1177,6 +1196,7 @@ class ColorFlow(PalettePlugin):
 					setattr(self.paletteView.frame, str(color), checkbox)
 					self._attach_rename(checkbox, color)
 					self._make_count(color, count, yPos)
+					self._attach_row_overlay(color, yPos)
 					yPos += 19
 				else:
 					if barWidth:
@@ -1186,6 +1206,7 @@ class ColorFlow(PalettePlugin):
 					setattr(self.paletteView.frame, str(color), checkbox)
 					self._attach_rename(checkbox, color)
 					self._make_count(color, count, yPos)
+					self._attach_row_overlay(color, yPos)
 					yPos += 19
 			self._countBoxes = {}
 			for reviewColor in list(self._rowChecks.keys()):
@@ -1285,6 +1306,9 @@ class ColorFlow(PalettePlugin):
 
 	def rowClicked_(self, sender):
 		try:
+			lastDrag = getattr(self, "_lastDragTime", None)
+			if lastDrag is not None and (datetime.now() - lastDrag).total_seconds() < 0.25:
+				return
 			color = self._color_for_recognizer(sender)
 			if color is None:
 				return
@@ -1939,6 +1963,7 @@ class ColorFlow(PalettePlugin):
 			rgb = self.colorKeys.get(key, (0.5, 0.5, 0.5, 0.5))
 			alpha = 0.5 if visible else 0.12
 			setattr(self.paletteView.frame, key+"eyeTag", Box((0, yPos-self.shift-1, 6, 19), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], alpha), cornerRadius=0, borderWidth=0))
+			setattr(self.paletteView.frame, key+"eyeLine", HorizontalLine((0, yPos-self.shift-1, 0, 1)))
 			shown = label or colornames.DEFAULT_LABELS.get(index, key)
 			textbox = TextBox((12, yPos-self.shift+2, -10, 20), shown, sizeStyle='small')
 			setattr(self.paletteView.frame, key+"eye", textbox)
