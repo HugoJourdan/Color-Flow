@@ -55,69 +55,39 @@ const MASTERS = [
 const cv = document.getElementById("c"), ctx = cv.getContext("2d");
 const W = cv.width, H = cv.height;
 
-function hexA(hex,a){
-  const n = parseInt(hex.slice(1),16);
-  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
-}
 // Vivid full-spectrum hue per label slot — the SAME palette as the favicon and
 // the button GIF (a full HSL rainbow wheel), not the muted Glyphs label hexes.
 function hueHsl(i){ return `hsl(${Math.round((i/12)*360)},100%,55%)`; }
-function hueHsla(i,a){ return `hsla(${Math.round((i/12)*360)},100%,55%,${a})`; }
 
 // Build one master's blurred colour disc on an offscreen canvas. Each label
 // colour is a soft radial blob placed at its position on the colour wheel,
 // sized by its share of the master; a final blur pass gives the favicon look.
-// Count-weighted average colour of a master — the disc's colour-only base fill
-// (no white), so sparse masters read as their hue, not as a pale wash.
-function avgHex(counts){
-  let r=0, g=0, b=0, sum=0;
-  counts.forEach((cnt,i)=>{
-    if (!cnt) return;
-    const n = parseInt(COLORS[i].slice(1),16);
-    r += ((n>>16)&255)*cnt; g += ((n>>8)&255)*cnt; b += (n&255)*cnt; sum += cnt;
-  });
-  if (!sum) return "#c8c8cc";
-  return `rgb(${Math.round(r/sum)},${Math.round(g/sum)},${Math.round(b/sum)})`;
-}
-
 const FS = 320;
+// Build one master's disc: PROPORTIONAL pie wedges — each label-colour occupies
+// an arc sized by its share of THIS master's coloured glyphs — then blurred for
+// the favicon look. So the disc literally shows the master's colour repartition:
+// a red/yellow-heavy master reads red/yellow, an even spread stays rainbow, and
+// the discs differ from one master to the next. Uncolored glyphs are represented
+// by the central hole, not here.
 function buildField(counts){
   const off = document.createElement("canvas"); off.width = off.height = FS;
   const g = off.getContext("2d");
   const cx = FS/2, cy = FS/2, R = FS*0.46;
-  const sum = counts.reduce((a,b)=>a+b,0) || 1;
-  // base: smooth conic rainbow in the favicon / button-GIF vivid HSL palette,
-  // each present hue placed at its true wheel angle (a full wheel when all 12
-  // colours are present). Opaque, never muddy/grey.
-  const present = [];
-  counts.forEach((c,i)=>{ if (c>0) present.push(i); });
-  if (!present.length){
+  const sum = counts.reduce((a,b)=>a+b,0);
+  if (!sum){
     g.fillStyle = "hsl(0,0%,82%)"; g.fillRect(0,0,FS,FS);
   } else {
-    let base;
-    try {
-      base = g.createConicGradient(-Math.PI/2, cx, cy);
-      present.forEach(idx=>{ base.addColorStop(idx/12, hueHsl(idx)); });
-      base.addColorStop(1, hueHsl(present[0]));
-    } catch (e) { base = hueHsl(present[0]); }
-    g.fillStyle = base; g.fillRect(0,0,FS,FS);
+    let acc = -Math.PI/2;                       // start at 12 o'clock
+    counts.forEach((cnt,i)=>{
+      if (!cnt) return;
+      const a1 = acc + (cnt/sum)*Math.PI*2;     // arc width = this colour's share
+      g.fillStyle = hueHsl(i);
+      g.beginPath(); g.moveTo(cx,cy);
+      g.arc(cx,cy, R*1.25, acc, a1); g.closePath(); g.fill();
+      acc = a1;
+    });
   }
-  // bias toward real proportions with vivid radial blobs at each hue's angle
-  counts.forEach((cnt,i)=>{
-    if (!cnt) return;
-    const share = cnt/sum;
-    const ang = (i/12)*Math.PI*2 - Math.PI/2;
-    const bx = cx+Math.cos(ang)*R*0.5, by = cy+Math.sin(ang)*R*0.5;
-    const rad = R*(0.5 + 0.9*share);
-    const grd = g.createRadialGradient(bx,by,0,bx,by,rad);
-    grd.addColorStop(0, hueHsl(i));
-    grd.addColorStop(1, hueHsla(i,0));
-    g.globalAlpha = 1; g.fillStyle = grd;
-    g.beginPath(); g.arc(bx,by,rad,0,7); g.fill();
-  });
-  g.globalAlpha = 1;
-  // colours fill to the hole (centre matches the sides); add just a touch of
-  // darkening toward the middle for depth around the bore
+  // darken toward the centre for depth around the bore
   const dk = g.createRadialGradient(cx,cy,0, cx,cy,R*0.72);
   dk.addColorStop(0, "rgba(0,0,0,0.58)");
   dk.addColorStop(0.5, "rgba(0,0,0,0.26)");
@@ -125,8 +95,8 @@ function buildField(counts){
   g.fillStyle = dk; g.beginPath(); g.arc(cx,cy,R*0.72,0,7); g.fill();
   const blurred = document.createElement("canvas"); blurred.width = blurred.height = FS;
   const bg = blurred.getContext("2d");
-  // soften the seams (lighter blur = sharper disc); HSL is already vivid so gentle boost
-  bg.filter = "blur(4px) saturate(1.3) brightness(1.06)";
+  // blur the wedge seams into a smooth favicon-like wheel; HSL is already vivid
+  bg.filter = "blur(9px) saturate(1.3) brightness(1.05)";
   bg.drawImage(off,0,0);
   return blurred;
 }
