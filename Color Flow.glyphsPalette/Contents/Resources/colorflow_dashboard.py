@@ -545,14 +545,15 @@ def _family_logo(font) -> dict:
 
 def _favicon_data_uri() -> str:
     """The bundled brand favicon as a self-contained ``data:`` URI. Prefers
-    ``favicon.png`` (base64) and falls back to ``favicon.svg`` (URL-encoded)
-    beside this module. ``""`` when neither file is present."""
+    ``favicon.gif`` (base64), then ``favicon.png`` (base64), and falls back to
+    ``favicon.svg`` (URL-encoded) beside this module. ``""`` when none present."""
     here = Path(__file__).parent
-    try:
-        png = (here / "favicon.png").read_bytes()
-        return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
-    except OSError:
-        pass
+    for name, mime in (("favicon.gif", "image/gif"), ("favicon.png", "image/png")):
+        try:
+            data = (here / name).read_bytes()
+        except OSError:
+            continue
+        return f"data:{mime};base64," + base64.b64encode(data).decode("ascii")
     try:
         text = (here / "favicon.svg").read_text(encoding="utf-8")
     except OSError:
