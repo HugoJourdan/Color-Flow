@@ -50,7 +50,7 @@ def _favicon_link(model: dict) -> str:
 
 def build_html(model: dict) -> str:
     """Assemble the complete, self-contained dashboard page from a model."""
-    title = xesc(f'{model["generated"]}_{model.get("family") or ""}_Color-Flow-Dashboard')
+    title = xesc(f'Colorflow Dashboard - {model.get("family") or "Untitled"}')
     return (
         '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
@@ -68,7 +68,7 @@ DASHBOARD_CSS = """
 :root{
   --bg:#0a0b0e;--surface:#0e1014;--surface-2:#101217;--border:#1c1f26;--border-2:#23262e;
   --text:#e6e8ec;--muted:#9aa0ab;--muted-2:#6b7280;--accent:#6e7bff;--ok:#3fb950;
-  --track:#15171c;--swatch-outline:rgba(255,255,255,.10);--glyph-ink:rgba(0,0,0,.74);
+  --track:#15171c;--swatch-outline:rgba(255,255,255,.10);--glyph-ink:var(--text);
   --c-none-a:#0e1116;--c-none-b:#3a3f4a;
   --c0:#f97e55;--c1:#ffbe68;--c2:#ba9d6d;--c3:#fff157;--c4:#c1ec8a;--c5:#6bab59;
   --c6:#64a5ef;--c7:#576ef1;--c8:#a962e7;--c9:#e77eb4;--c10:#c5c5c5;--c11:#5f5f5f;
@@ -85,7 +85,7 @@ html[data-theme=light]{
 }
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains Mono","JetBrainsMono Nerd Font",ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace,"Apple Color Emoji";
+body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains Mono",monospace;
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
 @media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}}
@@ -108,16 +108,16 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .chip:hover{color:var(--text)}
 .chip[aria-pressed=true]{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
 .overall{display:flex;align-items:center;gap:22px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:16px 0}
-.ov-num{display:flex;flex-direction:column}
+.ov-num{display:flex;align-items:center;justify-content:center}
 .ov-num .big{font-size:var(--fs-big);font-weight:650;letter-spacing:-.02em;line-height:1}
 .ov-num .big small{font-size:var(--fs-big-sm);color:var(--muted-2)}
 .ov-sub{font-size:var(--fs-xs);color:var(--muted-2);text-transform:uppercase;letter-spacing:.06em}
 .ov-main{flex:1}
 .ov-head{font-size:var(--fs-sm);color:var(--muted);margin-bottom:8px}
 .ov-head b{color:var(--text)}
-.seg{display:flex;height:8px;border-radius:5px;overflow:hidden;background:var(--track)}
-.seg>span{background:var(--accent)}
-.seg .soft{background:color-mix(in srgb,var(--accent) 35%,transparent)}
+.seg{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--track)}
+.seg>span{display:block;height:100%}
+.seg .seg-none{background:var(--c-none)}
 .ov-recipe{margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
 .ov-recipe b{color:var(--text)}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
@@ -128,20 +128,24 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .tab:hover{color:var(--text)}
 .tab.on{color:var(--text);border-bottom-color:var(--accent)}
 .tab .tabsvg{display:block;height:26px;width:auto;color:inherit}
-.rows{margin:6px 0 4px}
-.row{display:flex;align-items:center;gap:12px;font-size:var(--fs-row);padding:9px 0;border-top:1px solid var(--track)}
+.rows{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 22px;margin:6px 0 4px}
+.row{display:flex;align-items:center;gap:9px;font-size:var(--fs-sm);padding:7px 0;border-top:1px solid var(--track);min-width:0}
 .row .dot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
-.row .rl{flex:1}
+.row .rl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .chk{color:var(--ok)}
 .row.done .rl{color:var(--muted)}
-.bar{width:200px;height:5px;background:var(--track);border-radius:3px;overflow:hidden;flex:none}
+.bar{flex:1;min-width:20px;height:5px;background:var(--track);border-radius:3px;overflow:hidden}
 .bar>span{display:block;height:100%;border-radius:3px}
-.row .num{width:54px;text-align:right;color:var(--muted)}
-.row .pc{width:40px;text-align:right}
+.row .num{display:none}
+.row .pc{width:38px;text-align:right;flex:none}
+@media (max-width:720px){.rows{grid-template-columns:1fr}}
 .heat{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
 .heat-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:10px}
 .heat-h .ba-toggle{margin-left:auto;flex:none}
 .heat-h .hint{color:var(--muted-2)}
+.cat:first-child{margin-top:0}
+.cat-h{font-size:var(--fs-xs);color:var(--muted);margin:14px 0 6px;display:flex;align-items:center;gap:6px}
+.cat-n{color:var(--muted-2)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:6px}
 .cell{aspect-ratio:1;border:0;padding:0;border-radius:5px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}
@@ -175,27 +179,27 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cov-switch .chip.on{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
 .cov-rows{margin:6px 0 4px}
 .cov-row{display:flex;align-items:center;gap:12px;font-size:var(--fs-row);padding:9px 0;border-top:1px solid var(--track)}
-.cov-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.trend{display:flex;flex-direction:column;gap:16px;margin-top:14px}
-.trend-empty{margin-top:20px}
-.tcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
-.tcard-h{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:10px}
-.tname{font-weight:600}
-.tstats{display:flex;gap:18px;flex-wrap:wrap;margin-left:auto;font-size:var(--fs-sm)}
-.tstat{display:flex;flex-direction:column;line-height:1.25}
-.tstat i{font-style:normal;font-size:var(--fs-2xs);color:var(--muted-2);text-transform:uppercase;letter-spacing:.05em}
-.tstat.teta{min-width:150px}
-.tconf{font-size:var(--fs-2xs);padding:1px 5px;border-radius:4px;border:1px solid var(--border-2);color:var(--muted)}
-.tconf.high{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 60%,var(--border-2))}
-.tconf.low,.tconf.none{color:var(--muted-2)}
-.tchart{width:100%;height:auto;display:block;margin-top:2px}
-.tchart .tline{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
-.tchart circle{fill:var(--accent)}
-.tchart .tgoal{stroke:var(--border-2);stroke-width:1;stroke-dasharray:3 3}
-.tchart .tproj{stroke:var(--ok);stroke-width:1.5;stroke-dasharray:4 3;fill:none}
-.tchart .teta{fill:var(--ok)}
-.tchart .tband{fill:color-mix(in srgb,var(--ok) 14%,transparent)}
-.tfoot{display:flex;justify-content:space-between;font-size:var(--fs-2xs);color:var(--muted-2);margin-top:6px}
+.cov-name{width:120px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cov-bar{flex:1;display:flex;height:16px;border-radius:5px;overflow:hidden;background:var(--track);min-width:0}
+.cov-bar>span{display:block;height:100%}
+.cov-bar .cov-none{background:var(--c-none)}
+.cov-row .num{width:auto;min-width:48px;text-align:right;color:var(--muted)}
+.ov-ring{display:block}
+.ov-ring .ov-ring-track{stroke:var(--track)}
+.ov-ring .ov-ring-arc{stroke:var(--accent)}
+.ov-ring-t{fill:var(--text);font-size:17px;font-weight:600}
+.cmp-aa{display:block;height:20px;width:auto;margin:0 auto;color:var(--text)}
+.cmp-mname{display:block;font-size:var(--fs-2xs);color:var(--muted);font-weight:400;margin-top:3px;white-space:nowrap}
+.cfd-modal{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.5)}
+.cfd-modal-box{background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:18px 20px;box-shadow:0 18px 60px rgba(0,0,0,.45);max-width:440px;width:calc(100% - 40px)}
+.cfd-modal-h{font-size:var(--fs-base);font-weight:600;margin-bottom:14px}
+.cfd-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.cfd-card{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;background:var(--surface-2);border:1px solid var(--border-2);border-radius:10px;padding:16px 8px;color:var(--text);cursor:pointer;font:inherit}
+.cfd-card:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface-2))}
+.cfd-card-ic{font-size:22px;line-height:1.1}
+.cfd-card b{font-size:var(--fs-sm)}
+.cfd-card small{font-size:var(--fs-2xs);color:var(--muted-2)}
+@media print{.tb,.hd .icon,.cfd-modal,.cfd-tip,.toast{display:none!important}body{opacity:1!important}#cfd-app{max-width:none}}
 .ft{margin-top:30px;padding-top:16px;border-top:1px solid var(--border);font-size:var(--fs-2xs);color:var(--muted-2);line-height:1.6}
 .cfd-tip{position:fixed;z-index:20;display:none;background:var(--surface);border:1px solid var(--border-2);border-radius:8px;padding:8px 10px;box-shadow:0 6px 24px rgba(0,0,0,.32);pointer-events:none}
 .cfd-tip .tip-h{font-size:var(--fs-2xs);color:var(--muted);margin-bottom:5px;white-space:nowrap}
@@ -219,7 +223,7 @@ DASHBOARD_JS = r"""
   var prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
   var state = {
     master: H.masters.length ? H.masters[0].id : null,
-    view: "tabs", before: false, q: "", unfinishedOnly: true, sort: "workflow",
+    view: "tabs", before: false, unfinishedOnly: true, sort: "workflow",
     coverGroup: "byScript", recent: false,
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
@@ -244,7 +248,6 @@ DASHBOARD_JS = r"""
     if (H.mode==="free") return H.order.indexOf(String(k))!==-1;
     return String(k)===lastOrder;
   }
-  function matchQ(name){ return !state.q || name.toLowerCase().indexOf(state.q.toLowerCase())!==-1; }
   function stepsSorted(m){
     var s = H.steps.slice();
     if (state.sort==="progress"){ s.sort(function(a,b){ return countFor(m,b.key)-countFor(m,a.key); }); }
@@ -265,6 +268,16 @@ DASHBOARD_JS = r"""
     return { grand:grand, agg:agg, started:started, completion:completion };
   }
 
+  function aggExclusive(){
+    var dist = {}; H.order.forEach(function(o){ dist[o]=0; }); var none = 0;
+    H.masters.forEach(function(m){
+      (m.keys||[]).forEach(function(k){
+        var sk = String(k);
+        if (k===-1 || H.order.indexOf(sk)===-1) none++; else dist[sk]++;
+      });
+    });
+    return { dist:dist, none:none };
+  }
   function streakBadge(){
     var s = (H.trend && H.trend.streak) || {};
     if (!s.current) return "";
@@ -278,29 +291,31 @@ DASHBOARD_JS = r"""
       + '<span class="meta">'+esc(H.fileName)+' · v'+esc(H.version)+'</span>'
       + '<span class="sp"></span>'
       + streakBadge()
-      + '<span class="mode">Mode · '+(H.mode==="free"?"Free":"Step")+'</span>'
       + '<button type="button" id="cfd-theme" class="icon" aria-label="Toggle light or dark theme">◐</button></header>';
   }
   function toolbar(){
     return '<div class="tb">'
-      + '<label class="search"><span aria-hidden="true">⌕</span>'
-      + '<input id="cfd-search" type="search" placeholder="Search glyphs…" aria-label="Search glyphs" autocomplete="off"><kbd>/</kbd></label>'
       + '<button type="button" id="cfd-unfinished" class="chip" aria-pressed="'+state.unfinishedOnly+'">◦ Unfinished only</button>'
       + '<button type="button" id="cfd-sort" class="chip">↕ Sort: workflow</button>'
       + '<button type="button" id="cfd-recent" class="chip" aria-pressed="false" title="Ring glyphs edited in the last 7 days">🕑 Recent</button>'
-      + '<button type="button" id="cfd-trend" class="chip" aria-pressed="false">📈 Trend</button>'
       + '<button type="button" id="cfd-coverage" class="chip" aria-pressed="false">🗂 Coverage</button>'
       + '<button type="button" id="cfd-compare" class="chip" aria-pressed="false">▤ Compare</button>'
-      + '<button type="button" id="cfd-csv" class="chip" title="Download per-step counts as CSV">⇩ CSV</button>'
-      + '<button type="button" id="cfd-json" class="chip" title="Download the summary as JSON">⇩ JSON</button></div>';
+      + '<button type="button" id="cfd-export" class="chip" title="Export the report as PDF, CSV or JSON">⤓ Export Report</button></div>';
+  }
+  function ring(p){
+    var r=26, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(100,p))/100);
+    return '<svg class="ov-ring" width="66" height="66" viewBox="0 0 66 66" role="img" aria-label="'+p+'% complete">'
+      + '<circle class="ov-ring-track" cx="33" cy="33" r="'+r+'" fill="none" stroke-width="6"/>'
+      + '<circle class="ov-ring-arc" cx="33" cy="33" r="'+r+'" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 33 33)"/>'
+      + '<text class="ov-ring-t" x="33" y="34" text-anchor="middle" dominant-baseline="central">'+p+'%</text></svg>';
   }
   function overall(){
     var a = aggregate(), compP = pct(a.completion,a.grand), startP = pct(a.started,a.grand);
     var legend = H.steps.map(function(s){
-      return '<span class="lg"><i style="background:var('+varFor(s.key)+')"></i>'+esc(s.label)+' '+pct(a.agg[String(s.key)]||0,a.grand)+'%</span>';
+      return '<span class="lg" title="'+esc(s.label)+'"><i style="background:var('+varFor(s.key)+')"></i>'+pct(a.agg[String(s.key)]||0,a.grand)+'%</span>';
     }).join("");
     var head = (H.mode==="free" || !lastOrder)
-      ? '<b>'+a.started+'/'+a.grand+'</b> labelled ('+startP+'%)'
+      ? '<b>'+a.started+'/'+a.grand+'</b> ('+startP+'%)'
       : '<b>'+a.completion+'/'+a.grand+'</b> complete ('+compP+'%) · '+a.started+'/'+a.grand+' started ('+startP+'%)';
     var recipeLine = "";
     if (H.recipes && H.recipes.length){
@@ -309,11 +324,17 @@ DASHBOARD_JS = r"""
       recipeLine = '<div class="ov-recipe">Recipe-adjusted: <b>'+recipeComplete+'/'+a.grand+'</b> complete ('
         + pct(recipeComplete,a.grand)+'%) · '+H.recipes.length+' recipe'+(H.recipes.length===1?"":"s")+'</div>';
     }
+    var ex = aggExclusive();
+    var segParts = H.steps.map(function(s){
+      var w = pct(ex.dist[String(s.key)]||0, a.grand);
+      return w ? '<span style="width:'+w+'%;background:var('+varFor(s.key)+')" title="'+esc(s.label)+'"></span>' : "";
+    }).join("");
+    var noneW = pct(ex.none, a.grand);
+    if (noneW) segParts += '<span class="seg-none" style="width:'+noneW+'%" title="'+esc(H.noneLabel)+'"></span>';
     return '<section class="overall" aria-label="Overall totals">'
-      + '<div class="ov-num"><span class="big">'+compP+'<small>%</small></span><span class="ov-sub">'+(H.mode==="free"?"labelled":"complete")+'</span></div>'
+      + '<div class="ov-num">'+ring(compP)+'</div>'
       + '<div class="ov-main"><div class="ov-head">'+head+'</div>'
-      + '<div class="seg" role="img" aria-label="Overall '+compP+'% complete, '+startP+'% started">'
-      + '<span style="width:'+compP+'%"></span><span class="soft" style="width:'+Math.max(0,startP-compP)+'%"></span></div>'
+      + '<div class="seg" role="img" aria-label="Colour distribution across the font">'+segParts+'</div>'
       + '<div class="legend">'+legend+'</div>'+recipeLine+'</div></section>';
   }
 
@@ -333,34 +354,46 @@ DASHBOARD_JS = r"""
     return '<div class="rows">'+html+'</div>';
   }
   function heatmap(m){
+    var cats = H.categories || [];
     var items = [];
     for (var i=0;i<H.glyphNames.length;i++){
-      var name = H.glyphNames[i], k = m.keys[i];
+      var k = m.keys[i];
       if (state.unfinishedOnly && finished(k)) continue;
-      if (!matchQ(name)) continue;
-      items.push([name,k]);
+      items.push([H.glyphNames[i], k, i]);
     }
     var cap = 500, shown = items.slice(0,cap);
     var paths = (H.paths && H.paths[m.id]) || {};
     var ch = (H.changes && H.changes[m.id]) || {};
-    var cells = shown.map(function(it){
+    function cellHTML(it){
       var name = it[0], key = it[1], lab = labelFor(key);
       var wasKey = (ch[name] != null) ? ch[name][0] : key;
       var nowVar = varFor(key), wasVar = varFor(wasKey);
       var showVar = state.before ? wasVar : nowVar;
-      var href = "glyphsapp://show/?path=" + encodeURIComponent(H.filePath || "")
+      // keep slashes literal (encodeURI, not encodeURIComponent) so Glyphs resolves
+      // the path — otherwise it falls back to the frontmost font + current master,
+      // ignoring the layer (master) we asked for.
+      var href = "glyphsapp://show/?path=" + encodeURI(H.filePath || "")
         + "&glyph=" + encodeURIComponent(name) + "&layer=" + encodeURIComponent(m.id);
       var p = paths[name];
       var recentCls = (state.recent && H.lastEdit && H.lastEdit[name] != null && H.lastEdit[name] <= 7) ? ' recent' : '';
       var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '"/></svg>' : '';
-      return '<a class="cell' + (p ? ' glyph' : '') + recentCls + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:var(' + showVar + ')" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
+      return '<a class="cell' + (p ? ' glyph' : '') + recentCls + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:color-mix(in srgb,var(' + showVar + ') 25%,transparent)" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
+    }
+    // group cells by glyph category, Font-View style
+    var groups = {}, seen = [];
+    shown.forEach(function(it){ var c = cats[it[2]] || "Other"; if (!groups[c]){ groups[c]=[]; seen.push(c); } groups[c].push(it); });
+    var pref = ["Letter","Number","Punctuation","Symbol","Mark","Separator","Other"];
+    seen.sort(function(a,b){ var ia=pref.indexOf(a); ia=ia<0?pref.length:ia; var ib=pref.indexOf(b); ib=ib<0?pref.length:ib; return ia-ib || (a<b?-1:a>b?1:0); });
+    var sections = seen.map(function(c){
+      return '<div class="cat"><div class="cat-h">'+esc(c)+' <span class="cat-n">'+groups[c].length+'</span></div>'
+        + '<div class="grid" aria-label="'+esc(c)+'">'+groups[c].map(cellHTML).join("")+'</div></div>';
     }).join("");
     var more = items.length>cap ? '<span class="more">… +'+(items.length-cap)+' more</span>' : "";
-    var empty = items.length===0 ? '<p class="empty">No glyphs match.</p>' : "";
+    var empty = items.length===0 ? '<p class="empty">No glyphs.</p>' : "";
     var toggle = Object.keys(ch).length ? '<button type="button" class="ba-toggle chip" aria-pressed="'+state.before+'" title="Toggle the cell colours between before and after the last run">'+(state.before?"Before":"After")+'</button>' : '';
     return '<section class="heat"><div class="heat-h"><span>Per-glyph · '+items.length+(state.unfinishedOnly?" unfinished":"")
       + ' <span class="hint">hover for name · click to open</span></span>'+toggle+'</div>'
-      + '<div class="grid" aria-label="Per-glyph colours">'+cells+'</div>'+more+empty+'</section>';
+      + (sections||empty)+more+'</section>';
   }
   function changes(m){
     var ch = (H.changes && H.changes[m.id]) || {}, names = Object.keys(ch);
@@ -389,24 +422,38 @@ DASHBOARD_JS = r"""
     var m = masterById(state.master);
     return masterTabs()+'<div class="panel" role="tabpanel">'+rows(m)+heatmap(m)+'</div>';
   }
+  function covStacked(r){
+    // a left-aligned stacked bar of the colours actually set in this group
+    var dist = r.dist || {};
+    var segs = H.order.map(function(k){
+      var c = dist[k] || 0;
+      if (!c) return "";
+      var w = r.total ? (c/r.total*100) : 0;
+      return '<span style="width:'+w+'%;background:var(--c'+k+')" title="'+esc(labelFor(parseInt(k,10))+": "+c)+'"></span>';
+    }).join("");
+    var uncolored = r.uncolored || 0;
+    if (uncolored) segs += '<span class="cov-none" style="width:'+(r.total?uncolored/r.total*100:0)+'%" title="'+esc(H.noneLabel+": "+uncolored)+'"></span>';
+    return '<div class="cov-bar" role="img" aria-label="'+esc(r.key+": colour distribution")+'">'+segs+'</div>';
+  }
   function coverageView(){
     var cov = (H.coverage && H.coverage[state.coverGroup]) || {};
     var rows2 = cov[state.master] || [];
-    var goalVar = "--c"+(lastOrder!=null?lastOrder:0);
-    var head = '<div class="cov-h"><span class="cov-title">Coverage by '+(state.coverGroup==="byScript"?"script":"category")+'</span>'
+    var head = '<div class="cov-h"><span class="cov-title">Colours set by '+(state.coverGroup==="byScript"?"script":"category")+'</span>'
       + '<span class="cov-switch">'
       + '<button type="button" class="chip'+(state.coverGroup==="byScript"?" on":"")+'" data-cg="byScript" aria-pressed="'+(state.coverGroup==="byScript")+'">Script</button>'
       + '<button type="button" class="chip'+(state.coverGroup==="byCategory"?" on":"")+'" data-cg="byCategory" aria-pressed="'+(state.coverGroup==="byCategory")+'">Category</button></span></div>';
     var body = rows2.length ? rows2.map(function(r){
-      var p = pct(r.final, r.total);
-      return '<div class="cov-row"><span class="cov-name">'+esc(r.key)+'</span>'
-        + bar(r.final, r.total, goalVar, r.key+": "+r.final+" of "+r.total+" complete ("+p+"%)")
-        + '<span class="num">'+r.final+'/'+r.total+'</span><span class="pc">'+p+'%</span></div>';
+      return '<div class="cov-row"><span class="cov-name" title="'+esc(r.key)+'">'+esc(r.key)+'</span>'
+        + covStacked(r) + '<span class="num">'+r.total+'</span></div>';
     }).join("") : '<p class="empty">No glyphs.</p>';
     return masterTabs()+'<section class="cov"><div class="panel">'+head+'<div class="cov-rows">'+body+'</div></div></section>';
   }
   function compareView(){
-    var head = '<th scope="col">Step</th>'+H.masters.map(function(m){ return '<th scope="col">'+esc(m.name)+'</th>'; }).join("");
+    var head = '<th scope="col">Step</th>'+H.masters.map(function(m){
+      var pv = m.preview;
+      var aa = (pv && pv.d) ? '<svg class="cmp-aa" viewBox="'+esc(pv.vb)+'" preserveAspectRatio="xMidYMid meet"><path d="'+esc(pv.d)+'" fill="currentColor"/></svg>' : '';
+      return '<th scope="col">'+aa+'<span class="cmp-mname">'+esc(m.name)+'</span></th>';
+    }).join("");
     var body = H.steps.map(function(s){
       var tds = H.masters.map(function(m){
         var p = pct(countFor(m,s.key),H.glyphTotal);
@@ -418,66 +465,8 @@ DASHBOARD_JS = r"""
     body += '<tr class="none"><th scope="row"><span class="dot" style="background:var(--c-none)"></span>'+esc(H.noneLabel)+'</th>'+noneTds+'</tr>';
     return '<div class="cmp-wrap"><table class="cmp"><caption>Step completion by master</caption><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
   }
-  // ----- Trend: burndown + velocity + hedged finish-date forecast (#1) -----
-  function trendStats(fc){
-    var eta;
-    if (fc.confidence==="done") eta = '<b>done</b>';
-    else if (fc.etaIso) eta = '≈ <b>'+esc(fc.etaIso)+'</b> ±'+fc.bandDays+'d <span class="tconf '+esc(fc.confidence)+'">'+esc(fc.confidence)+'</span>';
-    else eta = '<span class="muted">no estimate yet</span>';
-    return '<span class="tstats">'
-      + '<span class="tstat"><i>Velocity</i>'+(fc.velocityPerWeek||0)+'/wk</span>'
-      + '<span class="tstat"><i>Remaining</i>'+(fc.remaining!=null?fc.remaining:"—")+'</span>'
-      + '<span class="tstat"><i>Complete</i>'+(fc.final!=null?fc.final:0)+'/'+(fc.total!=null?fc.total:0)+'</span>'
-      + '<span class="tstat teta"><i>Forecast</i>'+eta+'</span></span>';
-  }
-  function trendChart(pts, fc){
-    var W=640, H=150, pl=8, pr=8, ptop=10, pb=14, iw=W-pl-pr, ih=H-ptop-pb;
-    var total = (fc && fc.total) || pts.reduce(function(mx,o){ return Math.max(mx,o.mp.total); },1) || 1;
-    var t0 = new Date(pts[0].date).getTime();
-    function dayOff(d){ return (new Date(d).getTime()-t0)/86400000; }
-    var lastOff = Math.max(1, dayOff(pts[pts.length-1].date));
-    var etaOff = (fc && fc.etaIso) ? dayOff(fc.etaIso) : null;
-    var xmax = Math.max(lastOff, etaOff||0) || 1;
-    function X(off){ return pl + off/xmax*iw; }
-    function Y(v){ return ptop + ih - (v/total*ih); }
-    var poly = pts.map(function(o){ return X(dayOff(o.date)).toFixed(1)+","+Y(o.mp.final).toFixed(1); }).join(" ");
-    var dots = pts.map(function(o){ return '<circle cx="'+X(dayOff(o.date)).toFixed(1)+'" cy="'+Y(o.mp.final).toFixed(1)+'" r="2.5"/>'; }).join("");
-    var goalY = Y(total).toFixed(1);
-    var proj = "";
-    if (etaOff!=null && fc.confidence!=="done" && fc.confidence!=="none"){
-      var lx=X(lastOff).toFixed(1), ly=Y(pts[pts.length-1].mp.final).toFixed(1), ex=X(etaOff).toFixed(1);
-      var band = fc.bandDays ? Math.abs(X(etaOff+fc.bandDays)-X(etaOff)) : 0;
-      proj = (band ? '<rect class="tband" x="'+(ex-band).toFixed(1)+'" y="'+ptop+'" width="'+(2*band).toFixed(1)+'" height="'+ih+'"/>' : "")
-        + '<line class="tproj" x1="'+lx+'" y1="'+ly+'" x2="'+ex+'" y2="'+goalY+'"/>'
-        + '<circle class="teta" cx="'+ex+'" cy="'+goalY+'" r="3"/>';
-    }
-    return '<svg class="tchart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Completion over time toward the goal">'
-      + '<line class="tgoal" x1="'+pl+'" y1="'+goalY+'" x2="'+(W-pr)+'" y2="'+goalY+'"/>'
-      + proj + '<polyline class="tline" points="'+poly+'"/>' + dots + '</svg>';
-  }
-  function masterTrendCard(m, pts, fc){
-    var total = (fc && fc.total) || 0;
-    var foot = '<div class="tfoot"><span>'+esc(pts[0].date)+'</span><span>'+total+' goal</span><span>'+esc(pts[pts.length-1].date)+'</span></div>';
-    return '<section class="tcard"><div class="tcard-h"><span class="tname">'+esc(m.name)+'</span>'+trendStats(fc)+'</div>'
-      + trendChart(pts, fc) + foot + '</section>';
-  }
-  function trendView(){
-    var series = (H.trend && H.trend.series) || [];
-    if (series.length < 2){
-      return '<section class="trend-empty"><p class="empty">Not enough history yet. Color Flow records a snapshot every time you save the font; the burndown and finish-date forecast appear once there are at least two days of history.</p></section>';
-    }
-    var fcs = (H.trend && H.trend.forecast) || {};
-    var cards = H.masters.map(function(m){
-      var pts = series.map(function(p){ return { date:p.date, mp:p.masters[m.id] }; })
-                      .filter(function(o){ return o.mp; });
-      return pts.length ? masterTrendCard(m, pts, fcs[m.id] || {}) : "";
-    }).join("");
-    return '<div class="trend">'+cards+'</div>';
-  }
-
   function renderBody(){
     return state.view==="compare" ? compareView()
-      : state.view==="trend" ? trendView()
       : state.view==="coverage" ? coverageView()
       : tabsView();
   }
@@ -518,7 +507,7 @@ DASHBOARD_JS = r"""
       var cell = cells[i];
       var v = state.before ? cell.getAttribute("data-was") : cell.getAttribute("data-now");
       if (!v) continue;
-      cell.style.background = "var("+v+")";
+      cell.style.background = "color-mix(in srgb,var("+v+") 25%,transparent)";
     }
   }
 
@@ -527,7 +516,6 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-body").innerHTML = renderBody();
     document.documentElement.setAttribute("data-theme", state.theme);
     var cmp = document.getElementById("cfd-compare"); if (cmp) cmp.setAttribute("aria-pressed", state.view==="compare");
-    var trd = document.getElementById("cfd-trend"); if (trd) trd.setAttribute("aria-pressed", state.view==="trend");
     var cov = document.getElementById("cfd-coverage"); if (cov) cov.setAttribute("aria-pressed", state.view==="coverage");
     var uf = document.getElementById("cfd-unfinished"); if (uf) uf.setAttribute("aria-pressed", state.unfinishedOnly);
     var rc = document.getElementById("cfd-recent"); if (rc) rc.setAttribute("aria-pressed", state.recent);
@@ -597,6 +585,31 @@ DASHBOARD_JS = r"""
       toast("Exported "+name);
     } catch(e){ toast("Export not supported here"); }
   }
+  function runExport(fmt){
+    if (fmt==="pdf"){ try { window.print(); } catch(e){ toast("Print not supported here"); } }
+    else if (fmt==="csv"){ download(exportName("csv"), exportCSV(), "text/csv"); }
+    else if (fmt==="json"){ download(exportName("json"), exportJSON(), "application/json"); }
+  }
+  function closeExport(){ var m = document.getElementById("cfd-export-modal"); if (m) m.style.display = "none"; }
+  function openExport(){
+    var modal = document.getElementById("cfd-export-modal");
+    if (!modal){
+      modal = document.createElement("div"); modal.id = "cfd-export-modal"; modal.className = "cfd-modal";
+      modal.innerHTML = '<div class="cfd-modal-box" role="dialog" aria-label="Export report" aria-modal="true">'
+        + '<div class="cfd-modal-h">Export report</div><div class="cfd-cards">'
+        + '<button type="button" class="cfd-card" data-fmt="pdf"><span class="cfd-card-ic">🖨</span><b>PDF</b><small>Print or save as PDF</small></button>'
+        + '<button type="button" class="cfd-card" data-fmt="csv"><span class="cfd-card-ic">⤓</span><b>CSV</b><small>Per-step counts</small></button>'
+        + '<button type="button" class="cfd-card" data-fmt="json"><span class="cfd-card-ic">{ }</span><b>JSON</b><small>Full summary</small></button>'
+        + '</div></div>';
+      document.body.appendChild(modal);
+      modal.addEventListener("click", function(e){
+        if (e.target===modal){ closeExport(); return; }
+        var card = e.target.closest(".cfd-card"); if (!card) return;
+        closeExport(); runExport(card.getAttribute("data-fmt"));
+      });
+    }
+    modal.style.display = "flex";
+  }
 
   function bind(){
     document.getElementById("cfd-theme").addEventListener("click", function(){
@@ -608,14 +621,10 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-recent").addEventListener("click", function(){ state.recent = !state.recent; update(); });
     document.getElementById("cfd-sort").addEventListener("click", function(){ state.sort = state.sort==="workflow" ? "progress" : "workflow"; update(); });
     document.getElementById("cfd-compare").addEventListener("click", function(){ state.view = state.view==="compare" ? "tabs" : "compare"; update(); });
-    document.getElementById("cfd-trend").addEventListener("click", function(){ state.view = state.view==="trend" ? "tabs" : "trend"; update(); });
     document.getElementById("cfd-coverage").addEventListener("click", function(){ state.view = state.view==="coverage" ? "tabs" : "coverage"; update(); });
-    document.getElementById("cfd-csv").addEventListener("click", function(){ download(exportName("csv"), exportCSV(), "text/csv"); });
-    document.getElementById("cfd-json").addEventListener("click", function(){ download(exportName("json"), exportJSON(), "application/json"); });
-    var s = document.getElementById("cfd-search");
-    s.addEventListener("input", function(){ state.q = s.value; update(); });
+    document.getElementById("cfd-export").addEventListener("click", openExport);
     document.addEventListener("keydown", function(e){
-      if (e.key==="/" && document.activeElement!==s){ e.preventDefault(); s.focus(); }
+      if (e.key==="Escape"){ closeExport(); }
     });
     var bodyEl = document.getElementById("cfd-body");
     bodyEl.addEventListener("mouseover", function(e){

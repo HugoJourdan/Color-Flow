@@ -443,7 +443,7 @@ def test_build_model_shape_and_compact_glyph_names(tmp_path) -> None:
 
     assert model["family"] == "Acme Sans"
     assert model["fileName"] == "Font.glyphs"
-    assert model["version"] == "2.5"
+    assert model["version"] == "2.005"   # Glyphs-style zero-padded minor (versionMinor=5)
     assert model["generated"] == "2026-06-05"
     assert model["mode"] == "step"
     assert model["glyphTotal"] == 3

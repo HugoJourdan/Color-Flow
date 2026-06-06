@@ -491,7 +491,8 @@ def _coverage_for(current: dict, groups: dict[str, list[str]], order: list[str],
             started = total - uncolored_count(colors, order)
             final = started if (is_free or last is None) else counts.get(last, 0)
             rows.append({"key": group, "total": total, "final": final, "started": started,
-                         "uncolored": total - started, "counts": counts})
+                         "uncolored": total - started, "counts": counts,
+                         "dist": colornames.single_counts_from_colors(colors, order)})
         rows.sort(key=lambda row: (-row["total"], row["key"]))
         result[master_id] = rows
     return result
@@ -616,6 +617,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
     recipes = load_recipes()
     meta = glyph_meta(font)
     metas = [meta.get(name, {}) for name in glyph_names]
+    categories = [(entry.get("category") or "Other") for entry in metas]
     recipe_completion = {}
     for master in font.masters:
         per_glyph = current.get(master.id, {})
@@ -627,7 +629,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
     return {
         "family": font.familyName or "",
         "fileName": Path(font.filepath).name if font.filepath else (font.familyName or "Untitled"),
-        "version": f"{font.versionMajor}.{font.versionMinor}",
+        "version": f"{font.versionMajor}.{font.versionMinor:03d}",
         "generated": now.strftime("%Y-%m-%d"),
         "mode": "free" if is_free else "step",
         "glyphTotal": glyph_total,
@@ -635,6 +637,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "steps": steps,
         "noneLabel": none_text,
         "glyphNames": glyph_names,
+        "categories": categories,
         "masters": masters,
         "colors": {str(index): labelcolors.hex_for(rgba)
                    for index, rgba in enumerate(labelcolors.read_label_colors())},

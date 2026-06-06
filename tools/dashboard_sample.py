@@ -61,7 +61,10 @@ def _model(is_free: bool) -> dict:
         "generated": datetime(2026, 6, 5).strftime("%Y-%m-%d"),
         "mode": "free" if is_free else "step", "glyphTotal": len(SEQ),
         "order": ORDER, "steps": STEPS, "noneLabel": "🫥 None",
-        "glyphNames": NAMES, "masters": masters,
+        "glyphNames": NAMES,
+        "categories": [("Letter" if i < 14 else "Number" if i < 18 else "Punctuation")
+                       for i in range(len(SEQ))],
+        "masters": masters,
         "colors": {str(index): "#888888" for index in range(12)},
         "filePath": "/fonts/Acme.glyphs", "paths": paths,
         "favicon": outline,
@@ -79,12 +82,16 @@ def _model(is_free: bool) -> dict:
 def _coverage() -> dict:
     def script_rows(bump: int) -> list:
         return [
-            {"key": "latin", "total": 16, "final": 8 + bump, "started": 12, "uncolored": 4, "counts": {}},
-            {"key": "punctuation", "total": 6, "final": 2, "started": 4, "uncolored": 2, "counts": {}},
+            {"key": "latin", "total": 16, "final": 8 + bump, "started": 12, "uncolored": 4,
+             "counts": {}, "dist": {"8": 6, "4": 3, "6": 3}},
+            {"key": "punctuation", "total": 6, "final": 2, "started": 4, "uncolored": 2,
+             "counts": {}, "dist": {"6": 2, "3": 2}},
         ]
     category_rows = [
-        {"key": "Letter", "total": 18, "final": 10, "started": 15, "uncolored": 3, "counts": {}},
-        {"key": "Punctuation", "total": 4, "final": 1, "started": 2, "uncolored": 2, "counts": {}},
+        {"key": "Letter", "total": 18, "final": 10, "started": 15, "uncolored": 3,
+         "counts": {}, "dist": {"8": 5, "4": 5, "6": 3, "3": 2}},
+        {"key": "Punctuation", "total": 4, "final": 1, "started": 2, "uncolored": 2,
+         "counts": {}, "dist": {"3": 1, "6": 1}},
     ]
     return {
         "byScript": {"regular": script_rows(2), "bold": script_rows(0)},
