@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import tempfile
 import webbrowser
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import colornames
 import colorflow_assets
@@ -248,6 +248,97 @@ def record_history(font, snapshot: dict, now: datetime, cap: int = HISTORY_CAP) 
             del series[old_date]
     store[font.filepath] = series
     Glyphs.defaults[HISTORY_KEY] = store
+
+
+# --------------------------------------------------------------------------- #
+# Burndown / velocity / forecast — pure functions over the dated history.
+# "final" is the completion metric: in step mode the cumulative count at the
+# last workflow step; in free mode (no cumulative final) it equals "started".
+# --------------------------------------------------------------------------- #
+
+def _parse_iso(date: str) -> datetime:
+    """ISO ``YYYY-MM-DD`` -> ``datetime`` (history keys are always this shape)."""
+    return datetime.strptime(date, "%Y-%m-%d")
+
+
+def _coefficient_of_variation(values: list[float]) -> float:
+    """Std/mean of ``values`` (population). ``1.0`` for empty or non-positive mean
+    — used as a worst-case spread when the rate signal is weak."""
+    if not values:
+        return 1.0
+    mean = sum(values) / len(values)
+    if mean <= 0:
+        return 1.0
+    variance = sum((value - mean) ** 2 for value in values) / len(values)
+    return (variance ** 0.5) / mean
+
+
+def _master_point(per_glyph: dict, order: list[str], is_free: bool) -> dict[str, int]:
+    """One master's ``{final, started, total}`` for a single dated snapshot."""
+    colors = snapshot_to_colors(per_glyph)
+    counts = master_counts(colors, order, is_free)
+    total = len(per_glyph)
+    started = total - uncolored_count(colors, order)
+    last = order[-1] if order else None
+    final = started if (is_free or last is None) else counts.get(last, 0)
+    return {"final": final, "started": started, "total": total}
+
+
+def history_series(history: dict, order: list[str], is_free: bool) -> list[dict]:
+    """The dated history reduced to a per-master count time series, oldest-first:
+    ``[{"date": iso, "masters": {master_id: {final, started, total}}}]``."""
+    series = []
+    for date in sorted(history):
+        masters = {master_id: _master_point(per_glyph, order, is_free)
+                   for master_id, per_glyph in history[date].items()}
+        series.append({"date": date, "masters": masters})
+    return series
+
+
+def forecast_master(series: list[dict], master_id: str, total: int, now: datetime,
+                    is_free: bool, window_days: int = 28) -> dict:
+    """Velocity + a hedged finish-date for one master from its ``final`` history.
+
+    Rate is the completion gained per day over a trailing ``window_days`` window
+    (falling back to the last two points). Returns a never-a-hard-date estimate:
+    an ETA with a ``±`` band derived from how variable the recent pace was, plus a
+    confidence label. No ETA when there is too little data, no recent progress, or
+    the master is already done."""
+    points = [(point["date"], point["masters"][master_id]["final"])
+              for point in series if master_id in point["masters"]]
+    final_now = points[-1][1] if points else 0
+    remaining = max(0, total - final_now)
+    result = {"velocityPerWeek": 0.0, "remaining": remaining, "final": final_now,
+              "total": total, "etaIso": None, "bandDays": None,
+              "confidence": "none", "points": len(points)}
+    if len(points) < 2:
+        return result
+
+    cutoff = now - timedelta(days=window_days)
+    windowed = [(date, final) for (date, final) in points if _parse_iso(date) >= cutoff]
+    if len(windowed) < 2:
+        windowed = points[-2:]
+
+    span_days = max(1, (_parse_iso(windowed[-1][0]) - _parse_iso(windowed[0][0])).days)
+    rate = (windowed[-1][1] - windowed[0][1]) / span_days
+    result["velocityPerWeek"] = round(rate * 7, 1)
+    if remaining <= 0:
+        result["confidence"] = "done"
+        return result
+    if rate <= 0:
+        return result  # flat or regressing — no honest ETA
+
+    eta_days = remaining / rate
+    interval_rates = [
+        (later_final - earlier_final) / max(1, (_parse_iso(later) - _parse_iso(earlier)).days)
+        for (earlier, earlier_final), (later, later_final) in zip(windowed, windowed[1:])
+    ]
+    band_fraction = min(1.0, max(0.15, _coefficient_of_variation(interval_rates)))
+    result["etaIso"] = (now + timedelta(days=eta_days)).strftime("%Y-%m-%d")
+    result["bandDays"] = int(round(eta_days * band_fraction))
+    result["confidence"] = ("high" if len(windowed) >= 4 and band_fraction < 0.5
+                            else "med" if len(windowed) >= 3 else "low")
+    return result
 
 
 # --------------------------------------------------------------------------- #

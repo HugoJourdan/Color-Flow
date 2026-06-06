@@ -272,6 +272,78 @@ def test_coerce_history_stringifies_dates_and_ints() -> None:
     assert db._coerce_history(None) == {}
 
 
+# --------------------------------------------------------------------------- #
+# Burndown / velocity / forecast
+# --------------------------------------------------------------------------- #
+
+_FC_ORDER = ["0", "1", "2"]   # 3 workflow steps; "2" is the final step
+
+
+def _snap(n_final: int, total: int = 10) -> dict:
+    """One master's per-glyph snapshot: ``n_final`` glyphs at the final step (key
+    2), the rest uncoloured."""
+    return {"m1": {f"g{i}": 2 if i < n_final else cc.NO_COLOR for i in range(total)}}
+
+
+def _history(pairs: list) -> dict:
+    """``[(iso, n_final)]`` -> a dated history of single-master snapshots."""
+    return {date: _snap(n_final) for date, n_final in pairs}
+
+
+def test_history_series_reduces_to_per_master_counts() -> None:
+    history = _history([("2026-06-01", 2), ("2026-06-08", 4)])
+    series = db.history_series(history, _FC_ORDER, is_free=False)
+    assert [point["date"] for point in series] == ["2026-06-01", "2026-06-08"]
+    assert series[1]["masters"]["m1"] == {"final": 4, "started": 4, "total": 10}
+
+
+def test_forecast_steady_progress_gives_eta_and_high_confidence() -> None:
+    series = db.history_series(
+        _history([("2026-06-01", 2), ("2026-06-08", 4), ("2026-06-15", 6), ("2026-06-22", 8)]),
+        _FC_ORDER, is_free=False)
+    out = db.forecast_master(series, "m1", total=10, now=datetime(2026, 6, 22), is_free=False)
+    assert out["velocityPerWeek"] == 2.0      # +6 over 21 days = 2/week
+    assert out["remaining"] == 2 and out["final"] == 8
+    assert out["etaIso"] == "2026-06-29"      # 2 remaining / (2/7 per day) = 7 days
+    assert out["bandDays"] == 1               # perfectly steady -> tight band
+    assert out["confidence"] == "high"
+
+
+def test_forecast_two_points_is_low_confidence_but_still_estimates() -> None:
+    series = db.history_series(_history([("2026-06-01", 3), ("2026-06-08", 6)]),
+                              _FC_ORDER, is_free=False)
+    out = db.forecast_master(series, "m1", total=10, now=datetime(2026, 6, 8), is_free=False)
+    assert out["velocityPerWeek"] == 3.0
+    assert out["etaIso"] is not None and out["confidence"] == "low"
+
+
+def test_forecast_flat_history_has_no_eta() -> None:
+    series = db.history_series(_history([("2026-06-01", 5), ("2026-06-08", 5)]),
+                              _FC_ORDER, is_free=False)
+    out = db.forecast_master(series, "m1", total=10, now=datetime(2026, 6, 8), is_free=False)
+    assert out["velocityPerWeek"] == 0.0
+    assert out["etaIso"] is None and out["confidence"] == "none"
+
+
+def test_forecast_single_point_has_no_eta() -> None:
+    series = db.history_series(_history([("2026-06-08", 4)]), _FC_ORDER, is_free=False)
+    out = db.forecast_master(series, "m1", total=10, now=datetime(2026, 6, 8), is_free=False)
+    assert out["etaIso"] is None and out["confidence"] == "none" and out["points"] == 1
+
+
+def test_forecast_done_master_reports_done() -> None:
+    series = db.history_series(_history([("2026-06-01", 6), ("2026-06-08", 10)]),
+                              _FC_ORDER, is_free=False)
+    out = db.forecast_master(series, "m1", total=10, now=datetime(2026, 6, 8), is_free=False)
+    assert out["remaining"] == 0 and out["confidence"] == "done" and out["etaIso"] is None
+
+
+def test_master_point_free_mode_final_equals_started() -> None:
+    per_glyph = {"A": 0, "B": 1, "C": cc.NO_COLOR}    # free: exact labelled, no cumulative final
+    point = db._master_point(per_glyph, _FC_ORDER, is_free=True)
+    assert point["final"] == point["started"] == 2 and point["total"] == 3
+
+
 class _FakeLayerColor:
     def __init__(self, color: int | None, width: float = 500.0) -> None:
         self.color = color
