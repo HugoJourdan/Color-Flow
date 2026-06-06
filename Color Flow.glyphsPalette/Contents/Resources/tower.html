@@ -161,14 +161,18 @@ const bctx = buf.getContext("2d");
 // paint one disc into target context g at full opacity (drawDisc handles fading)
 function paintDisc(g, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   const o = rx*1.14;            // overscan so the field's blurred rim is clipped away
-  // 0) dreamy halo — a soft, heavily-blurred bloom of the disc's own colours,
-  //    unclipped so it spills past the rim into a glowing aura
+  // 0) dreamy halo — a layered bloom of the disc's own colours: several
+  //    increasingly large, blurrier, fainter copies so the glow falls off
+  //    softly into a diffuse aura (not one hard blurred block)
   g.save();
   g.translate(cx,cy); g.scale(1, ry/rx); g.rotate(rot);
-  g.globalAlpha = 0.45;
-  g.filter = "blur(4px)";
-  const hr = rx*1.1;
-  g.drawImage(fieldA, -hr, -hr, hr*2, hr*2);
+  const halo = [[1.15, 16, 0.26], [1.5, 40, 0.16], [2.0, 80, 0.10]];   // spread, blur, alpha
+  for (let h=0; h<halo.length; h++){
+    g.globalAlpha = halo[h][2];
+    g.filter = "blur(" + halo[h][1] + "px)";
+    const hh = rx*halo[h][0];
+    g.drawImage(fieldA, -hh, -hh, hh*2, hh*2);
+  }
   g.filter = "none";
   g.globalAlpha = 1;
   g.restore();
