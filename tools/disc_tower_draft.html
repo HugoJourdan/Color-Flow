@@ -28,8 +28,8 @@
 <div class="wrap">
   <canvas id="c" width="900" height="780"></canvas>
   <div class="row">
-    <label>tilt <input id="tilt" type="range" min="20" max="70" value="42"></label>
-    <label>slices/gap <input id="slices" type="range" min="1" max="20" value="12"></label>
+    <label>tilt <input id="tilt" type="range" min="20" max="70" value="20"></label>
+    <label>slices/gap <input id="slices" type="range" min="1" max="20" value="1"></label>
     <label><input id="spin" type="checkbox" checked> auto-spin</label>
     <label><input id="hole" type="checkbox" checked> uncolored hole</label>
   </div>
@@ -147,7 +147,7 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
 }
 
 let rot = -0.5, dragging = false, lastX = 0, autospin = true;
-let tilt = 0.42, perGap = 12, holeOn = true;
+let tilt = 0.20, perGap = 1, holeOn = true;   // minimum tilt + one disc per master by default
 
 function render(){
   ctx.clearRect(0,0,W,H);
