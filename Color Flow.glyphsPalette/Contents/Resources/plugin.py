@@ -28,6 +28,7 @@ from GlyphsApp import *
 # dir on sys.path, so a plain absolute import works.
 import colornames
 import labelcolors
+import colorflow_profile
 # Font-View colour grouping engine (the merged Rainbow FontView half).
 import fontview
 
@@ -228,7 +229,7 @@ class ColorFlow(PalettePlugin):
 	def Open_Action_Popover(self, sender):
 		try:
 			button = self._ns_button(sender)
-			self._popover = Popover((220, 184), parentView=button,
+			self._popover = Popover((220, 222), parentView=button,
 				preferredEdge='bottom', behavior='semitransient')
 			popover = self._popover
 			popover.dashboard = Button((12, 12, -12, 22), "Open Color Font Dashboard",
@@ -251,6 +252,11 @@ class ColorFlow(PalettePlugin):
 					callback=self._label_color_changed, color=wellColor)
 				setattr(popover, "lcWell%d" % index, well)
 				self._labelWells.append(well)
+			popover.profileSep = HorizontalLine((12, 184, -12, 1))
+			popover.profileExport = Button((12, 192, 98, 22), "Export Profile…",
+				callback=self._export_profile, sizeStyle='small')
+			popover.profileImport = Button((114, 192, -12, 22), "Import Profile…",
+				callback=self._import_profile, sizeStyle='small')
 			try:
 				popover.bind("did close", self._popover_did_close)
 			except Exception:
@@ -321,6 +327,91 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [label reset] error:\n" + traceback.format_exc())
+
+	# ------------------------------------------------------------------ workflow profiles (.colorflow)
+
+	@objc.python_method
+	def _live_profile(self, font, font_dir, name=""):
+		# Gather the current Color Flow config into a portable profile dict.
+		color_names = colornames.read_color_names(colornames.get_key_file(font_dir))
+		source = self.fontview.mode(font) if font is not None else "Layer"
+		return colorflow_profile.build_profile(
+			color_names=color_names, free_mode=self._free_mode(), rainbow_source=source,
+			label_colors=labelcolors.read_label_colors(), name=name)
+
+	@objc.python_method
+	def _font_dir(self, font):
+		return os.path.dirname(font.filepath) if (font is not None and font.filepath) else None
+
+	@objc.python_method
+	def _export_profile(self, sender):
+		try:
+			font = Glyphs.font
+			family = (font.familyName if font is not None else "") or "Color Flow profile"
+			profile = self._live_profile(font, self._font_dir(font), name=family)
+			path = GetSaveFile("Export Color Flow profile", "workflow.colorflow", ["colorflow"])
+			if not path:
+				return
+			with open(path, "w", encoding="utf-8") as handle:
+				handle.write(colorflow_profile.serialize(profile))
+			Message("Saved Color Flow profile.", title="Color Flow")
+		except Exception:
+			import traceback
+			print("Color Flow [export profile] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _import_profile(self, sender):
+		try:
+			path = GetOpenFile("Import Color Flow profile", False, ["colorflow"])
+			if not path:
+				return
+			with open(path, "r", encoding="utf-8") as handle:
+				incoming = colorflow_profile.parse(handle.read())
+			font = Glyphs.font
+			font_dir = self._font_dir(font)
+			diffs = colorflow_profile.diff_profile(self._live_profile(font, font_dir), incoming)
+			if not self._confirm_import(incoming, diffs):
+				return
+			self._apply_profile(incoming, font, font_dir)
+		except ValueError as error:
+			Message(str(error), title="Color Flow")
+		except Exception:
+			import traceback
+			print("Color Flow [import profile] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _confirm_import(self, incoming, diffs):
+		# Surface what will change before applying, so a shared profile never
+		# silently overwrites local choices.
+		if diffs:
+			shown = diffs[:12]
+			summary = "\n".join("• %s: %s" % (d["field"], d["detail"]) for d in shown)
+			if len(diffs) > len(shown):
+				summary += "\n• …and %d more" % (len(diffs) - len(shown))
+			info = "Importing “%s” will change:\n\n%s" % (incoming.get("name", "profile"), summary)
+		else:
+			info = "This profile matches your current settings."
+		alert = AppKit.NSAlert.alloc().init()
+		alert.setMessageText_("Import Color Flow profile?")
+		alert.setInformativeText_(info)
+		alert.addButtonWithTitle_("Apply")
+		alert.addButtonWithTitle_("Cancel")
+		return alert.runModal() == AppKit.NSAlertFirstButtonReturn
+
+	@objc.python_method
+	def _apply_profile(self, incoming, font, font_dir):
+		colornames.write_color_names(colornames.get_key_file(font_dir), incoming.get("colorNames", ""))
+		Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"] = bool(incoming.get("freeMode"))
+		if font is not None:
+			self.fontview.set_mode(font, incoming.get("rainbowSource", "Layer"))
+		colors = [tuple(rgba) for rgba in incoming.get("labelColors", [])]
+		if len(colors) == 12:
+			labelcolors.write_label_colors(colors)
+			labelcolors.refresh_app_label_colors(colors)
+		self.colorKeys = self._label_color_keys()
+		self.reload_after_settings()
+		Message("Imported Color Flow profile. Restart Glyphs if the label colours do not "
+			"update in its own Font and Edit views.", title="Color Flow")
 
 	@objc.python_method
 	def _popover_dashboard(self, sender):
