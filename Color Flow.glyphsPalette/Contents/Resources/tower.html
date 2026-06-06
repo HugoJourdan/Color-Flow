@@ -209,8 +209,8 @@ function render(){
   if (!M) return;                       // nothing to draw (no masters)
   const rx = 185, ry = rx*tilt;
   const N = (M-1)*perGap + 1;
-  const towerH = 210;   // tighter stack -> each disc layer reads thinner
-  const dz = N>1 ? towerH/(N-1) : 0;    // single disc: no vertical spread (avoid /0)
+  const dz = 52;                        // FIXED gap between discs
+  const towerH = N>1 ? (N-1)*dz : 0;    // tower grows taller with more discs (gap stays)
   const cx = W/2, topY = (H-towerH)/2 + 20;
 
   // soft ground shadow
