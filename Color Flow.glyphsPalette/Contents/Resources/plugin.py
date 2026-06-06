@@ -232,14 +232,7 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def Open_Action_Popover(self, sender):
 		try:
-			button = self.dialog
-			if sender is not None and hasattr(sender, "_nsObject"):
-				try:
-					button = self._ns_button(sender)
-				except Exception:
-					button = self.dialog
-			self._popover = Popover((220, 250), parentView=button,
-				preferredEdge='left', behavior='semitransient')
+			self._popover = FloatingWindow((220, 250), "Color Flow Settings")
 			popover = self._popover
 			popover.dashboard = Button((12, 12, -12, 22), "Open Color Font Dashboard",
 				callback=self._popover_dashboard, sizeStyle='small')
@@ -269,7 +262,7 @@ class ColorFlow(PalettePlugin):
 			popover.smartFilters = Button((12, 220, -12, 22), "Generate Smart Filters",
 				callback=self._generate_smart_filters, sizeStyle='small')
 			try:
-				popover.bind("did close", self._popover_did_close)
+				popover.bind("close", self._popover_did_close)
 			except Exception:
 				pass
 			popover.open()
@@ -1114,6 +1107,7 @@ class ColorFlow(PalettePlugin):
 				except Exception:
 					pass
 			self._build_meta_strip(order, glyphCount, masterId)
+			self._update_title_bar()
 		except Exception:
 			import traceback
 			print("Color Flow [Update_Plugin_UI] error:\n" + traceback.format_exc())
@@ -1266,6 +1260,101 @@ class ColorFlow(PalettePlugin):
 			pass
 		setattr(self.paletteView.frame, str(color)+"count", textbox)
 
+	# Experimental (#23): inject a colour progress bar into the palette SECTION
+	# HEADER (visible even when collapsed). Glyphs has no public hook for this, so
+	# we walk up from the palette view to the header NSView and add a subview. May
+	# break across Glyphs versions; fully guarded so it can never crash the palette.
+	@objc.python_method
+	def _find_title_field(self):
+		view = getattr(self, "dialog", None)
+		for _ in range(10):
+			if view is None:
+				break
+			sup = view.superview()
+			if sup is None:
+				break
+			try:
+				for sub in sup.subviews():
+					if sub.isKindOfClass_(AppKit.NSTextField):
+						try:
+							value = sub.stringValue()
+						except Exception:
+							value = None
+						if value and "Color Flow" in str(value):
+							return sub
+			except Exception:
+				pass
+			view = sup
+		return None
+
+	@objc.python_method
+	def _inject_title_bar(self):
+		if getattr(self, "_titleBar", None) is not None:
+			return
+		try:
+			field = self._find_title_field()
+			if field is None:
+				return
+			header = field.superview()
+			if header is None:
+				return
+			bounds = header.bounds()
+			barWidth, barHeight = 72.0, 6.0
+			xPos = bounds.size.width - barWidth - 12.0
+			yPos = (bounds.size.height - barHeight) / 2.0
+			bar = AppKit.NSView.alloc().initWithFrame_(((xPos, yPos), (barWidth, barHeight)))
+			bar.setAutoresizingMask_(AppKit.NSViewMinXMargin)
+			bar.setWantsLayer_(True)
+			try:
+				bar.layer().setCornerRadius_(3.0)
+				bar.layer().setMasksToBounds_(True)
+				bar.layer().setBackgroundColor_(AppKit.NSColor.colorWithRed_green_blue_alpha_(0.5, 0.5, 0.5, 0.18).CGColor())
+			except Exception:
+				pass
+			header.addSubview_(bar)
+			self._titleBar = bar
+		except Exception:
+			import traceback
+			print("Color Flow [title bar] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _update_title_bar(self):
+		bar = getattr(self, "_titleBar", None)
+		if bar is None or not self.font or not self.meaning:
+			return
+		try:
+			masterId = self.font.selectedFontMaster.id
+			order = list(self.meaning.keys())
+			glyphCount = len(self.font.glyphs)
+			if not glyphCount:
+				return
+			for sub in list(bar.subviews()):
+				sub.removeFromSuperview()
+			colors = []
+			for glyph in self.font.glyphs:
+				layer = glyph.layers[masterId]
+				colors.append(layer.color if layer is not None else None)
+			exclusive = colornames.single_counts_from_colors(colors, order)
+			width = bar.bounds().size.width
+			height = bar.bounds().size.height
+			xPos = 0.0
+			for key in order:
+				count = exclusive.get(key, 0)
+				if not count:
+					continue
+				segWidth = width / glyphCount * count
+				rgb = self.colorKeys.get(str(key), (0.5, 0.5, 0.5, 0.5))
+				seg = AppKit.NSView.alloc().initWithFrame_(((xPos, 0.0), (segWidth, height)))
+				seg.setWantsLayer_(True)
+				try:
+					seg.layer().setBackgroundColor_(AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.95).CGColor())
+				except Exception:
+					pass
+				bar.addSubview_(seg)
+				xPos += segWidth
+		except Exception:
+			pass
+
 	# Top strip: a fire progress-streak badge (#17) and a thin 100%-stacked
 	# whole-master progress ribbon (#23), drawn in the top band above the rows so
 	# the palette height is unchanged. Torn down each rebuild via self._metaAttrs.
@@ -1317,6 +1406,10 @@ class ColorFlow(PalettePlugin):
 			self.font = self._windowController.documentFont()
 		if not self.font:
 			return
+		try:
+			self._inject_title_bar()
+		except Exception:
+			pass
 
 		try:
 			grouping = getattr(self, "fontview", None)
@@ -1523,6 +1616,7 @@ class ColorFlow(PalettePlugin):
 			name = "eye.slash" if on else "eye"
 			image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, None)
 			nsbutton = self._ns_button(self.paletteView.frame.eyeButton)
+			nsbutton.setBordered_(False)
 			if image is not None:
 				nsbutton.setImage_(image)
 				nsbutton.setTitle_("")
