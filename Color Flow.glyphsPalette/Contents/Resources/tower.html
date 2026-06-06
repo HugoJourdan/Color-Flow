@@ -158,8 +158,11 @@ const FROST = (function(){
 const buf = document.createElement("canvas"); buf.width = W; buf.height = H;
 const bctx = buf.getContext("2d");
 
-// paint one disc into target context g at full opacity (drawDisc handles fading)
-function paintDisc(g, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
+// paint one disc into target context g at full opacity (drawDisc handles fading).
+// glow (default 1) scales the halo and brightens the face — a focused disc that's
+// "turning on" passes glow>1 for a brief flare.
+function paintDisc(g, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac, glow){
+  if (glow===undefined) glow = 1;
   const o = rx*1.14;            // overscan so the field's blurred rim is clipped away
   // 0) dreamy halo — a layered bloom of the disc's own colours: several
   //    increasingly large, blurrier, fainter copies so the glow falls off
@@ -168,7 +171,7 @@ function paintDisc(g, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   g.translate(cx,cy); g.scale(1, ry/rx); g.rotate(rot);
   const halo = [[1.006, 3, 0.22], [1.025, 6, 0.14], [1.06, 12, 0.08]];   // spread, blur, alpha
   for (let h=0; h<halo.length; h++){
-    g.globalAlpha = halo[h][2];
+    g.globalAlpha = halo[h][2] * glow;          // halo brightens with the disc's glow
     g.filter = "blur(" + halo[h][1] + "px)";
     const hh = rx*halo[h][0];
     g.drawImage(fieldA, -hh, -hh, hh*2, hh*2);
@@ -180,8 +183,10 @@ function paintDisc(g, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   g.save();
   g.translate(cx,cy); g.scale(1, ry/rx); g.rotate(rot);
   g.beginPath(); g.arc(0,0,rx,0,7); g.clip();
+  if (glow>1) g.filter = "brightness(" + (1 + (glow-1)*0.7) + ")";   // flare on turn-on
   g.globalAlpha = DISC_ALPHA;            g.drawImage(fieldA,-o,-o,o*2,o*2);
   if (fieldB && t>0){ g.globalAlpha = DISC_ALPHA*t; g.drawImage(fieldB,-o,-o,o*2,o*2); }
+  g.filter = "none";
   g.globalAlpha = 1;
   g.restore();
   // 2) frosted-glass treatment — fixed light (NOT rotated): milky veil + top
@@ -233,12 +238,12 @@ function paintDisc(g, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
 // draw a disc to the main canvas at the given opacity (1 = full). For opacity<1
 // the disc is rendered once into the offscreen buffer then composited, so it
 // fades uniformly (true translucency) instead of being veiled toward the bg.
-function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac, opacity, trim){
+function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac, opacity, trim, glow){
   // always render via the buffer (even at full opacity) so the punched hole is
   // transparent in the disc layer and the composite reveals the discs BELOW
   // through it — a see-through tunnel — instead of erasing down to the background
   bctx.clearRect(0,0,W,H);
-  paintDisc(bctx, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac);
+  paintDisc(bctx, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac, glow);
   if (trim>0){
     // darken only the disc's own pixels (source-atop) — the hole and the area
     // outside the disc stay untouched
@@ -262,6 +267,7 @@ let discHits = [], hitCx = 0, hitRx = 0, hitRy = 0;   // disc hit-test geometry,
 let downX = 0, downY = 0;                             // pointer-down point for click-vs-drag
 let trimVal = 0.6, opacityVal = 0.2;                  // non-selected discs: darken + fade
 let focusAmt = [];                                   // per-master trim amount (0..1), eased
+let pulse = [], prevSelected = -1;                   // per-master turn-on flare on focus
 
 function render(){
   ctx.clearRect(0,0,W,H);
@@ -270,12 +276,19 @@ function render(){
   // ease each master's trim amount (0 = focused/full, 1 = trimmed); track whether
   // a transition is in progress so switching/entering/leaving focus animates
   if (focusAmt.length !== M) focusAmt = new Array(M).fill(0);
+  if (pulse.length !== M) pulse = new Array(M).fill(0);
+  if (selected !== prevSelected){
+    if (selected >= 0) pulse[selected] = 1;   // flash the newly focused disc "on"
+    prevSelected = selected;
+  }
   let animating = false, anyTrim = false;
   for (let i=0;i<M;i++){
     const target = (selected<0 || i===selected) ? 0 : 1;
-    focusAmt[i] += (target - focusAmt[i]) * 0.08;
+    focusAmt[i] += (target - focusAmt[i]) * 0.16;
     if (Math.abs(target - focusAmt[i]) < 0.003) focusAmt[i] = target;
     else animating = true;
+    pulse[i] *= 0.88;                          // decay the turn-on flare
+    if (pulse[i] > 0.01) animating = true;     // keep rendering while it fades
     if (focusAmt[i] > 0.003) anyTrim = true;
   }
   const rx = 185, ry = rx*tilt;
@@ -304,8 +317,8 @@ function render(){
     else above.push(n);                  // selected<0 -> every disc lands here
   }
 
-  // paint one slice (drop shadow + disc) into context g at full opacity
-  function drawSliceInto(g, n, keepHole){
+  // paint one slice (drop shadow + disc) into context g; glow scales its aura
+  function drawSliceInto(g, n, keepHole, glow){
     const cy = topY + n*dz;
     const p = (M-1) - n/perGap;
     const lo = Math.max(0, Math.floor(p));
@@ -319,7 +332,7 @@ function render(){
     sh.addColorStop(1, "rgba(0,0,0,0)");
     g.fillStyle = sh; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
     g.restore();
-    paintDisc(g, fA, fB, t, cx, cy, rx, ry, rot, keepHole ? 1 : 0);
+    paintDisc(g, fA, fB, t, cx, cy, rx, ry, rot, keepHole ? 1 : 0, glow);
   }
 
   // composite a set of slices as ONE faded layer, so their mutual overlaps don't
@@ -327,7 +340,7 @@ function render(){
   function paintGroup(slices, opacity, trim, keepHole){
     if (!slices.length) return;
     bctx.clearRect(0,0,W,H);
-    for (let k=0;k<slices.length;k++) drawSliceInto(bctx, slices[k], keepHole);
+    for (let k=0;k<slices.length;k++) drawSliceInto(bctx, slices[k], keepHole, 0);   // trimmed = no glow
     if (trim>0){
       bctx.save();
       bctx.globalCompositeOperation = "source-atop";   // darken only painted pixels
@@ -338,14 +351,17 @@ function render(){
     ctx.save(); ctx.globalAlpha = opacity; ctx.drawImage(buf,0,0); ctx.restore();
   }
 
-  // draw one slice straight to the main canvas at a given opacity/trim (used
-  // mid-transition so each disc fades independently)
-  function drawDiscSlice(n, opacity, trim){
+  // draw one slice straight to the main canvas; opacity/trim/glow derive from the
+  // master's eased focus amount + its turn-on pulse, so a focused disc lights up
+  function drawDiscSlice(n){
     const cy = topY + n*dz;
     const p = (M-1) - n/perGap;
     const lo = Math.max(0, Math.floor(p));
     const t = p - lo;
     const fA = FIELDS[lo], fB = FIELDS[Math.min(M-1, lo+1)];
+    const mi = Math.round(p);
+    const amt = focusAmt[mi] || 0;                       // 0 = focused, 1 = trimmed
+    const glow = (1 - amt) * (1 + (pulse[mi] || 0) * 1.2);   // flare while turning on
     ctx.save();
     ctx.translate(cx, cy + ry*0.5); ctx.scale(1, ry/rx);
     const sh = ctx.createRadialGradient(0,0,0,0,0,rx);
@@ -354,40 +370,31 @@ function render(){
     sh.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
     ctx.restore();
-    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0, opacity, trim);
+    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0,
+             1 - amt*(1-opacityVal), amt*trimVal, glow);
   }
 
-  if (!anyTrim){
-    // nothing trimmed: plain stack (each disc buffered so its hole shows below)
-    for (let n=N-1;n>=0;n--) drawDiscSlice(n, 1, 0);
-  } else if (animating){
-    // mid-transition: per-disc fade so the old/new focused discs cross-fade
-    // (brief overlap among moving discs is fine)
-    for (let n=N-1;n>=0;n--){
-      const amt = focusAmt[Math.round((M-1) - n/perGap)] || 0;
-      drawDiscSlice(n, 1 - amt*(1-opacityVal), amt*trimVal);
-    }
-  } else {
+  if (!animating && selected>=0){
     // settled focus: trimmed discs composited as one faded layer (no overlap
     // show-through); the focused disc is buffered so its hole reveals below
     paintGroup(below, opacityVal, trimVal, holeOn);
-    if (focusedN>=0) drawDiscSlice(focusedN, 1, 0);
+    if (focusedN>=0) drawDiscSlice(focusedN);
     paintGroup(above, opacityVal, trimVal, holeOn);
+  } else {
+    // no focus or mid-transition: per-disc so holes show below and the focused
+    // disc cross-fades / lights up
+    for (let n=N-1;n>=0;n--) drawDiscSlice(n);
   }
 
-  // master names down the left, right-aligned just left of each disc; foreshortened
-  // to share the disc's inclination. Focused name bright; trimmed ones dim.
+  // master names down the left, right-aligned just left of each disc; focused
+  // name bright, trimmed ones dim. (Upright — not tilted.)
   ctx.textAlign = "right"; ctx.textBaseline = "middle";
   ctx.font = "600 13px -apple-system,BlinkMacSystemFont,sans-serif";
   for (let i=0;i<M;i++){
     const cy = topY + (M-1-i)*perGap*dz;
     const amt = focusAmt[i] || 0;
-    ctx.save();
-    ctx.translate(cx - rx - 18, cy);
-    ctx.scale(1, tilt);                       // align with the disc's inclination
     ctx.fillStyle = "rgba(255,255,255," + (1 - amt*0.65) + ")";
-    ctx.fillText(MASTERS[i].name, 0, 0);
-    ctx.restore();
+    ctx.fillText(MASTERS[i].name, cx - rx - 18, cy);
   }
 }
 
