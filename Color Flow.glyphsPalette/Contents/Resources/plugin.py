@@ -452,6 +452,23 @@ class ColorFlow(PalettePlugin):
 			import traceback
 			print("Color Flow [did-save] error:\n" + traceback.format_exc())
 		self._strippedForSave = False
+		try:
+			document = notification.object()
+			self._record_dashboard_history(self._font_from_document(document))
+		except Exception:
+			import traceback
+			print("Color Flow [history] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _record_dashboard_history(self, font):
+		# Passively accrue a dated per-glyph snapshot on every save so the
+		# dashboard's burndown / forecast / journey have a timeline to read,
+		# whether or not the dashboard was ever opened. Stored in Glyphs.defaults.
+		if font is None or not getattr(font, "filepath", None):
+			return
+		import colorflow_dashboard
+		snapshot = colorflow_dashboard.build_master_glyph_colors(font)
+		colorflow_dashboard.record_history(font, snapshot, datetime.now())
 
 	@objc.python_method
 	def _font_from_document(self, document):

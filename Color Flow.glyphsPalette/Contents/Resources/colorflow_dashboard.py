@@ -199,6 +199,58 @@ def save_snapshot(font, snapshot: dict) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Dated history — a capped series of per-glyph snapshots, the substrate for the
+# dashboard's burndown / velocity / finish-date forecast and the per-glyph
+# step-journey sparkline. Stored in Glyphs.defaults (not the .glyphs file),
+# keyed by file path then ISO date; same-day captures overwrite.
+# --------------------------------------------------------------------------- #
+
+HISTORY_KEY = "com.hugojourdan.ColorFlow-DashboardHistory"
+HISTORY_CAP = 60
+
+
+def _coerce_history(raw) -> dict[str, dict[str, dict[str, int]]]:
+    """Coerce a possibly NSDictionary-backed history into plain
+    ``{iso_date: {master_id: {glyph_name: int}}}`` so it behaves normally."""
+    history: dict[str, dict[str, dict[str, int]]] = {}
+    if not raw:
+        return history
+    for date in raw:
+        history[str(date)] = _coerce_snapshot(raw[date])
+    return history
+
+
+def load_history(font) -> dict[str, dict[str, dict[str, int]]]:
+    """This font's dated per-glyph snapshots from ``Glyphs.defaults`` (keyed by
+    file path), ordered oldest-first. Empty when none / unsaved / unavailable."""
+    if Glyphs is None or not font.filepath:
+        return {}
+    store = Glyphs.defaults[HISTORY_KEY]
+    if not store or not hasattr(store, "get"):
+        return {}
+    history = _coerce_history(store.get(font.filepath))
+    return {date: history[date] for date in sorted(history)}
+
+
+def record_history(font, snapshot: dict, now: datetime, cap: int = HISTORY_CAP) -> None:
+    """Append today's per-glyph ``snapshot`` to this font's dated history under
+    ``Glyphs.defaults`` (same-day capture overwrites), keeping at most ``cap`` most
+    recent dates. No-op without Glyphs or an unsaved font."""
+    if Glyphs is None or not font.filepath:
+        return
+    store = Glyphs.defaults[HISTORY_KEY]
+    store = dict(store) if hasattr(store, "keys") else {}
+    series = store.get(font.filepath) or {}
+    series = {str(date): series[date] for date in series}
+    series[now.strftime("%Y-%m-%d")] = snapshot
+    if cap and len(series) > cap:
+        for old_date in sorted(series)[:len(series) - cap]:
+            del series[old_date]
+    store[font.filepath] = series
+    Glyphs.defaults[HISTORY_KEY] = store
+
+
+# --------------------------------------------------------------------------- #
 # Full JSON model
 # --------------------------------------------------------------------------- #
 
@@ -347,6 +399,7 @@ def main(font=None) -> None:
     model = build_model(font, now, current, previous)
     html = colorflow_assets.build_html(model)
     save_snapshot(font, current)
+    record_history(font, current, now)
 
     base = Path(font.filepath).stem if font.filepath else (font.familyName or "font")
     out_path = Path(tempfile.gettempdir()) / f"{now.strftime('%Y%m%d')} {base} — Color Flow.html"

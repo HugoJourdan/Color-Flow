@@ -224,6 +224,54 @@ def test_coerce_snapshot_stringifies_and_ints() -> None:
     assert db._coerce_snapshot(None) == {}
 
 
+def test_record_history_round_trips_and_sorts(monkeypatch) -> None:
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    assert db.load_history(font) == {}                       # nothing yet
+    db.record_history(font, {"m1": {"A": 0}}, datetime(2026, 6, 4))
+    db.record_history(font, {"m1": {"A": 3}}, datetime(2026, 6, 6))
+    db.record_history(font, {"m1": {"A": 4}}, datetime(2026, 6, 5))
+    history = db.load_history(font)
+    assert list(history.keys()) == ["2026-06-04", "2026-06-05", "2026-06-06"]   # oldest-first
+    assert history["2026-06-06"] == {"m1": {"A": 3}}
+
+
+def test_record_history_same_day_overwrites(monkeypatch) -> None:
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    db.record_history(font, {"m1": {"A": 0}}, datetime(2026, 6, 6, 9))
+    db.record_history(font, {"m1": {"A": 8}}, datetime(2026, 6, 6, 17))
+    history = db.load_history(font)
+    assert list(history.keys()) == ["2026-06-06"]
+    assert history["2026-06-06"] == {"m1": {"A": 8}}         # latest capture of the day wins
+
+
+def test_record_history_caps_to_most_recent(monkeypatch) -> None:
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    for day in range(1, 6):
+        db.record_history(font, {"m1": {"A": day}}, datetime(2026, 6, day), cap=3)
+    history = db.load_history(font)
+    assert list(history.keys()) == ["2026-06-03", "2026-06-04", "2026-06-05"]  # oldest dropped
+
+
+def test_history_no_op_without_glyphs_or_filepath(monkeypatch) -> None:
+    monkeypatch.setattr(db, "Glyphs", None)
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    db.record_history(font, {"m1": {"A": 0}}, datetime(2026, 6, 6))   # silently no-op
+    assert db.load_history(font) == {}
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    unsaved = _FakeFont([_FakeMaster("m1", "R")], filepath="")
+    db.record_history(unsaved, {"m1": {"A": 0}}, datetime(2026, 6, 6))
+    assert db.load_history(unsaved) == {}
+
+
+def test_coerce_history_stringifies_dates_and_ints() -> None:
+    raw = {"2026-06-06": {"m1": {"A": "3"}}}   # NSDictionary-ish
+    assert db._coerce_history(raw) == {"2026-06-06": {"m1": {"A": 3}}}
+    assert db._coerce_history(None) == {}
+
+
 class _FakeLayerColor:
     def __init__(self, color: int | None, width: float = 500.0) -> None:
         self.color = color
