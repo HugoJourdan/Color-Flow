@@ -774,6 +774,16 @@ class ColorFlow(PalettePlugin):
 			button.addGestureRecognizer_(recognizer)
 		except Exception:
 			pass
+		try:
+			singleClick = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "rowClicked:")
+			singleClick.setNumberOfClicksRequired_(1)
+			try:
+				singleClick.requireGestureRecognizerToFail_(recognizer)
+			except Exception:
+				pass
+			button.addGestureRecognizer_(singleClick)
+		except Exception:
+			pass
 		# NOTE: do NOT set a Python attribute on the recognizer (e.g.
 		# pan._cf_color) — PyObjC framework objects have no __dict__, so it
 		# raises AttributeError and (when wrapped in try/except) silently
@@ -1006,7 +1016,6 @@ class ColorFlow(PalettePlugin):
 			counts = self._counts(masterId)
 			glyphCount = len(self.font.glyphs)
 			order = list(self.meaning.keys())
-			self._update_palette_title(counts, glyphCount, order)
 
 			selectedLayers = self.font.selectedLayers or []
 			selStates = [self._layer_state(layer, order) for layer in selectedLayers]
@@ -1151,6 +1160,19 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			pass
 
+	def rowClicked_(self, sender):
+		try:
+			color = self._color_for_recognizer(sender)
+			if color is None:
+				return
+			self._focusColor = None if getattr(self, "_focusColor", None) == color else color
+			self.Update_Plugin_UI()
+			if self._focusColor is not None:
+				self._open_step_tab(color)
+		except Exception:
+			import traceback
+			print("Color Flow [row click] error:\n" + traceback.format_exc())
+
 	def countClicked_(self, sender):
 		try:
 			color = self._color_for_count(sender)
@@ -1205,21 +1227,6 @@ class ColorFlow(PalettePlugin):
 			import traceback
 			print("Color Flow [open tab] error:\n" + traceback.format_exc())
 
-	# Whole-master completion as a tiny text bar in the palette title, so it's
-	# visible even when the palette section is collapsed (#23). Glyphs' title is
-	# read-only text + has no header-view hook, so this is a text bar, not a view.
-	@objc.python_method
-	def _update_palette_title(self, counts, glyphCount, order):
-		try:
-			last = order[-1] if order else None
-			done = counts.get(last, 0) if last is not None else 0
-			pct = int(round(done / glyphCount * 100)) if glyphCount else 0
-			filled = max(0, min(5, int(round(pct / 20.0))))
-			bar = "\u25b0" * filled + "\u25b1" * (5 - filled)
-			self.name = "Color Flow %s %d%%" % (bar, pct)
-		except Exception:
-			pass
-
 	# Top strip: a fire progress-streak badge (#17) and a thin 100%-stacked
 	# whole-master progress ribbon (#23), drawn in the top band above the rows so
 	# the palette height is unchanged. Torn down each rebuild via self._metaAttrs.
@@ -1243,6 +1250,10 @@ class ColorFlow(PalettePlugin):
 					layer = glyph.layers[masterId]
 					colors.append(layer.color if layer is not None else None)
 				exclusive = colornames.single_counts_from_colors(colors, order)
+				setattr(frame, "cfMiniTrack", Box((0, 19, self.width, 8),
+					fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(0.5, 0.5, 0.5, 0.14),
+					cornerRadius=4, borderWidth=0))
+				attrs.append("cfMiniTrack")
 				xPos = 0.0
 				for key in order:
 					count = exclusive.get(key, 0)
@@ -1251,7 +1262,7 @@ class ColorFlow(PalettePlugin):
 					segWidth = self.width / glyphCount * count
 					rgb = self.colorKeys.get(str(key), (0.5, 0.5, 0.5, 0.5))
 					name = "cfMini" + str(key)
-					setattr(frame, name, Box((xPos, 19, segWidth + 0.01, 5),
+					setattr(frame, name, Box((xPos, 19, segWidth + 0.01, 8),
 						fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.9),
 						cornerRadius=0, borderWidth=0))
 					attrs.append(name)
