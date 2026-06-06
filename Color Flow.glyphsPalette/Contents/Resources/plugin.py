@@ -102,16 +102,12 @@ class ColorFlow(PalettePlugin):
 		self._eyeRowViews = {}
 		self.paletteView.frame.eyeButton = Button((self.width-50, 1, 22, 17),
 			"👁", callback=self._toggle_eye_mode, sizeStyle='small')
-		self.paletteView.frame.matrixButton = Button((self.width-74, 1, 22, 17),
-			"▦", callback=self._toggle_matrix_mode, sizeStyle='small')
 
 		# Separator lines + colour tags (depend on the meaning order/visibility).
 		# Per-row widgets (label / bar / count) are built by Update_Plugin_UI.
 		self._rowChecks = {}
 		self._focusColor = None
 		self._countBoxes = {}
-		self._matrixMode = False
-		self._matrixAttrs = []
 		self._build_static_rows()
 
 		# # Select a master if none is selected
@@ -194,14 +190,6 @@ class ColorFlow(PalettePlugin):
 		Glyphs.addCallback(self.update, UPDATEINTERFACE)
 		try:
 			Glyphs.addCallback(self.contextMenuHandler, CONTEXTMENUCALLBACK)
-		except Exception:
-			pass
-		try:
-			Glyphs.addCallback(self.drawHUD, DRAWFOREGROUND)
-		except Exception:
-			pass
-		try:
-			Glyphs.addCallback(self.drawFontView, DRAWFONTVIEW)
 		except Exception:
 			pass
 		self.font = Glyphs.font
@@ -1006,11 +994,10 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def Update_Plugin_UI(self):
 		try:
-			for attr in getattr(self, "_metaAttrs", []) + getattr(self, "_matrixAttrs", []):
+			for attr in getattr(self, "_metaAttrs", []):
 				if hasattr(self.paletteView.frame, attr):
 					delattr(self.paletteView.frame, attr)
 			self._metaAttrs = []
-			self._matrixAttrs = []
 			if not self.font or not self.meaning or getattr(self, "_eye_mode", False):
 				return
 			self._rowChecks = {}
@@ -1081,122 +1068,9 @@ class ColorFlow(PalettePlugin):
 				except Exception:
 					pass
 			self._build_meta_strip(order, glyphCount, masterId)
-			if getattr(self, "_matrixMode", False) and len(self.font.masters) > 1 and glyphCount:
-				self._build_master_matrix(glyphCount)
 		except Exception:
 			import traceback
 			print("Color Flow [Update_Plugin_UI] error:\n" + traceback.format_exc())
-
-	# All-masters matrix (#16): a square toggle overlays one completion cell per
-	# master in each row (alpha proportional to that master's count for the step)
-	# so a lagging master is visible without switching masters.
-	@objc.python_method
-	def _toggle_matrix_mode(self, sender):
-		self._matrixMode = not getattr(self, "_matrixMode", False)
-		self._lastSignature = None
-		self.Update_Plugin_UI()
-
-	@objc.python_method
-	def _build_master_matrix(self, glyphCount):
-		frame = self.paletteView.frame
-		masters = list(self.font.masters)
-		countsByMaster = {}
-		for master in masters:
-			try:
-				countsByMaster[master.id] = self._counts(master.id)
-			except Exception:
-				countsByMaster[master.id] = {}
-		count = len(masters)
-		attrs = []
-		for color in list(self._rowChecks.keys()):
-			checkbox = self._rowChecks[color]
-			try:
-				top = checkbox.getPosSize()[1]
-			except Exception:
-				continue
-			countAttr = str(color) + "count"
-			if hasattr(frame, countAttr):
-				delattr(frame, countAttr)
-			rgb = self.colorKeys.get(str(color), (0.5, 0.5, 0.5, 0.5))
-			x0 = self.width - 54.0
-			cellWidth = 52.0 / count
-			for index, master in enumerate(masters):
-				fraction = countsByMaster[master.id].get(color, 0) / glyphCount
-				name = "mx_%s_%d" % (color, index)
-				setattr(frame, name, Box((x0 + index * cellWidth, top + 3, cellWidth - 1.5, 12),
-					fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.16 + 0.74 * fraction),
-					cornerRadius=2, borderWidth=0))
-				attrs.append(name)
-		self._matrixAttrs = attrs
-
-	# Font-View ambient progress (#21): a small dot in the final-step colour on
-	# glyphs that have reached the last workflow step, drawn via DRAWFONTVIEW so
-	# you can scan completion across the whole font overview.
-	@objc.python_method
-	def drawFontView(self, layer, info):
-		try:
-			if layer is None or not self.meaning:
-				return
-			order = list(self.meaning.keys())
-			if not order or str(layer.color) != order[-1]:
-				return
-			rgb = self.colorKeys.get(order[-1], (0.3, 0.7, 0.3, 0.5))
-			AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 1.0).set()
-			try:
-				asc = layer.master.ascender
-			except Exception:
-				asc = 800
-			try:
-				advance = layer.width
-			except Exception:
-				advance = 500
-			radius = 55.0
-			rect = ((advance - radius * 1.6, asc - radius * 0.4), (radius, radius))
-			AppKit.NSBezierPath.bezierPathWithOvalInRect_(rect).fill()
-		except Exception:
-			import traceback
-			print("Color Flow [font view] error:\n" + traceback.format_exc())
-
-	# Edit-View step HUD (#7): a small constant-size badge over the active glyph
-	# showing its current workflow step, drawn via the DRAWFOREGROUND callback.
-	@objc.python_method
-	def drawHUD(self, layer, info):
-		try:
-			if layer is None or not self.meaning:
-				return
-			scale = 1.0
-			try:
-				scale = info["Scale"] if hasattr(info, "__getitem__") else getattr(info, "scale", 1.0)
-			except Exception:
-				scale = 1.0
-			if not scale:
-				scale = 1.0
-			visible = [key for key, label in self.meaning.items() if label]
-			color = layer.color
-			key = str(color) if color is not None else None
-			if key in visible:
-				text = "%d/%d \u00b7 %s" % (visible.index(key) + 1, len(visible), self.meaning.get(key, ""))
-				rgb = self.colorKeys.get(key, (0.5, 0.5, 0.5, 0.5))
-			else:
-				text = "Uncoloured"
-				rgb = (0.5, 0.5, 0.5, 0.5)
-			asc = 800
-			try:
-				asc = layer.master.ascender
-			except Exception:
-				try:
-					asc = Glyphs.font.selectedFontMaster.ascender
-				except Exception:
-					asc = 800
-			fontSize = 11.0 / scale
-			nsColor = AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 1.0)
-			attrs = {AppKit.NSFontAttributeName: AppKit.NSFont.systemFontOfSize_(fontSize),
-				AppKit.NSForegroundColorAttributeName: nsColor}
-			badge = AppKit.NSAttributedString.alloc().initWithString_attributes_(text, attrs)
-			badge.drawAtPoint_((0, asc + 40))
-		except Exception:
-			import traceback
-			print("Color Flow [HUD] error:\n" + traceback.format_exc())
 
 	# Right-click “Set workflow step” on the Font/Edit-View selection (#6).
 	# The callback signature for a palette is not firmly documented, so the handler
