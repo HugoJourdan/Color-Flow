@@ -579,14 +579,14 @@ def test_build_model_master_preview_and_favicon(tmp_path) -> None:
     preview = model["masters"][0]["preview"]
     assert preview["d"] and preview["vb"]
     assert "M500" in preview["d"]            # the "a" is shifted right by the "A" advance (500)
-    assert model["favicon"]["d"] and model["favicon"]["vb"]
+    # the favicon is the bundled brand colour-wheel SVG, not font-derived
+    assert isinstance(model["favicon"], str) and "<svg" in model["favicon"]
 
 
-def test_build_model_preview_and_favicon_empty_without_outlines(tmp_path) -> None:
+def test_build_model_preview_empty_without_outlines(tmp_path) -> None:
     (tmp_path / "colorNames.txt").write_text("red=R\n", encoding="utf-8")
     font = _FakeFont([_FakeMaster("m1", "R")], [_FakeGlyph("A", {"m1": _FakeLayerColor(0)})],
                      filepath=str(tmp_path / "F.glyphs"))
     current = db.build_master_glyph_colors(font)
     model = db.build_model(font, datetime(2026, 6, 5), current, current)
     assert model["masters"][0]["preview"] == {}
-    assert model["favicon"] == {}

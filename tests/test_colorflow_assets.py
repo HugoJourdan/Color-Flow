@@ -67,21 +67,21 @@ def test_color_overrides_absent_without_colors() -> None:
 
 
 def test_favicon_link_is_inline_svg_data_uri() -> None:
-    link = assets._favicon_link({"favicon": {"d": "M0 0L10 0Z", "vb": "0 0 10 10"}})
+    svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0L10 0Z" fill="#abc"/></svg>'
+    link = assets._favicon_link({"favicon": svg})
     assert link.startswith('<link rel="icon" href="data:image/svg+xml,')
-    assert assets.FAVICON_FILL.lstrip("#") in link or assets.FAVICON_FILL in link
     # the SVG is URL-encoded into the data URI (raw "<svg" never leaks after the comma)
     assert 'svg+xml,<svg' not in link
 
 
 def test_favicon_link_empty_without_favicon() -> None:
     assert assets._favicon_link({}) == ""
-    assert assets._favicon_link({"favicon": {}}) == ""
+    assert assets._favicon_link({"favicon": ""}) == ""
 
 
 def test_build_html_embeds_favicon_and_glyph_ink_token() -> None:
     model = _model()
-    model["favicon"] = {"d": "M0 0L10 0Z", "vb": "0 0 10 10"}
+    model["favicon"] = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"/>'
     html = assets.build_html(model)
     assert 'rel="icon"' in html                 # favicon link present in <head>
     assert "--glyph-ink:" in html               # constant ink for glyph fills

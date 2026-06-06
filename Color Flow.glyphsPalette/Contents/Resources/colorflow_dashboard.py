@@ -29,6 +29,7 @@ The data layer imports nothing from Glyphs so it stays unit-testable; only
 
 from __future__ import annotations
 
+import re
 import tempfile
 import webbrowser
 from datetime import datetime, timedelta
@@ -444,18 +445,14 @@ def _master_previews(font) -> dict:
             for master in font.masters}
 
 
-def _favicon(font) -> dict:
-    """The lowercase ``a`` of the Regular master (or the first master) as a tight
-    ``{"d", "vb"}`` outline, used for the page favicon. ``{}`` when unavailable."""
-    if not font.masters:
-        return {}
-    glyph = font.glyphs["a"]
-    if glyph is None:
-        return {}
-    master = next((m for m in font.masters if (m.name or "").lower() == "regular"),
-                  font.masters[0])
-    layer = glyph.layers[master.id]
-    return glyphsvg.layer_outline(layer) if layer is not None else {}
+def _favicon_svg() -> str:
+    """The bundled brand favicon (the Color Flow colour wheel) as minified SVG
+    markup, read from ``favicon.svg`` beside this module. ``""`` when missing."""
+    try:
+        text = (Path(__file__).parent / "favicon.svg").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    return re.sub(r">\s+<", "><", text).strip()
 
 
 def _glyph_groups(font, attr: str) -> dict[str, list[str]]:
@@ -638,7 +635,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
                    for index, rgba in enumerate(labelcolors.read_label_colors())},
         "filePath": font.filepath or "",
         "paths": paths,
-        "favicon": _favicon(font),
+        "favicon": _favicon_svg(),
         "trend": trend,
         "journeys": journeys,
         "lastEdit": glyph_last_edit(font, now),

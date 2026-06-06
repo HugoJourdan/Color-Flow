@@ -12,9 +12,6 @@ import json
 from urllib.parse import quote
 from xml.sax.saxutils import escape as xesc
 
-# Fill for the favicon "a" — the brand accent, so it reads on any browser tab.
-FAVICON_FILL = "#6e7bff"
-
 
 def embed_model(model: dict) -> str:
     """Serialise the model into a ``<script type="application/json">`` block.
@@ -38,14 +35,12 @@ def _color_overrides(model: dict) -> str:
 
 
 def _favicon_link(model: dict) -> str:
-    """A ``<link rel="icon">`` carrying the model's favicon outline (the Regular
-    master's "a") as an inline SVG data URI. Empty when the model has no favicon."""
-    favicon = model.get("favicon") or {}
-    if not favicon.get("d"):
+    """A ``<link rel="icon">`` carrying the bundled brand favicon (the Color Flow
+    colour wheel SVG) as an inline SVG data URI. Empty when the model has none."""
+    favicon = model.get("favicon")
+    if not favicon:
         return ""
-    svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'
-           f'{favicon["vb"]}"><path d="{favicon["d"]}" fill="{FAVICON_FILL}"/></svg>')
-    return f'<link rel="icon" href="data:image/svg+xml,{quote(svg)}">'
+    return f'<link rel="icon" href="data:image/svg+xml,{quote(favicon)}">'
 
 
 def build_html(model: dict) -> str:

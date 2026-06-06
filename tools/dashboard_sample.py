@@ -67,7 +67,7 @@ def _model(is_free: bool) -> dict:
         "masters": masters,
         "colors": {str(index): "#888888" for index in range(12)},
         "filePath": "/fonts/Acme.glyphs", "paths": paths,
-        "favicon": outline,
+        "favicon": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 45"><circle cx="22" cy="22" r="20" fill="#6e7bff"/></svg>',
         "trend": _trend(),
         "journeys": {"regular": {"A": [-1, 4, 8], "C": [-1, -1, 4]}, "bold": {}},
         "lastEdit": {"A": 2, "C": 30, "E": 1},
