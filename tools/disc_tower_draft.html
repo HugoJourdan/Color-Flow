@@ -116,8 +116,13 @@ function buildField(counts){
     g.beginPath(); g.arc(bx,by,rad,0,7); g.fill();
   });
   g.globalAlpha = 1;
-  // (no white hub — the colours fill all the way to the hole so the centre
-  // reads the same as the sides; the muddy conic singularity sits inside the bore)
+  // colours fill to the hole (centre matches the sides); add just a touch of
+  // darkening toward the middle for depth around the bore
+  const dk = g.createRadialGradient(cx,cy,0, cx,cy,R*0.55);
+  dk.addColorStop(0, "rgba(0,0,0,0.16)");
+  dk.addColorStop(0.6, "rgba(0,0,0,0.05)");
+  dk.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = dk; g.beginPath(); g.arc(cx,cy,R*0.55,0,7); g.fill();
   const blurred = document.createElement("canvas"); blurred.width = blurred.height = FS;
   const bg = blurred.getContext("2d");
   // soften the seams (lighter blur = sharper disc); HSL is already vivid so gentle boost
