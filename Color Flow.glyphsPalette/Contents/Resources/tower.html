@@ -262,15 +262,23 @@ const DISC_ALPHA = 0.95;                       // discs a touch translucent
 let discHits = [], hitCx = 0, hitRx = 0, hitRy = 0;   // disc hit-test geometry, set each render
 let downX = 0, downY = 0;                             // pointer-down point for click-vs-drag
 let trimVal = 0.6, opacityVal = 0.2;                  // non-selected discs: darken + fade
-let dimT = 0;                                         // focus-mode amount (0..1), eased
+let focusAmt = [];                                   // per-master trim amount (0..1), eased
 
 function render(){
   ctx.clearRect(0,0,W,H);
   const M = MASTERS.length;
   if (!M) return;                       // nothing to draw (no masters)
-  // ease focus mode in/out for a smooth transition
-  dimT += (((selected>=0)?1:0) - dimT) * 0.08;
-  if (Math.abs((((selected>=0)?1:0)) - dimT) < 0.002) dimT = (selected>=0)?1:0;
+  // ease each master's trim amount (0 = focused/full, 1 = trimmed); track whether
+  // a transition is in progress so switching/entering/leaving focus animates
+  if (focusAmt.length !== M) focusAmt = new Array(M).fill(0);
+  let animating = false, anyTrim = false;
+  for (let i=0;i<M;i++){
+    const target = (selected<0 || i===selected) ? 0 : 1;
+    focusAmt[i] += (target - focusAmt[i]) * 0.08;
+    if (Math.abs(target - focusAmt[i]) < 0.003) focusAmt[i] = target;
+    else animating = true;
+    if (focusAmt[i] > 0.003) anyTrim = true;
+  }
   const rx = 185, ry = rx*tilt;
   const N = (M-1)*perGap + 1;
   const dz = 52;                        // FIXED gap between discs
@@ -331,15 +339,41 @@ function render(){
     ctx.save(); ctx.globalAlpha = opacity; ctx.drawImage(buf,0,0); ctx.restore();
   }
 
-  if (dimT < 0.002){
-    // no focus: plain top-paints-last stack
+  // draw one slice straight to the main canvas at a given opacity/trim (used
+  // mid-transition so each disc fades independently)
+  function drawDiscSlice(n, opacity, trim){
+    const cy = topY + n*dz;
+    const p = (M-1) - n/perGap;
+    const lo = Math.max(0, Math.floor(p));
+    const t = p - lo;
+    const fA = FIELDS[lo], fB = FIELDS[Math.min(M-1, lo+1)];
+    ctx.save();
+    ctx.translate(cx, cy + ry*0.5); ctx.scale(1, ry/rx);
+    const sh = ctx.createRadialGradient(0,0,0,0,0,rx);
+    sh.addColorStop(0, "rgba(0,0,0,0.07)");
+    sh.addColorStop(0.7, "rgba(0,0,0,0.03)");
+    sh.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
+    ctx.restore();
+    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0, opacity, trim);
+  }
+
+  if (!anyTrim){
+    // nothing trimmed: plain top-paints-last stack
     for (let n=N-1;n>=0;n--) drawSliceInto(ctx, n, holeOn);
+  } else if (animating){
+    // mid-transition: per-disc fade so the old/new focused discs cross-fade
+    // (brief overlap among moving discs is fine)
+    for (let n=N-1;n>=0;n--){
+      const amt = focusAmt[Math.round((M-1) - n/perGap)] || 0;
+      drawDiscSlice(n, 1 - amt*(1-opacityVal), amt*trimVal);
+    }
   } else {
-    const groupOpacity = 1 - dimT*(1-opacityVal);
-    const groupTrim = dimT*trimVal;
-    paintGroup(below, groupOpacity, groupTrim, holeOn);                  // behind the focus
-    if (focusedN>=0) drawSliceInto(ctx, focusedN, holeOn);               // focused disc, full
-    paintGroup(above, groupOpacity, groupTrim, holeOn && selected<0);    // in front; no holes when focusing
+    // settled focus: composite the trimmed discs as one faded layer so their
+    // mutual overlaps don't show through
+    paintGroup(below, opacityVal, trimVal, holeOn);
+    if (focusedN>=0) drawSliceInto(ctx, focusedN, holeOn);
+    paintGroup(above, opacityVal, trimVal, holeOn);
   }
 }
 
