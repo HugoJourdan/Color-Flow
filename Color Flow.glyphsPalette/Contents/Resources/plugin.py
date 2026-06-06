@@ -89,11 +89,6 @@ class ColorFlow(PalettePlugin):
 		self.paletteView = Window((self.width, self.height + 10))
 		self.paletteView.frame = Group((0, 0, self.width, self.height))
 
-		# Action button (⋯) — opens a popover with the Dashboard and the Font Glyph
-		# Order control.
-		self.paletteView.frame.actionButton = Button((self.width-26, 1, 26, 17),
-			"⋯", callback=self.Open_Action_Popover, sizeStyle='small')
-
 		# Eye toggle: enter an inline visibility-edit mode (show every colour; click
 		# a row to stage show/hide; press again to apply + collapse to visible-only).
 		self._eye_mode = False
@@ -102,6 +97,7 @@ class ColorFlow(PalettePlugin):
 		self._eyeRowViews = {}
 		self.paletteView.frame.eyeButton = Button((self.width-50, 1, 22, 17),
 			"👁", callback=self._toggle_eye_mode, sizeStyle='small')
+		self._set_eye_button(False)
 
 		# Separator lines + colour tags (depend on the meaning order/visibility).
 		# Per-row widgets (label / bar / count) are built by Update_Plugin_UI.
@@ -203,6 +199,7 @@ class ColorFlow(PalettePlugin):
 		self._strippedForSave = False
 		try:
 			self._install_rainbow_menu()
+			self._install_settings_menu()
 			self._rainbow_conflict_check()
 		except Exception:
 			import traceback
@@ -235,9 +232,14 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def Open_Action_Popover(self, sender):
 		try:
-			button = self._ns_button(sender)
+			button = self.dialog
+			if sender is not None and hasattr(sender, "_nsObject"):
+				try:
+					button = self._ns_button(sender)
+				except Exception:
+					button = self.dialog
 			self._popover = Popover((220, 250), parentView=button,
-				preferredEdge='bottom', behavior='semitransient')
+				preferredEdge='left', behavior='semitransient')
 			popover = self._popover
 			popover.dashboard = Button((12, 12, -12, 22), "Open Color Font Dashboard",
 				callback=self._popover_dashboard, sizeStyle='small')
@@ -500,6 +502,40 @@ class ColorFlow(PalettePlugin):
 						submenu.removeItem_(item)
 		except Exception:
 			pass
+
+	@objc.python_method
+	def _install_settings_menu(self):
+		title = "Color Flow settings\u2026"
+		self._settingsMenuItem = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(title, self.openSettings_, "")
+		self._settingsMenuItem.setTarget_(self)
+		barItem = Glyphs.menu[EDIT_MENU]
+		submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
+		if submenu is not None:
+			for item in list(submenu.itemArray()):
+				if item.title() == title:
+					submenu.removeItem_(item)
+			submenu.addItem_(self._settingsMenuItem)
+		else:
+			barItem.append(self._settingsMenuItem)
+
+	@objc.python_method
+	def _teardown_settings_menu(self):
+		try:
+			barItem = Glyphs.menu[EDIT_MENU]
+			submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
+			if submenu is not None:
+				for item in list(submenu.itemArray()):
+					if item.title() == "Color Flow settings\u2026":
+						submenu.removeItem_(item)
+		except Exception:
+			pass
+
+	def openSettings_(self, sender):
+		try:
+			self.Open_Action_Popover(None)
+		except Exception:
+			import traceback
+			print("Color Flow [settings menu] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _rainbow_conflict_check(self):
@@ -1048,10 +1084,7 @@ class ColorFlow(PalettePlugin):
 					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
 					self._attach_rename(checkbox, color)
-					if glyphCount and count >= glyphCount:
-						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+5-self.shift, -6, 20), "✅", alignment="right", sizeStyle='mini'))
-					else:
-						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+3-self.shift, -6, 20), f"{count}/{glyphCount}", alignment="right", sizeStyle='small'))
+					self._make_count(color, count, yPos)
 					yPos += 22
 				else:
 					if barWidth:
@@ -1060,10 +1093,7 @@ class ColorFlow(PalettePlugin):
 					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
 					self._attach_rename(checkbox, color)
-					if glyphCount and count >= glyphCount:
-						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+5-self.shift, -6, 20), "✅", alignment="right", sizeStyle='mini'))
-					else:
-						setattr(self.paletteView.frame, str(color)+"count", TextBox((self.width-50, yPos+3-self.shift, -6, 20), f"{count}/{glyphCount}", alignment="right", sizeStyle='small'))
+					self._make_count(color, count, yPos)
 					yPos += 22
 			self._countBoxes = {}
 			for reviewColor in list(self._rowChecks.keys()):
@@ -1226,6 +1256,15 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [open tab] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _make_count(self, color, count, yPos):
+		textbox = TextBox((self.width-50, yPos+3-self.shift, -6, 20), str(count), alignment="right", sizeStyle='small')
+		try:
+			textbox.getNSTextField().setFont_(AppKit.NSFont.monospacedDigitSystemFontOfSize_weight_(11.0, AppKit.NSFontWeightRegular))
+		except Exception:
+			pass
+		setattr(self.paletteView.frame, str(color)+"count", textbox)
 
 	# Top strip: a fire progress-streak badge (#17) and a thin 100%-stacked
 	# whole-master progress ribbon (#23), drawn in the top band above the rows so
@@ -1411,6 +1450,7 @@ class ColorFlow(PalettePlugin):
 		Glyphs.removeCallback(self.update)
 		# Remove the Rainbow Font View menu item this instance added.
 		self._teardown_rainbow_menu()
+		self._teardown_settings_menu()
 		# Remove the Cocoa save-notification observers.
 		try:
 			from Foundation import NSNotificationCenter
@@ -1480,7 +1520,14 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def _set_eye_button(self, on):
 		try:
-			self.paletteView.frame.eyeButton.setTitle("🙈" if on else "👁")
+			name = "eye.slash" if on else "eye"
+			image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, None)
+			nsbutton = self._ns_button(self.paletteView.frame.eyeButton)
+			if image is not None:
+				nsbutton.setImage_(image)
+				nsbutton.setTitle_("")
+			else:
+				nsbutton.setTitle_("🙈" if on else "👁")
 		except Exception:
 			pass
 
