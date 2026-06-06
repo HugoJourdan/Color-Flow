@@ -392,25 +392,20 @@ def progress_streak(history: dict, order: list[str], is_free: bool) -> dict:
 # --------------------------------------------------------------------------- #
 
 def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free: bool) -> dict:
-    """Per-master ``{glyph_name: {"d", "vb"}}`` for the heatmap's *unfinished*
-    glyphs (capped) — only the likely-shown glyphs are rendered so big fonts stay
-    light + fast. Each entry carries a tight per-glyph viewBox."""
-    order_set = set(order)
-    last = order[-1] if order else None
-    cap = 300
+    """Per-master ``{glyph_name: {"d", "vb"}}`` of glyph outlines for the heatmap
+    cells — the first ``cap`` glyphs in font order (finished AND unfinished, so
+    every shown cell can draw its letter), capped so big fonts stay light. Each
+    entry carries a tight per-glyph viewBox. ``current``/``order``/``is_free`` are
+    kept for signature stability."""
+    cap = 500   # matches the heatmap's per-master cell cap so every shown cell draws
     paths: dict = {}
     for master in font.masters:
         master_id = master.id
-        per_glyph = current.get(master_id, {})
         shown: dict = {}
         produced = 0
         for name in glyph_names:
             if produced >= cap:
                 break
-            key = per_glyph.get(name)
-            finished = (str(key) in order_set) if is_free else (str(key) == last)
-            if finished:
-                continue
             try:
                 layer = font.glyphs[name].layers[master_id]
             except Exception:

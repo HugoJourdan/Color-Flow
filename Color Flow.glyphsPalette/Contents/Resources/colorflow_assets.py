@@ -233,7 +233,7 @@ DASHBOARD_JS = r"""
   var prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
   var state = {
     master: H.masters.length ? H.masters[0].id : null,
-    view: "tabs", before: false, unfinishedOnly: true, sort: "workflow",
+    view: "tabs", before: false, sort: "workflow",
     coverGroup: "byScript", recent: false,
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
@@ -305,7 +305,6 @@ DASHBOARD_JS = r"""
   }
   function toolbar(){
     return '<div class="tb">'
-      + '<button type="button" id="cfd-unfinished" class="chip" aria-pressed="'+state.unfinishedOnly+'">◦ Unfinished only</button>'
       + '<button type="button" id="cfd-sort" class="chip">↕ Sort: workflow</button>'
       + '<button type="button" id="cfd-recent" class="chip" aria-pressed="false" title="Ring glyphs edited in the last 7 days">🕑 Recent</button>'
       + '<button type="button" id="cfd-coverage" class="chip" aria-pressed="false">🗂 Coverage</button>'
@@ -368,9 +367,7 @@ DASHBOARD_JS = r"""
     var cats = H.categories || [];
     var items = [];
     for (var i=0;i<H.glyphNames.length;i++){
-      var k = m.keys[i];
-      if (state.unfinishedOnly && finished(k)) continue;
-      items.push([H.glyphNames[i], k, i]);
+      items.push([H.glyphNames[i], m.keys[i], i]);
     }
     var cap = 500, shown = items.slice(0,cap);
     var paths = (H.paths && H.paths[m.id]) || {};
@@ -402,7 +399,7 @@ DASHBOARD_JS = r"""
     var more = items.length>cap ? '<span class="more">… +'+(items.length-cap)+' more</span>' : "";
     var empty = items.length===0 ? '<p class="empty">No glyphs.</p>' : "";
     var toggle = Object.keys(ch).length ? '<button type="button" class="ba-toggle chip" aria-pressed="'+state.before+'" title="Toggle the cell colours between before and after the last run">'+(state.before?"Before":"After")+'</button>' : '';
-    return '<section class="heat"><div class="heat-h"><span>Per-glyph · '+items.length+(state.unfinishedOnly?" unfinished":"")
+    return '<section class="heat"><div class="heat-h"><span>Per-glyph · '+items.length
       + ' <span class="hint">hover for name · click to open</span></span>'+toggle+'</div>'
       + (sections||empty)+more+'</section>';
   }
@@ -566,7 +563,6 @@ DASHBOARD_JS = r"""
     var cmp = document.getElementById("cfd-compare"); if (cmp) cmp.setAttribute("aria-pressed", state.view==="compare");
     var cov = document.getElementById("cfd-coverage"); if (cov) cov.setAttribute("aria-pressed", state.view==="coverage");
     var tl = document.getElementById("cfd-timeline"); if (tl) tl.setAttribute("aria-pressed", state.view==="timeline");
-    var uf = document.getElementById("cfd-unfinished"); if (uf) uf.setAttribute("aria-pressed", state.unfinishedOnly);
     var rc = document.getElementById("cfd-recent"); if (rc) rc.setAttribute("aria-pressed", state.recent);
     var sb = document.getElementById("cfd-sort"); if (sb) sb.textContent = "↕ Sort: "+(state.sort==="progress"?"progress":"workflow");
   }
@@ -666,7 +662,6 @@ DASHBOARD_JS = r"""
       try { localStorage.setItem("cfd-theme", state.theme); } catch(e){}
       document.documentElement.setAttribute("data-theme", state.theme);
     });
-    document.getElementById("cfd-unfinished").addEventListener("click", function(){ state.unfinishedOnly = !state.unfinishedOnly; update(); });
     document.getElementById("cfd-recent").addEventListener("click", function(){ state.recent = !state.recent; update(); });
     document.getElementById("cfd-sort").addEventListener("click", function(){ state.sort = state.sort==="workflow" ? "progress" : "workflow"; update(); });
     document.getElementById("cfd-compare").addEventListener("click", function(){ state.view = state.view==="compare" ? "tabs" : "compare"; update(); });
