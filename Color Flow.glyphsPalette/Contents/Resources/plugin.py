@@ -204,6 +204,10 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [Rainbow setup] error:\n" + traceback.format_exc())
+		try:
+			self.performSelector_withObject_afterDelay_("deferredHeaderSetup:", None, 2.0)
+		except Exception:
+			pass
 
 		# Keep our grouping glyphOrder OUT of the saved .glyphs file: strip it
 		# just before each save, restore it after. Glyphs has no DOCUMENTWILLSAVE
@@ -1107,6 +1111,7 @@ class ColorFlow(PalettePlugin):
 				except Exception:
 					pass
 			self._build_meta_strip(order, glyphCount, masterId)
+			self._update_title_bar()
 		except Exception:
 			import traceback
 			print("Color Flow [Update_Plugin_UI] error:\n" + traceback.format_exc())
@@ -1258,6 +1263,155 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			pass
 		setattr(self.paletteView.frame, str(color)+"count", textbox)
+
+	# Inject a colour bar into the palette SECTION HEADER (#23). Done deferred so
+	# the palette is docked first, then the whole window is searched for the title.
+	def deferredHeaderSetup_(self, sender):
+		try:
+			self._dump_view_hierarchy()
+			self._inject_title_bar()
+			self._update_title_bar()
+		except Exception:
+			import traceback
+			print("Color Flow [header setup] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _window_root(self):
+		view = getattr(self, "dialog", None)
+		top = view
+		for _ in range(25):
+			if view is None:
+				break
+			sup = view.superview()
+			if sup is None:
+				break
+			top = sup
+			view = sup
+		return top
+
+	@objc.python_method
+	def _dump_view_hierarchy(self):
+		if getattr(self, "_dumpedHierarchy", False):
+			return
+		self._dumpedHierarchy = True
+		try:
+			lines = ["Color Flow [header dump v2] window tree (class ='text' frame):"]
+			count = [0]
+			def walk(v, depth):
+				if v is None or count[0] > 90 or depth > 12:
+					return
+				count[0] += 1
+				text = ""
+				try:
+					if v.isKindOfClass_(AppKit.NSTextField):
+						text = " ='%s'" % str(v.stringValue())
+				except Exception:
+					pass
+				try:
+					fr = v.frame()
+					rect = " (%d,%d,%d,%d)" % (fr.origin.x, fr.origin.y, fr.size.width, fr.size.height)
+				except Exception:
+					rect = ""
+				lines.append("  " * depth + v.className() + text + rect)
+				try:
+					for sub in v.subviews():
+						walk(sub, depth + 1)
+				except Exception:
+					pass
+			walk(self._window_root(), 0)
+			print("\n".join(lines))
+		except Exception:
+			import traceback
+			print("Color Flow [header dump] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _search_title(self, view, depth):
+		if view is None or depth > 12:
+			return None
+		try:
+			if view.isKindOfClass_(AppKit.NSTextField):
+				value = str(view.stringValue() or "")
+				if "Color Flow" in value:
+					return view
+		except Exception:
+			pass
+		try:
+			for sub in view.subviews():
+				found = self._search_title(sub, depth + 1)
+				if found is not None:
+					return found
+		except Exception:
+			pass
+		return None
+
+	@objc.python_method
+	def _inject_title_bar(self):
+		if getattr(self, "_titleBar", None) is not None:
+			return
+		try:
+			field = self._search_title(self._window_root(), 0)
+			if field is None:
+				return
+			header = field.superview()
+			if header is None:
+				return
+			bounds = header.bounds()
+			barWidth, barHeight = 64.0, 6.0
+			xPos = bounds.size.width - barWidth - 10.0
+			yPos = (bounds.size.height - barHeight) / 2.0
+			bar = AppKit.NSView.alloc().initWithFrame_(((xPos, yPos), (barWidth, barHeight)))
+			bar.setAutoresizingMask_(AppKit.NSViewMinXMargin)
+			bar.setWantsLayer_(True)
+			try:
+				bar.layer().setCornerRadius_(3.0)
+				bar.layer().setMasksToBounds_(True)
+				bar.layer().setBackgroundColor_(AppKit.NSColor.colorWithRed_green_blue_alpha_(0.5, 0.5, 0.5, 0.18).CGColor())
+			except Exception:
+				pass
+			header.addSubview_(bar)
+			self._titleBar = bar
+			print("Color Flow [header] injected bar into %s" % header.className())
+		except Exception:
+			import traceback
+			print("Color Flow [title bar] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _update_title_bar(self):
+		bar = getattr(self, "_titleBar", None)
+		if bar is None or not self.font or not self.meaning:
+			return
+		try:
+			masterId = self.font.selectedFontMaster.id
+			order = list(self.meaning.keys())
+			glyphCount = len(self.font.glyphs)
+			if not glyphCount:
+				return
+			for sub in list(bar.subviews()):
+				sub.removeFromSuperview()
+			colors = []
+			for glyph in self.font.glyphs:
+				layer = glyph.layers[masterId]
+				colors.append(layer.color if layer is not None else None)
+			exclusive = colornames.single_counts_from_colors(colors, order)
+			width = bar.bounds().size.width
+			height = bar.bounds().size.height
+			xPos = 0.0
+			for key in order:
+				count = exclusive.get(key, 0)
+				if not count:
+					continue
+				segWidth = width / glyphCount * count
+				rgb = self.colorKeys.get(str(key), (0.5, 0.5, 0.5, 0.5))
+				seg = AppKit.NSView.alloc().initWithFrame_(((xPos, 0.0), (segWidth, height)))
+				seg.setWantsLayer_(True)
+				try:
+					seg.layer().setBackgroundColor_(AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.95).CGColor())
+				except Exception:
+					pass
+				bar.addSubview_(seg)
+				xPos += segWidth
+		except Exception:
+			pass
 
 	# Top strip: a fire progress-streak badge (#17) and a thin 100%-stacked
 	# whole-master progress ribbon (#23), drawn in the top band above the rows so
