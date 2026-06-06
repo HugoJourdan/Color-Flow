@@ -166,8 +166,8 @@ function render(){
   ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0,0,rx*1.05,0,7); ctx.fill();
   ctx.restore();
 
-  // draw top -> bottom so the nearer (lower) discs paint over the higher ones
-  for (let n=0; n<N; n++){
+  // draw bottom -> top so the TOP disc paints last and sits above the others
+  for (let n=N-1; n>=0; n--){
     const cy = topY + n*dz;
     const p = (M-1) - n/perGap;          // last master on top, first at the base
     const lo = Math.max(0, Math.floor(p));
