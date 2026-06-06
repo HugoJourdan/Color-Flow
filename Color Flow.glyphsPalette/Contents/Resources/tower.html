@@ -166,7 +166,7 @@ function paintDisc(g, fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   //    softly into a diffuse aura (not one hard blurred block)
   g.save();
   g.translate(cx,cy); g.scale(1, ry/rx); g.rotate(rot);
-  const halo = [[1.015, 5, 0.24], [1.06, 11, 0.15], [1.14, 22, 0.09]];   // spread, blur, alpha
+  const halo = [[1.006, 3, 0.22], [1.025, 6, 0.14], [1.06, 12, 0.08]];   // spread, blur, alpha
   for (let h=0; h<halo.length; h++){
     g.globalAlpha = halo[h][2];
     g.filter = "blur(" + halo[h][1] + "px)";
