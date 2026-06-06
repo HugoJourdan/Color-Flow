@@ -28,6 +28,7 @@
 <div class="wrap">
   <canvas id="c" width="900" height="780"></canvas>
   <div class="row">
+    <label>master <select id="master"></select></label>
     <label>tilt <input id="tilt" type="range" min="20" max="70" value="50"> <span id="tiltval">50</span></label>
     <label>slices/gap <input id="slices" type="range" min="1" max="20" value="1"></label>
     <label><input id="spin" type="checkbox" checked> auto-spin</label>
@@ -143,7 +144,7 @@ const FROST = (function(){
 })();
 
 // crossfade two fields into a tinted disc; returns nothing, draws into ctx
-function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
+function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac, dim){
   const o = rx*1.14;            // overscan so the field's blurred rim is clipped away
   // 1) colour field — rotates with the spin
   ctx.save();
@@ -197,10 +198,19 @@ function drawDisc(fieldA, fieldB, t, cx, cy, rx, ry, rot, holeFrac){
   ctx.strokeStyle = rim; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(0,0,rx*0.992,0,7); ctx.stroke();
   ctx.restore();
+  // selection trim: fade a non-selected disc toward the page background
+  if (dim>0){
+    ctx.save();
+    ctx.translate(cx,cy); ctx.scale(1, ry/rx);
+    ctx.beginPath(); ctx.arc(0,0,rx,0,7);
+    ctx.fillStyle = "rgba(236,236,236,"+dim+")";   // #ececec page background
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 let rot = -0.5, dragging = false, lastX = 0, autospin = true;
-let tilt = 0.50, perGap = 1, holeOn = true;   // tilt locked to 50 + one disc per master by default
+let tilt = 0.50, perGap = 1, holeOn = true, selected = -1;   // selected = -1 -> show all masters
 const DISC_ALPHA = 0.95;                       // discs a touch translucent
 
 function render(){
@@ -221,7 +231,10 @@ function render(){
   ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0,0,rx*1.05,0,7); ctx.fill();
   ctx.restore();
 
-  // draw bottom -> top so the TOP disc paints last and sits above the others
+  // draw bottom -> top so the TOP disc paints last and sits above the others.
+  // When a master is selected, its disc is deferred and painted last so it stays
+  // fully visible while the rest are trimmed (faded toward the background).
+  const deferred = [];
   for (let n=N-1; n>=0; n--){
     const cy = topY + n*dz;
     const p = (M-1) - n/perGap;          // last master on top, first at the base
@@ -237,7 +250,13 @@ function render(){
     sh.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0,0,rx,0,7); ctx.fill();
     ctx.restore();
-    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0);   // uniform central bore on every disc
+    if (selected>=0 && Math.round(p)===selected){ deferred.push([fA, fB, t, cy]); continue; }
+    const dim = (selected>=0) ? 0.66 : 0;   // trim the non-selected discs
+    drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0, dim);
+  }
+  // selected disc(s) on top, fully visible
+  for (let d=0; d<deferred.length; d++){
+    drawDisc(deferred[d][0], deferred[d][1], deferred[d][2], cx, deferred[d][3], rx, ry, rot, holeOn ? 1 : 0, 0);
   }
 }
 
@@ -254,6 +273,12 @@ document.getElementById("tilt").addEventListener("input", e=>{ tilt = +e.target.
 document.getElementById("slices").addEventListener("input", e=>{ perGap = +e.target.value; });
 document.getElementById("spin").addEventListener("change", e=>{ autospin = e.target.checked; });
 document.getElementById("hole").addEventListener("change", e=>{ holeOn = e.target.checked; });
+(function(){
+  const sel = document.getElementById("master");
+  const optAll = document.createElement("option"); optAll.value = "-1"; optAll.textContent = "All masters"; sel.appendChild(optAll);
+  MASTERS.forEach((m,i)=>{ const o = document.createElement("option"); o.value = String(i); o.textContent = m.name; sel.appendChild(o); });
+  sel.addEventListener("change", e=>{ selected = +e.target.value; });
+})();
 loop();
 </script>
 </body>
