@@ -233,24 +233,17 @@ function render(){
     ctx.restore();
     drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0);   // uniform central bore on every disc
   }
-  // master name ENGRAVED on each disc: drawn in the disc's own rotated + tilted
-  // frame so it lies flat on the surface and spins with the disc. Debossed look
-  // = a dark cut with a faint light highlight offset just below it.
+  // master name written ON each disc, centred on its visible front crescent
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.font = "700 14px -apple-system,BlinkMacSystemFont,sans-serif";
+  ctx.font = "600 12px -apple-system,BlinkMacSystemFont,sans-serif";
   for (let i=0;i<M;i++){
     const n = (M-1-i)*perGap;            // master i sits at slice (M-1-i): last master on top
     const cy = topY + n*dz;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.scale(1, ry/rx);                 // foreshorten onto the tilted face
-    ctx.rotate(rot);                     // follow the disc's spin
-    const ty = -rx*0.52;                 // sit on the face, clear of the central hole
-    ctx.fillStyle = "rgba(255,255,255,0.30)";   // light edge below = engraved highlight
-    ctx.fillText(MASTERS[i].name, 0, ty + 1.5);
-    ctx.fillStyle = "rgba(0,0,0,0.50)";          // dark cut
-    ctx.fillText(MASTERS[i].name, 0, ty);
-    ctx.restore();
+    const ly = cy + ry - dz/2;           // middle of the front band exposed below the disc above
+    ctx.fillStyle = "rgba(0,0,0,0.55)";  // drop shadow for legibility on bright colours
+    ctx.fillText(MASTERS[i].name, cx, ly+1);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(MASTERS[i].name, cx, ly);
   }
 }
 
