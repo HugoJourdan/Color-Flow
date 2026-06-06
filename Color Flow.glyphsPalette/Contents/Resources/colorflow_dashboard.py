@@ -394,38 +394,40 @@ def progress_streak(history: dict, order: list[str], is_free: bool) -> dict:
 
 def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free: bool) -> dict:
     """Per-master ``{glyph_name: {"d", "vb"}}`` of glyph outlines for the heatmap
-    cells — the first ``cap`` glyphs in font order (finished AND unfinished, so
-    every shown cell can draw its letter), capped so big fonts stay light. Each
-    entry carries a tight per-glyph viewBox. ``current``/``order``/``is_free`` are
-    kept for signature stability."""
-    cap = 500   # matches the heatmap's per-master cell cap so every shown cell draws
+    cells (every glyph in font order, so any shown cell can draw its letter), each
+    entry sharing the master's em box. Bounded by a TOTAL outline budget across all
+    masters: early masters draw their full glyph set, then it stops, so fonts with
+    very many masters keep the report a sane size. ``current``/``order``/``is_free``
+    are kept for signature stability."""
+    budget = 15000   # global ceiling on emitted outlines (≈ glyphs × early masters)
     upm = float(getattr(font, "upm", None) or 1000.0)
     paths: dict = {}
+    produced = 0
     for master in font.masters:
         master_id = master.id
-        # A single em box per master (ascender..descender) shared by every cell, so
-        # glyphs render at their true relative sizes instead of each filling the cell.
-        ascender = getattr(master, "ascender", None)
-        descender = getattr(master, "descender", None)
-        ascender = float(ascender) if ascender is not None else upm * 0.75
-        descender = float(descender) if descender is not None else -upm * 0.25
-        em_height = ascender - descender
-        if em_height <= 0:
-            em_height = upm
-        em_top = -ascender
         shown: dict = {}
-        produced = 0
-        for name in glyph_names:
-            if produced >= cap:
-                break
-            try:
-                layer = font.glyphs[name].layers[master_id]
-            except Exception:
-                layer = None
-            outline = glyphsvg.layer_outline_em(layer, em_top, em_height) if layer is not None else {}
-            if outline:
-                shown[name] = outline
-                produced += 1
+        if produced < budget:
+            # A single em box per master (ascender..descender) shared by every cell,
+            # so glyphs render at their true relative sizes (a shorter than A).
+            ascender = getattr(master, "ascender", None)
+            descender = getattr(master, "descender", None)
+            ascender = float(ascender) if ascender is not None else upm * 0.75
+            descender = float(descender) if descender is not None else -upm * 0.25
+            em_height = ascender - descender
+            if em_height <= 0:
+                em_height = upm
+            em_top = -ascender
+            for name in glyph_names:
+                if produced >= budget:
+                    break
+                try:
+                    layer = font.glyphs[name].layers[master_id]
+                except Exception:
+                    layer = None
+                outline = glyphsvg.layer_outline_em(layer, em_top, em_height) if layer is not None else {}
+                if outline:
+                    shown[name] = outline
+                    produced += 1
         paths[master_id] = shown
     return paths
 

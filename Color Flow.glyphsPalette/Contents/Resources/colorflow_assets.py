@@ -422,6 +422,10 @@ DASHBOARD_JS = r"""
     // group cells by glyph category, Font-View style
     var groups = {}, seen = [];
     shown.forEach(function(it){ var c = cats[it[2]] || "Other"; if (!groups[c]){ groups[c]=[]; seen.push(c); } groups[c].push(it); });
+    // order categories like the Glyphs Font View (Letter first); glyphs within a
+    // category keep font order. Unknown categories fall after, in first-appearance order.
+    var pref = ["Letter","Number","Punctuation","Symbol","Separator","Mark","Other"];
+    seen.sort(function(a,b){ var ia=pref.indexOf(a); ia=ia<0?pref.length:ia; var ib=pref.indexOf(b); ib=ib<0?pref.length:ib; return ia-ib; });
     var sections = seen.map(function(c){
       return '<div class="cat"><div class="cat-h">'+esc(c)+' <span class="cat-n">'+groups[c].length+'</span></div>'
         + '<div class="grid" aria-label="'+esc(c)+'">'+groups[c].map(cellHTML).join("")+'</div></div>';
