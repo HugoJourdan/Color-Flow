@@ -239,18 +239,6 @@ function render(){
     ctx.restore();
     drawDisc(fA, fB, t, cx, cy, rx, ry, rot, holeOn ? 1 : 0);   // uniform central bore on every disc
   }
-  // master name written ON each disc, centred on its visible front crescent
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.font = "600 12px -apple-system,BlinkMacSystemFont,sans-serif";
-  for (let i=0;i<M;i++){
-    const n = (M-1-i)*perGap;            // master i sits at slice (M-1-i): last master on top
-    const cy = topY + n*dz;
-    const ly = cy + ry - dz/2;           // middle of the front band exposed below the disc above
-    ctx.fillStyle = "rgba(0,0,0,0.55)";  // drop shadow for legibility on bright colours
-    ctx.fillText(MASTERS[i].name, cx, ly+1);
-    ctx.fillStyle = "#fff";
-    ctx.fillText(MASTERS[i].name, cx, ly);
-  }
 }
 
 function loop(){
