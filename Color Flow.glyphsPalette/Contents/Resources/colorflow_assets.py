@@ -115,6 +115,8 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .seg{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--track)}
 .seg>span{display:block;height:100%}
 .seg .seg-none{background:var(--c-none)}
+.segc{cursor:pointer}
+.seg>span.on{box-shadow:inset 0 0 0 2px var(--text)}
 .ov-recipe{margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
 .ov-recipe b{color:var(--text)}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
@@ -137,14 +139,18 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .row .pc{width:38px;text-align:right;flex:none}
 @media (max-width:720px){.rows{grid-template-columns:1fr}}
 .heat{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
-.heat-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:10px}
-.heat-h .ba-toggle{margin-left:auto;flex:none}
+.heat-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.heat-h .ba-toggle{flex:none}
 .heat-h .hint{color:var(--muted-2)}
+.heat-h .hsort{margin-left:auto;display:flex;gap:6px}
+.heat-h .chip{padding:4px 8px;font-size:var(--fs-2xs)}
+.focus-clear{border-color:var(--accent);color:var(--text)}
 .cat:first-child{margin-top:0}
 .cat-h{font-size:var(--fs-xs);color:var(--muted);margin:14px 0 6px;display:flex;align-items:center;gap:6px}
 .cat-n{color:var(--muted-2)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:3px}
-.cell{aspect-ratio:1;border:0;padding:0;border-radius:5px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.cell{aspect-ratio:1;border:0;padding:0;border-radius:5px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease,opacity .2s ease;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.cell.dim{opacity:.12}
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}
 .cell.copied{outline:2px solid var(--ok);outline-offset:1px}
 .cell svg{width:100%;height:100%;display:block;padding:3px;transform:scale(.9)}
@@ -248,7 +254,7 @@ DASHBOARD_JS = r"""
   var state = {
     master: H.masters.length ? H.masters[0].id : null,
     view: "tabs", before: false, sort: "workflow",
-    coverGroup: "byCategory",
+    coverGroup: "byCategory", glyphSort: "category", focus: null,
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
 
@@ -264,6 +270,14 @@ DASHBOARD_JS = r"""
   function masterById(id){
     for (var i=0;i<H.masters.length;i++){ if (H.masters[i].id===id) return H.masters[i]; }
     return H.masters[0];
+  }
+  // A clickable segment of a stacked colour bar. Clicking it focuses every glyph
+  // with that colour in the heatmap and dims the rest (state.focus). key -1 = None.
+  function segSpan(key,w,lab){
+    if (!w) return "";
+    var on = state.focus===key;
+    return '<span class="segc'+(on?" on":"")+'" data-fkey="'+key+'" style="width:'+w
+      + '%;background:var('+varFor(key)+')" title="'+esc(lab)+' — click to focus these glyphs"></span>';
   }
   function countFor(m,k){ return k===-1 ? m.uncolored : (m.counts[String(k)]||0); }
   function startedOf(m){ return H.glyphTotal - m.uncolored; }
@@ -351,11 +365,8 @@ DASHBOARD_JS = r"""
     }
     var ex = aggExclusive();
     var segParts = H.steps.map(function(s){
-      var w = pct(ex.dist[String(s.key)]||0, a.grand);
-      return w ? '<span style="width:'+w+'%;background:var('+varFor(s.key)+')" title="'+esc(s.label)+'"></span>' : "";
-    }).join("");
-    var noneW = pct(ex.none, a.grand);
-    if (noneW) segParts += '<span class="seg-none" style="width:'+noneW+'%" title="'+esc(H.noneLabel)+'"></span>';
+      return segSpan(s.key, pct(ex.dist[String(s.key)]||0, a.grand), s.label);
+    }).join("") + segSpan(-1, pct(ex.none, a.grand), H.noneLabel);
     return '<section class="overall" aria-label="Overall totals">'
       + '<div class="ov-num">'+ring(compP)+'</div>'
       + '<div class="ov-main"><div class="ov-head">'+head+'</div>'
@@ -384,11 +395,8 @@ DASHBOARD_JS = r"""
     var dist={}, none=0;
     (m.keys||[]).forEach(function(k){ var sk=String(k); if (k===-1 || H.order.indexOf(sk)===-1) none++; else dist[sk]=(dist[sk]||0)+1; });
     var segParts = H.steps.map(function(s){
-      var w = pct(dist[String(s.key)]||0, total);
-      return w ? '<span style="width:'+w+'%;background:var('+varFor(s.key)+')" title="'+esc(s.label)+'"></span>' : "";
-    }).join("");
-    var noneW = pct(none, total);
-    if (noneW) segParts += '<span class="seg-none" style="width:'+noneW+'%" title="'+esc(H.noneLabel)+'"></span>';
+      return segSpan(s.key, pct(dist[String(s.key)]||0, total), s.label);
+    }).join("") + segSpan(-1, pct(none, total), H.noneLabel);
     return '<section class="overall master-overall" aria-label="'+esc(m.name+" totals")+'">'
       + '<div class="ov-main"><div class="ov-head">'+head+'</div>'
       + '<div class="seg" role="img" aria-label="'+esc(m.name+" colour distribution")+'">'+segParts+'</div>'
@@ -408,6 +416,9 @@ DASHBOARD_JS = r"""
       var wasKey = (ch[name] != null) ? ch[name][0] : key;
       var nowVar = varFor(key), wasVar = varFor(wasKey);
       var showVar = state.before ? wasVar : nowVar;
+      // colour focus: dim every cell whose colour isn't the focused one (-1 = None)
+      var fkey = (key===-1 || H.order.indexOf(String(key))===-1) ? -1 : key;
+      var dim = state.focus!==null && fkey!==state.focus;
       // Fully percent-encode the path (encodeURIComponent → slashes become %2F),
       // exactly as the handbook example does. With literal slashes Glyphs misparses
       // the path and falls back to the frontmost font + active master, ignoring the
@@ -416,25 +427,36 @@ DASHBOARD_JS = r"""
         + "&glyph=" + encodeURIComponent(name) + "&layer=" + encodeURIComponent(m.id);
       var p = paths[name];
       var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '"/></svg>' : '';
-      return '<a class="cell' + (p ? ' glyph' : '') + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:color-mix(in srgb,var(' + showVar + ') 25%,transparent)" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
+      return '<a class="cell' + (p ? ' glyph' : '') + (dim ? ' dim' : '') + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:color-mix(in srgb,var(' + showVar + ') 25%,transparent)" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
     }
-    // group cells by glyph category, Font-View style
-    var groups = {}, seen = [];
-    shown.forEach(function(it){ var c = cats[it[2]] || "Other"; if (!groups[c]){ groups[c]=[]; seen.push(c); } groups[c].push(it); });
-    // order categories like the Glyphs Font View (Letter first); glyphs within a
-    // category keep font order. Unknown categories fall after, in first-appearance order.
-    var pref = ["Letter","Number","Punctuation","Mark","Separator","Symbol","Other"];
-    seen.sort(function(a,b){ var ia=pref.indexOf(a); ia=ia<0?pref.length:ia; var ib=pref.indexOf(b); ib=ib<0?pref.length:ib; return ia-ib; });
-    var sections = seen.map(function(c){
-      return '<div class="cat"><div class="cat-h">'+esc(c)+' <span class="cat-n">'+groups[c].length+'</span></div>'
-        + '<div class="grid" aria-label="'+esc(c)+'">'+groups[c].map(cellHTML).join("")+'</div></div>';
-    }).join("");
-    var more = "";
+    var sections;
+    if (state.glyphSort === "font"){
+      // pure font glyph order — one flat grid, no category headers
+      sections = '<div class="grid" aria-label="All glyphs in font order">'+shown.map(cellHTML).join("")+'</div>';
+    } else {
+      // group cells by glyph category, Font-View style
+      var groups = {}, seen = [];
+      shown.forEach(function(it){ var c = cats[it[2]] || "Other"; if (!groups[c]){ groups[c]=[]; seen.push(c); } groups[c].push(it); });
+      // order categories like the Glyphs Font View (Letter first); glyphs within a
+      // category keep font order. Unknown categories fall after, in first-appearance order.
+      var pref = ["Letter","Number","Punctuation","Mark","Separator","Symbol","Other"];
+      seen.sort(function(a,b){ var ia=pref.indexOf(a); ia=ia<0?pref.length:ia; var ib=pref.indexOf(b); ib=ib<0?pref.length:ib; return ia-ib; });
+      sections = seen.map(function(c){
+        return '<div class="cat"><div class="cat-h">'+esc(c)+' <span class="cat-n">'+groups[c].length+'</span></div>'
+          + '<div class="grid" aria-label="'+esc(c)+'">'+groups[c].map(cellHTML).join("")+'</div></div>';
+      }).join("");
+    }
     var empty = items.length===0 ? '<p class="empty">No glyphs.</p>' : "";
     var toggle = Object.keys(ch).length ? '<button type="button" class="ba-toggle chip" aria-pressed="'+state.before+'" title="Toggle the cell colours between before and after the last run">'+(state.before?"Before":"After")+'</button>' : '';
+    var sortCtl = '<span class="hsort">'
+      + '<button type="button" class="chip" data-gsort="category" aria-pressed="'+(state.glyphSort==="category")+'" title="Group glyphs by category (Font View order)">Category</button>'
+      + '<button type="button" class="chip" data-gsort="font" aria-pressed="'+(state.glyphSort==="font")+'" title="Keep the plain font glyph order">Font order</button></span>';
+    var focusInfo = state.focus!==null
+      ? '<button type="button" class="chip focus-clear" data-fclear="1" title="Clear colour focus">Focus: '+esc(labelFor(state.focus))+' ✕</button>'
+      : '';
     return '<section class="heat"><div class="heat-h"><span>Per-glyph · '+items.length
-      + ' <span class="hint">hover for name · click to open</span></span>'+toggle+'</div>'
-      + (sections||empty)+more+'</section>';
+      + ' <span class="hint">hover for name · click to open</span></span>'+sortCtl+focusInfo+toggle+'</div>'
+      + (sections||empty)+'</section>';
   }
   function changes(m){
     var ch = (H.changes && H.changes[m.id]) || {}, names = Object.keys(ch);
@@ -601,6 +623,9 @@ DASHBOARD_JS = r"""
     var tl = document.getElementById("cfd-timeline"); if (tl) tl.setAttribute("aria-pressed", state.view==="timeline");
     var ov = document.getElementById("cfd-overview"); if (ov) ov.setAttribute("aria-pressed", state.view==="tabs");
     var sb = document.getElementById("cfd-sort"); if (sb) sb.textContent = "↕ Sort: "+(state.sort==="progress"?"progress":"workflow");
+    // keep the static global bar's focused-segment ring in sync with state.focus
+    var gbar = document.querySelector(".overall:not(.master-overall)");
+    if (gbar) gbar.outerHTML = overall();
   }
 
   var toastTimer;
@@ -736,7 +761,7 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-timeline").addEventListener("click", function(){ state.view = state.view==="timeline" ? "tabs" : "timeline"; update(); });
     document.getElementById("cfd-export").addEventListener("click", openExport);
     document.addEventListener("keydown", function(e){
-      if (e.key==="Escape"){ closeExport(); }
+      if (e.key==="Escape"){ closeExport(); if (state.focus!==null){ state.focus = null; update(); } }
     });
     var bodyEl = document.getElementById("cfd-body");
     bodyEl.addEventListener("mouseover", function(e){
@@ -748,8 +773,19 @@ DASHBOARD_JS = r"""
     bodyEl.addEventListener("click", function(e){
       var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); update(); return; }
       var cg = e.target.closest("[data-cg]"); if (cg){ state.coverGroup = cg.getAttribute("data-cg"); update(); return; }
+      var gs = e.target.closest("[data-gsort]"); if (gs){ state.glyphSort = gs.getAttribute("data-gsort"); update(); return; }
+      var fc = e.target.closest("[data-fclear]"); if (fc){ state.focus = null; update(); return; }
       var ba = e.target.closest(".ba-toggle");
       if (ba){ e.preventDefault(); state.before = !state.before; ba.setAttribute("aria-pressed", state.before); ba.textContent = state.before ? "Before" : "After"; applyBeforeAfter(); return; }
+    });
+    // Colour-bar segments live both in the static global bar and in the per-master
+    // card (inside #cfd-body), so delegate their clicks at the document level.
+    document.addEventListener("click", function(e){
+      var seg = e.target.closest("[data-fkey]");
+      if (!seg) return;
+      var fk = parseInt(seg.getAttribute("data-fkey"),10);
+      state.focus = (state.focus===fk) ? null : fk;
+      update();
     });
   }
   function init(){
