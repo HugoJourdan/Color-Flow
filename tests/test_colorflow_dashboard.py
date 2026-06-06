@@ -655,7 +655,8 @@ def test_build_model_master_preview_and_favicon(tmp_path) -> None:
     preview = model["masters"][0]["preview"]
     assert preview["d"] and preview["vb"]
     assert "M500" in preview["d"]            # the "a" is shifted right by the "A" advance (500)
-    # the favicon is the bundled brand image as a self-contained data: URI (PNG)
+    # the favicon is the bundled brand image as a self-contained data: URI
+    # (favicon.gif preferred, then png/svg)
     assert isinstance(model["favicon"], str) and model["favicon"].startswith("data:image/")
 
 
