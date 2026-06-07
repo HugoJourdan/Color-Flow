@@ -2660,7 +2660,7 @@ DASHBOARD_JS = r"""
       }
       var bl=document.createElement("canvas"); bl.width=bl.height=Math.round(FS*dpr); var bg=bl.getContext("2d");
       bg.setTransform(dpr,0,0,dpr,0,0);
-      bg.filter="blur("+Math.round(FS*0.0625)+"px) saturate(1.6) brightness(0.92)"; bg.drawImage(off,0,0,FS,FS);
+      bg.filter="blur("+Math.round(FS*0.125)+"px) saturate(1.6) brightness(0.92)"; bg.drawImage(off,0,0,FS,FS);
       bg.filter="none"; bg.globalCompositeOperation="destination-in";
       bg.fillStyle="#000"; bg.beginPath(); bg.arc(FS/2,FS/2,FS*0.5,0,7); bg.fill();
       bg.globalCompositeOperation="source-over";
@@ -2683,15 +2683,6 @@ DASHBOARD_JS = r"""
     }
     var curFocus = (state.focus==null?null:state.focus);
     buildFields(curFocus);
-    var FROST = (function(){
-      var c=document.createElement("canvas"); c.width=c.height=Math.round(FS*dpr); var g=c.getContext("2d");
-      g.setTransform(dpr,0,0,dpr,0,0);
-      for (var k=0;k<1600;k++){ var x=Math.random()*FS,y=Math.random()*FS,r=Math.random()*1.6+0.3;
-        g.fillStyle="rgba(255,255,255,"+(Math.random()*0.07)+")"; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); }
-      var o=document.createElement("canvas"); o.width=o.height=Math.round(FS*dpr); var og=o.getContext("2d");
-      og.setTransform(dpr,0,0,dpr,0,0);
-      og.filter="blur(0.6px)"; og.drawImage(c,0,0,FS,FS); return o;
-    })();
     var buf=document.createElement("canvas"); buf.width=Math.round(W*dpr); buf.height=Math.round(Hc*dpr); var bctx=buf.getContext("2d");
     bctx.setTransform(dpr,0,0,dpr,0,0);
 
@@ -2704,32 +2695,21 @@ DASHBOARD_JS = r"""
         return;
       }
       var o=rx*1.14;
-      g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.rotate(rot);
-      var halo=[[1.006,3,0.22],[1.025,6,0.14],[1.06,12,0.08]];
-      for (var h=0;h<halo.length;h++){ g.globalAlpha=halo[h][2]*glow; g.filter="blur("+halo[h][1]+"px)"; var hh=rx*halo[h][0]; g.drawImage(fA,-hh,-hh,hh*2,hh*2); }
-      g.filter="none"; g.globalAlpha=1; g.restore();
+      // matte colour disc: no outer halo glow, no surface gloss/sheen/frost
       g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.rotate(rot);
       g.beginPath(); g.arc(0,0,rx,0,7); g.clip();
       if (glow>1) g.filter="brightness("+(1+(glow-1)*0.7)+")";
       g.globalAlpha=DISC_ALPHA; g.drawImage(fA,-o,-o,o*2,o*2);
       g.filter="none"; g.globalAlpha=1; g.restore();
+      // proportional-hole cut only (keeps the ring/tower read)
       g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.beginPath(); g.arc(0,0,rx,0,7); g.clip();
-      g.fillStyle="rgba(255,255,255,0.10)"; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
-      g.globalAlpha=0.9; g.drawImage(FROST,-rx,-rx,rx*2,rx*2); g.globalAlpha=1;
-      var sheen=g.createLinearGradient(0,-rx,0,rx);
-      sheen.addColorStop(0,"rgba(0,0,0,0.22)"); sheen.addColorStop(0.34,"rgba(255,255,255,0.02)");
-      sheen.addColorStop(0.66,"rgba(255,255,255,0.04)"); sheen.addColorStop(1,"rgba(255,255,255,0.18)");
-      g.fillStyle=sheen; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
-      var hot=g.createRadialGradient(0,rx*0.42,0,0,rx*0.42,rx*0.8);
-      hot.addColorStop(0,"rgba(255,255,255,0.15)"); hot.addColorStop(1,"rgba(255,255,255,0)");
-      g.fillStyle=hot; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
       if (holeFrac>0){ var hr=rx*0.26; g.globalCompositeOperation="destination-out";
         var pg=g.createRadialGradient(0,0,0,0,0,hr); pg.addColorStop(0,"rgba(0,0,0,1)"); pg.addColorStop(0.94,"rgba(0,0,0,1)"); pg.addColorStop(1,"rgba(0,0,0,0)");
         g.fillStyle=pg; g.beginPath(); g.arc(0,0,hr,0,7); g.fill(); g.globalCompositeOperation="source-over"; }
       g.restore();
+      // subtle dark edge for definition (no bright highlight = no shine)
       g.save(); g.translate(cx,cy); g.scale(1,ry/rx);
-      var rim=g.createLinearGradient(0,-rx,0,rx); rim.addColorStop(0,"rgba(0,0,0,0.24)"); rim.addColorStop(0.5,"rgba(255,255,255,0.05)"); rim.addColorStop(1,"rgba(255,255,255,0.32)");
-      g.strokeStyle=rim; g.lineWidth=2; g.beginPath(); g.arc(0,0,rx*0.992,0,7); g.stroke(); g.restore();
+      g.strokeStyle="rgba(0,0,0,0.16)"; g.lineWidth=1.5; g.beginPath(); g.arc(0,0,rx*0.992,0,7); g.stroke(); g.restore();
     }
     function shadowInto(g,cx,cy,rx,ry){
       g.save(); g.translate(cx,cy+ry*0.5); g.scale(1,ry/rx);
