@@ -299,6 +299,19 @@ def test_main_reports_progress_and_opens_report(tmp_path, monkeypatch) -> None:
     assert seen[-1] == 1.0                                   # reaches 100% before opening
 
 
+def test_main_open_when_done_false_returns_path_without_opening(tmp_path, monkeypatch) -> None:
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(0)}),
+              _FakeGlyph("B", {"m1": _FakeLayerColor(1)})]
+    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0, "B": 1})
+    font.filepath = str(tmp_path / "Font.glyphs")
+    opened: list[str] = []
+    monkeypatch.setattr(db.webbrowser, "open", lambda uri: opened.append(uri))
+    result = db.main(font, open_when_done=False)
+    assert not opened                                        # NOT auto-opened
+    assert result is not None and result.exists()            # path returned for Open/Save
+    assert result.suffix == ".html"
+
+
 def test_free_mode_reads_global_pref(monkeypatch) -> None:
     fake = _FakeGlyphsApp()
     fake.defaults[db.FREE_KEY] = True

@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import os
+import webbrowser
 from datetime import datetime
 from typing import Any
 
@@ -101,7 +102,7 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 		raw = [rgba_colors[i] for i in self._SPECTRUM if i < len(rgba_colors)]
 		if not raw:
 			raw = list(rgba_colors)
-		self._colors = [self._saturate(rgba, 1.35) for rgba in raw]   # punchier hues
+		self._colors = [self._saturate(rgba, 1.6) for rgba in raw]   # vivid, punchy hues
 		self._value = 0.0    # displayed fraction (eased toward _target)
 		self._target = 0.0   # latest real-progress milestone (monotonic, never decreases)
 		self._fillImage = None   # cached blurred gradient fill (rebuilt on size change)
@@ -135,6 +136,15 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 			output = blur.valueForKey_("outputImage")
 			if output is None:
 				return None
+			# Push saturation back up — the blur averages neighbouring hues and dulls them,
+			# so re-boost so the bar reads vivid/colourful even while soft.
+			controls = Quartz.CIFilter.filterWithName_("CIColorControls")
+			if controls is not None:
+				controls.setValue_forKey_(output, "inputImage")
+				controls.setValue_forKey_(1.5, "inputSaturation")
+				boosted = controls.valueForKey_("outputImage")
+				if boosted is not None:
+					output = boosted
 			output = output.imageByCroppingToRect_(image.extent())   # blur expands extent; crop back
 			rep = AppKit.NSCIImageRep.alloc().initWithCIImage_(output)
 			if rep is None:
@@ -200,6 +210,31 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 		bar_y = height - bar_h
 		radius = bar_h / 2.0
 		bar_rect = AppKit.NSMakeRect(0.0, bar_y, width, bar_h)
+		filled = prog * width
+		# Build (and cache once per size) the soft, saturated, Gaussian-blurred rainbow
+		# fill — both the glow and the bar itself draw from it.
+		nscolors = [
+			AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(rgba[0], rgba[1], rgba[2], 1.0)
+			for rgba in colors
+		]
+		blend = AppKit.NSGradient.alloc().initWithColors_(nscolors) if len(nscolors) >= 2 else None
+		key = (int(round(width)), int(round(bar_h)))
+		if blend is not None and getattr(self, "_fillKey", None) != key:
+			self._fillImage = self._blurred_fill(blend, width, bar_h, bar_h * 1.2)
+			self._fillKey = key
+		fill_image = getattr(self, "_fillImage", None)
+		# Coloured glow: the blurred fill drawn larger + faint BEHIND the track, so the
+		# rainbow haloes softly past the bar edges (drawn first, then the track covers
+		# the inside, leaving only the outer glow).
+		if colors and prog > 0.0 and fill_image is not None:
+			grow = bar_h * 0.7
+			glow_rect = AppKit.NSMakeRect(-grow, bar_y - grow, filled + grow * 2.0, bar_h + grow * 2.0)
+			src_rect = AppKit.NSMakeRect(0.0, 0.0, max(filled, 1.0), bar_h)
+			context = AppKit.NSGraphicsContext.currentContext()
+			context.saveGraphicsState()
+			fill_image.drawInRect_fromRect_operation_fraction_(
+				glow_rect, src_rect, AppKit.NSCompositingOperationSourceOver, 0.55)
+			context.restoreGraphicsState()
 		track = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(bar_rect, radius, radius)
 		AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(0.137, 0.149, 0.180, 1.0).set()
 		track.fill()
@@ -207,31 +242,15 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 			context = AppKit.NSGraphicsContext.currentContext()
 			context.saveGraphicsState()
 			track.addClip()
-			# Smooth blended rainbow across the FULL bar width — soft hue transitions
-			# like the favicon's blurred ring, not hard segment seams — but revealed
-			# only up to the filled fraction, so the colours stay anchored as it fills.
-			filled = prog * width
+			# reveal the fill only up to the filled fraction (colours stay anchored)
 			AppKit.NSBezierPath.bezierPathWithRect_(
 				AppKit.NSMakeRect(0.0, bar_y, filled, bar_h)).addClip()
-			nscolors = [
-				AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(rgba[0], rgba[1], rgba[2], 1.0)
-				for rgba in colors
-			]
-			blend = AppKit.NSGradient.alloc().initWithColors_(nscolors) if len(nscolors) >= 2 else None
-			# Render + Gaussian-blur the full-width gradient ONCE (cached); each frame
-			# just reveals more of it through the filled clip. The blur makes the colours
-			# read soft/dreamy like the favicon.
-			key = (int(round(width)), int(round(bar_h)))
-			if blend is not None and getattr(self, "_fillKey", None) != key:
-				self._fillImage = self._blurred_fill(blend, width, bar_h, bar_h * 1.2)
-				self._fillKey = key
-			fill_image = getattr(self, "_fillImage", None)
 			if fill_image is not None:
 				fill_image.drawInRect_fromRect_operation_fraction_(
 					bar_rect, AppKit.NSZeroRect, AppKit.NSCompositingOperationSourceOver, 1.0)
 			elif blend is not None:
 				blend.drawInRect_angle_(bar_rect, 0.0)
-			else:
+			elif nscolors:
 				nscolors[0].set()
 				AppKit.NSRectFill(AppKit.NSMakeRect(0.0, bar_y, filled, bar_h))
 			top = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(1.0, 1.0, 1.0, 0.22)
@@ -862,12 +881,29 @@ class ColorFlow(PalettePlugin):
 			loader = _ColorFlowLoaderBar.alloc().initWithFrame_(AppKit.NSMakeRect(16, 16, 224, 30))
 			loader.configure(labelcolors.read_label_colors())
 			content.addSubview_(loader)
+			# Open / Save buttons, hidden until the build finishes — they then take the
+			# loader's place so the report is no longer opened automatically.
+			open_btn = AppKit.NSButton.buttonWithTitle_target_action_("Open", self, "openReport:")
+			open_btn.setFrame_(AppKit.NSMakeRect(16, 18, 104, 24))
+			open_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
+			open_btn.setKeyEquivalent_("\r")   # Open = default button (Return)
+			open_btn.setHidden_(True)
+			content.addSubview_(open_btn)
+			save_btn = AppKit.NSButton.buttonWithTitle_target_action_("Save…", self, "saveReport:")
+			save_btn.setFrame_(AppKit.NSMakeRect(136, 18, 104, 24))
+			save_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
+			save_btn.setHidden_(True)
+			content.addSubview_(save_btn)
 			self._reportLoader = loader
 			self._reportPanel = panel
+			self._reportLabel = label
+			self._openBtn = open_btn
+			self._saveBtn = save_btn
+			self._reportPath = None
 			parent.beginSheet_completionHandler_(panel, None)
 			# Let the sheet paint once, then build on the next run-loop hop. The build
-			# drives the bar with REAL progress (set_progress + run-loop pumping), so no
-			# long pre-roll is needed — the bar tracks the actual work as it happens.
+			# drives the bar with REAL progress (set_progress + run-loop pumping); when it
+			# finishes we reveal Open / Save instead of auto-opening the report.
 			self.performSelector_withObject_afterDelay_("runReportGeneration:", None, 0.08)
 		except Exception:
 			import traceback
@@ -882,23 +918,84 @@ class ColorFlow(PalettePlugin):
 				loader.set_progress(frac)
 			_pump_runloop()
 
+		path = None
 		try:
-			self._run_dashboard(_on_progress)
+			path = self._run_dashboard(_on_progress, open_when_done=False)
 		finally:
 			if loader is not None:
 				try:
 					loader.set_progress(1.0)
 				except Exception:
 					pass
-			# Build is done and the main thread is free again: let the bar visibly
-			# reach 100% (a few timer ticks) before the sheet closes.
-			self.performSelector_withObject_afterDelay_("dismissReportSheet:", None, 0.3)
+			self._reportPath = path
+			# Build is done and the main thread is free again: let the bar visibly reach
+			# 100% (a few timer ticks), then reveal the Open / Save buttons.
+			self.performSelector_withObject_afterDelay_("showReportActions:", None, 0.3)
+
+	def showReportActions_(self, sender) -> None:
+		self._show_report_actions()
+
+	@objc.python_method
+	def _show_report_actions(self) -> None:
+		# Build finished: stop + hide the loader, swap the label, and reveal Open / Save.
+		# If nothing was produced, just close the sheet.
+		loader = getattr(self, "_reportLoader", None)
+		if loader is not None:
+			try:
+				loader.stop()
+			except Exception:
+				pass
+			loader.setHidden_(True)
+		path = getattr(self, "_reportPath", None)
+		if path is None:
+			self._dismiss_report_sheet()
+			return
+		label = getattr(self, "_reportLabel", None)
+		if label is not None:
+			label.setStringValue_("Color Flow report ready")
+		for button in (getattr(self, "_openBtn", None), getattr(self, "_saveBtn", None)):
+			if button is not None:
+				button.setHidden_(False)
+
+	def openReport_(self, sender) -> None:
+		path = getattr(self, "_reportPath", None)
+		if path is not None:
+			try:
+				webbrowser.open(path.as_uri())
+			except Exception:
+				import traceback
+				print("Color Flow [open report] error:\n" + traceback.format_exc())
+		self._dismiss_report_sheet()
+
+	def saveReport_(self, sender) -> None:
+		path = getattr(self, "_reportPath", None)
+		if path is None:
+			self._dismiss_report_sheet()
+			return
+		try:
+			save_panel = AppKit.NSSavePanel.savePanel()
+			save_panel.setNameFieldStringValue_(path.name)
+			try:
+				save_panel.setAllowedFileTypes_(["html"])
+			except Exception:
+				pass
+			if save_panel.runModal() == AppKit.NSModalResponseOK:
+				url = save_panel.URL()
+				dest = url.path() if url is not None else None
+				if dest:
+					with open(dest, "wb") as handle:
+						handle.write(path.read_bytes())
+		except Exception:
+			import traceback
+			print("Color Flow [save report] error:\n" + traceback.format_exc())
+		self._dismiss_report_sheet()
 
 	def dismissReportSheet_(self, sender) -> None:
 		self._dismiss_report_sheet()
 
 	@objc.python_method
 	def _dismiss_report_sheet(self) -> None:
+		self._reportPath = None
 		loader = getattr(self, "_reportLoader", None)
 		if loader is not None:
 			try:
@@ -1974,19 +2071,21 @@ class ColorFlow(PalettePlugin):
 		self._run_dashboard(None)
 
 	@objc.python_method
-	def _run_dashboard(self, progress=None) -> None:
+	def _run_dashboard(self, progress=None, open_when_done: bool = True) -> Any:
 		# ``progress`` (optional ``Callable[[float], None]``) is forwarded to
 		# colorflow_dashboard.main so the report-sheet loader can track real build
-		# progress; None when opened outside the sheet flow.
+		# progress; None when opened outside the sheet flow. Returns the written report
+		# Path (or None) so the sheet flow can offer Open / Save instead of auto-opening.
 		try:
 			import importlib
 
 			import colorflow_dashboard
 			importlib.reload(colorflow_dashboard)
-			colorflow_dashboard.main(Glyphs.font, progress=progress)
+			return colorflow_dashboard.main(Glyphs.font, progress=progress, open_when_done=open_when_done)
 		except Exception:
 			import traceback
 			print("Color Flow [dashboard] error:\n" + traceback.format_exc())
+			return None
 
 	########################################################################################################
 	#																									   #

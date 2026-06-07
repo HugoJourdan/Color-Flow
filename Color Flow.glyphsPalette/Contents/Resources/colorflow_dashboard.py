@@ -1072,10 +1072,12 @@ def build_model(font, now: datetime, current: dict, previous: dict, progress=Non
 # Entry point
 # --------------------------------------------------------------------------- #
 
-def main(font=None, progress=None) -> None:
-    """Build and open the report. ``progress`` (optional ``Callable[[float],
-    None]``) receives a monotonic 0->1 fraction at each phase boundary so a caller
-    can drive a determinate loading bar that tracks the real build."""
+def main(font=None, progress=None, open_when_done: bool = True) -> Path | None:
+    """Build the report, write it to a temp file, and (when ``open_when_done``)
+    open it in the browser. ``progress`` (optional ``Callable[[float], None]``)
+    receives a monotonic 0->1 fraction at each phase boundary so a caller can drive
+    a determinate loading bar. Returns the written ``Path`` (so a caller can offer
+    Open/Save itself), or ``None`` if nothing was produced."""
     def _emit(frac: float) -> None:
         if progress is not None:
             try:
@@ -1112,7 +1114,9 @@ def main(font=None, progress=None) -> None:
         out_path.write_text(html, encoding="utf-8")
     except OSError as error:
         Message(f"Could not write the dashboard:\n{error}", "Color Font Dashboard")
-        return
+        return None
     _emit(0.98)
-    webbrowser.open(out_path.as_uri())
+    if open_when_done:
+        webbrowser.open(out_path.as_uri())
     _emit(1.0)
+    return out_path
