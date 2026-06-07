@@ -384,6 +384,16 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-v-ok{border-color:var(--ok)}.tl-v-ok .tl-v-name{color:var(--ok)}
 .tl-v-amber{border-color:var(--c1)}.tl-v-amber .tl-v-name{color:var(--c1)}
 .tl-v-late{border-color:var(--c0)}.tl-v-late .tl-v-name{color:var(--c0)}
+.tl-machine{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
+.tl-machine-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
+.tl-scrub-bar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.tl-scrub-play{flex:0 0 auto}
+.tl-scrub-play[disabled]{opacity:.5;cursor:not-allowed}
+.tl-scrub{flex:1 1 auto;min-width:0;accent-color:var(--accent);color-scheme:dark light}
+.tl-scrub-date{flex:0 0 auto;font-size:var(--fs-xs);color:var(--text);font-variant-numeric:tabular-nums;min-width:54px;text-align:right}
+.tl-machine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(20px,1fr));gap:3px}
+.tl-machine-grid .cell{aspect-ratio:1;border-radius:4px;cursor:default;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.tl-machine-grid .cell svg{padding:2px}
 .dz{font-size:var(--fs-xs);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:4px 9px;color:var(--muted)}
 .dz-up{border-color:var(--ok);color:var(--ok)}
 .dz-down{border-color:var(--c0);color:var(--c0)}
@@ -440,6 +450,7 @@ DASHBOARD_JS = r"""
     coverGroup: "byCategory", glyphSort: "category", focus: null,
     ovExpand: {},                          // which Overview cards are expanded
     tlMode: "line",                        // Timeline chart mode: "line" | "flow" (streamgraph)
+    tlScrub: null,                         // Time Machine scrubber index (null -> latest snapshot)
     dateA: null, dateB: null,              // Timeline date A-vs-B diff selection
     journeyGlyph: null, helpOpen: false,   // journey modal + help panel
     theme: savedTheme || (prefersLight ? "light" : "dark")
@@ -1661,6 +1672,130 @@ DASHBOARD_JS = r"""
       + (runway ? '<span class="tl-deadline-runway">'+runway+'</span>' : "")
       + '<div class="tl-verdict-row">'+chips+'</div></div>';
   }
+  // ----- #11 Time Machine scrubber -------------------------------------------
+  // D3: the main heatmap lives in the Overview tab, so the Timeline tab renders its
+  // OWN compact heatmap and replays it day by day. The master scrubbed is the focused
+  // one, else the first (same anchor the lanes use). The scrub index is clamped onto
+  // a real H.trend.dates entry; null means "latest snapshot".
+  function scrubMaster(){ return reglogMaster(); }
+  // The snapshot index currently scrubbed: state.tlScrub clamped to the dates range,
+  // defaulting to the latest snapshot when unset.
+  function scrubIndex(){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (!dates.length) return -1;
+    var idx = state.tlScrub == null ? dates.length-1 : state.tlScrub;
+    return Math.max(0, Math.min(dates.length-1, idx));
+  }
+  // Recolour the compact Time-Machine grid in place to the master's colour state at
+  // the scrubbed date. Reconstructs each cell's key via stateAt (no interpolation) and
+  // writes it back with the SAME color-mix idiom applyBeforeAfter uses, so dark/light
+  // themes and the swatch tokens stay consistent. Throttled to rAF by scrubSet.
+  function scrubRecolour(){
+    var grid = document.querySelector(".tl-machine .tl-machine-grid");
+    if (!grid) return;
+    var dates = (H.trend && H.trend.dates) || [];
+    var idx = scrubIndex();
+    if (idx < 0 || !dates[idx]) return;
+    var st = stateAt(scrubMaster(), dates[idx]);
+    var cells = grid.querySelectorAll(".cell");
+    for (var i=0;i<cells.length;i++){
+      var cell = cells[i], name = cell.getAttribute("data-glyph");
+      var key = (name != null && st[name] != null) ? st[name] : -1;
+      var v = varFor(key);
+      cell.style.background = "color-mix(in srgb,var("+v+") 35%,transparent)";
+    }
+    var lab = document.querySelector(".tl-machine .tl-scrub-date");
+    if (lab) lab.textContent = dateLabel(dates[idx]);
+  }
+  // Set the scrub index (clamped), keep the range input + state in sync, and recolour
+  // the grid throttled to a single rAF per frame so a fast drag stays smooth.
+  var scrubRaf = 0;
+  function scrubSet(idx){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (!dates.length) return;
+    state.tlScrub = Math.max(0, Math.min(dates.length-1, idx));
+    var input = document.querySelector(".tl-machine .tl-scrub");
+    if (input && String(input.value) !== String(state.tlScrub)){ input.value = state.tlScrub; }
+    if (scrubRaf) return;                       // coalesce bursts of input events
+    scrubRaf = requestAnimationFrame(function(){ scrubRaf = 0; scrubRecolour(); });
+  }
+  // Keyboard on the scrubber: Left/Right step +-1 day, Home/End jump to the ends.
+  function scrubKey(evt){
+    var input = evt.target.closest && evt.target.closest(".tl-scrub");
+    if (!input) return;
+    var dates = (H.trend && H.trend.dates) || [];
+    if (!dates.length) return;
+    var cur = scrubIndex(), next = cur;
+    if (evt.key === "ArrowLeft"){ next = cur-1; }
+    else if (evt.key === "ArrowRight"){ next = cur+1; }
+    else if (evt.key === "Home"){ next = 0; }
+    else if (evt.key === "End"){ next = dates.length-1; }
+    else return;
+    evt.preventDefault();
+    scrubSet(next);
+  }
+  // Play auto-advances through the snapshots (one step per ~700ms) then stops at the
+  // end. Disabled under 3 snapshots; reduced-motion (or the test hook) refuses to
+  // start so the page never auto-animates against the user's preference — dragging
+  // still snaps instantly. A second click stops an in-flight playback.
+  var scrubTimer = 0;
+  function scrubStopPlay(){
+    if (scrubTimer){ clearInterval(scrubTimer); scrubTimer = 0; }
+    var btn = document.querySelector(".tl-machine .tl-scrub-play");
+    if (btn){ btn.setAttribute("aria-pressed", "false"); btn.textContent = "▶ Play"; }
+  }
+  function scrubPlay(){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (dates.length < 3) return;
+    if (scrubTimer){ scrubStopPlay(); return; }
+    var noAnim = window.__cfdNoAnim ||
+      (window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
+    if (noAnim) return;                         // reduced motion: no autoplay
+    if (scrubIndex() >= dates.length-1){ scrubSet(0); }   // replay from the start
+    var btn = document.querySelector(".tl-machine .tl-scrub-play");
+    if (btn){ btn.setAttribute("aria-pressed", "true"); btn.textContent = "❚❚ Pause"; }
+    scrubTimer = setInterval(function(){
+      var i = scrubIndex();
+      if (i >= dates.length-1){ scrubStopPlay(); return; }
+      scrubSet(i+1);
+    }, 700);
+  }
+  // Build one compact cell for the scrub grid: a div carrying data-glyph + the
+  // letterform (if the model embedded a path for this master), recoloured on render
+  // to the master's colour at the scrubbed date via the shared color-mix idiom.
+  function timeMachine(){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (dates.length < 2) return "";            // <2 snapshots: nothing to replay
+    var mid = scrubMaster();
+    if (!mid) return "";
+    var idx = scrubIndex();
+    var st = stateAt(mid, dates[idx]);
+    var names = H.glyphNames || [];
+    var paths = (H.paths && H.paths[mid]) || {};
+    var cells = names.map(function(name){
+      var key = (st[name] != null) ? st[name] : -1;
+      var v = varFor(key);
+      var p = paths[name];
+      var inner = p ? '<svg viewBox="'+esc(p.vb)+'" preserveAspectRatio="xMidYMid meet"><path d="'+esc(p.d)+'"/></svg>' : '';
+      return '<span class="cell'+(p ? ' glyph' : '')+'" data-glyph="'+esc(name)+'"'
+        + ' style="background:color-mix(in srgb,var('+v+') 35%,transparent)"'
+        + ' title="'+esc(name)+'" aria-hidden="true">'+inner+'</span>';
+    }).join("");
+    var canPlay = dates.length >= 3;            // autoplay needs >=3 snapshots
+    var controls = '<div class="tl-scrub-bar">'
+      + '<button type="button" class="chip tl-scrub-play" aria-pressed="false"'
+      + (canPlay ? "" : ' disabled aria-disabled="true" title="Needs at least 3 snapshots"')
+      + '>▶ Play</button>'
+      + '<input type="range" class="tl-scrub" min="0" max="'+(dates.length-1)+'" step="1" value="'+idx+'"'
+      + ' aria-label="Scrub through snapshot history" aria-valuetext="'+esc(dateLabel(dates[idx]))+'"/>'
+      + '<span class="tl-scrub-date" aria-live="polite">'+esc(dateLabel(dates[idx]))+'</span>'
+      + '</div>';
+    return '<div class="tl-machine" role="group" aria-label="Time Machine: replay the heatmap by date">'
+      + '<div class="tl-machine-h">Time Machine</div>'
+      + controls
+      + '<div class="tl-machine-grid heat" aria-label="Glyph colours at the scrubbed date">'+cells+'</div>'
+      + '</div>';
+  }
   function timelineView(){
     if (!hasTrend()){
       return '<section class="tl-empty"><p class="empty">Not enough history yet. Color Flow saves a snapshot each time you save the font; this timeline fills in as days of history accumulate.</p></section>';
@@ -1670,7 +1805,7 @@ DASHBOARD_JS = r"""
     // #14: This-week digest tops the tab (above the chart), per D1.
     return '<section class="timeline">'+weekDigest()+'<div class="tl-chartbar">'+tlModeToggle()
       + '<div class="tl-legend">'+parts.legend+'</div></div>'
-      + parts.chart+parts.foot+dateDiffPanel()+deadlinePanel()+categoryLanes()+scriptLanes()+regressionLog()+'</section>';
+      + parts.chart+parts.foot+dateDiffPanel()+deadlinePanel()+timeMachine()+categoryLanes()+scriptLanes()+regressionLog()+'</section>';
   }
   function compareView(){
     // columns = steps (+None); rows = masters, labelled by the master name.
@@ -1989,6 +2124,7 @@ DASHBOARD_JS = r"""
 
   function update(){
     hideTip();
+    scrubStopPlay();                            // a full re-render replaces the scrub grid; drop any in-flight playback
     barsAnim = (state.master !== barMaster);   // re-fill the colour bar only when the master changed
     barMaster = state.master;
     document.getElementById("cfd-body").innerHTML = renderBody();
@@ -2267,6 +2403,9 @@ DASHBOARD_JS = r"""
       var jc = e.target.closest(".heat .cell"); if (jc && (e.metaKey || e.ctrlKey)){ e.preventDefault(); openJourney(jc.getAttribute("data-glyph")); return; }
       var ba = e.target.closest(".ba-toggle");
       if (ba){ e.preventDefault(); state.before = !state.before; ba.setAttribute("aria-pressed", state.before); ba.textContent = state.before ? "Before" : "After"; applyBeforeAfter(); return; }
+      // #11 Time Machine: Play toggles autoplay (disabled <3 snapshots / reduced motion).
+      var pl = e.target.closest(".tl-scrub-play");
+      if (pl && !pl.disabled){ e.preventDefault(); scrubPlay(); return; }
     });
     bodyEl.addEventListener("change", function(e){
       if (e.target.id === "cfd-date-a"){ state.dateA = e.target.value; update(); }
@@ -2275,6 +2414,13 @@ DASHBOARD_JS = r"""
       // + verdict chips refresh without a reload.
       else if (e.target.id === "cfd-deadline"){ setDeadline(e.target.value); update(); }
     });
+    // #11 Time Machine: dragging the range slider scrubs the date; scrubSet throttles
+    // the grid recolour to rAF so a fast drag stays smooth. A manual drag stops autoplay.
+    bodyEl.addEventListener("input", function(e){
+      var sc = e.target.closest && e.target.closest(".tl-scrub");
+      if (sc){ scrubStopPlay(); scrubSet(parseInt(sc.value, 10) || 0); }
+    });
+    bodyEl.addEventListener("keydown", scrubKey);
     // #6 snapping crosshair: the chart SVG is rebuilt on every update(), so delegate
     // its pointer + keyboard interaction at the #cfd-body level (same idiom as the
     // heatmap tip above). pointermove snaps to the nearest snapshot; leaving the

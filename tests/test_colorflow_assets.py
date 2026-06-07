@@ -860,3 +860,79 @@ def test_dashboard_css_styles_report_insight_classes() -> None:
     # that made every swatch invisible.
     swatch_rule = css.split(".rg-sw")[1].split("}")[0]
     assert "width:" in swatch_rule and "height:" in swatch_rule
+
+
+def test_dashboard_js_has_time_machine_scrubber() -> None:
+    """#11: a Time Machine scrubber replays the heatmap day by day. D3: the Timeline
+    tab gets its OWN compact heatmap (the Overview heatmap is not visible here); each
+    cell carries data-glyph. A timeMachine builder renders that grid plus a notched
+    <input type="range"> (one notch per H.trend.dates entry) and a Play button, and is
+    wired into the timeline view. Dragging the slider sets state.tlScrub and recolours
+    the grid from stateAt(masterId, dateAtIndex) -> color-mix of varFor(key), reusing
+    the applyBeforeAfter recolour idiom. A label shows the current snapshot date."""
+    js = assets.DASHBOARD_JS
+    # the named builder, wired into the timeline view (D1: time-machine section)
+    assert "function timeMachine(" in js
+    timeline = js.split("function timelineView(")[1].split("function ")[0]
+    assert "timeMachine()" in timeline
+    machine = js.split("function timeMachine(")[1].split("\n  function ")[0]
+    # its own compact heatmap grid in this tab, cells carry data-glyph (D3)
+    assert "tl-machine" in machine
+    assert "data-glyph" in machine
+    # a notched range input, one notch per snapshot date, + a Play button
+    assert 'type="range"' in machine
+    assert "tl-scrub" in machine
+    assert "H.trend.dates" in machine or "H.trend && H.trend.dates" in machine
+    # the scrubber index lives on state (shared with the recolour + keyboard stepping)
+    assert "state.tlScrub" in js
+    assert "tlScrub:" in js                       # initialised on the state object
+
+
+def test_dashboard_js_time_machine_recolours_via_stateat() -> None:
+    """The recolour reconstructs each cell's colour from stateAt(master, dateAtIndex)
+    and writes it back with the SAME color-mix idiom applyBeforeAfter uses, throttled
+    to requestAnimationFrame so a fast drag stays smooth."""
+    js = assets.DASHBOARD_JS
+    recolour = js.split("function scrubRecolour(")[1].split("\n  function ")[0]
+    # reconstruct colour at the scrubbed date via the shared helper (not reinvented)
+    assert "stateAt(" in recolour
+    # reuse the applyBeforeAfter color-mix recolour idiom verbatim
+    assert 'color-mix(in srgb,var(' in recolour
+    assert "35%,transparent)" in recolour
+    assert "varFor(" in recolour
+    # throttle to rAF so dragging the slider does not recolour on every input event
+    assert "requestAnimationFrame" in recolour or "requestAnimationFrame" in js.split(
+        "function scrubSet(")[1].split("\n  function ")[0]
+
+
+def test_dashboard_js_time_machine_play_disabled_under_three_snapshots() -> None:
+    """Autoplay needs at least 3 snapshots to be meaningful; with <3 the Play button
+    is rendered disabled. Reduced-motion also disables autoplay (drag still snaps)."""
+    js = assets.DASHBOARD_JS
+    machine = js.split("function timeMachine(")[1].split("\n  function ")[0]
+    # the play control is disabled when there are fewer than 3 snapshots
+    assert "< 3" in machine or "<3" in machine or "length>=3" in machine or "length >= 3" in machine
+    assert "disabled" in machine
+    # reduced-motion disables autoplay via the shared gate (matchMedia / __cfdNoAnim)
+    play = js.split("function scrubPlay(")[1].split("\n  function ")[0]
+    assert "__cfdNoAnim" in play or "prefers-reduced-motion" in play
+
+
+def test_dashboard_js_time_machine_keyboard_steps_and_jumps() -> None:
+    """Keyboard on the scrubber: Left/Right step +-1 snapshot, Home/End jump to the
+    ends. Stepping reuses scrubSet so the grid recolours and the date label updates."""
+    js = assets.DASHBOARD_JS
+    key = js.split("function scrubKey(")[1].split("\n  function ")[0]
+    assert "ArrowLeft" in key and "ArrowRight" in key
+    assert '"Home"' in key and '"End"' in key
+    assert "scrubSet(" in key
+
+
+def test_dashboard_css_styles_time_machine_classes() -> None:
+    """#11: the time-machine grid + scrubber carry theme-safe rules built from the
+    design tokens (no hard-coded colours)."""
+    css = assets.DASHBOARD_CSS
+    for selector in (".tl-machine", ".tl-scrub"):
+        assert selector in css, selector
+    machine_rule = css.split(".tl-machine{")[1].split("}")[0]
+    assert "var(--" in machine_rule
