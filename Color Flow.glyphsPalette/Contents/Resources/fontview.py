@@ -1,4 +1,3 @@
-# encoding: utf-8
 """Font-View grouping engine for Color Flow (ported from Rainbow FontView).
 
 Groups the Font View into labelled colour sections by rewriting the font's
@@ -17,6 +16,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+from typing import Any
 
 import colornames
 
@@ -159,7 +159,15 @@ class FontViewGrouping:
 
     # ----------------------------------------------------------- dirty check
     def is_dirty(self, font) -> bool:
-        """Cheap O(selection) test for whether a rebuild is warranted."""
+        """Cheap test for whether a rebuild is warranted.
+
+        Checks, in order: a missing snapshot (force rebuild), a master change,
+        glyph-membership drift (any add/delete vs the snapshot, in O(glyph
+        count) with no per-layer colour read), and finally a per-layer colour
+        change on the current selection. An *off-selection* recolour of an
+        EXISTING glyph is not detected here and still relies on the next
+        selection change or master change to trigger the rebuild.
+        """
         snapshot = font.tempData[SNAPSHOT_KEY]
         if snapshot is None:
             return True
@@ -167,6 +175,10 @@ class FontViewGrouping:
         if master_id is None:
             return False
         if font.tempData[MASTER_KEY] != master_id:
+            return True
+        # Membership drift: a glyph added or deleted (even while unselected)
+        # makes the grouping stale. Compare names only — no colour reads.
+        if set(snapshot) != {glyph.name for glyph in font.glyphs}:
             return True
         mode = self.mode(font)
         for layer in font.selectedLayers or []:
@@ -180,17 +192,17 @@ class FontViewGrouping:
         return False
 
     # ----------------------------------------------------------- helpers
-    def _master_id(self, font):
+    def _master_id(self, font) -> str | None:
         master = font.selectedFontMaster if font.parent is not None else None
         if master is None:
             master = font.masters[0] if font.masters else None
         return master.id if master is not None else None
 
-    def _layer_color(self, glyph, master_id):
+    def _layer_color(self, glyph, master_id) -> int | None:
         layer = glyph.layers[master_id]
         return layer.color if layer is not None else None
 
-    def _glyph_order_param(self, font):
+    def _glyph_order_param(self, font) -> Any:
         for param in font.customParameters:
             if param.name == GLYPH_ORDER:
                 return param
