@@ -261,6 +261,14 @@ def test_dashboard_js_has_expandable_overview_cards_and_timeline_card() -> None:
     assert "leaderboard\", \"Furthest along\"" in js or 'ovCard("leaderboard"' in js
 
 
+def test_dashboard_timeline_card_has_no_static_legend() -> None:
+    js = assets.DASHBOARD_JS
+    card = js.split("function timelineCard(")[1].split("\n  function ")[0]
+    assert "tl-legend" not in card                        # static colour/name legend removed
+    assert "parts.chart + parts.foot" in card             # chart + range foot only
+    assert "tl-legend-card" not in assets.DASHBOARD_CSS    # its style dropped too
+
+
 def test_dashboard_js_uses_graded_step_progress() -> None:
     js = assets.DASHBOARD_JS
     assert "function stepWeights(" in js                 # palette-order step ranking

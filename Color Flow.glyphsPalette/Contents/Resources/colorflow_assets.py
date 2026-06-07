@@ -167,7 +167,6 @@ button.ov-card-h{cursor:pointer}
 .ov-exp{font-size:var(--fs-2xs);font-weight:600;color:var(--accent);text-transform:none;letter-spacing:0}
 button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .ov-card-body.scroll{max-height:300px;overflow-y:auto;padding-right:4px}
-.tl-legend-card{margin-top:10px;max-height:120px;overflow-y:auto}
 .lb-row{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;padding:5px 0;cursor:pointer;color:var(--text);font:inherit;text-align:left}
 .lb-row+.lb-row{border-top:1px solid var(--track)}
 .lb-n{flex:0 0 96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-xs)}
@@ -819,12 +818,12 @@ DASHBOARD_JS = r"""
     }).join("");
     return ovCard("histogram", "Masters by completion", rows, false);
   }
-  // Completion-over-time, compact; expanded grows the chart and adds the legend.
+  // Completion-over-time: chart + range foot, no static colour/name legend — the
+  // per-master name + % only appear on hover (the snapping crosshair / dot titles).
   function timelineCard(){
     if (!hasTrend()) return "";
-    // Always expanded (no collapse): full-height chart + legend + range foot.
     var parts = trendParts(680, 190);
-    var body = parts.chart + '<div class="tl-legend tl-legend-card">'+parts.legend+'</div>'+parts.foot;
+    var body = parts.chart + parts.foot;
     return ovCard("timeline", "Completion over time", body, false);
   }
   // rank within the workflow order; uncoloured/none and off-palette steps rank
