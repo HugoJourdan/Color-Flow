@@ -209,6 +209,38 @@ def test_dashboard_js_has_journey_helpers() -> None:
     assert "<=" in js  # stateAt: last event at or before the date
 
 
+def test_dashboard_js_has_calendar_x_axis() -> None:
+    """#7: trendParts draws real calendar date ticks, zebra ISO week bands and a
+    dashed 'today' rule, instead of an unlabelled day-offset axis."""
+    js = assets.DASHBOARD_JS
+    # short "D Mon" date->label helper for the X ticks
+    assert "function dateLabel(" in js
+    # the today rule reads the real today date from the model
+    assert "H.trend.today" in js
+    # the three new visual layers each get a class
+    assert "tl-weekband" in js
+    assert "tl-xtick" in js
+    assert "tl-today" in js
+    # the today rule keeps the existing grid/polyline/dots layers (still present)
+    assert "tl-grid" in js
+    assert "tl-dot" in js
+
+
+def test_dashboard_css_styles_calendar_axis_classes() -> None:
+    """#7: the week bands, x-axis tick labels and today rule each carry a
+    theme-safe CSS rule built from --text / --accent vars (no hard-coded colour)."""
+    css = assets.DASHBOARD_CSS
+    for selector in (".tl-weekband", ".tl-xtick", ".tl-today", ".tl-today-pill"):
+        assert selector in css, selector
+    # week bands are a faint --text tint (theme-safe), not a baked colour
+    band_rule = css.split(".tl-weekband")[1].split("}")[0]
+    assert "var(--text)" in band_rule
+    # today rule uses the accent var and is dashed
+    today_rule = css.split(".tl-today{")[1].split("}")[0]
+    assert "var(--accent)" in today_rule
+    assert "dasharray" in today_rule
+
+
 def test_dashboard_js_has_regression_card() -> None:
     js = assets.DASHBOARD_JS
     assert "function regressionCard(" in js

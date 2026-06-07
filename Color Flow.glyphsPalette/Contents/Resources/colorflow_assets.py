@@ -273,6 +273,11 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-lg.tl-sel{font-weight:600}
 .tl-grid{stroke:var(--track);stroke-width:1}
 .tl-axis{fill:var(--muted-2);font-size:10px}
+.tl-weekband{fill:var(--text);opacity:.035}
+.tl-xtick{fill:var(--muted-2);font-size:9px}
+.tl-today{stroke:var(--accent);stroke-width:1.5;stroke-dasharray:3 3;opacity:.7}
+.tl-today-pill{fill:var(--accent)}
+.tl-today-pill-t{fill:#fff;font-size:8.5px;font-weight:600}
 .tl-foot{display:flex;justify-content:space-between;font-size:var(--fs-2xs);color:var(--muted-2);margin-top:6px}
 .ov-ring{display:block}
 .ov-ring .ov-ring-track{stroke:var(--track)}
@@ -911,11 +916,19 @@ DASHBOARD_JS = r"""
   }
   // ----- Timeline: completion over time, one line per master -----
   function masterHue(i){ return Math.round((i*137.508) % 360); }
+  // ISO date "YYYY-MM-DD" -> short "D Mon" axis label (e.g. "7 Jun"). UTC-parsed
+  // so the day never drifts across the local timezone boundary.
+  var CFD_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function dateLabel(iso){
+    var d = new Date(iso + "T00:00:00Z");
+    if (isNaN(d.getTime())) return iso;
+    return d.getUTCDate() + " " + CFD_MONTHS[d.getUTCMonth()];
+  }
   // Shared trend builder: returns the chart SVG, the per-master legend and the
   // date foot, so both the Timeline view and the Overview card draw the same.
   function trendParts(W, Ht){
     var series = (H.trend && H.trend.series) || [];
-    var pl=30, pr=12, ptop=12, pb=8, iw=W-pl-pr, ih=Ht-ptop-pb;
+    var pl=30, pr=12, ptop=12, pb=16, iw=W-pl-pr, ih=Ht-ptop-pb;
     var t0 = new Date(series[0].date).getTime();
     function dayOff(d){ return (new Date(d).getTime()-t0)/86400000; }
     var lastOff = Math.max(1, dayOff(series[series.length-1].date));
@@ -926,6 +939,46 @@ DASHBOARD_JS = r"""
       return '<line class="tl-grid" x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'"/>'
         + '<text class="tl-axis" x="'+(pl-5)+'" y="'+(parseFloat(y)+3).toFixed(1)+'" text-anchor="end">'+g+'</text>';
     }).join("");
+    // ----- #7 real calendar X axis: zebra ISO-week bands + date tick labels -----
+    var bandTop = ptop, bandH = ih;
+    // day-offset of the Monday that opens the ISO week containing the first snapshot,
+    // so band boundaries line up with calendar weeks rather than the data start.
+    var firstDate = new Date(series[0].date + "T00:00:00Z");
+    var firstDow = (firstDate.getUTCDay() + 6) % 7;          // 0 = Monday
+    var weekStart = -firstDow;                                // offset of that Monday
+    var weekBands = "";
+    for (var wOff = weekStart, band = 0; wOff < lastOff; wOff += 7, band++){
+      if (band % 2 === 0){ continue; }                       // tint every other week only
+      var bx0 = Math.max(pl, X(Math.max(0, wOff)));
+      var bx1 = Math.min(W - pr, X(Math.min(lastOff, wOff + 7)));
+      if (bx1 <= bx0){ continue; }
+      weekBands += '<rect class="tl-weekband" x="'+bx0.toFixed(1)+'" y="'+bandTop+'" width="'+(bx1-bx0).toFixed(1)+'" height="'+bandH+'"/>';
+    }
+    // thin the tick labels so they never collide on long spans: aim for ~6 ticks,
+    // stepping whole snapshots so every label sits on a real data X.
+    var tickStep = Math.max(1, Math.ceil(series.length / 6));
+    var xticks = "";
+    series.forEach(function(p, idx){
+      if (idx % tickStep !== 0 && idx !== series.length - 1){ return; }
+      var tx = X(dayOff(p.date));
+      var anchor = idx === 0 ? "start" : (idx === series.length - 1 ? "end" : "middle");
+      xticks += '<text class="tl-xtick" x="'+tx.toFixed(1)+'" y="'+(ptop+ih+pb).toFixed(1)+'" text-anchor="'+anchor+'">'+esc(dateLabel(p.date))+'</text>';
+    });
+    // dashed "today" rule + pill, only when today falls inside the plotted span.
+    var todayRule = "";
+    var today = H.trend && H.trend.today;
+    if (today){
+      var tOff = dayOff(today);
+      if (tOff >= 0 && tOff <= lastOff){
+        var trx = X(tOff);
+        var lab = dateLabel(today);
+        var pillW = lab.length * 5.5 + 12;
+        var pillX = Math.min(W - pr - pillW, Math.max(pl, trx - pillW/2));
+        todayRule = '<line class="tl-today" x1="'+trx.toFixed(1)+'" y1="'+ptop+'" x2="'+trx.toFixed(1)+'" y2="'+(ptop+ih).toFixed(1)+'"/>'
+          + '<rect class="tl-today-pill" x="'+pillX.toFixed(1)+'" y="'+(ptop-1)+'" width="'+pillW.toFixed(1)+'" height="13" rx="6"/>'
+          + '<text class="tl-today-pill-t" x="'+(pillX+pillW/2).toFixed(1)+'" y="'+(ptop+8.5)+'" text-anchor="middle">'+esc(lab)+'</text>';
+      }
+    }
     var lines = "", selLine = "", legend = "";
     H.masters.forEach(function(m, i){
       var col = "hsl("+masterHue(i)+",70%,55%)";
@@ -944,7 +997,7 @@ DASHBOARD_JS = r"""
       legend += '<span class="tl-lg'+(dim?" tl-dim":"")+(sel?" tl-sel":"")+'"><i style="background:'+col+'"></i>'+esc(m.name)+' '+Math.round(pts[pts.length-1].pc)+'%</span>';
     });
     lines += selLine;
-    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" aria-label="Completion over time per master">'+grid+lines+'</svg>';
+    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" aria-label="Completion over time per master">'+weekBands+grid+xticks+lines+todayRule+'</svg>';
     var foot = '<div class="tl-foot"><span>'+esc(series[0].date)+'</span><span>'+esc(series[series.length-1].date)+'</span></div>';
     return { chart:chart, legend:legend, foot:foot };
   }
