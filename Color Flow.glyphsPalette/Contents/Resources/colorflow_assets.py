@@ -160,7 +160,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cat-h{font-size:var(--fs-xs);color:var(--muted);margin:14px 0 6px;display:flex;align-items:center;gap:6px}
 .cat-n{color:var(--muted-2)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:3px}
-.cell{aspect-ratio:1;border:0;padding:0;border-radius:5px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease,opacity .2s ease;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.cell{aspect-ratio:1;border:0;padding:0;border-radius:5px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease,opacity .2s ease}
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}
 .cell.copied{outline:2px solid var(--ok);outline-offset:1px}
 .cell svg{width:100%;height:100%;display:block;padding:3px;transform:scale(.9)}
@@ -449,7 +449,7 @@ DASHBOARD_JS = r"""
         + "&glyph=" + encodeURIComponent(name) + "&layer=" + encodeURIComponent(m.id);
       var p = paths[name];
       var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '"/></svg>' : '';
-      return '<a class="cell' + (p ? ' glyph' : '') + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:color-mix(in srgb,var(' + showVar + ') 25%,transparent)" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
+      return '<a class="cell' + (p ? ' glyph' : '') + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:color-mix(in srgb,var(' + showVar + ') 35%,transparent)" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
     }
     var sections;
     if (state.glyphSort === "font"){
@@ -635,7 +635,7 @@ DASHBOARD_JS = r"""
       var cell = cells[i];
       var v = state.before ? cell.getAttribute("data-was") : cell.getAttribute("data-now");
       if (!v) continue;
-      cell.style.background = "color-mix(in srgb,var("+v+") 25%,transparent)";
+      cell.style.background = "color-mix(in srgb,var("+v+") 35%,transparent)";
     }
   }
 
