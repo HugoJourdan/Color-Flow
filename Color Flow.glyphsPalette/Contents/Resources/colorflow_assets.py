@@ -122,7 +122,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .ov-name{color:var(--text);font-weight:600;margin-right:9px}
 .ov-name::after{content:"·";color:var(--muted-2);margin-left:9px}
 .seg{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--track)}
-.seg>span{display:block;height:100%;transform-origin:left center;transition:opacity .2s ease}
+.seg>span{display:block;height:100%;transform-origin:left center;transition:opacity .2s ease;box-shadow:inset -1px 0 2px -0.5px rgba(0,0,0,.45)}
 .seg .seg-none{background:var(--c-none)}
 .segc{cursor:pointer}
 .seg>span.off{opacity:.28}
