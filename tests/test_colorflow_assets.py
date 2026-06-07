@@ -494,6 +494,56 @@ def test_dashboard_js_date_diff_state_keys_initialised() -> None:
     assert "dateA:" in js and "dateB:" in js
 
 
+def test_dashboard_js_has_week_digest_card() -> None:
+    """#14: a "This week" digest card tops the Timeline tab. The builder snaps a
+    week-ago date to the real H.trend.dates entry nearest 7 days before the latest
+    snapshot, runs diffCounts(master, weekAgo, today) for the big signed net % +
+    advanced/regressed micro-stats, and a single trend arrow comparing this week's
+    net to the prior 7-day window's net (a second diffCounts). Falls back to "since
+    you started" on <7 days of history; rolls up across all masters when none is
+    selected."""
+    js = assets.DASHBOARD_JS
+    # the named digest builder, wired into the timeline view above the chart
+    assert "function weekDigest(" in js
+    timeline = js.split("function timelineView(")[1].split("function ")[0]
+    assert "weekDigest()" in timeline
+    # the digest container class
+    assert "tl-digest" in js
+    # the honest "This week" headline + the <7-day fallback label
+    assert "This week" in js
+    assert "since you started" in js
+    # snaps a real date ~7 days before the latest; reuses the diff engine, not a reinvention
+    assert "diffCounts(" in js
+    assert "H.trend.dates" in js or "H.trend && H.trend.dates" in js
+    # big signed net % + advanced/regressed micro-stats
+    assert "advanced" in js and "regressed" in js
+    # all-masters roll-up when no master is selected
+    assert "state.master" in js
+
+
+def test_dashboard_js_week_digest_compares_prior_week() -> None:
+    """#14: the trend arrow compares this week's net delta against the prior 7-day
+    window's net (a second diffCounts call over the window before weekAgo)."""
+    js = assets.DASHBOARD_JS
+    digest = js.split("function weekDigest(")[1].split("\n  function ")[0]
+    # two diffCounts windows: this week + the prior window before it
+    assert digest.count("diffCounts(") >= 2 or digest.count("rollupDiff(") >= 2 \
+        or (digest.count("diffCounts(") + digest.count("rollupDiff(")) >= 2
+    # an explicit prior-window anchor date
+    assert "prior" in digest.lower()
+    # the comparison drives a single up/down/flat arrow token
+    assert "deltaPct" in digest
+
+
+def test_dashboard_css_styles_week_digest_class() -> None:
+    """#14: the digest card carries a theme-safe rule and the big net number is
+    sized/coloured via the design tokens (no hard-coded colours)."""
+    css = assets.DASHBOARD_CSS
+    assert ".tl-digest" in css
+    digest_block = css.split(".tl-digest")[1].split("}")[0]
+    assert "var(--" in digest_block
+
+
 def test_dashboard_js_has_journey_modal() -> None:
     js = assets.DASHBOARD_JS
     assert "function openJourney(" in js

@@ -334,6 +334,17 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .cm-steps-l{color:var(--muted-2)}
 .cm-step{display:inline-flex;align-items:center;gap:5px}
 .cm-step-n{color:var(--text)}
+.tl-digest{margin-bottom:14px;border:1px solid var(--border-2);border-radius:var(--r);background:var(--surface-2);padding:12px 14px}
+.tl-digest-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.tl-digest-title{font-weight:600;color:var(--text)}
+.tl-digest-sub{font-size:var(--fs-xs);color:var(--muted)}
+.tl-digest-body{display:flex;align-items:center;gap:10px;margin-top:6px}
+.tl-digest-net{font-size:var(--fs-big-sm);font-weight:700;letter-spacing:-.01em;line-height:1}
+.tl-digest-arrow{font-size:1.1em}
+.tl-digest-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.tl-d-up{color:var(--ok)}
+.tl-d-down{color:var(--c0)}
+.tl-d-flat{color:var(--muted-2)}
 .tl-diff{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
 .tl-diff-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
 .tl-diff-pick{display:flex;gap:14px;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--muted)}
@@ -1221,6 +1232,75 @@ DASHBOARD_JS = r"""
     var deltaPct = Math.round((gradedStateSum(after) - gradedStateSum(before)) / denom * 100);
     return {advanced:advanced, regressed:regressed, unchanged:unchanged, deltaPct:deltaPct};
   }
+  // ----- #14 This-week digest card ------------------------------------------
+  // Snap an ISO target to the real H.trend.dates entry nearest (but not after) it,
+  // falling back to the earliest date when the target predates all history. Lets the
+  // digest "label honestly": it always reports a date a snapshot actually exists for.
+  function snapDate(dates, targetIso){
+    var pick = dates[0];
+    for (var i = 0; i < dates.length; i++){
+      if (dates[i] <= targetIso) pick = dates[i]; else break;
+    }
+    return pick;
+  }
+  // ISO date N days before another ISO date (UTC midnight, timezone-stable).
+  function isoMinusDays(iso, days){
+    var d = new Date(iso + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() - days);
+    return d.toISOString().slice(0, 10);
+  }
+  // Diff over [isoA, isoB] for the focused master, or rolled up across every master
+  // when none is selected: advanced/regressed are summed, the net % is the mean of the
+  // per-master nets so it stays on the same 0-100 scale as diffCounts' deltaPct.
+  function rollupDiff(isoA, isoB){
+    if (state.master != null) return diffCounts(state.master, isoA, isoB);
+    var advanced = 0, regressed = 0, unchanged = 0, netSum = 0, n = 0;
+    H.masters.forEach(function(m){
+      var c = diffCounts(m.id, isoA, isoB);
+      advanced += c.advanced; regressed += c.regressed; unchanged += c.unchanged;
+      netSum += c.deltaPct; n++;
+    });
+    return { advanced:advanced, regressed:regressed, unchanged:unchanged,
+             deltaPct: n ? Math.round(netSum / n) : 0 };
+  }
+  function weekDigest(){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (dates.length < 2) return "";
+    var today = (H.trend && H.trend.today) || dates[dates.length-1];
+    // snap a ~7-days-before-today target onto a real snapshot; fall back to "since you
+    // started" when there is under a week of history (weekAgo lands on the first date).
+    var weekAgo = snapDate(dates, isoMinusDays(today, 7));
+    var started = weekAgo === dates[0]
+      && new Date(today+"T00:00:00Z").getTime() - new Date(dates[0]+"T00:00:00Z").getTime() < 7*86400000;
+    var label = started ? "since you started" : "vs " + esc(dateLabel(weekAgo));
+    var cur = rollupDiff(weekAgo, today);
+    // prior 7-day window: from a snapped ~7-days-before-weekAgo date up to weekAgo. Only
+    // meaningful when a real earlier snapshot exists, otherwise the arrow is suppressed.
+    var priorAnchor = snapDate(dates, isoMinusDays(weekAgo, 7));
+    var hasPrior = priorAnchor !== weekAgo;
+    var prior = hasPrior ? rollupDiff(priorAnchor, weekAgo) : null;
+    var arrow = "", arrowCls = "tl-d-flat", arrowTitle = "No earlier week to compare";
+    if (prior){
+      var diff = cur.deltaPct - prior.deltaPct;
+      arrow = diff > 0 ? "▲" : (diff < 0 ? "▼" : "▬");
+      arrowCls = diff > 0 ? "tl-d-up" : (diff < 0 ? "tl-d-down" : "tl-d-flat");
+      arrowTitle = "This week's net " + (cur.deltaPct>=0?"+":"") + cur.deltaPct
+        + "% vs prior week " + (prior.deltaPct>=0?"+":"") + prior.deltaPct + "%";
+    }
+    var net = (cur.deltaPct>=0?"+":"") + cur.deltaPct + "%";
+    // honest scope label: rolled up across every master, or the focused master's name.
+    var scope = "all masters";
+    if (state.master != null){ var mm = masterById(state.master); scope = mm ? esc(mm.name) : ""; }
+    return '<div class="tl-digest" role="group" aria-label="This week digest">'
+      + '<div class="tl-digest-head"><span class="tl-digest-title">This week</span>'
+      + '<span class="tl-digest-sub">'+label+(scope?' · '+scope:'')+'</span></div>'
+      + '<div class="tl-digest-body">'
+      + '<span class="tl-digest-net '+(cur.deltaPct>=0?"tl-d-up":"tl-d-down")+'">'+net+' net</span>'
+      + '<span class="tl-digest-arrow '+arrowCls+'" title="'+arrowTitle+'" aria-label="'+arrowTitle+'">'+arrow+'</span>'
+      + '</div>'
+      + '<div class="tl-digest-stats"><span class="dz dz-up">↑ '+cur.advanced+' advanced</span>'
+      + '<span class="dz dz-down">↓ '+cur.regressed+' regressed</span></div></div>';
+  }
   function dateDiffPanel(){
     var dates = (H.trend && H.trend.dates) || [];
     if (dates.length < 2){
@@ -1247,7 +1327,8 @@ DASHBOARD_JS = r"""
     }
     // D2: Line is the default; Flow renders the stacked colour streamgraph (#5).
     var parts = state.tlMode === "flow" ? streamParts(680, 200) : trendParts(680, 200);
-    return '<section class="timeline"><div class="tl-chartbar">'+tlModeToggle()
+    // #14: This-week digest tops the tab (above the chart), per D1.
+    return '<section class="timeline">'+weekDigest()+'<div class="tl-chartbar">'+tlModeToggle()
       + '<div class="tl-legend">'+parts.legend+'</div></div>'
       + parts.chart+parts.foot+dateDiffPanel()+'</section>';
   }
