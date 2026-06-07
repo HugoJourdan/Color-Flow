@@ -212,12 +212,14 @@ def test_dashboard_calendar_lives_on_overview() -> None:
     assert "function calendarCard(" in js
     overview_extras = js.split("function overviewExtras(")[1].split("\n  function ")[0]
     assert "calendarCard()" in overview_extras
+    # calendar pinned left of the 2-col-wide timeline card (calendar first in source)
+    assert '"ov-cal-tl">\'+cal+tl+\'' in overview_extras
     timeline_view = js.split("function timelineView(")[1].split("\n  function ")[0]
     assert "activityCalendar()" not in timeline_view     # moved off the Timeline tab
     # clicking a day when the Time Machine isn't on screen hops to the Timeline tab
     assert 'state.view = "timeline"' in js
     css = assets.DASHBOARD_CSS
-    assert ".ov-extra .ovc-calendar{grid-column:1/-1}" in css
+    assert ".ov-cal-tl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr)" in css
 
 
 def test_dashboard_has_standard_calendar_and_toggle() -> None:

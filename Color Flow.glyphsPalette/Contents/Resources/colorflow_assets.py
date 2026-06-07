@@ -157,8 +157,9 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .legend .lg{display:inline-flex;align-items:center;gap:5px}
 .ov-extra{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:14px;margin-top:16px}
 .ov-extra .ovc-timeline{grid-column:1/-1}
-.ov-extra .ovc-calendar{grid-column:1/-1}
+.ov-cal-tl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:14px;margin-top:14px}
 .ovc-calendar .tl-cal-card{margin-top:0;border-top:0;padding-top:0}
+@media (max-width:720px){.ov-cal-tl{grid-template-columns:1fr}}
 .ov-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
 .ov-card.open{grid-column:1/-1}
 .ov-card-h{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin:0 0 10px;padding:0;background:none;border:0;font:inherit;font-size:var(--fs-2xs);font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:left}
@@ -928,7 +929,12 @@ DASHBOARD_JS = r"""
   }
   function overviewExtras(){
     if (!H.masters.length) return "";
-    return '<div class="ov-extra">'+crossMasterCard()+leaderboard()+histogram()+timelineCard()+calendarCard()+'</div>';
+    var cards = '<div class="ov-extra">'+crossMasterCard()+leaderboard()+histogram()+'</div>';
+    // Completion-over-time sits in a 2-column-wide slot with the activity calendar
+    // pinned to its left (calendar first in source order).
+    var tl = timelineCard(), cal = calendarCard();
+    if (tl || cal){ cards += '<div class="ov-cal-tl">'+cal+tl+'</div>'; }
+    return cards;
   }
   // Regression + Recent are per-master change feeds, so they belong with the
   // selected master, not the global Overview. Both already key off state.master
