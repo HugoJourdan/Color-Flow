@@ -65,7 +65,7 @@ def _favicon_link(model: dict) -> str:
 
 def build_html(model: dict) -> str:
     """Assemble the complete, self-contained dashboard page from a model."""
-    title = xesc(f'CF - {model.get("family") or "Untitled"}')
+    title = xesc(f'{model.get("family") or "Untitled"} - Colorflow')
     return (
         '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'

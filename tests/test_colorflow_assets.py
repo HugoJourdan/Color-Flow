@@ -40,7 +40,7 @@ def test_build_html_title_from_model_is_escaped() -> None:
     model["family"] = "a<b>"
     html = assets.build_html(model)
     assert "a&lt;b&gt;" in html
-    assert "<title>CF - a&lt;b&gt;</title>" in html
+    assert "<title>a&lt;b&gt; - Colorflow</title>" in html
 
 
 def test_embed_model_gzips_and_neutralises_script_breakout() -> None:
