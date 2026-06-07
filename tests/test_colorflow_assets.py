@@ -340,6 +340,17 @@ def test_dashboard_css_styles_brush_class() -> None:
     assert "var(--accent)" in brush_rule
 
 
+def test_dashboard_css_hides_brush_handles_until_painted() -> None:
+    """#8: the two draggable handles must stay hidden until brushPaint() sets
+    display:block — same as the band. Without display:none the handle rects render
+    stacked at x=0 in the left axis gutter on the very first chart paint, before any
+    brush interaction."""
+    css = assets.DASHBOARD_CSS
+    assert ".tl-brush-h{" in css
+    handle_rule = css.split(".tl-brush-h{")[1].split("}")[0]
+    assert "display:none" in handle_rule
+
+
 def test_dashboard_js_has_regression_card() -> None:
     js = assets.DASHBOARD_JS
     assert "function regressionCard(" in js

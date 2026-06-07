@@ -283,7 +283,7 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-cross-mark{fill:var(--muted-2);pointer-events:none;display:none}
 .tl-crossarea{fill:transparent;cursor:crosshair}
 .tl-brush{fill:var(--accent);opacity:.16;pointer-events:none;display:none}
-.tl-brush-h{fill:var(--accent);opacity:.9;cursor:ew-resize}
+.tl-brush-h{fill:var(--accent);opacity:.9;cursor:ew-resize;display:none}
 .tl-brush-h:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .tl-chart:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .tl-foot{display:flex;justify-content:space-between;font-size:var(--fs-2xs);color:var(--muted-2);margin-top:6px}
