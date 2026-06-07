@@ -410,14 +410,13 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-machine{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
 .tl-machine-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
 .tl-scrub-bar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.tl-scrub-play{flex:0 0 auto}
-.tl-scrub-play[disabled]{opacity:.5;cursor:not-allowed}
 .tl-scrub-wrap{flex:1 1 auto;min-width:0;position:relative}
 .tl-scrub-wrap .tl-scrub{width:100%;display:block}
 .tl-scrub{accent-color:var(--accent);color-scheme:dark light}
 .tl-scrub-ticks{position:relative;height:20px;margin:1px 7px 0;pointer-events:none}
-.tl-tick{position:absolute;top:0;width:1px;height:5px;background:var(--border-2);transform:translateX(-50%)}
-.tl-tick-lab{height:7px;background:var(--muted-2)}
+.tl-tick{position:absolute;top:0;width:1px;height:3px;background:var(--border);transform:translateX(-50%)}
+.tl-tick-snap{height:6px;background:var(--muted-2)}
+.tl-tick-lab{height:8px;background:var(--accent)}
 .tl-tick-d{position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:9px;line-height:1;color:var(--muted-2);white-space:nowrap;font-variant-numeric:tabular-nums}
 .tl-scrub-date{flex:0 0 auto;font-size:var(--fs-xs);color:var(--text);font-variant-numeric:tabular-nums;min-width:54px;text-align:right}
 .tl-scrub-diff{flex:0 0 auto;font-size:var(--fs-xs);font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
@@ -1768,6 +1767,26 @@ DASHBOARD_JS = r"""
     var idx = state.tlScrub == null ? dates.length-1 : state.tlScrub;
     return Math.max(0, Math.min(dates.length-1, idx));
   }
+  // The slider's day domain: snapshots map to their offset (in days) from the first
+  // snapshot, so the thumb + tick marks sit at true calendar spacing. Dragging lands on
+  // an arbitrary day; scrubDayToIndex snaps it back to the nearest real snapshot.
+  function scrubDayMs(iso){ return new Date(iso+"T00:00:00Z").getTime(); }
+  function scrubSpanDays(){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (dates.length < 2) return 0;
+    return Math.round((scrubDayMs(dates[dates.length-1]) - scrubDayMs(dates[0])) / 86400000);
+  }
+  function scrubIndexToDay(i){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (!dates.length) return 0;
+    return Math.round((scrubDayMs(dates[i]) - scrubDayMs(dates[0])) / 86400000);
+  }
+  function scrubDayToIndex(day){
+    var dates = (H.trend && H.trend.dates) || [];
+    var best = 0, bestD = Infinity;
+    for (var i=0;i<dates.length;i++){ var diff = Math.abs(scrubIndexToDay(i) - day); if (diff < bestD){ bestD = diff; best = i; } }
+    return best;
+  }
   // Recolour the compact Time-Machine grid in place to the master's colour state at
   // the scrubbed date. Reconstructs each cell's key via stateAt (no interpolation) and
   // writes it back with the SAME color-mix idiom applyBeforeAfter uses, so dark/light
@@ -1831,7 +1850,8 @@ DASHBOARD_JS = r"""
     if (!dates.length) return;
     state.tlScrub = Math.max(0, Math.min(dates.length-1, idx));
     var input = document.querySelector(".tl-machine .tl-scrub");
-    if (input && String(input.value) !== String(state.tlScrub)){ input.value = state.tlScrub; }
+    var dv = String(scrubIndexToDay(state.tlScrub));   // slider is in the day domain
+    if (input && input.value !== dv){ input.value = dv; }
     if (scrubRaf) return;                       // coalesce bursts of input events
     scrubRaf = requestAnimationFrame(function(){ scrubRaf = 0; scrubRecolour(); });
   }
@@ -1849,32 +1869,6 @@ DASHBOARD_JS = r"""
     else return;
     evt.preventDefault();
     scrubSet(next);
-  }
-  // Play auto-advances through the snapshots (one step per ~700ms) then stops at the
-  // end. Disabled under 3 snapshots; reduced-motion (or the test hook) refuses to
-  // start so the page never auto-animates against the user's preference — dragging
-  // still snaps instantly. A second click stops an in-flight playback.
-  var scrubTimer = 0;
-  function scrubStopPlay(){
-    if (scrubTimer){ clearInterval(scrubTimer); scrubTimer = 0; }
-    var btn = document.querySelector(".tl-machine .tl-scrub-play");
-    if (btn){ btn.setAttribute("aria-pressed", "false"); btn.textContent = "▶ Play"; }
-  }
-  function scrubPlay(){
-    var dates = (H.trend && H.trend.dates) || [];
-    if (dates.length < 3) return;
-    if (scrubTimer){ scrubStopPlay(); return; }
-    var noAnim = window.__cfdNoAnim ||
-      (window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
-    if (noAnim) return;                         // reduced motion: no autoplay
-    if (scrubIndex() >= dates.length-1){ scrubSet(0); }   // replay from the start
-    var btn = document.querySelector(".tl-machine .tl-scrub-play");
-    if (btn){ btn.setAttribute("aria-pressed", "true"); btn.textContent = "❚❚ Pause"; }
-    scrubTimer = setInterval(function(){
-      var i = scrubIndex();
-      if (i >= dates.length-1){ scrubStopPlay(); return; }
-      scrubSet(i+1);
-    }, 700);
   }
   // Build one compact cell for the scrub grid: a div carrying data-glyph + the
   // letterform (if the model embedded a path for this master), recoloured on render
@@ -1897,25 +1891,26 @@ DASHBOARD_JS = r"""
         + ' style="background:color-mix(in srgb,var('+v+') 35%,transparent)"'
         + ' title="'+esc(name)+'" aria-hidden="true">'+inner+'</span>';
     }).join("");
-    var canPlay = dates.length >= 3;            // autoplay needs >=3 snapshots
-    // One tick per snapshot, aligned to the thumb travel; date labels thinned to ~6 so
-    // they don't overlap. The ticks are purely visual (the live date is the chip at right).
-    var n = dates.length, lastI = n - 1;
+    // The slider runs in a DAY domain (0..span days) so ticks sit at true calendar
+    // spacing: a faint tick per day, an emphasised + thinned-label tick on each snapshot
+    // day. Dragging snaps to the nearest snapshot (only those have data).
+    var lastI = dates.length - 1;
+    var span = scrubSpanDays();
+    var dayOfIdx = scrubIndexToDay(idx);
+    var snapByDay = {}; for (var si=0; si<=lastI; si++){ snapByDay[scrubIndexToDay(si)] = si; }
     var labelStep = Math.max(1, Math.ceil(lastI / 5));   // aim for <=6 dated ticks
     var ticks = "";
-    for (var ti=0; ti<n; ti++){
-      var leftPct = lastI > 0 ? (ti / lastI * 100) : 0;
-      var labeled = (ti % labelStep === 0) || (ti === lastI && lastI % labelStep !== 0);
-      ticks += '<span class="tl-tick'+(labeled?" tl-tick-lab":"")+'" style="left:'+leftPct.toFixed(2)+'%">'
-        + (labeled ? '<span class="tl-tick-d">'+esc(dateLabel(dates[ti]))+'</span>' : '')
+    for (var d=0; d<=span; d++){
+      var leftPct = span > 0 ? (d / span * 100) : 0;
+      var snapI = snapByDay[d], isSnap = snapI != null;
+      var labeled = isSnap && ((snapI % labelStep === 0) || (snapI === lastI && lastI % labelStep !== 0));
+      ticks += '<span class="tl-tick'+(isSnap?" tl-tick-snap":"")+(labeled?" tl-tick-lab":"")+'" style="left:'+leftPct.toFixed(2)+'%">'
+        + (labeled ? '<span class="tl-tick-d">'+esc(dateLabel(dates[snapI]))+'</span>' : '')
         + '</span>';
     }
     var controls = '<div class="tl-scrub-bar">'
-      + '<button type="button" class="chip tl-scrub-play" aria-pressed="false"'
-      + (canPlay ? "" : ' disabled aria-disabled="true" title="Needs at least 3 snapshots"')
-      + '>▶ Play</button>'
       + '<div class="tl-scrub-wrap">'
-      + '<input type="range" class="tl-scrub" min="0" max="'+lastI+'" step="1" value="'+idx+'"'
+      + '<input type="range" class="tl-scrub" min="0" max="'+span+'" step="1" value="'+dayOfIdx+'"'
       + ' aria-label="Scrub through snapshot history" aria-valuetext="'+esc(dateLabel(dates[idx]))+'"/>'
       + '<div class="tl-scrub-ticks" aria-hidden="true">'+ticks+'</div>'
       + '</div>'
@@ -2446,7 +2441,6 @@ DASHBOARD_JS = r"""
 
   function update(){
     hideTip();
-    scrubStopPlay();                            // a full re-render replaces the scrub grid; drop any in-flight playback
     barsAnim = !introPlayed;                    // fill the colour bar once on first paint, never on master switches
     introPlayed = true;
     document.getElementById("cfd-body").innerHTML = renderBody();
@@ -2746,9 +2740,6 @@ DASHBOARD_JS = r"""
       var jc = e.target.closest(".heat .cell"); if (jc && (e.metaKey || e.ctrlKey)){ e.preventDefault(); openJourney(jc.getAttribute("data-glyph")); return; }
       var ba = e.target.closest(".ba-toggle");
       if (ba){ e.preventDefault(); state.before = !state.before; ba.setAttribute("aria-pressed", state.before); ba.textContent = state.before ? "Before" : "After"; applyBeforeAfter(); return; }
-      // #11 Time Machine: Play toggles autoplay (disabled <3 snapshots / reduced motion).
-      var pl = e.target.closest(".tl-scrub-play");
-      if (pl && !pl.disabled){ e.preventDefault(); scrubPlay(); return; }
     });
     bodyEl.addEventListener("change", function(e){
       if (e.target.id === "cfd-date-a"){ state.dateA = e.target.value; update(); }
@@ -2757,11 +2748,12 @@ DASHBOARD_JS = r"""
       // + verdict chips refresh without a reload.
       else if (e.target.id === "cfd-deadline"){ setDeadline(e.target.value); update(); }
     });
-    // #11 Time Machine: dragging the range slider scrubs the date; scrubSet throttles
-    // the grid recolour to rAF so a fast drag stays smooth. A manual drag stops autoplay.
+    // #11 Time Machine: dragging the range slider scrubs the date. The slider is in the
+    // day domain, so map the dragged day to the nearest snapshot before scrubbing;
+    // scrubSet throttles the grid recolour to rAF so a fast drag stays smooth.
     bodyEl.addEventListener("input", function(e){
       var sc = e.target.closest && e.target.closest(".tl-scrub");
-      if (sc){ scrubStopPlay(); scrubSet(parseInt(sc.value, 10) || 0); }
+      if (sc){ scrubSet(scrubDayToIndex(parseInt(sc.value, 10) || 0)); }
     });
     bodyEl.addEventListener("keydown", scrubKey);
     // #6 snapping crosshair: the chart SVG is rebuilt on every update(), so delegate

@@ -957,7 +957,7 @@ def test_dashboard_js_has_time_machine_scrubber() -> None:
     """#11: a Time Machine scrubber replays the heatmap day by day. D3: the Timeline
     tab gets its OWN compact heatmap (the Overview heatmap is not visible here); each
     cell carries data-glyph. A timeMachine builder renders that grid plus a notched
-    <input type="range"> (one notch per H.trend.dates entry) and a Play button, and is
+    <input type="range"> (day-domain, snapping to snapshots) and is
     wired into the timeline view. Dragging the slider sets state.tlScrub and recolours
     the grid from stateAt(masterId, dateAtIndex) -> color-mix of varFor(key), reusing
     the applyBeforeAfter recolour idiom. A label shows the current snapshot date."""
@@ -970,7 +970,7 @@ def test_dashboard_js_has_time_machine_scrubber() -> None:
     # its own compact heatmap grid in this tab, cells carry data-glyph (D3)
     assert "tl-machine" in machine
     assert "data-glyph" in machine
-    # a notched range input, one notch per snapshot date, + a Play button
+    # a range input scrubbing the snapshot history (day-domain slider)
     assert 'type="range"' in machine
     assert "tl-scrub" in machine
     assert "H.trend.dates" in machine or "H.trend && H.trend.dates" in machine
@@ -994,19 +994,6 @@ def test_dashboard_js_time_machine_recolours_via_stateat() -> None:
     # throttle to rAF so dragging the slider does not recolour on every input event
     assert "requestAnimationFrame" in recolour or "requestAnimationFrame" in js.split(
         "function scrubSet(")[1].split("\n  function ")[0]
-
-
-def test_dashboard_js_time_machine_play_disabled_under_three_snapshots() -> None:
-    """Autoplay needs at least 3 snapshots to be meaningful; with <3 the Play button
-    is rendered disabled. Reduced-motion also disables autoplay (drag still snaps)."""
-    js = assets.DASHBOARD_JS
-    machine = js.split("function timeMachine(")[1].split("\n  function ")[0]
-    # the play control is disabled when there are fewer than 3 snapshots
-    assert "< 3" in machine or "<3" in machine or "length>=3" in machine or "length >= 3" in machine
-    assert "disabled" in machine
-    # reduced-motion disables autoplay via the shared gate (matchMedia / __cfdNoAnim)
-    play = js.split("function scrubPlay(")[1].split("\n  function ")[0]
-    assert "__cfdNoAnim" in play or "prefers-reduced-motion" in play
 
 
 def test_dashboard_js_time_machine_keyboard_steps_and_jumps() -> None:
@@ -1108,9 +1095,19 @@ def test_dashboard_scrub_slider_has_dated_ticks() -> None:
     assert 'class="tl-scrub-wrap"' in machine          # slider wrapped for tick alignment
     assert 'class="tl-scrub-ticks"' in machine         # tick row under the slider
     assert "tl-tick-d" in machine                       # dated tick labels
-    assert "dateLabel(dates[ti])" in machine            # labels reuse the shared formatter
+    assert "dateLabel(dates[snapI])" in machine         # labels reuse the shared formatter
+    # ticks run in a day domain: a tick per day, emphasised on snapshot days
+    assert "tl-tick-snap" in machine
+    assert "function scrubSpanDays(" in js and "function scrubDayToIndex(" in js
     css = assets.DASHBOARD_CSS
     assert ".tl-scrub-ticks{" in css and ".tl-tick{" in css and ".tl-tick-d{" in css
+
+
+def test_dashboard_time_machine_play_button_removed() -> None:
+    js = assets.DASHBOARD_JS
+    assert "scrubPlay" not in js                         # Play/autoplay machinery gone
+    assert "tl-scrub-play" not in js
+    assert ".tl-scrub-play" not in assets.DASHBOARD_CSS
 
 
 def test_dashboard_js_has_seed_state_builder() -> None:
