@@ -318,3 +318,28 @@ def test_dashboard_css_styles_help_panel() -> None:
     # The legend rows the help panel emits must carry layout/alignment rules.
     for selector in (".hp-list", ".hp-row", ".hp-n", ".hp-pos", ".hp-gloss", ".rg-sw"):
         assert selector in css, selector
+
+
+def test_build_html_wires_all_report_insight_features() -> None:
+    """End-to-end smoke: every new render unit + its wiring marker is present in
+    the generated document, and the self-contained/no-network invariant holds."""
+    html = assets.build_html(_model())
+    # render units
+    for marker in ("function forecastCard(", "function regressionCard(",
+                   "function recentCard(", "function dateDiffPanel(",
+                   "function openJourney(", "function helpPanel(",
+                   "function journeyOf(", "function stateAt("):
+        assert marker in html, marker
+    # wiring: header button, cell + row triggers, date selects, journey index
+    assert 'id="cfd-help"' in html
+    assert 'id="cfd-date-a"' in html and 'id="cfd-date-b"' in html
+    assert "data-jglyph" in html
+    assert "H.journeyIndex" in html
+    # spec #4 net graded-% delta reaches the document; swatches reuse varFor
+    assert "function gradedStateSum(" in html and "% net" in html
+    assert "function swatchFor(" in html and "varFor(key)" in html
+    # hard invariants preserved
+    assert "http://" not in html and "https://" not in html
+    assert "<noscript>" in html
+    assert "prefers-reduced-motion" in html
+    assert "DecompressionStream" in html
