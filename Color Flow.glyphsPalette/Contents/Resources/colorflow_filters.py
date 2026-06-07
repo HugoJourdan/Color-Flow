@@ -1,4 +1,3 @@
-# encoding: utf-8
 """Build the "Color Flow" smart-filter group for the Glyphs sidebar.
 
 Generates a folder of smart filters — one per workflow step, plus a "None"
@@ -37,9 +36,11 @@ def build_filter_group(steps: list, none_label: str = "None",
     return {"name": group_name, "subGroup": items}
 
 
-def merge_into_filters(existing: list, group: dict, group_name: str = GROUP_NAME) -> list:
+def merge_into_filters(existing: list[dict] | None, group: dict,
+                       group_name: str = GROUP_NAME) -> list[dict]:
     """Return the ``Filters`` list with any previous group of the same name
-    replaced by ``group`` (so regenerating updates in place, never duplicates)."""
+    replaced by ``group`` (so regenerating updates in place, never duplicates).
+    ``existing`` may be ``None`` (treated as an empty list)."""
     kept = [entry for entry in (existing or []) if entry.get("name") != group_name]
     kept.append(group)
     return kept

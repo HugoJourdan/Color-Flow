@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
-
 import colorflow_profile as profile
+import pytest
 
 
 def _profile(color_names: str = "red=Outline\norange=Spacing\n", free_mode: bool = False,
@@ -33,6 +32,15 @@ def test_parse_rejects_bad_json_and_wrong_version() -> None:
         profile.parse("[]")                       # not an object
     with pytest.raises(ValueError):
         profile.parse('{"version": 999}')         # unsupported version
+
+
+def test_parse_rejects_non_iterable_label_colors() -> None:
+    # null / number / string entries are not RGBA lists: must raise ValueError
+    # (the documented contract), not a bare TypeError the importer ignores.
+    with pytest.raises(ValueError):
+        profile.parse('{"version": 1, "labelColors": [null, 5, "x"]}')
+    with pytest.raises(ValueError):
+        profile.parse('{"version": 1, "labelColors": 7}')   # field itself not a list
 
 
 def test_diff_identical_profiles_is_empty() -> None:

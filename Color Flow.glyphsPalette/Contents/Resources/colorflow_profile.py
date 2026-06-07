@@ -1,4 +1,3 @@
-# encoding: utf-8
 """Portable Color Flow workflow profiles — export / import / diff.
 
 A ``.colorflow`` file is a small JSON bundle of everything that defines a Color
@@ -15,6 +14,7 @@ is what makes import conflict-surfacing rather than a silent overwrite.
 from __future__ import annotations
 
 import json
+
 import colornames
 
 PROFILE_VERSION = 1
@@ -41,9 +41,25 @@ def serialize(profile: dict) -> str:
     return json.dumps(profile, ensure_ascii=False, indent=2)
 
 
+def _coerce_label_colors(raw_colors: object) -> list[tuple]:
+    """Validate the ``labelColors`` field into a list of RGBA tuples. Raises
+    ``ValueError`` if the field, or any entry, is not a list/tuple of values —
+    so a malformed profile surfaces as a caught ``ValueError`` rather than a
+    bare ``TypeError`` that the importer would let fail silently."""
+    if not isinstance(raw_colors, list):
+        raise ValueError(f"labelColors must be a list, got {type(raw_colors).__name__}.")
+    coerced: list[tuple] = []
+    for rgba in raw_colors:
+        if not isinstance(rgba, (list, tuple)):
+            raise ValueError(f"Each labelColors entry must be a list, got {type(rgba).__name__}.")
+        coerced.append(tuple(rgba))
+    return coerced
+
+
 def parse(text: str) -> dict:
     """Parse + normalise a ``.colorflow`` file into a profile dict. Raises
-    ``ValueError`` on malformed JSON, a non-object, or an unsupported version."""
+    ``ValueError`` on malformed JSON, a non-object, an unsupported version, or a
+    malformed ``labelColors`` field."""
     try:
         raw = json.loads(text)
     except (ValueError, TypeError) as error:
@@ -56,7 +72,7 @@ def parse(text: str) -> dict:
         color_names=str(raw.get("colorNames") or ""),
         free_mode=bool(raw.get("freeMode")),
         rainbow_source=str(raw.get("rainbowSource") or "Layer"),
-        label_colors=[tuple(rgba) for rgba in (raw.get("labelColors") or [])],
+        label_colors=_coerce_label_colors(raw.get("labelColors") or []),
         name=str(raw.get("name") or ""),
     )
 
