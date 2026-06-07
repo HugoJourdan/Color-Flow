@@ -985,7 +985,7 @@ DASHBOARD_JS = r"""
         g.fillStyle=dk; g.beginPath(); g.arc(cx,cy,R*0.72,0,7); g.fill();
       }
       var bl=document.createElement("canvas"); bl.width=bl.height=FS; var bg=bl.getContext("2d");
-      bg.filter="blur(13px) saturate(1.3) brightness(0.9)"; bg.drawImage(off,0,0);
+      bg.filter="blur(13px) saturate(1.6) brightness(0.92)"; bg.drawImage(off,0,0);
       bg.filter="none"; bg.globalCompositeOperation="destination-in";
       bg.fillStyle="#000"; bg.beginPath(); bg.arc(FS/2,FS/2,FS*0.5,0,7); bg.fill();
       bg.globalCompositeOperation="source-over";
@@ -1097,6 +1097,21 @@ DASHBOARD_JS = r"""
         group(below); if (vis(sel)) focusDisc(sel); group(above);
       }
     }
+    // Size the canvas to fill the main column down to the footer, and show as
+    // many discs as fit (the rest stay scrollable via the wheel).
+    function fit(){
+      var main=document.getElementById("cfd-main"), host=cv.parentNode;
+      var availW=(host&&host.clientWidth)||240, availH=(main&&main.clientHeight)||0;
+      if (availH<240) availH=560;                      // stacked/mobile or pre-layout -> fallback
+      cv.style.width=availW+"px"; cv.style.height=availH+"px";
+      cv.width=availW; cv.height=availH; W=cv.width; Hc=cv.height;
+      buf.width=W; buf.height=Hc;
+      var rx=Math.min(92,W*0.42), ry=rx*tilt, topY=ry+16, botPad=ry+12;   // mirror render() geometry
+      VISIBLE=Math.max(4, Math.min(H.masters.length, Math.floor((Hc-topY-botPad)/34)+1));
+      vt=Math.max(0, Math.min(Math.max(0,H.masters.length-VISIBLE), vt));
+    }
+    fit();
+    window.addEventListener("resize", fit);
     function loop(){ rot+=0.008; render(); requestAnimationFrame(loop); }
     cv.addEventListener("wheel", function(e){ e.preventDefault();
       vt += e.deltaY*0.02; vt=Math.max(0, Math.min(Math.max(0,H.masters.length-VISIBLE), vt));
