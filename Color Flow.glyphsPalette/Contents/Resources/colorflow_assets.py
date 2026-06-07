@@ -831,7 +831,7 @@ DASHBOARD_JS = r"""
     var W = cv.width, Hc = cv.height, FS = 320;
     var DISC_ALPHA = 0.95, tilt = 0.5, trimVal = 0.6, opacityVal = 0.2;
     var rot = -0.5, focusAmt = [];
-    var VISIBLE = Math.min(10, H.masters.length);   // discs shown at once
+    var VISIBLE = Math.min(16, H.masters.length);   // discs shown at once
     var vt = 0;                                      // scroll: master index at window top
     function hueHsl(i){ return "hsl(" + Math.round((i/12)*360) + ",100%,55%)"; }
     function countsOf(m){
@@ -913,7 +913,7 @@ DASHBOARD_JS = r"""
       g.fillStyle=sh; g.beginPath(); g.arc(0,0,rx,0,7); g.fill(); g.restore();
     }
     var geo={rx:0,ry:0,cx:0,topY:0,dz:0,vt:0};
-    function selIndex(){ for (var i=0;i<H.masters.length;i++){ if (H.masters[i].id===state.master) return i; } return 0; }
+    function selIndex(){ if (state.master==null) return -1; for (var i=0;i<H.masters.length;i++){ if (H.masters[i].id===state.master) return i; } return -1; }
     var prevSel=-1;
     function render(){
       ctx.clearRect(0,0,W,Hc);
@@ -921,7 +921,7 @@ DASHBOARD_JS = r"""
       var sel=selIndex(), maxTop=Math.max(0, M-VISIBLE);
       // scroll the focused master into view only when it's outside the window
       if (sel!==prevSel){
-        if (sel < Math.floor(vt) || sel > Math.floor(vt)+VISIBLE-1) vt = sel - Math.floor(VISIBLE/2);
+        if (sel>=0 && (sel < Math.floor(vt) || sel > Math.floor(vt)+VISIBLE-1)) vt = sel - Math.floor(VISIBLE/2);
         prevSel = sel;
       }
       vt = Math.max(0, Math.min(maxTop, vt));
@@ -961,9 +961,13 @@ DASHBOARD_JS = r"""
         edgeFade(bctx);
         ctx.save(); ctx.globalAlpha=1-amt*(1-opacityVal); ctx.drawImage(buf,0,0); ctx.restore();
       }
-      var below=[], above=[];
-      for (var n=M-1;n>=0;n--){ if (!vis(n)) continue; if (n>sel) below.push(n); else if (n<sel) above.push(n); }
-      group(below); if (vis(sel)) focusDisc(sel); group(above);
+      if (sel<0){
+        for (var n=M-1;n>=0;n--){ if (vis(n)) focusDisc(n); }   // no selection: every disc full
+      } else {
+        var below=[], above=[];
+        for (var n2=M-1;n2>=0;n2--){ if (!vis(n2)) continue; if (n2>sel) below.push(n2); else if (n2<sel) above.push(n2); }
+        group(below); if (vis(sel)) focusDisc(sel); group(above);
+      }
     }
     function loop(){ rot+=0.008; render(); requestAnimationFrame(loop); }
     cv.addEventListener("wheel", function(e){ e.preventDefault();
@@ -975,7 +979,9 @@ DASHBOARD_JS = r"""
       for (var i=0;i<H.masters.length;i++){ var cy=geo.topY+(i-geo.vt)*geo.dz;
         if (cy<geo.topY-geo.dz*1.6 || cy>geo.topY+(VISIBLE-1)*geo.dz+geo.dz*1.6) continue;
         var ex=(px-geo.cx)/geo.rx, ey=(py-cy)/geo.ry;
-        if (ex*ex+ey*ey<=1){ state.master=H.masters[i].id; state.view="tabs"; update(); return; } }
+        if (ex*ex+ey*ey<=1){ var id=H.masters[i].id;
+          state.master = (state.master===id) ? null : id;   // click the selected disc -> clear focus
+          state.view="tabs"; update(); return; } }
     });
     loop();
   }
