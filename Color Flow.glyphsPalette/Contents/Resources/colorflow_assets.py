@@ -157,6 +157,8 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .legend .lg{display:inline-flex;align-items:center;gap:5px}
 .ov-extra{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:14px;margin-top:16px}
 .ov-extra .ovc-timeline{grid-column:1/-1}
+.ov-extra .ovc-calendar{grid-column:1/-1}
+.ovc-calendar .tl-cal-card{margin-top:0;border-top:0;padding-top:0}
 .ov-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
 .ov-card.open{grid-column:1/-1}
 .ov-card-h{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin:0 0 10px;padding:0;background:none;border:0;font:inherit;font-size:var(--fs-2xs);font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:left}
@@ -918,9 +920,16 @@ DASHBOARD_JS = r"""
       : "";
     return ovCard("crossMaster", "Across masters", head + ident + differLine + steps, false);
   }
+  // The activity calendar (heatmap / standard month grid) lives on the Overview, as a
+  // full-width card. Clicking a day still scrubs the Time Machine (jumping to the
+  // Timeline tab if it isn't on screen — see the data-calday handler).
+  function calendarCard(){
+    if (!hasTrend()) return "";
+    return '<div class="ov-card ovc-calendar">'+activityCalendar()+'</div>';
+  }
   function overviewExtras(){
     if (!H.masters.length) return "";
-    return '<div class="ov-extra">'+crossMasterCard()+leaderboard()+histogram()+timelineCard()+'</div>';
+    return '<div class="ov-extra">'+crossMasterCard()+leaderboard()+histogram()+timelineCard()+calendarCard()+'</div>';
   }
   // Regression + Recent are per-master change feeds, so they belong with the
   // selected master, not the global Overview. Both already key off state.master
@@ -2116,7 +2125,7 @@ DASHBOARD_JS = r"""
     // #14: This-week digest tops the tab (above the chart), per D1. No static legend
     // line — the colour/name read-out only appears on hover (the snapping crosshair).
     return '<section class="timeline">'+weekDigest()+'<div class="tl-chartbar">'+tlModeToggle()+'</div>'
-      + parts.chart+parts.foot+dateDiffPanel()+deadlinePanel()+timeMachine()+activityCalendar()+categoryLanes()+scriptLanes()+regressionLog()+'</section>';
+      + parts.chart+parts.foot+dateDiffPanel()+deadlinePanel()+timeMachine()+categoryLanes()+scriptLanes()+regressionLog()+'</section>';
   }
   function compareView(){
     // columns = steps (+None); rows = masters, labelled by the master name.
@@ -2725,7 +2734,13 @@ DASHBOARD_JS = r"""
         while (state.calM > 11){ state.calM -= 12; state.calY++; }
         update(); return; }
       var gs = e.target.closest("[data-gsort]"); if (gs){ state.glyphSort = gs.getAttribute("data-gsort"); update(); return; }
-      var cd = e.target.closest("[data-calday]"); if (cd){ scrubSet(parseInt(cd.getAttribute("data-calday"),10)); return; }
+      var cd = e.target.closest("[data-calday]"); if (cd){
+        var ci = parseInt(cd.getAttribute("data-calday"),10);
+        state.tlScrub = ci;                                          // seed the scrub index
+        if (!document.querySelector(".tl-machine .tl-machine-grid")){ // calendar on Overview:
+          state.view = "timeline"; state.focus = null; update();      // bring up the Time Machine
+        }
+        scrubSet(ci); return; }
       var fc = e.target.closest("[data-fclear]"); if (fc){ setFocus(null); return; }
       var jr = e.target.closest("[data-jglyph]"); if (jr){ openJourney(jr.getAttribute("data-jglyph")); return; }
       var jc = e.target.closest(".heat .cell"); if (jc && (e.metaKey || e.ctrlKey)){ e.preventDefault(); openJourney(jc.getAttribute("data-glyph")); return; }

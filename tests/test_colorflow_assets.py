@@ -200,9 +200,24 @@ def test_dashboard_has_activity_calendar() -> None:
     assert "function activityCalendar(" in js
     assert "function calActivity(" in js
     assert "data-calday" in js                           # day cells carry their snapshot index
-    assert "scrubSet(parseInt(cd.getAttribute" in js     # click jumps the Time Machine
+    assert 'parseInt(cd.getAttribute("data-calday")' in js  # click reads the snapshot index
+    assert "scrubSet(ci)" in js                          # ...and scrubs the Time Machine to it
     css = assets.DASHBOARD_CSS
     assert ".tl-cal-d" in css and ".tl-cal-wk" in css
+
+
+def test_dashboard_calendar_lives_on_overview() -> None:
+    js = assets.DASHBOARD_JS
+    # the calendar is an Overview card, not part of the Timeline section anymore
+    assert "function calendarCard(" in js
+    overview_extras = js.split("function overviewExtras(")[1].split("\n  function ")[0]
+    assert "calendarCard()" in overview_extras
+    timeline_view = js.split("function timelineView(")[1].split("\n  function ")[0]
+    assert "activityCalendar()" not in timeline_view     # moved off the Timeline tab
+    # clicking a day when the Time Machine isn't on screen hops to the Timeline tab
+    assert 'state.view = "timeline"' in js
+    css = assets.DASHBOARD_CSS
+    assert ".ov-extra .ovc-calendar{grid-column:1/-1}" in css
 
 
 def test_dashboard_has_standard_calendar_and_toggle() -> None:
