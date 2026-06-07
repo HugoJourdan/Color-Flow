@@ -243,7 +243,7 @@ class ColorFlow(PalettePlugin):
 						button = self.dialog
 				elif hasattr(sender, "superview"):
 					button = sender
-			self._popover = Popover((220, 488), parentView=button,
+			self._popover = Popover((220, 460), parentView=button,
 				preferredEdge='left', behavior='semitransient')
 			popover = self._popover
 			popover.fgoLabel = TextBox((12, 12, -12, 16), "Font Glyph Order",
@@ -326,10 +326,6 @@ class ColorFlow(PalettePlugin):
 			except Exception:
 				import traceback
 				print("Color Flow [report gif] error:\n" + traceback.format_exc())
-			# A second action below the report: open the Color Tower (an isometric
-			# stack of per-master colour discs) in its own WKWebView window.
-			popover.tower = Button((12, reportY + 8 + 28, -12, 22), "Open Color Tower",
-				callback=self._open_tower, sizeStyle='small')
 			# Strip the blue AppKit focus ring (halo) from every control in the popover.
 			try:
 				self._strip_focus_rings(self._ns_button(popover.dashboard).superview())
@@ -1844,62 +1840,6 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [dashboard] error:\n" + traceback.format_exc())
-
-	# ------------------------------------------------------------------ color tower
-
-	@objc.python_method
-	def _open_tower(self, sender):
-		# Build the per-master colour-disc model for the current font and show the
-		# Color Tower visualizer (tower.html) in its own WKWebView window.
-		try:
-			import importlib
-			import colorflow_tower
-			importlib.reload(colorflow_tower)
-			font = Glyphs.font
-			if font is None:
-				Message("Open a font first.", "Color Tower")
-				return
-			if len(font.glyphs) == 0:
-				Message("No glyphs to visualize.", "Color Tower")
-				return
-			self._present_tower_window(colorflow_tower.build_html_for_font(font), font)
-		except Exception:
-			import traceback
-			print("Color Flow [tower] error:\n" + traceback.format_exc())
-
-	@objc.python_method
-	def _present_tower_window(self, html, font):
-		import WebKit
-		# Close any tower window from a previous click before opening a fresh one.
-		old = getattr(self, "_towerWindow", None)
-		if old is not None:
-			try:
-				old.close()
-			except Exception:
-				pass
-		style = (AppKit.NSWindowStyleMaskTitled | AppKit.NSWindowStyleMaskClosable
-			| AppKit.NSWindowStyleMaskResizable | AppKit.NSWindowStyleMaskMiniaturizable)
-		rect = AppKit.NSMakeRect(0, 0, 560, 680)
-		config = WebKit.WKWebViewConfiguration.alloc().init()
-		webview = WebKit.WKWebView.alloc().initWithFrame_configuration_(rect, config)
-		webview.loadHTMLString_baseURL_(html, None)
-		window = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
-			rect, style, AppKit.NSBackingStoreBuffered, False)
-		title = "Color Tower"
-		try:
-			if font is not None and font.familyName:
-				title = "Color Tower — %s" % font.familyName
-		except Exception:
-			pass
-		window.setTitle_(title)
-		window.setReleasedWhenClosed_(False)   # we hold the Python ref; don't free on close
-		window.setContentView_(webview)
-		window.center()
-		window.makeKeyAndOrderFront_(None)
-		# Retain so the window and its web view aren't reclaimed immediately.
-		self._towerWindow = window
-		self._towerWebView = webview
-
 
 	########################################################################################################
 	#																									   #
