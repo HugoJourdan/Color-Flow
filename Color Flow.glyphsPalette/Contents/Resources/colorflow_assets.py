@@ -841,12 +841,18 @@ DASHBOARD_JS = r"""
     var VISIBLE = Math.min(16, H.masters.length);   // discs shown at once
     var vt = 0;                                      // scroll: master index at window top
     function hueHsl(i){ return "hsl(" + Math.round((i/12)*360) + ",100%,55%)"; }
+    // the ACTUAL Glyphs label colour for slot i (from the model / CSS vars), not a synthetic rainbow
+    function slotColor(i){
+      if (H.colors && H.colors[String(i)]) return H.colors[String(i)];
+      var v=(getComputedStyle(document.documentElement).getPropertyValue("--c"+i)||"").trim();
+      return v || hueHsl(i);
+    }
     function countsOf(m){
       var c = [0,0,0,0,0,0,0,0,0,0,0,0], keys = m.keys || [];
       for (var i=0;i<keys.length;i++){ var k=keys[i]; if (k>=0 && k<12) c[k]++; }
       return c;
     }
-    var UNCOL = "hsl(225,8%,42%)";   // neutral grey for the uncoloured share
+    var UNCOL = "hsl(225,8%,26%)";   // dark neutral grey for the uncoloured share
     function buildField(counts, uncolored){
       var off=document.createElement("canvas"); off.width=off.height=FS;
       var g=off.getContext("2d"), cx=FS/2, cy=FS/2, R=FS*0.46, sum=0, i;
@@ -856,7 +862,7 @@ DASHBOARD_JS = r"""
         // one wedge per present colour (hue) + the uncoloured share (grey), all
         // proportional to the master's glyph total so uncoloured glyphs show too
         var segs=[];
-        for (i=0;i<12;i++){ if(counts[i]>0) segs.push([counts[i]/total, hueHsl(i)]); }
+        for (i=0;i<12;i++){ if(counts[i]>0) segs.push([counts[i]/total, slotColor(i)]); }
         if (uncolored>0) segs.push([uncolored/total, UNCOL]);
         var acc=0, stops=[];
         for (i=0;i<segs.length;i++){ stops.push([acc+segs[i][0]/2, segs[i][1]]); acc+=segs[i][0]; }
