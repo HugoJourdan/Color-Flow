@@ -21,9 +21,9 @@
 	<key>productPageURL</key>
 	<string>https://github.com/HugoJourdan/Color-Flow</string>
 	<key>productReleaseNotes</key>
-	<string>2.0 — Merges Rainbow FontView: group the Font View into colour sections (File &gt; Color Flow: Rainbow Font View). Double-click a label to rename it inline. Fixes the broken keyboard-shortcut scripts, a colorNames.txt load crash, and corrupt progress counts (now self-healing). Faster palette (widget reuse). Please disable the standalone Rainbow FontView plugin.</string>
+	<string>2.0 — Merges Rainbow FontView: group the Font View into colour sections (File &gt; Color Flow: Rainbow Font View). Fixes the broken keyboard-shortcut scripts, a colorNames.txt load crash, and corrupt progress counts (now self-healing). Faster palette (widget reuse). Please disable the standalone Rainbow FontView plugin.</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright, HugoJourdan, 2022</string>
+	<string>Copyright, HugoJourdan, 2022–2026</string>
 	<key>NSPrincipalClass</key>
 	<string>ColorFlow</string>
 	<key>class</key>
