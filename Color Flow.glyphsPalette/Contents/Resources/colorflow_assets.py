@@ -848,7 +848,7 @@ DASHBOARD_JS = r"""
       var off=document.createElement("canvas"); off.width=off.height=FS;
       var g=off.getContext("2d"), cx=FS/2, cy=FS/2, R=FS*0.46, sum=0, i;
       for (i=0;i<12;i++) sum+=counts[i];
-      if (!sum){ g.fillStyle="hsl(0,0%,82%)"; g.fillRect(0,0,FS,FS); }
+      if (!sum){ g.fillStyle="rgba(255,255,255,0.12)"; g.fillRect(0,0,FS,FS); }   // no colours -> translucent
       else {
         var acc=0, stops=[];
         for (i=0;i<12;i++){ if(!counts[i]) continue; stops.push([acc+(counts[i]/sum)/2,i]); acc+=counts[i]/sum; }
@@ -863,9 +863,11 @@ DASHBOARD_JS = r"""
           for (i=0;i<12;i++){ if(!counts[i]) continue; var a1=a+(counts[i]/sum)*Math.PI*2;
             g.fillStyle=hueHsl(i); g.beginPath(); g.moveTo(cx,cy); g.arc(cx,cy,R*1.25,a,a1); g.closePath(); g.fill(); a=a1; } }
       }
-      var dk=g.createRadialGradient(cx,cy,0,cx,cy,R*0.72);
-      dk.addColorStop(0,"rgba(0,0,0,0.58)"); dk.addColorStop(0.5,"rgba(0,0,0,0.26)"); dk.addColorStop(1,"rgba(0,0,0,0)");
-      g.fillStyle=dk; g.beginPath(); g.arc(cx,cy,R*0.72,0,7); g.fill();
+      if (sum){   // centre-darken only coloured discs; leave an empty disc evenly translucent
+        var dk=g.createRadialGradient(cx,cy,0,cx,cy,R*0.72);
+        dk.addColorStop(0,"rgba(0,0,0,0.58)"); dk.addColorStop(0.5,"rgba(0,0,0,0.26)"); dk.addColorStop(1,"rgba(0,0,0,0)");
+        g.fillStyle=dk; g.beginPath(); g.arc(cx,cy,R*0.72,0,7); g.fill();
+      }
       var bl=document.createElement("canvas"); bl.width=bl.height=FS; var bg=bl.getContext("2d");
       bg.filter="blur(13px) saturate(1.3) brightness(1.05)"; bg.drawImage(off,0,0);
       bg.filter="none"; bg.globalCompositeOperation="destination-in";
