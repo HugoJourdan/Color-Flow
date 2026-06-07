@@ -205,6 +205,20 @@ def test_dashboard_has_activity_calendar() -> None:
     assert ".tl-cal-d" in css and ".tl-cal-wk" in css
 
 
+def test_progress_bar_and_dots_glow_softened() -> None:
+    js = assets.DASHBOARD_JS
+    html = assets.build_html(_model())
+    # bar glow reduced (42% -> 22%) and no longer at the old strength
+    assert "0 0 9px color-mix(in srgb,var('+glow+') 22%,transparent)" in js
+    assert "42%,transparent)" not in js
+    # coverage bars now carry the same per-segment colour glow
+    assert "box-shadow:0 0 9px color-mix(in srgb,'+bg+' 22%,transparent)" in js
+    assert ".cov-bar{flex:1;display:flex;height:10px;border-radius:5px;overflow:visible" in html
+    # legend colour dots glow in their own colour
+    assert "function legendDot(" in js
+    assert "0 0 7px color-mix(in srgb,var('+v+') 26%,transparent)" in js
+
+
 def test_dashboard_js_has_expandable_overview_cards_and_timeline_card() -> None:
     js = assets.DASHBOARD_JS
     assert "function ovCard(" in js                       # shared expandable card

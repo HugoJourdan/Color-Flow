@@ -248,8 +248,10 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .cov-rows{margin:6px 0 4px}
 .cov-row{display:flex;align-items:center;gap:12px;font-size:var(--fs-xs);padding:9px 0;border-top:1px solid var(--track)}
 .cov-name{width:120px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cov-bar{flex:1;display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--track);min-width:0}
-.cov-bar>span{display:flex;align-items:center;justify-content:center;height:100%;min-width:0;overflow:hidden}
+.cov-bar{flex:1;display:flex;height:10px;border-radius:5px;overflow:visible;background:var(--track);min-width:0}
+.cov-bar>span{display:flex;align-items:center;justify-content:center;height:100%;min-width:0}
+.cov-bar>span:first-child{border-radius:5px 0 0 5px}
+.cov-bar>span:last-child{border-radius:0 5px 5px 0}
 .cov-bar .cov-none{background:var(--c-none)}
 .cov-row .num{width:auto;min-width:48px;text-align:right;color:var(--muted)}
 .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px;margin:12px 0 4px}
@@ -507,6 +509,12 @@ DASHBOARD_JS = r"""
     return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
   function pct(n,t){ return t ? Math.round(n/t*100) : 0; }
   function varFor(k){ return k===-1 ? "--c-none" : "--c"+k; }
+  // A legend swatch dot that glows in its own colour (matches the progress-bar glow).
+  function legendDot(key){
+    var v = varFor(key);
+    return '<i style="background:var('+v+');box-shadow:inset 0 0 0 1px var(--swatch-outline),'
+      + '0 0 7px color-mix(in srgb,var('+v+') 26%,transparent)"></i>';
+  }
   function labelFor(k){
     if (k===-1 || String(k)==="-1") return H.noneLabel;
     // steps keys are ints, but callers pass H.order keys (strings) too — compare as
@@ -528,7 +536,7 @@ DASHBOARD_JS = r"""
     var glow = key===-1 ? "--c-none-b" : varFor(key);
     return '<span class="segc'+(on?" on":"")+(off?" off":"")+'" data-fkey="'+key+'" style="width:'+w
       + '%;background:var('+varFor(key)+');--i:'+(idx||0)
-      + ';box-shadow:0 0 9px color-mix(in srgb,var('+glow+') 42%,transparent),inset -6px 0 9px -3px rgba(0,0,0,.2)" title="'+esc(lab)+' — click to focus these glyphs"></span>';
+      + ';box-shadow:0 0 9px color-mix(in srgb,var('+glow+') 22%,transparent),inset -6px 0 9px -3px rgba(0,0,0,.2)" title="'+esc(lab)+' — click to focus these glyphs"></span>';
   }
   function countFor(m,k){ return k===-1 ? m.uncolored : (m.counts[String(k)]||0); }
   function startedOf(m){ return H.glyphTotal - m.uncolored; }
@@ -614,7 +622,7 @@ DASHBOARD_JS = r"""
   function overall(){
     var a = aggregate(), compP = gradedOverallPct();
     var legend = H.steps.map(function(s){
-      return '<span class="lg" title="'+esc(s.label)+'"><i style="background:var('+varFor(s.key)+')"></i>'+pct(a.agg[String(s.key)]||0,a.grand)+'%</span>';
+      return '<span class="lg" title="'+esc(s.label)+'">'+legendDot(s.key)+pct(a.agg[String(s.key)]||0,a.grand)+'%</span>';
     }).join("");
     var recipeLine = "";
     if (H.recipes && H.recipes.length){
@@ -641,7 +649,7 @@ DASHBOARD_JS = r"""
     var started = total - m.uncolored;
     var startP = pct(started,total);
     var legend = stepsSorted(m).map(function(s){
-      return '<span class="lg" title="'+esc(s.label)+'"><i style="background:var('+varFor(s.key)+')"></i>'+pct(countFor(m,s.key)||0,total)+'%</span>';
+      return '<span class="lg" title="'+esc(s.label)+'">'+legendDot(s.key)+pct(countFor(m,s.key)||0,total)+'%</span>';
     }).join("");
     var head = '<span class="ov-name">'+esc(m.name)+'</span>'
       + '<b>'+gradedMasterPct(m)+'% complete</b> · '+started+'/'+total+' started ('+startP+'%)';
@@ -908,7 +916,8 @@ DASHBOARD_JS = r"""
     // text — each segment's colour label + share show in a hover tooltip instead.
     var dist = r.dist || {};
     function seg(w, bg, cls, title){
-      return '<span'+(cls?' class="'+cls+'"':'')+' style="width:'+w+'%;background:'+bg+'" title="'+title+'"></span>';
+      return '<span'+(cls?' class="'+cls+'"':'')+' style="width:'+w+'%;background:'+bg
+        +';box-shadow:0 0 9px color-mix(in srgb,'+bg+' 22%,transparent)" title="'+title+'"></span>';
     }
     var segs = H.order.map(function(k){
       var c = dist[k] || 0;
