@@ -304,6 +304,42 @@ def test_dashboard_css_styles_crosshair_class() -> None:
     assert ".tl-crossarea" in css
 
 
+def test_dashboard_js_has_brush_to_compare() -> None:
+    """#8: a pointerdown+drag across the chart overlay paints a translucent band
+    between two snapped snapshot dates and, on release, drives the A/B compare by
+    setting state.dateA / state.dateB. The handler derives an inverse X->date from
+    the forward X() scale, keeps the <select> a11y fallback synced, and exposes two
+    draggable handles nudged by the arrow keys."""
+    js = assets.DASHBOARD_JS
+    # the named brush handler that wires the drag interaction
+    assert "function brushMove(" in js
+    # the translucent band + the two draggable handles draw as .tl-brush elements
+    assert "tl-brush" in js
+    # the band snaps to discrete snapshots (same data as the crosshair) and inverts
+    # the forward X scale to recover the date under the pointer
+    assert "data-snaps" in js
+    # on release the brush sets BOTH compare endpoints, then re-renders
+    assert "state.dateA" in js and "state.dateB" in js
+    # the existing <select> a11y fallback stays the source of truth markup
+    assert 'id="cfd-date-a"' in js and 'id="cfd-date-b"' in js
+    # pointer drag + keyboard nudge on a focused handle
+    assert "pointerdown" in js
+    assert "ArrowLeft" in js and "ArrowRight" in js
+    # reduced-motion: numbers settle on release (no live anim) via the shared gate
+    assert "__cfdNoAnim" in js or "prefers-reduced-motion" in js
+    # the brush band carries a CSS rule
+    assert ".tl-brush" in assets.DASHBOARD_CSS
+
+
+def test_dashboard_css_styles_brush_class() -> None:
+    """#8: the brush band is a translucent --accent fill so it reads as a range
+    selection over the plot without hiding the lines underneath."""
+    css = assets.DASHBOARD_CSS
+    assert ".tl-brush" in css
+    brush_rule = css.split(".tl-brush{")[1].split("}")[0]
+    assert "var(--accent)" in brush_rule
+
+
 def test_dashboard_js_has_regression_card() -> None:
     js = assets.DASHBOARD_JS
     assert "function regressionCard(" in js

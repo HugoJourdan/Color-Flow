@@ -282,6 +282,9 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-cross{stroke:var(--muted-2);stroke-width:1;opacity:.85;pointer-events:none;display:none}
 .tl-cross-mark{fill:var(--muted-2);pointer-events:none;display:none}
 .tl-crossarea{fill:transparent;cursor:crosshair}
+.tl-brush{fill:var(--accent);opacity:.16;pointer-events:none;display:none}
+.tl-brush-h{fill:var(--accent);opacity:.9;cursor:ew-resize}
+.tl-brush-h:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .tl-chart:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .tl-foot{display:flex;justify-content:space-between;font-size:var(--fs-2xs);color:var(--muted-2);margin-top:6px}
 .ov-ring{display:block}
@@ -1056,7 +1059,16 @@ DASHBOARD_JS = r"""
     var crossLayer = '<line class="tl-cross" y1="'+ptop+'" y2="'+(ptop+ih).toFixed(1)+'"/>'
       + '<circle class="tl-cross-mark" r="3.5"/>'
       + '<rect class="tl-crossarea" x="'+pl+'" y="'+ptop+'" width="'+iw.toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
-    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData+' aria-label="Completion over time per master. Hover or use the left and right arrow keys to read each snapshot.">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+grid+xticks+lines+todayRule+crossLayer+'</svg>';
+    // ----- #8 brush-to-compare: a translucent band + two draggable handles drawn
+    // over the same plot. brushMove() snaps each edge to the nearest snapshot X
+    // (reusing data-snaps), inverts the forward X scale to recover dates, and on
+    // release writes them into state.dateA/dateB. The handles are focusable so the
+    // arrow keys nudge a focused edge. The <select> a11y fallback stays the source
+    // markup (dateDiffPanel below). All hidden until a drag begins.
+    var brushLayer = '<rect class="tl-brush" y="'+ptop+'" height="'+ih.toFixed(1)+'"/>'
+      + '<rect class="tl-brush-h" data-edge="a" tabindex="0" role="slider" aria-label="Compare range start" y="'+ptop+'" width="6" height="'+ih.toFixed(1)+'"/>'
+      + '<rect class="tl-brush-h" data-edge="b" tabindex="0" role="slider" aria-label="Compare range end" y="'+ptop+'" width="6" height="'+ih.toFixed(1)+'"/>';
+    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData+' aria-label="Completion over time per master. Hover or use the left and right arrow keys to read each snapshot.">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+grid+xticks+lines+todayRule+brushLayer+crossLayer+'</svg>';
     var foot = '<div class="tl-foot"><span>'+esc(series[0].date)+'</span><span>'+esc(series[series.length-1].date)+'</span></div>';
     return { chart:chart, legend:legend, foot:foot };
   }
@@ -1271,6 +1283,8 @@ DASHBOARD_JS = r"""
   // Keyboard: Left/Right step the snapped snapshot and refresh the same read-out.
   function crosshairKey(evt){
     if (evt.key!=="ArrowLeft" && evt.key!=="ArrowRight"){ return; }
+    // a focused brush handle owns the arrow keys (brushKey) — don't also step the crosshair.
+    if (evt.target.closest && evt.target.closest(".tl-brush-h")){ return; }
     var svg = evt.target.closest && evt.target.closest(".tl-chart");
     if (!svg){ return; }
     var snaps; try { snaps = JSON.parse(svg.getAttribute("data-snaps")||"[]"); } catch(e){ snaps = []; }
@@ -1279,6 +1293,125 @@ DASHBOARD_JS = r"""
     var idx = crossIdx < 0 ? (evt.key==="ArrowLeft" ? snaps.length-1 : 0)
       : Math.max(0, Math.min(snaps.length-1, crossIdx + (evt.key==="ArrowRight" ? 1 : -1)));
     crossSnapTo(svg, idx, null);
+  }
+
+  // ----- #8 brush-to-compare ------------------------------------------------
+  // The two snapshot indices the brush currently spans (low..high). Live during a
+  // drag/nudge so the band + handles stay coherent before the diff settles.
+  var brushA = -1, brushB = -1;
+  // Read the snapshot X anchors off the SVG (same data-snaps the crosshair uses).
+  function brushSnaps(svg){
+    var snaps; try { snaps = JSON.parse(svg.getAttribute("data-snaps")||"[]"); } catch(e){ snaps = []; }
+    return snaps;
+  }
+  // Invert the forward X scale: map a client X to the NEAREST snapshot index. The
+  // forward map is X(off)=pl+off/lastOff*iw drawn into the viewBox, so we only need
+  // the snapshot X anchors and the box->viewBox ratio to recover the date under the
+  // pointer — no interpolation, the series is discrete.
+  function brushIndexFromClient(svg, clientX){
+    var snaps = brushSnaps(svg); if (!snaps.length){ return -1; }
+    var box = svg.getBoundingClientRect(); if (!box.width){ return -1; }
+    var vb = svg.viewBox && svg.viewBox.baseVal;
+    var vbw = (vb && vb.width) || box.width;
+    var ux = (clientX - box.left) / box.width * vbw;       // pointer X in SVG user-space
+    var nearest = 0, best = Infinity;
+    for (var i=0;i<snaps.length;i++){
+      var d = Math.abs(snaps[i].x - ux);
+      if (d < best){ best = d; nearest = i; }
+    }
+    return nearest;
+  }
+  // Position the translucent band + the two handles for the current brush span.
+  function brushPaint(svg){
+    var snaps = brushSnaps(svg);
+    var band = svg.querySelector(".tl-brush");
+    var handles = svg.querySelectorAll(".tl-brush-h");
+    if (brushA < 0 || brushB < 0 || !snaps.length){
+      if (band){ band.style.display = "none"; }
+      return;
+    }
+    var lo = Math.min(brushA, brushB), hi = Math.max(brushA, brushB);
+    var xLo = snaps[lo].x, xHi = snaps[hi].x;
+    if (band){
+      band.setAttribute("x", xLo);
+      band.setAttribute("width", Math.max(0, xHi - xLo).toFixed(1));
+      band.style.display = "block";
+    }
+    for (var i=0;i<handles.length;i++){
+      var edge = handles[i].getAttribute("data-edge");
+      var hx = (edge === "a") ? xLo : xHi;
+      handles[i].setAttribute("x", (hx - 3).toFixed(1));   // centre the 6px-wide handle
+      handles[i].style.display = "block";
+    }
+  }
+  // Settle the compare: write the two snapped dates into state.dateA/dateB and the
+  // <select> a11y fallback, then re-render so dateDiffPanel recomputes advanced/
+  // regressed/unchanged/net for the range. Reduced-motion is honoured implicitly —
+  // dateDiffPanel just renders numbers, no live animation runs while dragging.
+  function brushApply(svg){
+    var snaps = brushSnaps(svg);
+    if (brushA < 0 || brushB < 0 || !snaps.length){ return; }
+    var lo = Math.min(brushA, brushB), hi = Math.max(brushA, brushB);
+    state.dateA = snaps[lo].d;
+    state.dateB = snaps[hi].d;
+    update();
+  }
+  // Named brush handler: pointerdown on the chart starts a drag; pointermove paints
+  // the live band; pointerup snaps both endpoints into the compare. A drag that
+  // starts on a handle drags that single edge; otherwise both edges track the drag.
+  function brushMove(evt){
+    var svg = evt.target.closest && evt.target.closest(".tl-chart");
+    if (!svg){ return; }
+    var snaps = brushSnaps(svg); if (snaps.length < 2){ return; }
+    var start = brushIndexFromClient(svg, evt.clientX); if (start < 0){ return; }
+    var onHandle = evt.target.closest && evt.target.closest(".tl-brush-h");
+    var dragEdge = onHandle ? onHandle.getAttribute("data-edge") : null;
+    if (dragEdge){
+      // dragging a single existing handle; keep the other edge anchored.
+      if (dragEdge === "a"){ brushA = start; } else { brushB = start; }
+    } else {
+      brushA = start; brushB = start;     // fresh drag: collapse, then expand on move
+    }
+    brushPaint(svg);
+    evt.preventDefault();
+    function onPointerMove(moveEvt){
+      var idx = brushIndexFromClient(svg, moveEvt.clientX); if (idx < 0){ return; }
+      if (dragEdge === "a"){ brushA = idx; }
+      else if (dragEdge === "b"){ brushB = idx; }
+      else { brushB = idx; }
+      brushPaint(svg);
+    }
+    function onPointerUp(){
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+      brushApply(svg);
+    }
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", onPointerUp);
+  }
+  // Keyboard: Left/Right nudge the focused handle by one snapshot, then settle.
+  function brushKey(evt){
+    if (evt.key!=="ArrowLeft" && evt.key!=="ArrowRight"){ return; }
+    var handle = evt.target.closest && evt.target.closest(".tl-brush-h");
+    if (!handle){ return; }
+    var svg = handle.closest(".tl-chart"); if (!svg){ return; }
+    var snaps = brushSnaps(svg); if (snaps.length < 2){ return; }
+    evt.preventDefault();
+    var edge = handle.getAttribute("data-edge");
+    // seed from the current compare endpoints if the brush has not been dragged yet,
+    // so a keyboard-only user still gets a coherent range to nudge.
+    if (brushA < 0 || brushB < 0){
+      brushA = 0; brushB = snaps.length-1;
+      for (var i=0;i<snaps.length;i++){
+        if (state.dateA && snaps[i].d===state.dateA){ brushA = i; }
+        if (state.dateB && snaps[i].d===state.dateB){ brushB = i; }
+      }
+    }
+    var step = evt.key==="ArrowRight" ? 1 : -1;
+    if (edge === "a"){ brushA = Math.max(0, Math.min(snaps.length-1, brushA + step)); }
+    else { brushB = Math.max(0, Math.min(snaps.length-1, brushB + step)); }
+    brushPaint(svg);
+    brushApply(svg);
   }
 
   // Animate the heatmap cells between their last-run ("before") and current
@@ -1588,6 +1721,12 @@ DASHBOARD_JS = r"""
       if (chart && (!e.relatedTarget || !chart.contains(e.relatedTarget))){ crosshairLeave(e); }
     });
     bodyEl.addEventListener("keydown", crosshairKey);
+    // #8 brush-to-compare: pointerdown on the chart starts a drag that paints a
+    // band between two snapped snapshots and, on release, drives state.dateA/dateB
+    // (dateDiffPanel recomputes the range). Arrow keys nudge a focused handle. The
+    // <select> a11y fallback in dateDiffPanel stays synced via update().
+    bodyEl.addEventListener("pointerdown", brushMove);
+    bodyEl.addEventListener("keydown", brushKey);
     // Colour-bar segments live both in the static global bar and in the per-master
     // card (inside #cfd-body), so delegate their clicks at the document level.
     document.addEventListener("click", function(e){
