@@ -121,6 +121,16 @@ def test_build_html_has_script_coverage_grid() -> None:
     assert "function scriptRows(" in html              # per-master / aggregated rows
 
 
+def test_dashboard_js_has_expandable_overview_cards_and_timeline_card() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function ovCard(" in js                       # shared expandable card
+    assert "function timelineCard(" in js                 # timeline shown in the Overview
+    assert "function trendParts(" in js                   # chart shared by view + card
+    assert "data-ovexpand" in js                          # header toggles expansion
+    assert "ovExpand" in js                               # per-card expanded state
+    assert "leaderboard\", \"Furthest along\"" in js or 'ovCard("leaderboard"' in js
+
+
 def test_dashboard_js_uses_graded_step_progress() -> None:
     js = assets.DASHBOARD_JS
     assert "function stepWeights(" in js                 # palette-order step ranking

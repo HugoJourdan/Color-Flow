@@ -139,7 +139,13 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .legend .lg{display:inline-flex;align-items:center;gap:5px}
 .ov-extra{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:14px;margin-top:16px}
 .ov-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
-.ov-card h4{margin:0 0 10px;font-size:var(--fs-2xs);font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.ov-card.open{grid-column:1/-1}
+.ov-card-h{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin:0 0 10px;padding:0;background:none;border:0;font:inherit;font-size:var(--fs-2xs);font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:left}
+button.ov-card-h{cursor:pointer}
+.ov-exp{font-size:var(--fs-2xs);font-weight:600;color:var(--accent);text-transform:none;letter-spacing:0}
+button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
+.ov-card-body.scroll{max-height:300px;overflow-y:auto;padding-right:4px}
+.tl-legend-card{margin-top:10px;max-height:120px;overflow-y:auto}
 .lb-row{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;padding:5px 0;cursor:pointer;color:var(--text);font:inherit;text-align:left}
 .lb-row+.lb-row{border-top:1px solid var(--track)}
 .lb-n{flex:0 0 96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-xs)}
@@ -307,6 +313,7 @@ DASHBOARD_JS = r"""
     master: null,                          // no master selected -> global overview
     view: "tabs", before: false, sort: "workflow",
     coverGroup: "byCategory", glyphSort: "category", focus: null,
+    ovExpand: {},                          // which Overview cards are expanded
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
   // One-shot: the colour bars animate-fill only on the first render, not on
@@ -560,21 +567,34 @@ DASHBOARD_JS = r"""
   }
   // ----- Overview extras (only when no master is selected) ------------------
   function masterPct(m){ return gradedMasterPct(m); }   // graded step progress
+  // A dashboard card; when expandable, the header toggles state.ovExpand[key]
+  // and the body scrolls so the full content is reachable.
+  function ovCard(key, title, bodyHtml, expandable){
+    var open = !!state.ovExpand[key];
+    var head = expandable
+      ? '<button type="button" class="ov-card-h" data-ovexpand="'+esc(key)+'" aria-expanded="'+open+'"><span>'+esc(title)+'</span><span class="ov-exp">'+(open?"Show less":"Show all")+'</span></button>'
+      : '<div class="ov-card-h"><span>'+esc(title)+'</span></div>';
+    return '<div class="ov-card'+(open?" open":"")+'">'+head
+      + '<div class="ov-card-body'+(open?" scroll":"")+'">'+bodyHtml+'</div></div>';
+  }
+  function lbRow(r){
+    return '<button type="button" class="lb-row" data-m="'+esc(r.id)+'" title="Focus '+esc(r.name)+'">'
+      + '<span class="lb-n">'+esc(r.name)+'</span>'
+      + '<span class="lb-bar"><span style="width:'+r.p+'%"></span></span>'
+      + '<span class="lb-p">'+r.p+'%</span></button>';
+  }
   // Ranked masters by graded step progress; click a row to focus that master.
+  // Collapsed shows the top 6; expanded scrolls through every master.
   function leaderboard(){
     var rows = H.masters.map(function(m){ return {id:m.id, name:m.name, p:masterPct(m), any:masterStarted(m)}; });
     rows.sort(function(a,b){ return b.p-a.p || (a.name<b.name?-1:1); });
     var started = rows.filter(function(r){ return r.any; });
-    var top = (started.length?started:rows).slice(0,6);
-    var bars = top.map(function(r){
-      return '<button type="button" class="lb-row" data-m="'+esc(r.id)+'" title="Focus '+esc(r.name)+'">'
-        + '<span class="lb-n">'+esc(r.name)+'</span>'
-        + '<span class="lb-bar"><span style="width:'+r.p+'%"></span></span>'
-        + '<span class="lb-p">'+r.p+'%</span></button>';
-    }).join("");
+    var open = !!state.ovExpand.leaderboard;
+    var list = open ? rows : (started.length?started:rows).slice(0,6);
+    var bars = list.map(lbRow).join("");
     var zero = rows.length - started.length;
-    var foot = zero>0 ? '<div class="ov-foot">'+zero+' master'+(zero===1?"":"s")+' not started</div>' : '';
-    return '<div class="ov-card"><h4>Furthest along</h4>'+bars+foot+'</div>';
+    var foot = (!open && zero>0) ? '<div class="ov-foot">'+zero+' master'+(zero===1?"":"s")+' not started</div>' : '';
+    return ovCard("leaderboard", "Furthest along", bars+foot, rows.length>6);
   }
   // How many masters fall in each completion band.
   function histogram(){
@@ -587,11 +607,19 @@ DASHBOARD_JS = r"""
         + '<span class="hg-bar"><span style="width:'+(b.n/max*100).toFixed(1)+'%"></span></span>'
         + '<span class="hg-n">'+b.n+'</span></div>';
     }).join("");
-    return '<div class="ov-card"><h4>Masters by completion</h4>'+rows+'</div>';
+    return ovCard("histogram", "Masters by completion", rows, false);
+  }
+  // Completion-over-time, compact; expanded grows the chart and adds the legend.
+  function timelineCard(){
+    if (!hasTrend()) return "";
+    var open = !!state.ovExpand.timeline;
+    var parts = trendParts(680, open?190:120);
+    var body = parts.chart + (open ? '<div class="tl-legend tl-legend-card">'+parts.legend+'</div>'+parts.foot : '');
+    return ovCard("timeline", "Completion over time", body, true);
   }
   function overviewExtras(){
     if (!H.masters.length) return "";
-    return '<div class="ov-extra">'+leaderboard()+histogram()+'</div>';
+    return '<div class="ov-extra">'+leaderboard()+histogram()+timelineCard()+'</div>';
   }
   function tabsView(){
     if (state.master==null) return overall()+overviewExtras();   // no master selected -> global view + extras
@@ -727,12 +755,11 @@ DASHBOARD_JS = r"""
   }
   // ----- Timeline: completion over time, one line per master -----
   function masterHue(i){ return Math.round((i*137.508) % 360); }
-  function timelineView(){
+  // Shared trend builder: returns the chart SVG, the per-master legend and the
+  // date foot, so both the Timeline view and the Overview card draw the same.
+  function trendParts(W, Ht){
     var series = (H.trend && H.trend.series) || [];
-    if (series.length < 2){
-      return '<section class="tl-empty"><p class="empty">Not enough history yet. Color Flow saves a snapshot each time you save the font; this timeline fills in as days of history accumulate.</p></section>';
-    }
-    var W=680, Ht=200, pl=30, pr=12, ptop=12, pb=8, iw=W-pl-pr, ih=Ht-ptop-pb;
+    var pl=30, pr=12, ptop=12, pb=8, iw=W-pl-pr, ih=Ht-ptop-pb;
     var t0 = new Date(series[0].date).getTime();
     function dayOff(d){ return (new Date(d).getTime()-t0)/86400000; }
     var lastOff = Math.max(1, dayOff(series[series.length-1].date));
@@ -763,7 +790,15 @@ DASHBOARD_JS = r"""
     lines += selLine;
     var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" aria-label="Completion over time per master">'+grid+lines+'</svg>';
     var foot = '<div class="tl-foot"><span>'+esc(series[0].date)+'</span><span>'+esc(series[series.length-1].date)+'</span></div>';
-    return '<section class="timeline"><div class="tl-legend">'+legend+'</div>'+chart+foot+'</section>';
+    return { chart:chart, legend:legend, foot:foot };
+  }
+  function hasTrend(){ return ((H.trend && H.trend.series) || []).length >= 2; }
+  function timelineView(){
+    if (!hasTrend()){
+      return '<section class="tl-empty"><p class="empty">Not enough history yet. Color Flow saves a snapshot each time you save the font; this timeline fills in as days of history accumulate.</p></section>';
+    }
+    var parts = trendParts(680, 200);
+    return '<section class="timeline"><div class="tl-legend">'+parts.legend+'</div>'+parts.chart+parts.foot+'</section>';
   }
   function compareView(){
     // columns = steps (+None); rows = masters, labelled by the master name.
@@ -1041,6 +1076,7 @@ DASHBOARD_JS = r"""
     });
     bodyEl.addEventListener("click", function(e){
       var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); update(); return; }
+      var ox = e.target.closest("[data-ovexpand]"); if (ox){ var ok=ox.getAttribute("data-ovexpand"); state.ovExpand[ok]=!state.ovExpand[ok]; update(); return; }
       var cr = e.target.closest(".cmprow[data-m],.lb-row[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; update(); return; }
       var cg = e.target.closest("[data-cg]"); if (cg){ state.coverGroup = cg.getAttribute("data-cg"); update(); return; }
       var gs = e.target.closest("[data-gsort]"); if (gs){ state.glyphSort = gs.getAttribute("data-gsort"); update(); return; }
