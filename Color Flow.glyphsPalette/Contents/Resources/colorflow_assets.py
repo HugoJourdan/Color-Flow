@@ -133,6 +133,30 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .ov-recipe b{color:var(--text)}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
 .legend .lg{display:inline-flex;align-items:center;gap:5px}
+.ov-extra{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:14px;margin-top:16px}
+.ov-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.ov-card h4{margin:0 0 10px;font-size:var(--fs-2xs);font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.lb-row{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;padding:5px 0;cursor:pointer;color:var(--text);font:inherit;text-align:left}
+.lb-row+.lb-row{border-top:1px solid var(--track)}
+.lb-n{flex:0 0 96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-xs)}
+.lb-bar{flex:1;height:7px;border-radius:4px;background:var(--track);overflow:hidden}
+.lb-bar>span{display:block;height:100%;background:var(--accent);border-radius:4px}
+.lb-p{flex:0 0 36px;text-align:right;font-size:var(--fs-xs);color:var(--muted)}
+.lb-row:hover .lb-bar>span{filter:brightness(1.18)}
+.ov-foot{margin-top:9px;font-size:var(--fs-2xs);color:var(--muted-2)}
+.hg-row{display:flex;align-items:center;gap:9px;padding:4px 0}
+.hg-l{flex:0 0 56px;font-size:var(--fs-2xs);color:var(--muted)}
+.hg-bar{flex:1;height:9px;border-radius:4px;background:var(--track);overflow:hidden}
+.hg-bar>span{display:block;height:100%;background:var(--accent);border-radius:4px}
+.hg-n{flex:0 0 26px;text-align:right;font-size:var(--fs-2xs);color:var(--muted)}
+.dp-bar{display:flex;height:14px;border-radius:5px;overflow:hidden;background:var(--track);margin-bottom:10px}
+.dp-seg{display:block;height:100%}
+.dp-seg.dp-all,.dp-leg i.dp-all{background:var(--accent)}
+.dp-seg.dp-some,.dp-leg i.dp-some{background:color-mix(in srgb,var(--accent) 42%,var(--track))}
+.dp-seg.dp-none,.dp-leg i.dp-none{background:color-mix(in srgb,var(--text) 7%,var(--track))}
+.dp-leg{display:flex;flex-wrap:wrap;gap:12px;font-size:var(--fs-2xs);color:var(--muted)}
+.dp-leg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.dp-leg b{color:var(--text)}
 .legend i{width:8px;height:8px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .tabs{display:flex;gap:18px;border-bottom:1px solid var(--border);margin-bottom:6px;overflow-x:auto}
 .tab{font:var(--fs-sm) inherit;background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted-2);padding:8px 0;cursor:pointer;white-space:nowrap}
@@ -522,8 +546,59 @@ DASHBOARD_JS = r"""
     }).join("");
     return '<div class="tabs" role="tablist">'+tabs+'</div>';
   }
+  // ----- Overview extras (only when no master is selected) ------------------
+  function masterPct(m){ return pct(H.glyphTotal-(m.uncolored||0), H.glyphTotal); }
+  // Ranked masters by how much colour is set; click a row to focus that master.
+  function leaderboard(){
+    var rows = H.masters.map(function(m){ return {id:m.id, name:m.name, p:masterPct(m)}; });
+    rows.sort(function(a,b){ return b.p-a.p || (a.name<b.name?-1:1); });
+    var started = rows.filter(function(r){ return r.p>0; });
+    var top = (started.length?started:rows).slice(0,6);
+    var bars = top.map(function(r){
+      return '<button type="button" class="lb-row" data-m="'+esc(r.id)+'" title="Focus '+esc(r.name)+'">'
+        + '<span class="lb-n">'+esc(r.name)+'</span>'
+        + '<span class="lb-bar"><span style="width:'+r.p+'%"></span></span>'
+        + '<span class="lb-p">'+r.p+'%</span></button>';
+    }).join("");
+    var zero = rows.length - started.length;
+    var foot = zero>0 ? '<div class="ov-foot">'+zero+' master'+(zero===1?"":"s")+' not started</div>' : '';
+    return '<div class="ov-card"><h4>Furthest along</h4>'+bars+foot+'</div>';
+  }
+  // How many masters fall in each completion band.
+  function histogram(){
+    var buckets=[{l:"0%",n:0},{l:"1–25%",n:0},{l:"26–50%",n:0},{l:"51–75%",n:0},{l:"76–99%",n:0},{l:"100%",n:0}];
+    H.masters.forEach(function(m){ var p=masterPct(m);
+      var b = p<=0?0 : p>=100?5 : p<=25?1 : p<=50?2 : p<=75?3 : 4; buckets[b].n++; });
+    var max=buckets.reduce(function(a,c){return Math.max(a,c.n);},1);
+    var rows=buckets.map(function(b){
+      return '<div class="hg-row"><span class="hg-l">'+b.l+'</span>'
+        + '<span class="hg-bar"><span style="width:'+(b.n/max*100).toFixed(1)+'%"></span></span>'
+        + '<span class="hg-n">'+b.n+'</span></div>';
+    }).join("");
+    return '<div class="ov-card"><h4>Masters by completion</h4>'+rows+'</div>';
+  }
+  // For every glyph, in how many masters it is coloured: all / some / none.
+  function crossDepth(){
+    var oset={}, i, j; for(i=0;i<H.order.length;i++) oset[H.order[i]]=1;
+    var nM=H.masters.length, total=H.glyphTotal, all=0, some=0, none=0;
+    for (i=0;i<total;i++){
+      var c=0;
+      for (j=0;j<nM;j++){ var k=H.masters[j].keys[i]; if (k!==-1 && oset[k]) c++; }
+      if (c===0) none++; else if (c===nM) all++; else some++;
+    }
+    function seg(n,cls,lab){ var w=total?n/total*100:0; return '<span class="dp-seg '+cls+'" style="width:'+w.toFixed(2)+'%" title="'+esc(lab+": "+n)+'"></span>'; }
+    var bar='<div class="dp-bar" role="img" aria-label="Glyph colour depth across masters">'+seg(all,"dp-all","In all "+nM)+seg(some,"dp-some","In some")+seg(none,"dp-none","In none")+'</div>';
+    var leg='<div class="dp-leg"><span><i class="dp-all"></i>All '+nM+': <b>'+all+'</b></span>'
+      +'<span><i class="dp-some"></i>Some: <b>'+some+'</b></span>'
+      +'<span><i class="dp-none"></i>None: <b>'+none+'</b></span></div>';
+    return '<div class="ov-card"><h4>Glyph depth across masters</h4>'+bar+leg+'</div>';
+  }
+  function overviewExtras(){
+    if (!H.masters.length) return "";
+    return '<div class="ov-extra">'+leaderboard()+histogram()+crossDepth()+'</div>';
+  }
   function tabsView(){
-    if (state.master==null) return overall();   // no master selected -> the global progress bar
+    if (state.master==null) return overall()+overviewExtras();   // no master selected -> global view + extras
     var m = masterById(state.master);
     return '<div class="panel" role="tabpanel">'+masterOverall(m)+heatmap(m)+'</div>';
   }
@@ -968,7 +1043,7 @@ DASHBOARD_JS = r"""
     });
     bodyEl.addEventListener("click", function(e){
       var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); update(); return; }
-      var cr = e.target.closest(".cmprow[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; update(); return; }
+      var cr = e.target.closest(".cmprow[data-m],.lb-row[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; update(); return; }
       var cg = e.target.closest("[data-cg]"); if (cg){ state.coverGroup = cg.getAttribute("data-cg"); update(); return; }
       var gs = e.target.closest("[data-gsort]"); if (gs){ state.glyphSort = gs.getAttribute("data-gsort"); update(); return; }
       var fc = e.target.closest("[data-fclear]"); if (fc){ setFocus(null); return; }
