@@ -85,12 +85,14 @@ body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains M
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
 @media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro>span{animation:none}.heat,.heat.fading{transition:none;opacity:1}}
-#cfd-app{max-width:1180px;margin:0 auto;padding:0 20px 60px}
+#cfd-app{max-width:1180px;margin:0 auto;padding:0 20px}
 #cfd-main{display:flex;gap:24px;align-items:flex-start}
-#cfd-tower{position:sticky;top:14px;flex:0 0 240px;width:240px}
+#cfd-tower{position:sticky;top:0;flex:0 0 240px;width:240px}
 #cfd-tower canvas{display:block;width:240px;height:560px;cursor:pointer}
-#cfd-body{flex:1 1 auto;min-width:0;max-height:calc(100vh - 120px);overflow-y:auto;padding-right:6px}
-@media (max-width:780px){#cfd-main{flex-direction:column}#cfd-tower{position:static;width:100%;flex:0 0 auto}#cfd-tower canvas{margin:0 auto}#cfd-body{max-height:none;overflow:visible;padding-right:0}}
+#cfd-body{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;padding-right:6px}
+/* wide screens: lock the window, scroll the body internally (page never grows) */
+@media screen and (min-width:781px){html,body{height:100%;overflow:hidden}#cfd-app{height:100vh;display:flex;flex-direction:column}#cfd-main{flex:1 1 auto;min-height:0;overflow:hidden}#cfd-body{height:100%}}
+@media (max-width:780px){#cfd-main{flex-direction:column}#cfd-tower{position:static;width:100%;flex:0 0 auto}#cfd-tower canvas{margin:0 auto}#cfd-body{overflow:visible;padding-right:0}}
 .hd{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:14px 0;background:var(--bg);border-bottom:1px solid var(--border)}
 .hd .fam-logo{height:22px;width:auto;color:var(--text);display:block}
 .hd .fam{font-weight:600}
@@ -345,7 +347,6 @@ DASHBOARD_JS = r"""
       ? '<svg class="fam-logo" viewBox="'+esc(H.logo.vb)+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="'+esc(H.family)+'"><path d="'+esc(H.logo.d)+'" fill="currentColor"/></svg>'
       : '<span class="fam">'+esc(H.family)+'</span>';
     return '<header class="hd">'+fam
-      + '<span class="meta">'+esc(H.fileName)+' · v'+esc(H.version)+'</span>'
       + '<span class="sp"></span>'
       + streakBadge()
       + '<button type="button" id="cfd-theme" class="icon" aria-label="Toggle light or dark theme">◐</button></header>';
@@ -852,7 +853,7 @@ DASHBOARD_JS = r"""
       for (var i=0;i<keys.length;i++){ var k=keys[i]; if (k>=0 && k<12) c[k]++; }
       return c;
     }
-    var UNCOL = "hsl(225,8%,10%)";   // dark neutral grey for the uncoloured share
+    var UNCOL = "hsl(225,8%,4%)";   // dark neutral grey for the uncoloured share
     function buildField(counts, uncolored){
       var off=document.createElement("canvas"); off.width=off.height=FS;
       var g=off.getContext("2d"), cx=FS/2, cy=FS/2, R=FS*0.46, sum=0, i;
@@ -881,7 +882,7 @@ DASHBOARD_JS = r"""
         g.fillStyle=dk; g.beginPath(); g.arc(cx,cy,R*0.72,0,7); g.fill();
       }
       var bl=document.createElement("canvas"); bl.width=bl.height=FS; var bg=bl.getContext("2d");
-      bg.filter="blur(13px) saturate(1.3) brightness(1.05)"; bg.drawImage(off,0,0);
+      bg.filter="blur(13px) saturate(1.3) brightness(0.9)"; bg.drawImage(off,0,0);
       bg.filter="none"; bg.globalCompositeOperation="destination-in";
       bg.fillStyle="#000"; bg.beginPath(); bg.arc(FS/2,FS/2,FS*0.5,0,7); bg.fill();
       bg.globalCompositeOperation="source-over";
@@ -1024,7 +1025,7 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-app").innerHTML =
       header() + toolbar()
       + '<div id="cfd-main"><aside id="cfd-tower" aria-label="Masters"><canvas id="cfd-tower-cv" width="240" height="560"></canvas></aside><div id="cfd-body"></div></div>'
-      + '<footer class="ft">ColorFlow Report — '+esc(H.generated)+'</footer>';
+      + '<footer class="ft">ColorFlow Report — '+esc(H.generated)+' · '+esc(H.fileName)+' · v'+esc(H.version)+'</footer>';
     bind(); update(); initTower();
     window.__cfdExport = { csv: exportCSV, json: exportJSON, rows: exportRows, printHTML: buildPrintReport };
     // After the first paint the bars have run their fill animation once; stop
