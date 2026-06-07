@@ -2718,9 +2718,11 @@ DASHBOARD_JS = r"""
       g.strokeStyle=rim; g.lineWidth=2; g.beginPath(); g.arc(0,0,rx*0.992,0,7); g.stroke(); g.restore();
     }
     function shadowInto(g,cx,cy,rx,ry){
-      g.save(); g.translate(cx,cy+ry*0.5); g.scale(1,ry/rx);
-      var sh=g.createRadialGradient(0,0,0,0,0,rx); sh.addColorStop(0,"rgba(0,0,0,0.07)"); sh.addColorStop(0.7,"rgba(0,0,0,0.03)"); sh.addColorStop(1,"rgba(0,0,0,0)");
-      g.fillStyle=sh; g.beginPath(); g.arc(0,0,rx,0,7); g.fill(); g.restore();
+      // a touch stronger + slightly wider so the tighter-stacked discs cast a little
+      // more shadow into the gap below each one
+      g.save(); g.translate(cx,cy+ry*0.55); g.scale(1,ry/rx);
+      var sh=g.createRadialGradient(0,0,0,0,0,rx*1.04); sh.addColorStop(0,"rgba(0,0,0,0.11)"); sh.addColorStop(0.7,"rgba(0,0,0,0.05)"); sh.addColorStop(1,"rgba(0,0,0,0)");
+      g.fillStyle=sh; g.beginPath(); g.arc(0,0,rx*1.04,0,7); g.fill(); g.restore();
     }
     var geo={rx:0,ry:0,cx:0,topY:0,dz:0,vt:0};
     function selIndex(){ if (state.master==null) return -1; for (var i=0;i<H.masters.length;i++){ if (H.masters[i].id===state.master) return i; } return -1; }
@@ -2740,7 +2742,7 @@ DASHBOARD_JS = r"""
       for (var i=0;i<M;i++){ focusAmt[i] = (sel<0 || i===sel) ? 0 : 1; }   // instant switch, no fade
       var rx=Math.min(92, W*0.42), ry=rx*tilt;
       var topY=ry+16, botPad=ry+12;
-      var dz=VISIBLE>1?Math.min(60,(Hc-topY-botPad)/(VISIBLE-1)):0, cx=W/2;
+      var dz=VISIBLE>1?Math.min(51,(Hc-topY-botPad)/(VISIBLE-1)):0, cx=W/2;   // ~15% tighter stack
       var winBot=topY+(VISIBLE-1)*dz, fade=dz*1.1;
       geo={rx:rx,ry:ry,cx:cx,topY:topY,dz:dz,vt:vt};
       function cyOf(i){ return topY+(i-vt)*dz; }
@@ -2789,7 +2791,7 @@ DASHBOARD_JS = r"""
       W=availW; Hc=availH;                                       // logical drawing units (CSS px)
       buf.width=Math.round(W*dpr); buf.height=Math.round(Hc*dpr); bctx.setTransform(dpr,0,0,dpr,0,0);
       var rx=Math.min(92,W*0.42), ry=rx*tilt, topY=ry+16, botPad=ry+12;   // mirror render() geometry
-      VISIBLE=Math.max(4, Math.min(H.masters.length, Math.floor((Hc-topY-botPad)/34)+1));
+      VISIBLE=Math.max(4, Math.min(H.masters.length, Math.floor((Hc-topY-botPad)/29)+1));   // ~15% tighter disc gap
       vt=Math.max(0, Math.min(Math.max(0,H.masters.length-VISIBLE), vt));
     }
     fit();
