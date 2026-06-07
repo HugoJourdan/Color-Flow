@@ -203,7 +203,7 @@ def test_dashboard_has_activity_calendar() -> None:
     assert 'parseInt(cd.getAttribute("data-calday")' in js  # click reads the snapshot index
     assert "scrubSet(ci)" in js                          # ...and scrubs the Time Machine to it
     css = assets.DASHBOARD_CSS
-    assert ".tl-cal-d" in css and ".tl-cal-wk" in css
+    assert ".tl-cal-card" in css and ".tl-mcal-grid{" in css
 
 
 def test_dashboard_calendar_lives_on_overview() -> None:
@@ -222,19 +222,20 @@ def test_dashboard_calendar_lives_on_overview() -> None:
     assert ".ov-cal-tl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr)" in css
 
 
-def test_dashboard_has_standard_calendar_and_toggle() -> None:
+def test_dashboard_calendar_is_month_grid_only() -> None:
     js = assets.DASHBOARD_JS
     assert "function standardCalendar(" in js            # macOS-style month grid
-    assert "function calModeToggle(" in js               # Heatmap | Standard switch
-    assert "function heatmapCalendar(" in js             # heatmap body factored out
     assert "function calMonthRef(" in js                 # displayed-month state
-    assert 'data-calmode="standard"' in js and 'data-calmode="heatmap"' in js
     assert "data-calnav" in js                           # prev/next month nav
-    assert "state.calMode = clm.getAttribute" in js      # toggle handler
-    assert "calMode: \"heatmap\"" in js                  # default mode preserved
+    # the heatmap variant + its Heatmap/Standard toggle are gone
+    assert "function heatmapCalendar(" not in js
+    assert "function calModeToggle(" not in js
+    assert "data-calmode" not in js
+    assert "calMode" not in js
     css = assets.DASHBOARD_CSS
     assert ".tl-mcal-grid{display:grid;grid-template-columns:repeat(7,28px)" in css
-    assert ".tl-cal-mode-btn" in css
+    assert ".tl-cal-mode-btn" not in css                 # toggle styles removed
+    assert ".tl-cal-wk" not in css and ".tl-cal-key" not in css  # heatmap styles removed
 
 
 def test_progress_bar_and_dots_glow_softened() -> None:

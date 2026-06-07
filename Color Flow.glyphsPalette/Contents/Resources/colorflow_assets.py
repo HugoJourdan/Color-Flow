@@ -428,25 +428,7 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-machine-grid .cell svg{padding:2px}
 .tl-cal-card{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
 .tl-cal-h{display:flex;align-items:center;gap:10px;font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
-.tl-cal-key{margin-left:auto;display:inline-flex;align-items:center;gap:3px;color:var(--muted-2);font-size:var(--fs-2xs)}
-.tl-cal-key i{width:10px;height:10px;border-radius:2px;display:inline-block;background:var(--track)}
-.tl-cal-key i.lv1{background:color-mix(in srgb,var(--accent) 12%,var(--track))}
-.tl-cal-key i.lv2{background:color-mix(in srgb,var(--accent) 40%,var(--track))}
-.tl-cal-key i.lv3{background:color-mix(in srgb,var(--accent) 70%,var(--track))}
-.tl-cal-key i.lv4{background:var(--accent)}
-.tl-cal{display:flex;gap:4px;overflow-x:auto;padding-bottom:2px}
-.tl-cal-wk{display:flex;flex-direction:column;gap:4px}
-.tl-cal-d{width:16px;height:16px;border-radius:4px;background:var(--track)}
-.tl-cal-d.lv1{background:color-mix(in srgb,var(--accent) 12%,var(--track))}
-.tl-cal-d.lv2{background:color-mix(in srgb,var(--accent) 40%,var(--track))}
-.tl-cal-d.lv3{background:color-mix(in srgb,var(--accent) 70%,var(--track))}
-.tl-cal-d.lv4{background:var(--accent)}
-.tl-cal-d[data-calday]{cursor:pointer}
-.tl-cal-d[data-calday]:hover{outline:1px solid var(--text);outline-offset:1px}
 .tl-cal-ttl{flex:none}
-.tl-cal-mode{display:inline-flex;gap:4px}
-.tl-cal-mode-btn{padding:3px 9px;font-size:var(--fs-2xs)}
-.tl-cal-mode .tl-cal-mode-btn[aria-pressed=true]{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
 .tl-mcal{margin-top:2px}
 .tl-mcal-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px}
 .tl-mcal-title{font-size:var(--fs-sm);font-weight:600;color:var(--text);min-width:150px;text-align:center}
@@ -518,8 +500,7 @@ DASHBOARD_JS = r"""
     glyphSort: "category", focus: null,
     ovExpand: {},                          // which Overview cards are expanded
     tlMode: "line",                        // Timeline chart mode: "line" | "flow" (streamgraph)
-    calMode: "heatmap",                    // Activity calendar: "heatmap" | "standard" (month grid)
-    calY: null, calM: null,                // Standard-calendar displayed month (lazy: last snapshot)
+    calY: null, calM: null,                // Activity-calendar displayed month (lazy: last snapshot)
     tlScrub: null,                         // Time Machine scrubber index (null -> latest snapshot)
     dateA: null, dateB: null,              // Timeline date A-vs-B diff selection
     journeyGlyph: null, helpOpen: false,   // journey modal + help panel
@@ -2022,31 +2003,6 @@ DASHBOARD_JS = r"""
     return function(c){ if (!c) return 1; var r = c/maxC; return r>0.66?4:r>0.33?3:2; };
   }
   function calMasterId(){ return state.master != null ? state.master : (H.masters[0] && H.masters[0].id); }
-  // GitHub-contribution heatmap: one column per week (Sunday-anchored), spanning the
-  // whole snapshot range. Returns the grid markup only (card chrome added by caller).
-  function heatmapCalendar(){
-    var dates = (H.trend && H.trend.dates) || [];
-    var counts = calActivity(calMasterId());
-    var dateIdx = {}; dates.forEach(function(dt, i){ dateIdx[dt] = i; });
-    var DAY = 86400000;
-    function toUTC(s){ return new Date(s+"T00:00:00Z").getTime(); }
-    function isoOf(ms){ var dt = new Date(ms), mo = dt.getUTCMonth()+1, da = dt.getUTCDate();
-      return dt.getUTCFullYear()+"-"+(mo<10?"0":"")+mo+"-"+(da<10?"0":"")+da; }
-    var startMs = toUTC(dates[0]), endMs = toUTC(dates[dates.length-1]);
-    var gridStart = startMs - new Date(startMs).getUTCDay()*DAY;       // back to Sunday
-    var level = calLevelFn(counts);
-    var weeks = "", col = "";
-    for (var ms = gridStart; ms <= endMs; ms += DAY){
-      if (new Date(ms).getUTCDay()===0 && ms!==gridStart){ weeks += '<div class="tl-cal-wk">'+col+'</div>'; col = ""; }
-      var key = isoOf(ms), inRange = ms >= startMs, cnt = counts[key] || 0;
-      var lv = inRange ? level(cnt) : 0, snapI = dateIdx[key];
-      var attr = (snapI!=null) ? ' data-calday="'+snapI+'" role="button" tabindex="0"' : '';
-      var title = inRange ? (key + (cnt ? " · "+cnt+" changed" : " · no change")) : "";
-      col += '<div class="tl-cal-d lv'+lv+'"'+attr+' title="'+esc(title)+'"></div>';
-    }
-    if (col) weeks += '<div class="tl-cal-wk">'+col+'</div>';
-    return '<div class="tl-cal" role="img" aria-label="Per-day glyph-colour activity; click a day to scrub the Time Machine to it.">'+weeks+'</div>';
-  }
   // The displayed month for the Standard calendar; lazily seeded to the last snapshot's
   // month so the first thing the user sees is where their history actually is.
   function calMonthRef(){
@@ -2096,22 +2052,11 @@ DASHBOARD_JS = r"""
       + '<div class="tl-mcal-grid" role="img" aria-label="'+esc(MONTHS[m]+" "+y+" snapshot calendar; click a snapshot day to scrub the Time Machine to it.")+'">'
       + dow + cells + '</div></div>';
   }
-  // Heatmap | Standard segmented toggle (mirrors the Line/Flow control).
-  function calModeToggle(){
-    var heat = state.calMode !== "standard";
-    return '<div class="tl-cal-mode" role="group" aria-label="Calendar view mode">'
-      + '<button type="button" class="chip tl-cal-mode-btn" data-calmode="heatmap" aria-pressed="'+heat+'" title="GitHub-style activity heatmap">Heatmap</button>'
-      + '<button type="button" class="chip tl-cal-mode-btn" data-calmode="standard" aria-pressed="'+(!heat)+'" title="macOS-style month calendar">Standard</button>'
-      + '</div>';
-  }
   function activityCalendar(){
     var dates = (H.trend && H.trend.dates) || [];
     if (dates.length < 2) return "";
-    var standard = state.calMode === "standard";
-    var body = standard ? standardCalendar() : heatmapCalendar();
-    var key = standard ? "" : '<span class="tl-cal-key">less <i class="lv1"></i><i class="lv2"></i><i class="lv3"></i><i class="lv4"></i> more</span>';
-    return '<div class="tl-cal-card"><div class="tl-cal-h"><span class="tl-cal-ttl">Activity calendar</span>'
-      + calModeToggle() + key + '</div>' + body + '</div>';
+    return '<div class="tl-cal-card"><div class="tl-cal-h"><span class="tl-cal-ttl">Activity calendar</span></div>'
+      + standardCalendar() + '</div>';
   }
   function timelineView(){
     // #20: <3 snapshots routes to the rich seed states (a skeleton + locked chips at
@@ -2725,7 +2670,6 @@ DASHBOARD_JS = r"""
       var ox = e.target.closest("[data-ovexpand]"); if (ox){ var ok=ox.getAttribute("data-ovexpand"); state.ovExpand[ok]=!state.ovExpand[ok]; update(); return; }
       var cr = e.target.closest(".cmprow[data-m],.lb-row[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; update(); return; }
       var tm = e.target.closest("[data-tlmode]"); if (tm){ state.tlMode = tm.getAttribute("data-tlmode"); update(); return; }
-      var clm = e.target.closest("[data-calmode]"); if (clm){ state.calMode = clm.getAttribute("data-calmode"); update(); return; }
       var cnv = e.target.closest("[data-calnav]"); if (cnv){
         calMonthRef();                                   // ensure calY/calM seeded
         state.calM += parseInt(cnv.getAttribute("data-calnav"),10);
