@@ -98,12 +98,52 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 
 	@objc.python_method
 	def configure(self, rgba_colors: list) -> None:
-		self._colors = [rgba_colors[i] for i in self._SPECTRUM if i < len(rgba_colors)]
-		if not self._colors:
-			self._colors = list(rgba_colors)
+		raw = [rgba_colors[i] for i in self._SPECTRUM if i < len(rgba_colors)]
+		if not raw:
+			raw = list(rgba_colors)
+		self._colors = [self._saturate(rgba, 1.35) for rgba in raw]   # punchier hues
 		self._value = 0.0    # displayed fraction (eased toward _target)
 		self._target = 0.0   # latest real-progress milestone (monotonic, never decreases)
+		self._fillImage = None   # cached blurred gradient fill (rebuilt on size change)
+		self._fillKey = None
 		self.start()
+
+	@objc.python_method
+	def _saturate(self, rgba: tuple, factor: float) -> tuple:
+		import colorsys
+		hue, sat, val = colorsys.rgb_to_hsv(rgba[0], rgba[1], rgba[2])
+		red, green, blue = colorsys.hsv_to_rgb(hue, min(1.0, sat * factor), val)
+		return (red, green, blue, rgba[3] if len(rgba) > 3 else 1.0)
+
+	@objc.python_method
+	def _blurred_fill(self, gradient: Any, width: float, bar_h: float, radius: float) -> Any:
+		# Render the full-width gradient offscreen and Gaussian-blur it so the colours
+		# read soft/dreamy like the favicon. Returns an NSImage sized to the bar, or
+		# None when Core Image is unavailable (caller falls back to the crisp gradient).
+		try:
+			import Quartz
+			source = AppKit.NSImage.alloc().initWithSize_(AppKit.NSMakeSize(width, bar_h))
+			source.lockFocus()
+			gradient.drawInRect_angle_(AppKit.NSMakeRect(0.0, 0.0, width, bar_h), 0.0)
+			source.unlockFocus()
+			image = Quartz.CIImage.alloc().initWithData_(source.TIFFRepresentation())
+			blur = Quartz.CIFilter.filterWithName_("CIGaussianBlur")
+			if image is None or blur is None:
+				return None
+			blur.setValue_forKey_(image, "inputImage")
+			blur.setValue_forKey_(radius, "inputRadius")
+			output = blur.valueForKey_("outputImage")
+			if output is None:
+				return None
+			output = output.imageByCroppingToRect_(image.extent())   # blur expands extent; crop back
+			rep = AppKit.NSCIImageRep.alloc().initWithCIImage_(output)
+			if rep is None:
+				return None
+			result = AppKit.NSImage.alloc().initWithSize_(AppKit.NSMakeSize(width, bar_h))
+			result.addRepresentation_(rep)
+			return result
+		except Exception:
+			return None
 
 	@objc.python_method
 	def start(self) -> None:
@@ -156,7 +196,7 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 		bounds = self.bounds()
 		width = bounds.size.width
 		height = bounds.size.height
-		bar_h = 16.0
+		bar_h = 16.0 / 1.5   # thinner bar
 		bar_y = height - bar_h
 		radius = bar_h / 2.0
 		bar_rect = AppKit.NSMakeRect(0.0, bar_y, width, bar_h)
@@ -178,7 +218,18 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 				for rgba in colors
 			]
 			blend = AppKit.NSGradient.alloc().initWithColors_(nscolors) if len(nscolors) >= 2 else None
-			if blend is not None:
+			# Render + Gaussian-blur the full-width gradient ONCE (cached); each frame
+			# just reveals more of it through the filled clip. The blur makes the colours
+			# read soft/dreamy like the favicon.
+			key = (int(round(width)), int(round(bar_h)))
+			if blend is not None and getattr(self, "_fillKey", None) != key:
+				self._fillImage = self._blurred_fill(blend, width, bar_h, bar_h * 1.2)
+				self._fillKey = key
+			fill_image = getattr(self, "_fillImage", None)
+			if fill_image is not None:
+				fill_image.drawInRect_fromRect_operation_fraction_(
+					bar_rect, AppKit.NSZeroRect, AppKit.NSCompositingOperationSourceOver, 1.0)
+			elif blend is not None:
 				blend.drawInRect_angle_(bar_rect, 0.0)
 			else:
 				nscolors[0].set()
@@ -800,15 +851,15 @@ class ColorFlow(PalettePlugin):
 			if parent is None:
 				self.Open_Color_Font_Dashboard(None)
 				return
-			rect = AppKit.NSMakeRect(0, 0, 300, 104)
+			rect = AppKit.NSMakeRect(0, 0, 256, 84)
 			panel = AppKit.NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
 				rect, AppKit.NSWindowStyleMaskTitled, AppKit.NSBackingStoreBuffered, False)
 			panel.setTitle_("Color Flow")
 			content = panel.contentView()
 			label = AppKit.NSTextField.labelWithString_("Generating Color Flow report\u2026")
-			label.setFrame_(AppKit.NSMakeRect(20, 60, 260, 18))
+			label.setFrame_(AppKit.NSMakeRect(16, 52, 224, 16))
 			content.addSubview_(label)
-			loader = _ColorFlowLoaderBar.alloc().initWithFrame_(AppKit.NSMakeRect(20, 22, 260, 34))
+			loader = _ColorFlowLoaderBar.alloc().initWithFrame_(AppKit.NSMakeRect(16, 16, 224, 30))
 			loader.configure(labelcolors.read_label_colors())
 			content.addSubview_(loader)
 			self._reportLoader = loader
