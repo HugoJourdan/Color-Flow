@@ -39,6 +39,7 @@ from typing import Any, cast
 from urllib.parse import quote
 
 import colorflow_assets
+import colorflow_git
 import colorflow_recipes
 import colornames
 import glyphsvg
@@ -325,6 +326,66 @@ def record_history(font, snapshot: dict, now: datetime, cap: int = HISTORY_CAP) 
             del series[old_date]
     store[font.filepath] = series
     Glyphs.defaults[HISTORY_KEY] = store
+
+
+def write_history(font, history: dict, cap: int = HISTORY_CAP) -> None:
+    """Replace this font's entire dated history in ``Glyphs.defaults`` with
+    ``history`` (``{iso_date: snapshot}``), capped to the most-recent ``cap`` dates.
+    Used by the git backfill to install reconstructed history wholesale. No-op
+    without Glyphs or an unsaved font."""
+    if Glyphs is None or not font.filepath:
+        return
+    store = Glyphs.defaults[HISTORY_KEY]
+    store = dict(store) if hasattr(store, "keys") else {}
+    series = {str(date): history[date] for date in history}
+    if cap and len(series) > cap:
+        for old_date in sorted(series)[: len(series) - cap]:
+            del series[old_date]
+    store[font.filepath] = series
+    Glyphs.defaults[HISTORY_KEY] = store
+
+
+def _git_open_colors(path) -> dict | None:
+    """Open a historical font (a ``.glyphs`` file or ``.glyphspackage`` extracted by
+    the git backfill) headlessly and return its ``{master_id: {glyph_name: key}}``
+    colour snapshot. Glyphs-only; ``None`` outside Glyphs or on any open failure."""
+    if Glyphs is None:
+        return None
+    font = None
+    try:
+        font = Glyphs.open(str(path), showInterface=False)
+        if font is None:
+            return None
+        return build_master_glyph_colors(font)
+    except Exception:  # pragma: no cover - app-only path
+        return None
+    finally:  # close the document we opened so it doesn't linger in the app
+        if font is not None:
+            try:  # pragma: no cover - app-only path
+                document = getattr(font, "parent", None)
+                if document is not None:
+                    document.close()
+            except Exception:  # pragma: no cover - app-only path
+                pass
+
+
+def backfill_from_git(font, progress=None, cap: int = HISTORY_CAP) -> int:
+    """Reconstruct this font's dated history from its git commits and merge it under
+    any existing live snapshots. Returns the number of days imported from git (0 when
+    the font isn't in a git repo, isn't saved, or Glyphs is unavailable)."""
+    if Glyphs is None or not font.filepath:
+        return 0
+    existing = load_history(font)
+    # Incremental: don't re-open days we already have a snapshot for, so only the
+    # first run pays the full cost and later runs import just newly-committed days.
+    git_history = colorflow_git.collect_git_history(
+        font.filepath, _git_open_colors, cap=cap, progress=progress, skip=set(existing)
+    )
+    if not git_history:
+        return 0
+    merged = colorflow_git.merge_history(existing, git_history, cap)
+    write_history(font, merged, cap)
+    return len(git_history)
 
 
 # --------------------------------------------------------------------------- #
@@ -1099,8 +1160,16 @@ def main(font=None, progress=None, open_when_done: bool = True) -> Path | None:
     now = datetime.now()
     current = build_master_glyph_colors(font)
     _emit(0.05)
+    # Backfill the dated history from the font's git commits (incremental — only days
+    # not already recorded). No-op when the font isn't in a git repo. This is what lets
+    # the timeline populate immediately instead of accruing one snapshot per day.
+    try:
+        backfill_from_git(font, progress=lambda frac: _emit(0.05 + 0.10 * frac))
+    except Exception:
+        pass
+    _emit(0.15)
     previous = load_snapshot(font) or current
-    model = build_model(font, now, current, previous, progress=lambda frac: _emit(0.05 + 0.70 * frac))
+    model = build_model(font, now, current, previous, progress=lambda frac: _emit(0.15 + 0.65 * frac))
     _emit(0.80)
     html = colorflow_assets.build_html(model)
     _emit(0.94)

@@ -1,0 +1,200 @@
+"""Reconstruct Color Flow's dated history from a font's git commits.
+
+Color Flow normally accrues one snapshot per day, only on the days the report is
+run — so a fresh install has no timeline. When the font lives in a git repo we can
+backfill that history: for each past day, check out that day's last commit of the
+font, read its per-master ``layer.color`` state, and synthesise the exact same
+``{iso_date: {master_id: {glyph_name: key}}}`` shape the live snapshots use. Every
+downstream forecast/journey/streak function then works unchanged.
+
+This module is the import-clean, fully unit-tested plumbing: it shells out to git
+and extracts historical file content, but the font-reading step is injected as a
+``load_colors`` callable so the orchestration is testable without Glyphs. The Glyphs
+side (open a historical font headlessly, run ``build_master_glyph_colors``) lives in
+``colorflow_dashboard`` where GlyphsApp is already imported.
+"""
+
+from __future__ import annotations
+
+import io
+import shutil
+import subprocess
+import tarfile
+import tempfile
+from collections.abc import Callable
+from pathlib import Path
+
+# Matches colorflow_dashboard.HISTORY_CAP; passed in explicitly by callers, but a
+# local default keeps this module standalone for tests.
+DEFAULT_CAP = 60
+
+# One per-master colour snapshot: {master_id: {glyph_name: key}}.
+Snapshot = dict[str, dict[str, int]]
+
+
+def _git_text(args: list[str], cwd: Path) -> str | None:
+    """Run ``git <args>`` in ``cwd`` and return stdout as text, or ``None`` if git
+    is missing or the command fails (non-zero exit)."""
+    try:
+        result = subprocess.run(
+            ["git", *args], cwd=str(cwd), capture_output=True, text=True, check=False
+        )
+    except (OSError, ValueError):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def _git_bytes(args: list[str], cwd: Path) -> bytes | None:
+    """Run ``git <args>`` in ``cwd`` and return stdout as raw bytes, or ``None`` on
+    failure — used for blob/archive content that should not be text-decoded."""
+    try:
+        result = subprocess.run(
+            ["git", *args], cwd=str(cwd), capture_output=True, check=False
+        )
+    except (OSError, ValueError):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def git_root(path: Path) -> Path | None:
+    """The repository root containing ``path`` (a file or directory), or ``None`` if
+    ``path`` is not inside a git working tree."""
+    start = path if path.is_dir() else path.parent
+    if not start.exists():
+        return None
+    out = _git_text(["rev-parse", "--show-toplevel"], start)
+    if not out:
+        return None
+    root = out.strip()
+    return Path(root) if root else None
+
+
+def _rel(repo: Path, target: Path) -> str:
+    """``target`` as a POSIX path relative to ``repo`` (git speaks forward slashes)."""
+    return target.resolve().relative_to(repo.resolve()).as_posix()
+
+
+def is_tracked(repo: Path, target: Path) -> bool:
+    """Whether ``target`` (a file or a ``.glyphspackage`` directory) is tracked in
+    ``repo`` — true when git lists at least one file at that path."""
+    out = _git_text(["ls-files", "--", _rel(repo, target)], repo)
+    return bool(out and out.strip())
+
+
+def day_commits(
+    repo: Path, target: Path, cap: int = DEFAULT_CAP, skip: set[str] | None = None
+) -> list[tuple[str, str]]:
+    """The history of ``target`` collapsed to one commit per calendar day.
+
+    Returns ``[(iso_date, sha), ...]`` oldest-first, keeping the *last* commit of
+    each day (the day's final state) and at most ``cap`` most-recent days. Days whose
+    ISO date is in ``skip`` are then dropped (already recorded — used for incremental
+    backfill). Follows first-parent only, so merges don't pull in side-branch states."""
+    rel = _rel(repo, target)
+    out = _git_text(
+        ["log", "--first-parent", "--date=short", "--format=%cd|%H", "--", rel], repo
+    )
+    if not out:
+        return []
+    # git log is newest-first; the first sha seen for a date is that day's latest.
+    latest_per_day: dict[str, str] = {}
+    for line in out.splitlines():
+        line = line.strip()
+        if "|" not in line:
+            continue
+        iso, sha = line.split("|", 1)
+        if iso and sha and iso not in latest_per_day:
+            latest_per_day[iso] = sha
+    days = sorted(latest_per_day)            # oldest-first
+    if cap and len(days) > cap:
+        days = days[-cap:]                   # keep the most-recent `cap` days
+    if skip:
+        days = [iso for iso in days if iso not in skip]
+    return [(iso, latest_per_day[iso]) for iso in days]
+
+
+def extract_commit(repo: Path, target: Path, sha: str, dest_dir: Path) -> Path | None:
+    """Materialise ``target`` as it was at ``sha`` into ``dest_dir`` and return the
+    path to the extracted font. Handles both a single ``.glyphs`` file (``git show``)
+    and a ``.glyphspackage`` directory (``git archive`` -> in-memory tar extract).
+    Returns ``None`` if the content can't be retrieved."""
+    rel = _rel(repo, target)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    if target.is_dir():
+        data = _git_bytes(["archive", "--format=tar", sha, "--", rel], repo)
+        if data is None:
+            return None
+        try:
+            with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+                archive.extractall(dest_dir)  # noqa: S202 - our own repo's tree
+        except (tarfile.TarError, OSError):
+            return None
+        extracted = dest_dir / rel
+        return extracted if extracted.exists() else None
+    data = _git_bytes(["show", f"{sha}:{rel}"], repo)
+    if data is None:
+        return None
+    out_path = dest_dir / Path(rel).name
+    try:
+        out_path.write_bytes(data)
+    except OSError:
+        return None
+    return out_path
+
+
+def collect_git_history(
+    font_path: str | Path,
+    load_colors: Callable[[Path], Snapshot | None],
+    cap: int = DEFAULT_CAP,
+    progress: Callable[[float], None] | None = None,
+    skip: set[str] | None = None,
+) -> dict[str, Snapshot]:
+    """Reconstruct ``{iso_date: snapshot}`` from ``font_path``'s git history.
+
+    For each per-day commit, the font at that commit is extracted to a temp dir and
+    handed to ``load_colors`` (which returns a ``{master_id: {glyph_name: key}}``
+    snapshot, or ``None`` to skip). Days whose ISO date is in ``skip`` are not opened
+    at all (incremental backfill). Days that fail to extract or load are skipped.
+    Returns ``{}`` when the path is not in a git repo or not tracked."""
+    target = Path(font_path)
+    repo = git_root(target)
+    if repo is None or not is_tracked(repo, target):
+        return {}
+    commits = day_commits(repo, target, cap, skip)
+    if not commits:
+        return {}
+    history: dict[str, Snapshot] = {}
+    work_root = Path(tempfile.mkdtemp(prefix="cfgit-"))
+    try:
+        for index, (iso, sha) in enumerate(commits):
+            sub = work_root / sha[:12]
+            extracted = extract_commit(repo, target, sha, sub)
+            if extracted is not None:
+                try:
+                    colors = load_colors(extracted)
+                except Exception:  # noqa: BLE001 - one bad commit must not abort the rest
+                    colors = None
+                if colors:
+                    history[iso] = colors
+            if progress is not None:
+                try:
+                    progress((index + 1) / len(commits))
+                except Exception:  # noqa: BLE001 - progress is best-effort
+                    pass
+    finally:
+        shutil.rmtree(work_root, ignore_errors=True)
+    return history
+
+
+def merge_history(
+    existing: dict[str, Snapshot], git_history: dict[str, Snapshot], cap: int = DEFAULT_CAP
+) -> dict[str, Snapshot]:
+    """Merge git-derived history under any existing live snapshots. Live snapshots
+    win on a shared date (the user actually recorded those), git fills the gaps; the
+    result is capped to the most-recent ``cap`` dates."""
+    merged: dict[str, Snapshot] = dict(git_history)
+    merged.update(existing)                  # live snapshots take precedence
+    if cap and len(merged) > cap:
+        for old_date in sorted(merged)[: len(merged) - cap]:
+            del merged[old_date]
+    return merged

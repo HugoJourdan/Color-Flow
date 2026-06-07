@@ -392,6 +392,48 @@ def test_history_no_op_without_glyphs_or_filepath(monkeypatch) -> None:
     assert db.load_history(unsaved) == {}
 
 
+def test_write_history_replaces_and_caps(monkeypatch) -> None:
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    db.record_history(font, {"m1": {"A": 0}}, datetime(2026, 6, 9))   # a pre-existing day
+    db.write_history(font, {f"2026-06-0{day}": {"m1": {"A": day}} for day in range(1, 6)}, cap=3)
+    history = db.load_history(font)
+    assert list(history) == ["2026-06-03", "2026-06-04", "2026-06-05"]  # replaced + capped
+
+
+def test_backfill_from_git_merges_into_history(monkeypatch) -> None:
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    db.record_history(font, {"m1": {"A": 5}}, datetime(2026, 6, 2))   # a live snapshot
+    captured: dict = {}
+
+    def fake_collect(path, load, cap=60, progress=None, skip=None) -> dict:
+        captured["skip"] = skip
+        full = {"2026-06-01": {"m1": {"A": 0}}, "2026-06-02": {"m1": {"A": 9}}}
+        return {date: snap for date, snap in full.items() if not skip or date not in skip}
+
+    monkeypatch.setattr(db.colorflow_git, "collect_git_history", fake_collect)
+    imported = db.backfill_from_git(font)
+    assert captured["skip"] == {"2026-06-02"}    # already-recorded day skipped (incremental)
+    assert imported == 1                          # only the new day imported
+    history = db.load_history(font)
+    assert history == {
+        "2026-06-01": {"m1": {"A": 0}},
+        "2026-06-02": {"m1": {"A": 5}},          # live snapshot preserved
+    }
+
+
+def test_backfill_from_git_no_op_when_not_in_repo(monkeypatch) -> None:
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    monkeypatch.setattr(
+        db.colorflow_git, "collect_git_history",
+        lambda path, load, cap=60, progress=None, skip=None: {},  # not a git repo / nothing tracked
+    )
+    assert db.backfill_from_git(font) == 0
+    assert db.load_history(font) == {}
+
+
 def test_coerce_history_stringifies_dates_and_ints() -> None:
     raw = {"2026-06-06": {"m1": {"A": "3"}}}   # NSDictionary-ish
     assert db._coerce_history(raw) == {"2026-06-06": {"m1": {"A": 3}}}
