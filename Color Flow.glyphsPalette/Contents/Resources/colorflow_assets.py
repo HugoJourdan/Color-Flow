@@ -888,10 +888,9 @@ DASHBOARD_JS = r"""
 
     function paintDisc(g,fA,cx,cy,rx,ry,holeFrac,glow,empty){
       if (glow===undefined) glow=1;
-      if (empty){   // no colours: a faint frosted disc (subtle fill + rim), not a white blob
+      if (empty){   // no colours: just a faint frosted fill, no rim/border
         g.save(); g.translate(cx,cy); g.scale(1,ry/rx);
         g.fillStyle="rgba(255,255,255,0.06)"; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
-        g.strokeStyle="rgba(255,255,255,0.20)"; g.lineWidth=2; g.beginPath(); g.arc(0,0,rx*0.992,0,7); g.stroke();
         g.restore();
         return;
       }
