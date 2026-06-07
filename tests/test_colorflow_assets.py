@@ -186,3 +186,12 @@ def test_dashboard_js_routes_focus_through_setfocus() -> None:
     assert "__cfdNoAnim" in js
     assert "items.filter(matchesFocus)" in js                   # recompose to selected colour
     assert "barsAnim = (state.master !== barMaster)" in js       # one-shot fill flag
+
+
+def test_dashboard_js_has_journey_helpers() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function journeyOf(" in js
+    assert "function stateAt(" in js
+    # journeyOf reads the sparse index; stateAt carries the last event forward.
+    assert "H.journeyIndex" in js
+    assert "<=" in js  # stateAt: last event at or before the date

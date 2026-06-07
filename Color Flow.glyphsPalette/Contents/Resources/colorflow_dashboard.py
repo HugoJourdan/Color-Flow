@@ -835,6 +835,37 @@ def _glyph_journeys(history: dict, dates: list, current: dict, glyph_names: list
     return journeys
 
 
+def build_journey_index(history: dict, dates: list) -> dict:
+    """Sparse per-master ``{glyph_name: [[iso_date, step_key], ...]}`` of colour
+    *change-events* — the first observation of each glyph plus every date its key
+    actually changed. Reconstructs full state at any date by carrying the last
+    event forward, so it stays small for big fonts (vs the dense ``journeys``
+    array). Missing dates read as uncoloured. Covers every glyph seen in history,
+    aligned to ``dates`` (oldest-first)."""
+    if not dates:
+        return {}
+    index: dict = {}
+    master_ids: set = set()
+    for per_master in history.values():
+        master_ids.update(per_master.keys())
+    for master_id in master_ids:
+        names: set = set()
+        for date in dates:
+            names.update(history.get(date, {}).get(master_id, {}).keys())
+        per_glyph: dict = {}
+        for name in names:
+            events: list = []
+            previous = None
+            for date in dates:
+                key = history.get(date, {}).get(master_id, {}).get(name, colornames.NO_COLOR)
+                if key != previous:
+                    events.append([date, key])
+                    previous = key
+            per_glyph[name] = events
+        index[master_id] = per_glyph
+    return index
+
+
 def _days_ago(value, now: datetime) -> int | None:
     """Whole days between ``value`` (a Glyphs ``lastChange`` NSDate or a
     ``datetime``) and ``now``; ``None`` when absent/unreadable. Glyphs' per-glyph
@@ -918,6 +949,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "streak": progress_streak(history, order, is_free),
     }
     journeys = _glyph_journeys(history, dates, current, glyph_names, order, is_free)
+    journey_index = build_journey_index(history, dates)
 
     recipes = load_recipes()
     meta = glyph_meta(font)
@@ -952,6 +984,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "logo": _family_logo(font),
         "trend": trend,
         "journeys": journeys,
+        "journeyIndex": journey_index,
         "lastEdit": glyph_last_edit(font, now),
         "recipes": recipes,
         "recipeCompletion": recipe_completion,

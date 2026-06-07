@@ -839,6 +839,25 @@ DASHBOARD_JS = r"""
   function journeyFor(name){
     return H.journeys && H.journeys[state.master] && H.journeys[state.master][name];
   }
+  // ----- Shared journey substrate: reconstruct colour state from the sparse
+  // change-event index (journeyIndex[masterId][glyphName] = [[date,key],...]) ----
+  function journeyOf(masterId, name){
+    var perMaster = H.journeyIndex && H.journeyIndex[masterId];
+    return (perMaster && perMaster[name]) || [];
+  }
+  function stateAt(masterId, iso){
+    var perMaster = H.journeyIndex && H.journeyIndex[masterId];
+    var out = {};
+    if (!perMaster) return out;
+    for (var name in perMaster){
+      var events = perMaster[name], key = null;
+      for (var i=0;i<events.length;i++){
+        if (events[i][0] <= iso) key = events[i][1]; else break;
+      }
+      if (key !== null) out[name] = key;
+    }
+    return out;
+  }
   function showTip(name, x, y){
     var journey = journeyFor(name);
     var edited = (H.lastEdit && H.lastEdit[name] != null) ? H.lastEdit[name] : null;

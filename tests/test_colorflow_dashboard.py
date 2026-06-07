@@ -429,6 +429,37 @@ def test_glyph_journeys_only_changed_unfinished_aligned_to_dates() -> None:
     assert db._glyph_journeys(history, [], current, ["A"], _FC_ORDER, is_free=False) == {}
 
 
+def test_build_journey_index_emits_sparse_change_events_only() -> None:
+    # history: 3 dates, one master, glyph A changes twice, glyph B never changes.
+    history = {
+        "2026-06-01": {"m1": {"A": cc.NO_COLOR, "B": 2}},
+        "2026-06-02": {"m1": {"A": 1, "B": 2}},
+        "2026-06-03": {"m1": {"A": 5, "B": 2}},
+    }
+    dates = ["2026-06-01", "2026-06-02", "2026-06-03"]
+    index = db.build_journey_index(history, dates)
+    # Only the first observation + each actual change is recorded (sparse).
+    assert index["m1"]["A"] == [["2026-06-01", cc.NO_COLOR], ["2026-06-02", 1], ["2026-06-03", 5]]
+    # A glyph that never changed records a single initial event, not one per date.
+    assert index["m1"]["B"] == [["2026-06-01", 2]]
+
+
+def test_build_journey_index_handles_missing_dates_as_uncoloured() -> None:
+    # m1 has no entry on the middle date -> that date reads as NO_COLOR, a change.
+    history = {
+        "2026-06-01": {"m1": {"A": 3}},
+        "2026-06-02": {},
+        "2026-06-03": {"m1": {"A": 3}},
+    }
+    dates = ["2026-06-01", "2026-06-02", "2026-06-03"]
+    index = db.build_journey_index(history, dates)
+    assert index["m1"]["A"] == [["2026-06-01", 3], ["2026-06-02", cc.NO_COLOR], ["2026-06-03", 3]]
+
+
+def test_build_journey_index_empty_when_no_dates() -> None:
+    assert db.build_journey_index({}, []) == {}
+
+
 class _FakeNSDate:
     def __init__(self, timestamp: float) -> None:
         self._timestamp = timestamp
@@ -545,6 +576,19 @@ def test_build_model_shape_and_compact_glyph_names(tmp_path) -> None:
     assert model["glyphNames"] == ["A", "B", "C"]          # stored once
     assert model["masters"][0]["keys"] == [8, 4, -1]        # parallel to glyphNames
     assert model["changes"] == {"m1": {}}
+
+
+def test_build_model_emits_journey_index_field(tmp_path) -> None:
+    (tmp_path / "colorNames.txt").write_text(
+        "purple=Outline\nyellow=Ready\nNone=Nothing\n", encoding="utf-8")
+    master = _FakeMaster("m1", "Regular")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)})]
+    font = _FakeFont([master], glyphs, filepath=str(tmp_path / "Font.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert "journeyIndex" in model
+    # One master, today's snapshot only -> one initial event for A.
+    assert model["journeyIndex"]["m1"]["A"] == [["2026-06-05", 8]]
 
 
 def test_build_model_counts_match_palette_step_and_free(tmp_path) -> None:
