@@ -103,6 +103,8 @@ def test_build_html_has_tower_master_navigator() -> None:
     assert "function initTower(" in html         # tower bootstrap
     assert "#cfd-main{display:flex" in html      # sidebar + body layout
     assert "bind(); update(); initTower();" in html
+    assert "Math.min(10, H.masters.length)" in html   # windowed: ~10 discs shown
+    assert '"wheel"' in html                          # scroll reveals the rest
 
 
 def test_dashboard_js_routes_focus_through_setfocus() -> None:

@@ -831,6 +831,8 @@ DASHBOARD_JS = r"""
     var W = cv.width, Hc = cv.height, FS = 320;
     var DISC_ALPHA = 0.95, tilt = 0.5, trimVal = 0.6, opacityVal = 0.2;
     var rot = -0.5, focusAmt = [];
+    var VISIBLE = Math.min(10, H.masters.length);   // discs shown at once
+    var vt = 0;                                      // scroll: master index at window top
     function hueHsl(i){ return "hsl(" + Math.round((i/12)*360) + ",100%,55%)"; }
     function countsOf(m){
       var c = [0,0,0,0,0,0,0,0,0,0,0,0], keys = m.keys || [];
@@ -910,45 +912,68 @@ DASHBOARD_JS = r"""
       var sh=g.createRadialGradient(0,0,0,0,0,rx); sh.addColorStop(0,"rgba(0,0,0,0.07)"); sh.addColorStop(0.7,"rgba(0,0,0,0.03)"); sh.addColorStop(1,"rgba(0,0,0,0)");
       g.fillStyle=sh; g.beginPath(); g.arc(0,0,rx,0,7); g.fill(); g.restore();
     }
-    var geo={rx:0,ry:0,cx:0,topY:0,dz:0};
+    var geo={rx:0,ry:0,cx:0,topY:0,dz:0,vt:0};
     function selIndex(){ for (var i=0;i<H.masters.length;i++){ if (H.masters[i].id===state.master) return i; } return 0; }
+    var prevSel=-1;
     function render(){
       ctx.clearRect(0,0,W,Hc);
       var M=H.masters.length; if (!M) return;
-      var sel=selIndex();
+      var sel=selIndex(), maxTop=Math.max(0, M-VISIBLE);
+      // scroll the focused master into view only when it's outside the window
+      if (sel!==prevSel){
+        if (sel < Math.floor(vt) || sel > Math.floor(vt)+VISIBLE-1) vt = sel - Math.floor(VISIBLE/2);
+        prevSel = sel;
+      }
+      vt = Math.max(0, Math.min(maxTop, vt));
       if (focusAmt.length!==M){ focusAmt=[]; for (var z=0;z<M;z++) focusAmt[z]=(z===sel?0:1); }
       for (var i=0;i<M;i++){ var target=(i===sel)?0:1;
         if (target>focusAmt[i]) focusAmt[i]=target;                       // off: instant
         else { focusAmt[i]+=(target-focusAmt[i])*0.07; if (focusAmt[i]-target<0.003) focusAmt[i]=target; } }
       var rx=Math.min(92, W*0.42), ry=rx*tilt;
-      var topY=ry+16, botPad=ry+12, avail=Hc-topY-botPad;
-      var dz=M>1?Math.min(58, avail/(M-1)):0, towerH=(M-1)*dz, cx=W/2;
-      geo={rx:rx,ry:ry,cx:cx,topY:topY,dz:dz};
-      ctx.save(); ctx.translate(cx,topY+towerH+ry*0.6); ctx.scale(1,tilt);
-      var sg=ctx.createRadialGradient(0,0,0,0,0,rx); sg.addColorStop(0,"rgba(0,0,0,.10)"); sg.addColorStop(1,"rgba(0,0,0,0)");
-      ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(0,0,rx*1.05,0,7); ctx.fill(); ctx.restore();
+      var topY=ry+16, botPad=ry+12;
+      var dz=VISIBLE>1?Math.min(60,(Hc-topY-botPad)/(VISIBLE-1)):0, cx=W/2;
+      var winBot=topY+(VISIBLE-1)*dz, fade=dz*1.1;
+      geo={rx:rx,ry:ry,cx:cx,topY:topY,dz:dz,vt:vt};
+      function cyOf(i){ return topY+(i-vt)*dz; }
+      function vis(i){ var c=cyOf(i); return c>=topY-dz*1.6 && c<=winBot+dz*1.6; }
+      // soft top/bottom of the scroll window: a vertical alpha mask (purely a
+      // function of y) so the no-overlap group composite still works
+      function edgeFade(g){
+        function cl(v){ return Math.max(0,Math.min(1,v)); }
+        var gr=g.createLinearGradient(0,0,0,Hc);
+        gr.addColorStop(cl((topY-fade)/Hc),"rgba(0,0,0,0)");
+        gr.addColorStop(cl(topY/Hc),"rgba(0,0,0,1)");
+        gr.addColorStop(cl(winBot/Hc),"rgba(0,0,0,1)");
+        gr.addColorStop(cl((winBot+fade)/Hc),"rgba(0,0,0,0)");
+        g.save(); g.globalCompositeOperation="destination-in"; g.fillStyle=gr; g.fillRect(0,0,W,Hc); g.restore();
+      }
       function group(idxs){
         if (!idxs.length) return;
         bctx.clearRect(0,0,W,Hc);
-        for (var k=0;k<idxs.length;k++){ var ii=idxs[k], cyy=topY+ii*dz; shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,0); }
+        for (var k=0;k<idxs.length;k++){ var ii=idxs[k], cyy=cyOf(ii); shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,0); }
         bctx.save(); bctx.globalCompositeOperation="source-atop"; bctx.fillStyle="rgba(0,0,0,"+trimVal+")"; bctx.fillRect(0,0,W,Hc); bctx.restore();
+        edgeFade(bctx);
         ctx.save(); ctx.globalAlpha=opacityVal; ctx.drawImage(buf,0,0); ctx.restore();
       }
-      function focusDisc(ii){ var amt=focusAmt[ii], cyy=topY+ii*dz;
-        shadowInto(ctx,cx,cyy,rx,ry);
-        bctx.clearRect(0,0,W,Hc); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,1-amt);
+      function focusDisc(ii){ var amt=focusAmt[ii], cyy=cyOf(ii);
+        bctx.clearRect(0,0,W,Hc); shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,1-amt);
         var trim=amt*trimVal; if (trim>0){ bctx.save(); bctx.globalCompositeOperation="source-atop"; bctx.fillStyle="rgba(0,0,0,"+trim+")"; bctx.fillRect(0,0,W,Hc); bctx.restore(); }
+        edgeFade(bctx);
         ctx.save(); ctx.globalAlpha=1-amt*(1-opacityVal); ctx.drawImage(buf,0,0); ctx.restore();
       }
       var below=[], above=[];
-      for (var n=M-1;n>=0;n--){ if (n>sel) below.push(n); else if (n<sel) above.push(n); }
-      group(below); focusDisc(sel); group(above);
+      for (var n=M-1;n>=0;n--){ if (!vis(n)) continue; if (n>sel) below.push(n); else if (n<sel) above.push(n); }
+      group(below); if (vis(sel)) focusDisc(sel); group(above);
     }
     function loop(){ rot+=0.008; render(); requestAnimationFrame(loop); }
+    cv.addEventListener("wheel", function(e){ e.preventDefault();
+      vt += e.deltaY*0.02; vt=Math.max(0, Math.min(Math.max(0,H.masters.length-VISIBLE), vt));
+    }, {passive:false});
     cv.addEventListener("click", function(e){
       var rect=cv.getBoundingClientRect();
       var px=(e.clientX-rect.left)*(W/rect.width), py=(e.clientY-rect.top)*(Hc/rect.height);
-      for (var i=0;i<H.masters.length;i++){ var cy=geo.topY+i*geo.dz;
+      for (var i=0;i<H.masters.length;i++){ var cy=geo.topY+(i-geo.vt)*geo.dz;
+        if (cy<geo.topY-geo.dz*1.6 || cy>geo.topY+(VISIBLE-1)*geo.dz+geo.dz*1.6) continue;
         var ex=(px-geo.cx)/geo.rx, ey=(py-cy)/geo.ry;
         if (ex*ex+ey*ey<=1){ state.master=H.masters[i].id; state.view="tabs"; update(); return; } }
     });
