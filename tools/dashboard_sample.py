@@ -24,6 +24,58 @@ STEPS = [
 ORDER = ["8", "4", "6", "3"]
 SEQ = [8, 8, 4, 4, 4, 6, 6, 3, 3, 3, 3, -1, -1, 8, 4, 6, 3, -1, 8, 4, -1, 6]
 NAMES = [chr(c) for c in range(ord("A"), ord("A") + len(SEQ))]
+DATES = ["2026-06-01", "2026-06-03", "2026-06-05"]
+# Glyphs that went backwards between the middle and latest snapshot, so the
+# regression log + scrub diff-rings have something to show in the sample.
+REGRESS_NAMES = {"C", "P"}
+
+
+def _script_for(index: int) -> str:
+    """A spread of writing systems so the per-script lanes show several groups
+    (digits get an empty script -> the front-end buckets them as 'Other')."""
+    if index < 10:
+        return "latin"
+    if index < 14:
+        return "cyrillic"
+    if index < 18:
+        return ""
+    return "greek"
+
+
+def _step_sequence(name: str, final_key: int) -> list[int]:
+    """A 3-point colour journey (aligned to ``DATES``) ending at ``final_key``.
+
+    Normal glyphs walk forward through ``ORDER`` (uncoloured -> ... -> final).
+    A ``REGRESS_NAMES`` glyph is shown as 'done' at the middle snapshot then
+    dropped back to its current step, giving a real backward move."""
+    final_str = str(final_key)
+    rank = ORDER.index(final_str) if final_str in ORDER else len(ORDER) - 1
+    done = int(ORDER[-1])
+    if name in REGRESS_NAMES and final_key != done:
+        start = int(ORDER[max(0, rank - 1)])
+        return [start, done, final_key]
+    return [int(ORDER[step]) if step >= 0 else -1 for step in (rank - 2, rank - 1, rank)]
+
+
+def _journey_index(masters: list[dict]) -> dict:
+    """Sparse per-master change-event index the Timeline features read via
+    ``stateAt``: ``{masterId: {glyph: [[isoDate, key], ...]}}`` (events only)."""
+    index: dict[str, dict[str, list[list]]] = {}
+    for master in masters:
+        per_glyph: dict[str, list[list]] = {}
+        for name, final_key in zip(NAMES, master["keys"]):
+            if final_key == -1:
+                continue
+            events: list[list] = []
+            previous = None
+            for date, key in zip(DATES, _step_sequence(name, final_key)):
+                if key != previous:
+                    events.append([date, key])
+                    previous = key
+            if events:
+                per_glyph[name] = events
+        index[master["id"]] = per_glyph
+    return index
 
 
 def _counts(keys: list[int], is_free: bool) -> dict[str, int]:
@@ -64,12 +116,14 @@ def _model(is_free: bool) -> dict:
         "glyphNames": NAMES,
         "categories": [("Letter" if i < 14 else "Number" if i < 18 else "Punctuation")
                        for i in range(len(SEQ))],
+        "scripts": [_script_for(i) for i in range(len(SEQ))],
         "masters": masters,
         "colors": {str(index): "#888888" for index in range(12)},
         "filePath": "/fonts/Acme.glyphs", "paths": paths,
         "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
         "logo": {"d": "M0 0L100 0L100 -700L0 -700ZM200 0L360 0L360 -500L200 -500Z", "vb": "0 -740 360 780"},
         "trend": _trend(),
+        "journeyIndex": _journey_index(masters),
         "journeys": {"regular": {"A": [-1, 4, 8], "C": [-1, -1, 4]}, "bold": {}},
         "lastEdit": {"A": 2, "C": 30, "E": 1},
         "recipes": [{"match": {"category": "Mark"}, "steps": ["6", "3"]}],
@@ -101,7 +155,7 @@ def _coverage() -> dict:
 
 
 def _trend() -> dict:
-    dates = ["2026-06-01", "2026-06-03", "2026-06-05"]
+    dates = DATES
     series = []
     for index, date in enumerate(dates):
         masters = {}
