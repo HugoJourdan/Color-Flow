@@ -526,9 +526,9 @@ DASHBOARD_JS = r"""
     journeyGlyph: null, helpOpen: false,   // journey modal + help panel
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
-  // The colour bar re-runs its fill animation on first paint AND whenever the
-  // selected master changes (switching discs) — not on unrelated re-renders.
-  var barsAnim = false, barMaster = "\uffff";
+  // The colour bar runs its fill animation once, on the first paint only — not on
+  // master switches or any later re-render.
+  var barsAnim = false, introPlayed = false;
 
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
     return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
@@ -2447,8 +2447,8 @@ DASHBOARD_JS = r"""
   function update(){
     hideTip();
     scrubStopPlay();                            // a full re-render replaces the scrub grid; drop any in-flight playback
-    barsAnim = (state.master !== barMaster);   // re-fill the colour bar only when the master changed
-    barMaster = state.master;
+    barsAnim = !introPlayed;                    // fill the colour bar once on first paint, never on master switches
+    introPlayed = true;
     document.getElementById("cfd-body").innerHTML = renderBody();
     document.documentElement.setAttribute("data-theme", state.theme);
     var cmp = document.getElementById("cfd-compare"); if (cmp) cmp.setAttribute("aria-pressed", state.view==="compare");

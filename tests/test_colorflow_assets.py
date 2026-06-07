@@ -274,7 +274,8 @@ def test_dashboard_js_routes_focus_through_setfocus() -> None:
     assert "function setFocus(" in js
     assert "__cfdNoAnim" in js
     assert "items.filter(matchesFocus)" in js                   # recompose to selected colour
-    assert "barsAnim = (state.master !== barMaster)" in js       # one-shot fill flag
+    assert "barsAnim = !introPlayed" in js                       # fill animation only on first paint
+    assert "barMaster" not in js                                 # no re-fill on master switch
 
 
 def test_dashboard_js_clears_focus_when_leaving_overview() -> None:
