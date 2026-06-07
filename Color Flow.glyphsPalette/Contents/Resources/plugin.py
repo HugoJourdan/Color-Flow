@@ -1172,6 +1172,10 @@ class ColorFlow(PalettePlugin):
 			firstColor = selectedLayers[0].color if selectedLayers else None
 
 			for color, meaning in self.meaning.items():
+				focusColor = getattr(self, "_focusColor", None)
+				focused = focusColor is not None
+				isFocusRow = focused and str(color) == str(focusColor)
+				rowAlpha = 1.0 if (not focused or isFocusRow) else 0.28
 				for suffix in ("", "box", "count", "hl", "focus", "click"):
 					attr = str(color) + suffix
 					if hasattr(self.paletteView.frame, attr):
@@ -1194,16 +1198,29 @@ class ColorFlow(PalettePlugin):
 						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
 					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
+					try:
+						_tv = checkbox._nsObject
+						_tc = _tv.textColor() or AppKit.NSColor.labelColor()
+						_tv.setTextColor_(_tc.colorWithAlphaComponent_(rowAlpha))
+					except Exception:
+						pass
 					self._register_row_checkbox(checkbox, color)
 					self._make_count(color, count, yPos)
 					self._attach_row_overlay(color, yPos)
 					yPos += 19
 				else:
 					if barWidth:
-						fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
+						_rgba = self.colorKeys[str(color)]
+						fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(_rgba[0], _rgba[1], _rgba[2], _rgba[3] * rowAlpha)
 						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
 					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
+					try:
+						_tv = checkbox._nsObject
+						_tc = _tv.textColor() or AppKit.NSColor.labelColor()
+						_tv.setTextColor_(_tc.colorWithAlphaComponent_(rowAlpha))
+					except Exception:
+						pass
 					self._register_row_checkbox(checkbox, color)
 					self._make_count(color, count, yPos)
 					self._attach_row_overlay(color, yPos)
