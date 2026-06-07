@@ -1350,6 +1350,22 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [review] error:\n" + traceback.format_exc())
 
 	@objc.python_method
+	def _clear_focus(self) -> None:
+		# Escape (or a programmatic clear) drops focus mode and repaints. Safe to
+		# call when nothing is focused — it is then a no-op repaint.
+		if getattr(self, "_focusColor", None) is None:
+			return
+		self._focusColor = None
+		try:
+			self.Update_Plugin_UI()
+		except Exception:
+			pass
+
+	def cancelOperation_(self, sender) -> None:
+		# AppKit routes the Escape key to cancelOperation_ up the responder chain.
+		self._clear_focus()
+
+	@objc.python_method
 	def _color_for_count(self, recognizer) -> str | None:
 		view = recognizer.view()
 		for color, box in getattr(self, "_countBoxes", {}).items():
