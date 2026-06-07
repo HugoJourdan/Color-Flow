@@ -574,7 +574,7 @@ DASHBOARD_JS = r"""
     return '<svg class="scard-gl" viewBox="'+esc(o.vb)+'" aria-hidden="true"><path d="'+esc(o.d)+'"/></svg>';
   }
   function scriptGrid(){
-    var rows = scriptRows();
+    var rows = scriptRows().filter(function(r){ return r.key !== "Other"; });
     if (!rows.length) return '<p class="empty">No glyphs.</p>';
     var meta = (H.coverage && H.coverage.scriptMeta) || {};
     var cards = rows.map(function(r){
@@ -611,9 +611,6 @@ DASHBOARD_JS = r"""
           g.fillStyle=segs[i][1]; g.beginPath(); g.moveTo(cx,cy); g.arc(cx,cy,R,a,a1); g.closePath(); g.fill(); a=a1; } }
       ctx.filter="blur("+Math.round(Math.max(W,Ht)*0.085)+"px) saturate(1.2)"; ctx.drawImage(off,0,0); ctx.filter="none";
     }
-    var dk=ctx.createRadialGradient(cx,cy,0,cx,cy,R*0.85);
-    dk.addColorStop(0,"rgba(0,0,0,0.46)"); dk.addColorStop(0.55,"rgba(0,0,0,0.2)"); dk.addColorStop(1,"rgba(0,0,0,0)");
-    ctx.fillStyle=dk; ctx.fillRect(0,0,W,Ht);
   }
   function paintScriptCards(){
     var cards = document.querySelectorAll(".scard");
