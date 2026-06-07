@@ -1,5 +1,7 @@
-# encoding: utf-8
-from __future__ import division, print_function, unicode_literals
+# pyright: reportUndefinedVariable=false
+# `from vanilla import *` / `from GlyphsApp import *` pull in runtime-only names
+# that Glyphs injects; pyright can't see them, so the undefined-name rule is off
+# for this file (ruff likewise ignores F403/F405 here via pyproject).
 
 
 #######################################################
@@ -13,26 +15,41 @@ from __future__ import division, print_function, unicode_literals
 
 
 import os
-import AppKit
-
 from datetime import datetime
-from vanilla import *
-from AppKit import NSMenuItem, NSOnState, NSOffState, NSCursor, NSClickGestureRecognizer, NSPanGestureRecognizer, NSGestureRecognizerStateBegan, NSGestureRecognizerStateChanged, NSGestureRecognizerStateEnded
-from Foundation import NSObject
-from GlyphsApp.plugins import *
-from GlyphsApp.UI import *
-from GlyphsApp import *
+
+import AppKit
+import colorflow_filters
+import colorflow_profile
 
 # Shared, GlyphsApp-free colorNames logic (also embedded into the shortcut
 # scripts by tools/generate_shortcuts.py). Glyphs puts this bundle's Resources/
 # dir on sys.path, so a plain absolute import works.
 import colornames
-import labelcolors
-import colorflow_profile
-import colorflow_filters
+
 # Font-View colour grouping engine (the merged Rainbow FontView half).
 import fontview
+import labelcolors
+from AppKit import (
+	NSClickGestureRecognizer,
+	NSCursor,
+	NSGestureRecognizerStateBegan,
+	NSGestureRecognizerStateChanged,
+	NSGestureRecognizerStateEnded,
+	NSMenuItem,
+	NSOffState,
+	NSOnState,
+	NSPanGestureRecognizer,
+)
+from Foundation import NSObject
 
+# Star imports are runtime-only Glyphs globals. Order is significant: vanilla
+# first so its widgets lose any name collision to the GlyphsApp UI helpers, and
+# GlyphsApp last so its names win. Import sorting is disabled for this file
+# (I001 in pyproject) to keep that precedence — do not reorder.
+from vanilla import *
+from GlyphsApp.plugins import *
+from GlyphsApp.UI import *
+from GlyphsApp import *
 
 
 class ColorFlow(PalettePlugin):
@@ -276,11 +293,11 @@ class ColorFlow(PalettePlugin):
 				rowY = 94 + index * 26
 				wellColor = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(*rgbaList[index])
 				well = ColorWell((12, rowY, 26, 22), callback=self._label_color_changed, color=wellColor)
-				setattr(popover, "lcWell%d" % index, well)
+				setattr(popover, f"lcWell{index}", well)
 				self._labelWells.append(well)
 				field = EditText((44, rowY, -12, 22), labelByIndex.get(index, ""),
 					callback=self._label_name_changed, continuous=False, sizeStyle='small')
-				setattr(popover, "lcField%d" % index, field)
+				setattr(popover, f"lcField{index}", field)
 				self._labelFields[index] = field
 			reportY = 94 + 12 * 26 + 6
 			popover.reportSep = HorizontalLine((12, reportY, -12, 1))
@@ -459,7 +476,7 @@ class ColorFlow(PalettePlugin):
 			path = GetOpenFile("Import Color Flow profile", False, ["json", "colorflow"])
 			if not path:
 				return
-			with open(path, "r", encoding="utf-8") as handle:
+			with open(path, encoding="utf-8") as handle:
 				incoming = colorflow_profile.parse(handle.read())
 			font = Glyphs.font
 			font_dir = self._font_dir(font)
@@ -479,10 +496,10 @@ class ColorFlow(PalettePlugin):
 		# silently overwrites local choices.
 		if diffs:
 			shown = diffs[:12]
-			summary = "\n".join("• %s: %s" % (d["field"], d["detail"]) for d in shown)
+			summary = "\n".join(f"• {d['field']}: {d['detail']}" for d in shown)
 			if len(diffs) > len(shown):
-				summary += "\n• …and %d more" % (len(diffs) - len(shown))
-			info = "Importing “%s” will change:\n\n%s" % (incoming.get("name", "profile"), summary)
+				summary += f"\n• …and {len(diffs) - len(shown)} more"
+			info = f"Importing “{incoming.get('name', 'profile')}” will change:\n\n{summary}"
 		else:
 			info = "This profile matches your current settings."
 		alert = AppKit.NSAlert.alloc().init()
@@ -1345,7 +1362,7 @@ class ColorFlow(PalettePlugin):
 		order = list(self.meaning.keys())
 		names = self._glyphs_for_step(color, masterId, order)
 		if not names:
-			Message("No glyphs at \u201c%s\u201d." % self.meaning.get(color, str(color)), title="Color Flow")
+			Message(f"No glyphs at \u201c{self.meaning.get(color, str(color))}\u201d.", title="Color Flow")
 			return
 		try:
 			font.newTab("/" + "/".join(names))
@@ -1614,6 +1631,7 @@ class ColorFlow(PalettePlugin):
 	def Open_Color_Font_Dashboard(self, sender):
 		try:
 			import importlib
+
 			import colorflow_dashboard
 			importlib.reload(colorflow_dashboard)
 			colorflow_dashboard.main(Glyphs.font)
@@ -1685,7 +1703,7 @@ class ColorFlow(PalettePlugin):
 			for key, label in getattr(self, "_eyeRowViews", {}).items():
 				if label._nsObject == view:
 					index = int(key)
-					for row in self._eye_rows:
+					for row in (self._eye_rows or []):
 						if row[0] == index:
 							row[2] = not row[2]
 							break
