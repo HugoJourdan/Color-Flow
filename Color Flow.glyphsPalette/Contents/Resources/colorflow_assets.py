@@ -330,6 +330,8 @@ DASHBOARD_JS = r"""
     view: "tabs", before: false, sort: "workflow",
     coverGroup: "byCategory", glyphSort: "category", focus: null,
     ovExpand: {},                          // which Overview cards are expanded
+    dateA: null, dateB: null,              // Timeline date A-vs-B diff selection
+    journeyGlyph: null, helpOpen: false,   // journey modal + help panel
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
   // The colour bar re-runs its fill animation on first paint AND whenever the
@@ -885,12 +887,58 @@ DASHBOARD_JS = r"""
     return { chart:chart, legend:legend, foot:foot };
   }
   function hasTrend(){ return ((H.trend && H.trend.series) || []).length >= 2; }
+  // graded value of one state map {glyph:key}: sum of the per-step weights used by
+  // the existing % helpers (stepWeights().weight maps key -> (i+1)/N).
+  function gradedStateSum(stateMap){
+    var W = stepWeights().weight, s = 0;
+    for (var name in stateMap){ var w = W[stateMap[name]]; if (w) s += w; }
+    return s;
+  }
+  function diffCounts(masterId, isoA, isoB){
+    var before = stateAt(masterId, isoA), after = stateAt(masterId, isoB);
+    var advanced = 0, regressed = 0, unchanged = 0;
+    var names = {};
+    for (var n1 in before){ names[n1] = true; }
+    for (var n2 in after){ names[n2] = true; }
+    for (var name in names){
+      var was = before[name]; if (was == null) was = -1;
+      var nw = after[name]; if (nw == null) nw = -1;
+      if (rankOf(nw) > rankOf(was)) advanced++;
+      else if (rankOf(nw) < rankOf(was)) regressed++;
+      else unchanged++;
+    }
+    // net graded-% delta (spec #4): change in graded completion between A and B,
+    // over the whole-font denominator, same scale as the % cards. Signed.
+    var denom = H.glyphTotal || Object.keys(names).length || 1;
+    var deltaPct = Math.round((gradedStateSum(after) - gradedStateSum(before)) / denom * 100);
+    return {advanced:advanced, regressed:regressed, unchanged:unchanged, deltaPct:deltaPct};
+  }
+  function dateDiffPanel(){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (dates.length < 2){
+      return '<div class="tl-diff"><p class="empty">Need at least two snapshots.</p></div>';
+    }
+    var a = state.dateA || dates[0];
+    var b = state.dateB || dates[dates.length-1];
+    var mid = state.master || (H.masters[0] && H.masters[0].id);
+    var opts = function(sel){ return dates.map(function(d){
+      return '<option value="'+esc(d)+'"'+(d===sel?" selected":"")+'>'+esc(d)+'</option>'; }).join(""); };
+    var c = diffCounts(mid, a, b);
+    return '<div class="tl-diff"><div class="tl-diff-h">Compare snapshots</div>'
+      + '<div class="tl-diff-pick">'
+      + '<label>From <select id="cfd-date-a">'+opts(a)+'</select></label>'
+      + '<label>To <select id="cfd-date-b">'+opts(b)+'</select></label></div>'
+      + '<div class="tl-diff-out"><span class="dz dz-up">↑ '+c.advanced+' advanced</span>'
+      + '<span class="dz dz-down">↓ '+c.regressed+' regressed</span>'
+      + '<span class="dz dz-flat">= '+c.unchanged+' unchanged</span>'
+      + '<span class="dz dz-net">'+(c.deltaPct>=0?"+":"")+c.deltaPct+'% net</span></div></div>';
+  }
   function timelineView(){
     if (!hasTrend()){
       return '<section class="tl-empty"><p class="empty">Not enough history yet. Color Flow saves a snapshot each time you save the font; this timeline fills in as days of history accumulate.</p></section>';
     }
     var parts = trendParts(680, 200);
-    return '<section class="timeline"><div class="tl-legend">'+parts.legend+'</div>'+parts.chart+parts.foot+'</section>';
+    return '<section class="timeline"><div class="tl-legend">'+parts.legend+'</div>'+parts.chart+parts.foot+dateDiffPanel()+'</section>';
   }
   function compareView(){
     // columns = steps (+None); rows = masters, labelled by the master name.
@@ -1194,6 +1242,10 @@ DASHBOARD_JS = r"""
       var fc = e.target.closest("[data-fclear]"); if (fc){ setFocus(null); return; }
       var ba = e.target.closest(".ba-toggle");
       if (ba){ e.preventDefault(); state.before = !state.before; ba.setAttribute("aria-pressed", state.before); ba.textContent = state.before ? "Before" : "After"; applyBeforeAfter(); return; }
+    });
+    bodyEl.addEventListener("change", function(e){
+      if (e.target.id === "cfd-date-a"){ state.dateA = e.target.value; update(); }
+      else if (e.target.id === "cfd-date-b"){ state.dateB = e.target.value; update(); }
     });
     // Colour-bar segments live both in the static global bar and in the per-master
     // card (inside #cfd-body), so delegate their clicks at the document level.

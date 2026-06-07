@@ -240,3 +240,27 @@ def test_dashboard_js_recent_card_when_label() -> None:
     js = assets.DASHBOARD_JS
     assert "function whenLabel(" in js
     assert '"today"' in js
+
+
+def test_dashboard_js_has_date_diff_panel() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function dateDiffPanel(" in js
+    assert "function diffCounts(" in js
+    assert 'id="cfd-date-a"' in js
+    assert 'id="cfd-date-b"' in js
+    assert "state.dateA" in js and "state.dateB" in js
+    assert "H.trend.dates" in js
+    assert "stateAt(" in js
+    assert "Need at least two snapshots" in js   # <2 distinct dates state
+    assert "advanced" in js and "regressed" in js
+    # net graded-% delta (spec #4): computed via the existing step-weight helper
+    # and rendered as a signed "% net" token in the panel output.
+    assert "function gradedStateSum(" in js
+    assert "deltaPct" in js
+    assert "stepWeights(" in js
+    assert "% net" in js
+
+
+def test_dashboard_js_date_diff_state_keys_initialised() -> None:
+    js = assets.DASHBOARD_JS
+    assert "dateA:" in js and "dateB:" in js
