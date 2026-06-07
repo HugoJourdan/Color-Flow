@@ -141,8 +141,8 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .ov-head b{color:var(--text)}
 .ov-name{color:var(--text);font-weight:600;margin-right:9px}
 .ov-name::after{content:"·";color:var(--muted-2);margin-left:9px}
-.seg{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--track)}
-.seg>span{display:block;height:100%;transform-origin:left center;transition:opacity .2s ease;box-shadow:inset -6px 0 9px -3px rgba(0,0,0,.2)}
+.seg{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--track);box-shadow:0 0 7px -1px rgba(255,255,255,.16)}
+.seg>span{display:block;height:100%;transform-origin:left center;transition:opacity .2s ease;box-shadow:inset -6px 0 9px -3px rgba(0,0,0,.2);filter:saturate(1.12) brightness(1.05)}
 .seg .seg-none{background:var(--c-none)}
 .segc{cursor:pointer}
 .seg>span.off{opacity:.28}
@@ -165,6 +165,7 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .lb-row{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;padding:5px 0;cursor:pointer;color:var(--text);font:inherit;text-align:left}
 .lb-row+.lb-row{border-top:1px solid var(--track)}
 .lb-n{flex:0 0 96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-xs)}
+.ov-card.open .lb-n{flex-basis:170px}
 .lb-bar{flex:1;height:7px;border-radius:4px;background:var(--track);overflow:hidden}
 .lb-bar>span{display:block;height:100%;background:var(--accent);border-radius:4px}
 .lb-p{flex:0 0 36px;text-align:right;font-size:var(--fs-xs);color:var(--muted)}
@@ -238,6 +239,7 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .cmp td{position:relative}
 .cmp .cmpbar{position:absolute;left:0;top:0;bottom:0;border-radius:0;opacity:.28}
 .cmp .cmpn{position:relative}
+.cmp td.cmp-done{text-align:center;color:var(--ok);font-size:var(--fs-sm)}
 .cov{margin-top:6px}
 .cov-h{display:flex;align-items:center;gap:12px;margin:10px 0 4px}
 .cov-title{font-size:var(--fs-sm);color:var(--muted)}
@@ -319,13 +321,7 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .rg-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
 .rg-ar{color:var(--muted-2)}
 .rg-when{margin-left:auto;color:var(--muted-2)}
-.cm-headline{margin:0 0 8px;font-size:var(--fs-sm);color:var(--text)}
-.cm-headline b{font-size:var(--fs-big-sm)}
-.cm-bar{display:block;width:100%;flex:none;height:7px;margin:0 0 12px}
-.cm-line{margin:0 0 6px;font-size:var(--fs-xs);color:var(--muted)}
-.cm-line b{color:var(--text)}
-.cm-note{color:var(--muted-2)}
-.cm-differ-list{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.cm-differ-list{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px;max-height:240px;overflow-y:auto}
 .cm-differ-row{font-size:var(--fs-xs);background:var(--surface-2);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--text);padding:3px 8px;cursor:pointer}
 .cm-differ-row:hover{border-color:var(--accent)}
 .cm-steps{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:4px;font-size:var(--fs-xs);color:var(--muted)}
@@ -490,8 +486,10 @@ DASHBOARD_JS = r"""
   function pct(n,t){ return t ? Math.round(n/t*100) : 0; }
   function varFor(k){ return k===-1 ? "--c-none" : "--c"+k; }
   function labelFor(k){
-    if (k===-1) return H.noneLabel;
-    for (var i=0;i<H.steps.length;i++){ if (H.steps[i].key===k) return H.steps[i].label; }
+    if (k===-1 || String(k)==="-1") return H.noneLabel;
+    // steps keys are ints, but callers pass H.order keys (strings) too — compare as
+    // strings so the real label is returned (not the "Color N" fallback).
+    for (var i=0;i<H.steps.length;i++){ if (String(H.steps[i].key)===String(k)) return H.steps[i].label; }
     return "Color "+k;
   }
   function masterById(id){
@@ -766,10 +764,10 @@ DASHBOARD_JS = r"""
   // Completion-over-time, compact; expanded grows the chart and adds the legend.
   function timelineCard(){
     if (!hasTrend()) return "";
-    var open = !!state.ovExpand.timeline;
-    var parts = trendParts(680, open?190:120);
-    var body = parts.chart + (open ? '<div class="tl-legend tl-legend-card">'+parts.legend+'</div>'+parts.foot : '');
-    return ovCard("timeline", "Completion over time", body, true);
+    // Always expanded (no collapse): full-height chart + legend + range foot.
+    var parts = trendParts(680, 190);
+    var body = parts.chart + '<div class="tl-legend tl-legend-card">'+parts.legend+'</div>'+parts.foot;
+    return ovCard("timeline", "Completion over time", body, false);
   }
   // rank within the workflow order; uncoloured/none and off-palette steps rank
   // below every real step so "-> none" reads as backward.
@@ -845,22 +843,14 @@ DASHBOARD_JS = r"""
   function crossMasterCard(){
     var cm = H.crossMaster;
     if (!cm) return "";
-    var open = !!state.ovExpand.crossMaster;
-    var donePct = pct(cm.doneEverywhere, cm.total);
-    var head = '<p class="cm-headline"><b>'+cm.doneEverywhere+'</b> / '+cm.total+' done everywhere</p>'
-      + '<div class="bar cm-bar"><span style="width:'+donePct+'%;background:var(--accent)"></span></div>';
-    var ident = '<p class="cm-line">identical in all masters: <b>'+cm.identical+'</b></p>';
-    var single = (cm.masterCount < 2) ? ' <span class="cm-note">(single master)</span>' : '';
-    var differLine = '<p class="cm-line">differ between masters: <b>'+cm.differ+'</b>'+single+'</p>';
-    var differList = "";
-    if (open){
-      var names = cm.differGlyphs || [];
-      differList = names.length
-        ? '<div class="cm-differ-list">'+names.map(function(name){
-            return '<button type="button" class="cm-differ-row" data-jglyph="'+esc(name)+'">'+esc(name)+'</button>';
-          }).join("")+'</div>'
-        : '<p class="ov-empty">No glyphs differ.</p>';
-    }
+    // No summary stats, no "Show all": just the by-step chips + the (always-shown,
+    // scrollable) list of glyphs that vary across the masters, clickable to jump.
+    var names = cm.differGlyphs || [];
+    var differList = names.length
+      ? '<div class="cm-differ-list">'+names.map(function(name){
+          return '<button type="button" class="cm-differ-row" data-jglyph="'+esc(name)+'">'+esc(name)+'</button>';
+        }).join("")+'</div>'
+      : '<p class="ov-empty">No glyphs differ.</p>';
     var byStep = cm.byStep || {};
     var chips = Object.keys(byStep).map(function(k){
       var key = parseInt(k, 10);
@@ -870,8 +860,7 @@ DASHBOARD_JS = r"""
     var steps = chips
       ? '<div class="cm-steps"><span class="cm-steps-l">by step:</span>'+chips+'</div>'
       : "";
-    var body = head + ident + differLine + differList + steps;
-    return ovCard("crossMaster", "Across masters", body, (cm.differGlyphs||[]).length > 0);
+    return ovCard("crossMaster", "Across masters", steps + differList, false);
   }
   function overviewExtras(){
     if (!H.masters.length) return "";
@@ -1944,9 +1933,9 @@ DASHBOARD_JS = r"""
     }
     // D2: Line is the default; Flow renders the stacked colour streamgraph (#5).
     var parts = state.tlMode === "flow" ? streamParts(680, 200) : trendParts(680, 200);
-    // #14: This-week digest tops the tab (above the chart), per D1.
-    return '<section class="timeline">'+weekDigest()+'<div class="tl-chartbar">'+tlModeToggle()
-      + '<div class="tl-legend">'+parts.legend+'</div></div>'
+    // #14: This-week digest tops the tab (above the chart), per D1. No static legend
+    // line — the colour/name read-out only appears on hover (the snapping crosshair).
+    return '<section class="timeline">'+weekDigest()+'<div class="tl-chartbar">'+tlModeToggle()+'</div>'
       + parts.chart+parts.foot+dateDiffPanel()+deadlinePanel()+timeMachine()+categoryLanes()+scriptLanes()+regressionLog()+'</section>';
   }
   function compareView(){
@@ -1962,9 +1951,9 @@ DASHBOARD_JS = r"""
       var aa = esc(m.name);
       var cells = H.steps.map(function(s){
         var p = pct(countFor(m,s.key),H.glyphTotal);
-        // a fully-set step reads as a checkmark instead of "100%"
-        var cellLabel = p >= 100 ? '✅' : (p+'%');
-        return '<td><span class="cmpbar" style="width:'+p+'%;background:var('+varFor(s.key)+')"></span><span class="cmpn">'+cellLabel+'</span></td>';
+        // a fully-set step shows just a checkmark — no % text, no colour bar
+        if (p >= 100) return '<td class="cmp-done">✅</td>';
+        return '<td><span class="cmpbar" style="width:'+p+'%;background:var('+varFor(s.key)+')"></span><span class="cmpn">'+p+'%</span></td>';
       }).join("");
       var cls = state.master==null ? "" : (m.id===state.master ? " cmp-sel" : " cmp-dim");
       return '<tr class="cmprow'+cls+'" data-m="'+esc(m.id)+'" title="Click to focus this master"><th scope="row" class="cmp-m" aria-label="'+esc(m.name)+'">'+aa+'</th>'+cells+'</tr>';

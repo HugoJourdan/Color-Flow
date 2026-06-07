@@ -191,8 +191,9 @@ def test_coverage_bar_has_no_inline_percent_uses_hover_tooltip() -> None:
 def test_compare_tab_has_label_legend_and_checkmark_for_full_steps() -> None:
     html = assets.build_html(_model())
     assert 'class="cmp-legend legend"' in html          # colour-label legend above the table
-    assert "p >= 100 ? '✅' : (p+'%')" in html           # 100% cells become a checkmark
+    assert '<td class="cmp-done">✅</td>' in html         # 100% = checkmark only, no colour bar
     assert ".cmp-legend{margin:6px 0 2px}" in html       # legend styling present
+    assert ".cmp td.cmp-done{text-align:center" in html  # checkmark cell centred
 
 
 def test_dashboard_js_has_expandable_overview_cards_and_timeline_card() -> None:
@@ -492,12 +493,11 @@ def test_dashboard_js_has_cross_master_card() -> None:
     js = assets.DASHBOARD_JS
     assert "function crossMasterCard(" in js
     assert "H.crossMaster" in js
-    # headline + progress bar, the identical/differ/byStep lines
-    assert "done everywhere" in js
-    assert "identical in all masters" in js
-    assert "differ between masters" in js
+    # by-step swatch chips + the clickable differ list — no summary stats, no toggle
     assert "by step:" in js
-    assert "(single master)" in js          # masterCount < 2 note
+    assert "done everywhere" not in js
+    assert "identical in all masters" not in js
+    assert "differ between masters" not in js
     # the differ list rows open the existing per-glyph journey modal
     assert "data-jglyph" in js
     assert "cm.differGlyphs" in js
@@ -848,8 +848,7 @@ def test_dashboard_css_styles_help_panel() -> None:
 def test_dashboard_css_styles_cross_master_card() -> None:
     css = assets.DASHBOARD_CSS
     # Every class crossMasterCard emits needs a layout rule.
-    for selector in (".cm-headline", ".cm-bar", ".cm-line", ".cm-note",
-                     ".cm-differ-list", ".cm-differ-row", ".cm-steps",
+    for selector in (".cm-differ-list", ".cm-differ-row", ".cm-steps",
                      ".cm-steps-l", ".cm-step", ".cm-step-n"):
         assert selector in css, selector
 
