@@ -14,8 +14,11 @@
 #######################################################
 
 
+from __future__ import annotations
+
 import os
 from datetime import datetime
+from typing import Any
 
 import AppKit
 import colorflow_filters
@@ -64,7 +67,7 @@ class ColorFlow(PalettePlugin):
 	#																									   #
 
 	@objc.python_method
-	def settings(self):
+	def settings(self) -> None:
 		self.name = 'Color Flow'
 		self.init = False
 		self.colorKeys = {
@@ -143,12 +146,12 @@ class ColorFlow(PalettePlugin):
 	# {"0".."11": (r, g, b, 0.5)} from the user's Glyphs label colours, keeping the
 	# palette's 0.5 alpha so only the hue follows the label colour.
 	@objc.python_method
-	def _label_color_keys(self):
+	def _label_color_keys(self) -> dict:
 		colors = labelcolors.read_label_colors()
 		return {str(index): (rgba[0], rgba[1], rgba[2], 0.5) for index, rgba in enumerate(colors)}
 
 	@objc.python_method
-	def _build_static_rows(self):
+	def _build_static_rows(self) -> None:
 		yPos = 2
 		for k in self.meaning.keys():
 			setattr(self.paletteView.frame, str(k)+"line", HorizontalLine((0, yPos, 0, 1)))
@@ -161,7 +164,7 @@ class ColorFlow(PalettePlugin):
 
 	# Re-read colorNames.txt and rebuild the palette after a Settings-panel save.
 	@objc.python_method
-	def reload_after_settings(self):
+	def reload_after_settings(self) -> None:
 		self.meaning = self.Load_Meaning()
 		for i in range(12):
 			for suffix in ("line", "colorTag", "", "box", "count", "hl", "focus", "click", "eye", "eyeTag", "eyeLine"):
@@ -185,7 +188,7 @@ class ColorFlow(PalettePlugin):
 
 
 	@objc.python_method
-	def start(self):
+	def start(self) -> None:
 		Glyphs.addCallback(self.update, UPDATEINTERFACE)
 		try:
 			Glyphs.addCallback(self.contextMenuHandler, CONTEXTMENUCALLBACK)
@@ -231,13 +234,13 @@ class ColorFlow(PalettePlugin):
 	########################################################################################################
 
 	@objc.python_method
-	def _rainbow_menu_title(self):
+	def _rainbow_menu_title(self) -> str:
 		return "Color Flow: Font Glyph Order"
 
 	# Action popover: a Default/Layer/Glyph segmented control + label/colour
 	# for the Font Glyph Order grouping. Replaces the old ⋯ menu.
 	@objc.python_method
-	def Open_Action_Popover(self, sender):
+	def Open_Action_Popover(self, sender) -> None:
 		try:
 			button = self.dialog
 			if sender is not None:
@@ -347,7 +350,7 @@ class ColorFlow(PalettePlugin):
 
 	# Current grouping state -> segment index (0 Default / 1 Layer / 2 Glyph).
 	@objc.python_method
-	def _rainbow_segment_index(self):
+	def _rainbow_segment_index(self) -> int:
 		font = Glyphs.font
 		if font is None or not self.fontview.is_enabled(font):
 			return 0
@@ -356,14 +359,14 @@ class ColorFlow(PalettePlugin):
 	# Popover closed and the user edited at least one label colour: prompt for the
 	# Glyphs restart its own views need (Color Flow already updated live).
 	@objc.python_method
-	def _popover_did_close(self, sender):
+	def _popover_did_close(self, sender) -> None:
 		if getattr(self, "_labelColorsEdited", False):
 			self._labelColorsEdited = False
 			Message("Restart Glyphs for the new label colours to take effect in its "
 				"own Font and Edit views. Color Flow already updated.", title="Color Flow")
 
 	@objc.python_method
-	def _close_popover(self):
+	def _close_popover(self) -> None:
 		popover = getattr(self, "_popover", None)
 		if popover is not None:
 			try:
@@ -375,7 +378,7 @@ class ColorFlow(PalettePlugin):
 	# Gather all twelve wells -> write LabelColors, best-effort live-refresh the
 	# app, and refresh Color Flow's own swatches immediately.
 	@objc.python_method
-	def _label_color_changed(self, sender):
+	def _label_color_changed(self, sender) -> None:
 		try:
 			colors = []
 			for well in getattr(self, "_labelWells", []):
@@ -397,7 +400,7 @@ class ColorFlow(PalettePlugin):
 	# rewrite colorNames.txt (a non-empty field = visible, empty = hidden),
 	# preserving the colour order + the None label.
 	@objc.python_method
-	def _label_name_changed(self, sender):
+	def _label_name_changed(self, sender) -> None:
 		try:
 			font = Glyphs.font
 			path = colornames.get_key_file(self._font_dir(font))
@@ -426,7 +429,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [rename label] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _label_colors_reset(self, sender):
+	def _label_colors_reset(self, sender) -> None:
 		try:
 			labelcolors.reset_label_colors()
 			rgbaList = labelcolors.read_label_colors()
@@ -442,7 +445,7 @@ class ColorFlow(PalettePlugin):
 	# ------------------------------------------------------------------ workflow profiles (.colorflow)
 
 	@objc.python_method
-	def _live_profile(self, font, font_dir, name=""):
+	def _live_profile(self, font, font_dir, name="") -> dict:
 		# Gather the current Color Flow config into a portable profile dict.
 		color_names = colornames.read_color_names(colornames.get_key_file(font_dir))
 		source = self.fontview.mode(font) if font is not None else "Layer"
@@ -451,11 +454,11 @@ class ColorFlow(PalettePlugin):
 			label_colors=labelcolors.read_label_colors(), name=name)
 
 	@objc.python_method
-	def _font_dir(self, font):
+	def _font_dir(self, font) -> str | None:
 		return os.path.dirname(font.filepath) if (font is not None and font.filepath) else None
 
 	@objc.python_method
-	def _export_profile(self, sender):
+	def _export_profile(self, sender) -> None:
 		try:
 			font = Glyphs.font
 			family = (font.familyName if font is not None else "") or "Color Flow profile"
@@ -471,7 +474,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [export profile] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _import_profile(self, sender):
+	def _import_profile(self, sender) -> None:
 		try:
 			path = GetOpenFile("Import Color Flow profile", False, ["json", "colorflow"])
 			if not path:
@@ -491,7 +494,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [import profile] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _confirm_import(self, incoming, diffs):
+	def _confirm_import(self, incoming, diffs) -> bool:
 		# Surface what will change before applying, so a shared profile never
 		# silently overwrites local choices.
 		if diffs:
@@ -510,7 +513,7 @@ class ColorFlow(PalettePlugin):
 		return alert.runModal() == AppKit.NSAlertFirstButtonReturn
 
 	@objc.python_method
-	def _apply_profile(self, incoming, font, font_dir):
+	def _apply_profile(self, incoming, font, font_dir) -> None:
 		# Never overwrite the user's colorNames with an empty file: parse()
 		# normalises a missing/null colorNames to "", so a profile built from a
 		# font that had no key file would otherwise wipe local labels/order.
@@ -530,7 +533,7 @@ class ColorFlow(PalettePlugin):
 			"update in its own Font and Edit views.", title="Color Flow")
 
 	@objc.python_method
-	def _generate_smart_filters(self, sender):
+	def _generate_smart_filters(self, sender) -> None:
 		# Build a "Color Flow" smart-filter group (one filter per visible step +
 		# None) and merge it into the font's Filters parameter. Filters match the
 		# GLYPH colour — Glyphs has no per-master layer-colour predicate.
@@ -554,7 +557,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [smart filters] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _popover_dashboard(self, sender):
+	def _popover_dashboard(self, sender) -> None:
 		self._close_popover()
 		self._present_report_sheet()
 
@@ -562,7 +565,7 @@ class ColorFlow(PalettePlugin):
 	# indeterminate progress bar, then build the report on the next runloop tick
 	# (so the sheet has painted) and dismiss the sheet when it opens.
 	@objc.python_method
-	def _present_report_sheet(self):
+	def _present_report_sheet(self) -> None:
 		try:
 			parent = self.dialog.window() if self.dialog is not None else None
 			if parent is None:
@@ -589,14 +592,14 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [report sheet] error:\n" + traceback.format_exc())
 			self.Open_Color_Font_Dashboard(None)
 
-	def runReportGeneration_(self, sender):
+	def runReportGeneration_(self, sender) -> None:
 		try:
 			self.Open_Color_Font_Dashboard(None)
 		finally:
 			self._dismiss_report_sheet()
 
 	@objc.python_method
-	def _dismiss_report_sheet(self):
+	def _dismiss_report_sheet(self) -> None:
 		panel = getattr(self, "_reportPanel", None)
 		if panel is None:
 			return
@@ -614,7 +617,7 @@ class ColorFlow(PalettePlugin):
 	# Default / Layer / Glyph for the Font Glyph Order grouping (popover stays open
 	# so the source can be switched without reopening).
 	@objc.python_method
-	def _popover_rainbow(self, sender):
+	def _popover_rainbow(self, sender) -> None:
 		font = Glyphs.font
 		if font is None:
 			return
@@ -632,7 +635,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [rainbow] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _install_rainbow_menu(self):
+	def _install_rainbow_menu(self) -> None:
 		# Add a File-menu toggle, removing any stale copy from a previous load.
 		title = self._rainbow_menu_title()
 		self._rainbowMenuItem = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
@@ -649,7 +652,7 @@ class ColorFlow(PalettePlugin):
 			barItem.append(self._rainbowMenuItem)
 
 	@objc.python_method
-	def _teardown_rainbow_menu(self):
+	def _teardown_rainbow_menu(self) -> None:
 		try:
 			title = self._rainbow_menu_title()
 			barItem = Glyphs.menu[FILE_MENU]
@@ -662,7 +665,7 @@ class ColorFlow(PalettePlugin):
 			pass
 
 	@objc.python_method
-	def _install_settings_menu(self):
+	def _install_settings_menu(self) -> None:
 		title = "Color Flow settings\u2026"
 		self._settingsMenuItem = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(title, self.openSettings_, "")
 		self._settingsMenuItem.setTarget_(self)
@@ -677,7 +680,7 @@ class ColorFlow(PalettePlugin):
 			barItem.append(self._settingsMenuItem)
 
 	@objc.python_method
-	def _teardown_settings_menu(self):
+	def _teardown_settings_menu(self) -> None:
 		try:
 			barItem = Glyphs.menu[EDIT_MENU]
 			submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
@@ -688,7 +691,7 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			pass
 
-	def openSettings_(self, sender):
+	def openSettings_(self, sender) -> None:
 		try:
 			self.Open_Action_Popover(sender)
 		except Exception:
@@ -696,7 +699,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [settings menu] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _rainbow_conflict_check(self):
+	def _rainbow_conflict_check(self) -> None:
 		# Warn once if the standalone Rainbow FontView is still installed (two
 		# plugins fighting over glyphOrder would conflict).
 		if Glyphs.defaults["com.hugojourdan.ColorFlow-RainbowConflictWarned"]:
@@ -717,7 +720,7 @@ class ColorFlow(PalettePlugin):
 
 	# --- ObjC selectors (no python_method decorator: called by menu / timer) ---
 
-	def validateMenuItem_(self, menuItem):
+	def validateMenuItem_(self, menuItem) -> bool:
 		font = Glyphs.font
 		if font is None:
 			menuItem.setState_(NSOffState)
@@ -728,10 +731,10 @@ class ColorFlow(PalettePlugin):
 			menuItem.setState_(NSOffState)
 		return True
 
-	def toggleRainbow_(self, sender):
+	def toggleRainbow_(self, sender) -> None:
 		self.Toggle_Rainbow(sender)
 
-	def rainbowDebouncedRebuild_(self, sender):
+	def rainbowDebouncedRebuild_(self, sender) -> None:
 		font = self._pendingFont or Glyphs.font
 		self._pendingFont = None
 		if font is None:
@@ -745,7 +748,7 @@ class ColorFlow(PalettePlugin):
 
 	# --- keep our grouping order out of saved files (Cocoa save notifications) ---
 
-	def documentWillSave_(self, notification):
+	def documentWillSave_(self, notification) -> None:
 		self._strippedForSave = False
 		try:
 			font = self._font_from_document(notification.object())
@@ -755,7 +758,7 @@ class ColorFlow(PalettePlugin):
 			import traceback
 			print("Color Flow [will-save] error:\n" + traceback.format_exc())
 
-	def documentDidSave_(self, notification):
+	def documentDidSave_(self, notification) -> None:
 		try:
 			document = notification.object()
 			font = self._font_from_document(document)
@@ -778,7 +781,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [history] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _record_dashboard_history(self, font):
+	def _record_dashboard_history(self, font) -> None:
 		# Passively accrue a dated per-glyph snapshot on every save so the
 		# dashboard's burndown / forecast / journey have a timeline to read,
 		# whether or not the dashboard was ever opened. Stored in Glyphs.defaults.
@@ -800,7 +803,7 @@ class ColorFlow(PalettePlugin):
 		colorflow_dashboard.record_history(font, snapshot, datetime.now())
 
 	@objc.python_method
-	def _font_from_document(self, document):
+	def _font_from_document(self, document) -> Any:
 		if document is None:
 			return None
 		font = getattr(document, "font", None)
@@ -816,7 +819,7 @@ class ColorFlow(PalettePlugin):
 	# --- python callbacks (action menu + the ObjC toggle target) ---
 
 	@objc.python_method
-	def Toggle_Rainbow(self, sender):
+	def Toggle_Rainbow(self, sender) -> None:
 		font = Glyphs.font
 		if font is None:
 			return
@@ -829,13 +832,13 @@ class ColorFlow(PalettePlugin):
 	# ------------------------------------------------------------------ inline label rename
 
 	@objc.python_method
-	def _ns_button(self, check):
+	def _ns_button(self, check) -> Any:
 		if hasattr(check, "getNSButton"):
 			return check.getNSButton()
 		return check._nsObject
 
 	@objc.python_method
-	def _strip_focus_rings(self, view):
+	def _strip_focus_rings(self, view) -> None:
 		# Remove the blue AppKit focus ring (halo) from a view and every descendant.
 		# NSFocusRingTypeNone == 1.
 		try:
@@ -862,13 +865,13 @@ class ColorFlow(PalettePlugin):
 	# --- mode: contiguous "step" (default, nothing saved in the file) vs "free"
 	# (independent checkboxes, stored per-layer in userData). ---
 	@objc.python_method
-	def _free_mode(self):
+	def _free_mode(self) -> bool:
 		return bool(Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"])
 
 	# A layer's checkbox state, derived from its colour. Free mode is single-
 	# select (only the matching colour); step mode is the contiguous run.
 	@objc.python_method
-	def _layer_state(self, layer, order):
+	def _layer_state(self, layer, order) -> dict:
 		if self._free_mode():
 			return colornames.exclusive_state_for_color(layer.color, order)
 		return colornames.checked_state_for_color(layer.color, order)
@@ -876,7 +879,7 @@ class ColorFlow(PalettePlugin):
 	# Per-step counts for a master, derived from native layer colours. Nothing
 	# Color Flow tracks is saved in the .glyphs file, in either mode.
 	@objc.python_method
-	def _derive_counts(self, masterId):
+	def _derive_counts(self, masterId) -> dict:
 		order = list(self.meaning.keys())
 		colors = []
 		for glyph in self.font.glyphs:
@@ -887,7 +890,7 @@ class ColorFlow(PalettePlugin):
 		return colornames.counts_from_colors(colors, order)
 
 	@objc.python_method
-	def _counts(self, masterId):
+	def _counts(self, masterId) -> dict:
 		key = "com.hugojourdan.ColorFlow-counts-" + masterId
 		counts = self.font.tempData[key]
 		if not hasattr(counts, "keys"):
@@ -896,7 +899,7 @@ class ColorFlow(PalettePlugin):
 		return counts
 
 	@objc.python_method
-	def _invalidate_counts(self, masterId):
+	def _invalidate_counts(self, masterId) -> None:
 		self.font.tempData["com.hugojourdan.ColorFlow-counts-" + masterId] = None
 
 	# Remember which colour a freshly built row checkbox belongs to (the widgets
@@ -904,14 +907,14 @@ class ColorFlow(PalettePlugin):
 	# lives on a full-width transparent overlay added after the count, so the
 	# WHOLE row responds — see _attach_row_overlay.
 	@objc.python_method
-	def _register_row_checkbox(self, checkbox, color):
+	def _register_row_checkbox(self, checkbox, color) -> None:
 		self._rowChecks[color] = checkbox
 
 	# A transparent, full-width overlay laid over each row (above the bar, label
 	# and count) so a click anywhere on the row opens that step's tab and a drag
 	# reorders it. The label/count underneath stay visible.
 	@objc.python_method
-	def _attach_row_overlay(self, color, yPos):
+	def _attach_row_overlay(self, color, yPos) -> None:
 		overlay = Group((0, yPos - self.shift - 1, self.width, 19))
 		setattr(self.paletteView.frame, str(color) + "click", overlay)
 		self._rowOverlays[color] = overlay
@@ -939,7 +942,7 @@ class ColorFlow(PalettePlugin):
 	# Resolve which colour-row a gesture recognizer is attached to (its view is
 	# the row's checkbox NSButton).
 	@objc.python_method
-	def _color_for_recognizer(self, recognizer):
+	def _color_for_recognizer(self, recognizer) -> str | None:
 		view = recognizer.view()
 		for color, overlay in getattr(self, "_rowOverlays", {}).items():
 			try:
@@ -956,7 +959,7 @@ class ColorFlow(PalettePlugin):
 	# row currently under the pointer (cursor-position targeting, so it always
 	# follows the mouse regardless of the view's coordinate flip). A grabbing-hand
 	# cursor shows while dragging. Reorder + persist on release.
-	def colorDragged_(self, recognizer):
+	def colorDragged_(self, recognizer) -> None:
 		try:
 			state = recognizer.state()
 			if state == NSGestureRecognizerStateBegan:
@@ -993,7 +996,7 @@ class ColorFlow(PalettePlugin):
 
 	# The visible-row index under the pointer right now (flip-safe).
 	@objc.python_method
-	def _drop_index(self, recognizer):
+	def _drop_index(self, recognizer) -> int | None:
 		frameView = self.paletteView.frame.getNSView()
 		point = recognizer.locationInView_(frameView)
 		y = point.y
@@ -1006,7 +1009,7 @@ class ColorFlow(PalettePlugin):
 
 	# Top y (flipped coords) of a visible row band, matching the colour-bar offset.
 	@objc.python_method
-	def _row_top(self, index):
+	def _row_top(self, index) -> float | None:
 		visible = list(self.meaning.keys())
 		if not (0 <= index < len(visible)):
 			return None
@@ -1020,7 +1023,7 @@ class ColorFlow(PalettePlugin):
 
 	# Live drag highlight: tint the dragged row blue + show a blue insertion line.
 	@objc.python_method
-	def _begin_drag_feedback(self, color):
+	def _begin_drag_feedback(self, color) -> None:
 		self._clear_drag_feedback()
 		if color is None:
 			return
@@ -1038,7 +1041,7 @@ class ColorFlow(PalettePlugin):
 
 	# Move the insertion line to the slot the dragged colour would drop into.
 	@objc.python_method
-	def _update_drop_line(self, color, dst):
+	def _update_drop_line(self, color, dst) -> None:
 		if not hasattr(self.paletteView.frame, "dropLine"):
 			return
 		visible = list(self.meaning.keys())
@@ -1056,7 +1059,7 @@ class ColorFlow(PalettePlugin):
 			pass
 
 	@objc.python_method
-	def _clear_drag_feedback(self):
+	def _clear_drag_feedback(self) -> None:
 		for attr in ("dragHighlight", "dropLine"):
 			if hasattr(self.paletteView.frame, attr):
 				try:
@@ -1066,7 +1069,7 @@ class ColorFlow(PalettePlugin):
 
 	# Grabbing-hand cursor while dragging (push once, pop once — flag-balanced).
 	@objc.python_method
-	def _push_drag_cursor(self):
+	def _push_drag_cursor(self) -> None:
 		if getattr(self, "_cursorPushed", False):
 			return
 		try:
@@ -1076,7 +1079,7 @@ class ColorFlow(PalettePlugin):
 			pass
 
 	@objc.python_method
-	def _pop_drag_cursor(self):
+	def _pop_drag_cursor(self) -> None:
 		if not getattr(self, "_cursorPushed", False):
 			return
 		try:
@@ -1088,7 +1091,7 @@ class ColorFlow(PalettePlugin):
 	# Which visible row sits under a y-coordinate (in the frame view's flipped
 	# coords, top-down): the row whose checkbox vertical centre is nearest.
 	@objc.python_method
-	def _row_index_at_point(self, y):
+	def _row_index_at_point(self, y) -> int | None:
 		visible = list(self.meaning.keys())
 		bestIndex = None
 		bestDist = None
@@ -1108,7 +1111,7 @@ class ColorFlow(PalettePlugin):
 
 	# Move `color` to absolute position `dst` among the visible colours; persist.
 	@objc.python_method
-	def _reorder_color_to(self, color, dst):
+	def _reorder_color_to(self, color, dst) -> None:
 		visible = list(self.meaning.keys())
 		key = str(color)
 		if key not in visible:
@@ -1124,7 +1127,7 @@ class ColorFlow(PalettePlugin):
 	# Write colorNames.txt with the visible colours in `new_order`, preserving
 	# each colour's label + the hidden colours.
 	@objc.python_method
-	def _write_order(self, new_order):
+	def _write_order(self, new_order) -> None:
 		fontDir = None
 		font = Glyphs.font
 		if font is not None and font.filepath:
@@ -1147,7 +1150,7 @@ class ColorFlow(PalettePlugin):
 
 	# Update Palette UI (original look; checkbox state + counts derived from colour).
 	@objc.python_method
-	def Update_Plugin_UI(self):
+	def Update_Plugin_UI(self) -> None:
 		try:
 			for attr in getattr(self, "_metaAttrs", []) + getattr(self, "_bodyAttrs", []):
 				if hasattr(self.paletteView.frame, attr):
@@ -1232,7 +1235,7 @@ class ColorFlow(PalettePlugin):
 	# The callback signature for a palette is not firmly documented, so the handler
 	# finds the NSMenu among whatever args Glyphs passes and is fully guarded.
 	@objc.python_method
-	def contextMenuHandler(self, *args):
+	def contextMenuHandler(self, *args) -> None:
 		try:
 			if not self.meaning:
 				return
@@ -1263,7 +1266,7 @@ class ColorFlow(PalettePlugin):
 			import traceback
 			print("Color Flow [context menu] error:\n" + traceback.format_exc())
 
-	def setStepFromMenu_(self, sender):
+	def setStepFromMenu_(self, sender) -> None:
 		try:
 			raw = sender.representedObject()
 			self._apply_step_to_selection(None if raw == "none" else int(raw))
@@ -1272,7 +1275,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [set step] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _apply_step_to_selection(self, color):
+	def _apply_step_to_selection(self, color) -> None:
 		font = Glyphs.font
 		if font is None:
 			return
@@ -1294,13 +1297,13 @@ class ColorFlow(PalettePlugin):
 	# focus that step (row highlight) and open exactly its glyphs in a new Edit
 	# tab to walk through them; click again to clear focus.
 	# Pointing-hand cursor while hovering a clickable count badge (#10/#11).
-	def cursorUpdate_(self, event):
+	def cursorUpdate_(self, event) -> None:
 		try:
 			AppKit.NSCursor.pointingHandCursor().set()
 		except Exception:
 			pass
 
-	def rowClicked_(self, sender):
+	def rowClicked_(self, sender) -> None:
 		try:
 			lastDrag = getattr(self, "_lastDragTime", None)
 			if lastDrag is not None and (datetime.now() - lastDrag).total_seconds() < 0.25:
@@ -1316,7 +1319,7 @@ class ColorFlow(PalettePlugin):
 			import traceback
 			print("Color Flow [row click] error:\n" + traceback.format_exc())
 
-	def countClicked_(self, sender):
+	def countClicked_(self, sender) -> None:
 		try:
 			color = self._color_for_count(sender)
 			if color is None:
@@ -1330,7 +1333,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [review] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _color_for_count(self, recognizer):
+	def _color_for_count(self, recognizer) -> str | None:
 		view = recognizer.view()
 		for color, box in getattr(self, "_countBoxes", {}).items():
 			try:
@@ -1341,7 +1344,7 @@ class ColorFlow(PalettePlugin):
 		return None
 
 	@objc.python_method
-	def _glyphs_for_step(self, color, masterId, order):
+	def _glyphs_for_step(self, color, masterId, order) -> list:
 		names = []
 		for glyph in self.font.glyphs:
 			layer = glyph.layers[masterId]
@@ -1351,7 +1354,7 @@ class ColorFlow(PalettePlugin):
 		return names
 
 	@objc.python_method
-	def _open_step_tab(self, color):
+	def _open_step_tab(self, color) -> None:
 		font = self.font
 		if font is None:
 			return
@@ -1371,7 +1374,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [open tab] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _make_count(self, color, count, yPos):
+	def _make_count(self, color, count, yPos) -> None:
 		textbox = TextBox((self.width-50, yPos+3-self.shift, -6, 20), str(count), alignment="right", sizeStyle='small')
 		try:
 			size = AppKit.NSFont.smallSystemFontSize()
@@ -1384,7 +1387,7 @@ class ColorFlow(PalettePlugin):
 			pass
 		setattr(self.paletteView.frame, str(color)+"count", textbox)
 
-	def headerEyeClicked_(self, sender):
+	def headerEyeClicked_(self, sender) -> None:
 		try:
 			self._toggle_eye_mode(sender)
 		except Exception:
@@ -1392,7 +1395,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [header eye] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _is_collapsed(self):
+	def _is_collapsed(self) -> bool:
 		try:
 			view = self.dialog
 			if view is None or view.window() is None:
@@ -1404,7 +1407,7 @@ class ColorFlow(PalettePlugin):
 			return False
 
 	@objc.python_method
-	def _sync_header(self):
+	def _sync_header(self) -> None:
 		bar = getattr(self, "_titleBar", None)
 		if bar is None:
 			return
@@ -1426,7 +1429,7 @@ class ColorFlow(PalettePlugin):
 	# UPDATEINTERFACE; we deliberately avoid a repeating NSTimer here because a
 	# scheduled timer with target=self retains the instance, which would prevent
 	# __del__ from ever running and leak every callback/observer on reload.
-	def deferredHeaderSetup_(self, sender):
+	def deferredHeaderSetup_(self, sender) -> None:
 		try:
 			self._inject_title_bar()
 			self._update_title_bar()
@@ -1435,7 +1438,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [header setup] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _window_root(self):
+	def _window_root(self) -> Any:
 		view = getattr(self, "dialog", None)
 		top = view
 		for _ in range(25):
@@ -1449,7 +1452,7 @@ class ColorFlow(PalettePlugin):
 		return top
 
 	@objc.python_method
-	def _search_title(self, view, depth):
+	def _search_title(self, view, depth) -> Any:
 		if view is None or depth > 12:
 			return None
 		try:
@@ -1469,7 +1472,7 @@ class ColorFlow(PalettePlugin):
 		return None
 
 	@objc.python_method
-	def _inject_title_bar(self):
+	def _inject_title_bar(self) -> None:
 		if getattr(self, "_titleBar", None) is not None:
 			return
 		try:
@@ -1538,7 +1541,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [title bar] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _update_title_bar(self):
+	def _update_title_bar(self) -> None:
 		bar = getattr(self, "_titleBar", None)
 		if bar is None or not self.font or not self.meaning:
 			return
@@ -1577,7 +1580,7 @@ class ColorFlow(PalettePlugin):
 
 	# UPDATEINTERFACE handler: cheap dirty-check on selection + layer colours.
 	@objc.python_method
-	def update(self, sender):
+	def update(self, sender) -> None:
 		if self._windowController:
 			self.font = self._windowController.documentFont()
 		if not self.font:
@@ -1628,7 +1631,7 @@ class ColorFlow(PalettePlugin):
 	# distribution + what changed since last run). Reloaded each time so edits to
 	# dashboard.py take effect without restarting Glyphs.
 	@objc.python_method
-	def Open_Color_Font_Dashboard(self, sender):
+	def Open_Color_Font_Dashboard(self, sender) -> None:
 		try:
 			import importlib
 
@@ -1652,7 +1655,7 @@ class ColorFlow(PalettePlugin):
 	# colornames module so the palette and the shortcut scripts can
 	# never diverge (see tools/generate_shortcuts.py).
 	@objc.python_method
-	def Load_Meaning(self):
+	def Load_Meaning(self) -> dict:
 		fontDir = None
 		font = Glyphs.font
 		if font is not None and font.filepath:
@@ -1668,7 +1671,7 @@ class ColorFlow(PalettePlugin):
 	#																									   #
 
 	@objc.python_method
-	def __del__(self):
+	def __del__(self) -> None:
 		# Delete callbacks when Glyphs quits, otherwise it'll crash :(
 		Glyphs.removeCallback(self.update)
 		# start() also registers contextMenuHandler on CONTEXTMENUCALLBACK; mirror
@@ -1689,7 +1692,7 @@ class ColorFlow(PalettePlugin):
 
 
 	@objc.python_method
-	def __file__(self):
+	def __file__(self) -> str:
 		"""Please leave this method unchanged"""
 		return __file__
 
@@ -1697,7 +1700,7 @@ class ColorFlow(PalettePlugin):
 
 	# ObjC selector: a single click on a colour row in eye mode toggles whether
 	# that colour is staged visible or hidden.
-	def eyeRowClicked_(self, sender):
+	def eyeRowClicked_(self, sender) -> None:
 		try:
 			view = sender.view()
 			for key, label in getattr(self, "_eyeRowViews", {}).items():
@@ -1717,7 +1720,7 @@ class ColorFlow(PalettePlugin):
 	# technique the Glyphs team documents for smooth palette resizing). Falls back
 	# to a direct, un-animated resize if the constraint could not be created.
 	@objc.python_method
-	def _set_palette_height(self, height, animated=True):
+	def _set_palette_height(self, height, animated=True) -> None:
 		self.height = height
 		constraint = getattr(self, "_heightConstraint", None)
 		if constraint is None:
@@ -1736,7 +1739,7 @@ class ColorFlow(PalettePlugin):
 			constraint.setConstant_(height)
 
 	@objc.python_method
-	def _toggle_eye_mode(self, sender):
+	def _toggle_eye_mode(self, sender) -> None:
 		try:
 			if self._eye_mode:
 				self._exit_eye_mode()
@@ -1747,7 +1750,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [eye toggle] error:\n" + traceback.format_exc())
 
 	@objc.python_method
-	def _set_eye_button(self, on):
+	def _set_eye_button(self, on) -> None:
 		try:
 			name = "eye.slash" if on else "eye"
 			image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, None)
@@ -1764,13 +1767,13 @@ class ColorFlow(PalettePlugin):
 			pass
 
 	@objc.python_method
-	def _eye_key_path(self):
+	def _eye_key_path(self) -> str:
 		font = Glyphs.font
 		fontDir = os.path.dirname(font.filepath) if (font is not None and font.filepath) else None
 		return colornames.resolve_key_file(fontDir)
 
 	@objc.python_method
-	def _enter_eye_mode(self):
+	def _enter_eye_mode(self) -> None:
 		path = self._eye_key_path()
 		text = colornames.read_color_names(path) or colornames.DEFAULT_COLOR_NAMES
 		rows, none_label = colornames.parse_settings(text)
@@ -1786,7 +1789,7 @@ class ColorFlow(PalettePlugin):
 		self._build_eye_mode_ui()
 
 	@objc.python_method
-	def _exit_eye_mode(self):
+	def _exit_eye_mode(self) -> None:
 		self._eye_mode = False
 		self._set_eye_button(False)
 		rows = [(index, label, visible) for index, label, visible in (self._eye_rows or [])]
@@ -1797,7 +1800,7 @@ class ColorFlow(PalettePlugin):
 		self.reload_after_settings()
 
 	@objc.python_method
-	def _teardown_eye_rows(self):
+	def _teardown_eye_rows(self) -> None:
 		for index in range(12):
 			for suffix in ("eye", "eyeTag", "eyeLine"):
 				attr = str(index) + suffix
@@ -1808,7 +1811,7 @@ class ColorFlow(PalettePlugin):
 	# Render every colour (visible + hidden) as a click-to-toggle row; hidden rows
 	# are dimmed. A 1-click gesture per label flips its staged visibility.
 	@objc.python_method
-	def _build_eye_mode_ui(self):
+	def _build_eye_mode_ui(self) -> None:
 		for index in range(12):
 			for suffix in ("", "box", "count", "hl", "colorTag", "line", "eye", "eyeTag", "eyeLine"):
 				attr = str(index) + suffix
