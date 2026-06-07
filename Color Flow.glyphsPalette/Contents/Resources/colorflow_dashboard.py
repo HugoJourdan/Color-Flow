@@ -30,12 +30,13 @@ The data layer imports nothing from Glyphs so it stays unit-testable; only
 from __future__ import annotations
 
 import base64
+import json
 import re
 import tempfile
 import webbrowser
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 from urllib.parse import quote
 import colornames
 import colorflow_assets
@@ -443,43 +444,184 @@ def progress_streak(history: dict, order: list[str], is_free: bool) -> dict:
 # Full JSON model
 # --------------------------------------------------------------------------- #
 
+_OUTLINE_CACHE_KEY = "com.dinamo.colorflow.outlineCache"
+
+
+def _change_stamp(glyph) -> float | None:
+    """Epoch seconds of a glyph's ``lastChange`` (NSDate or datetime), or ``None``
+    when it has none — foundry setups often disable lastChange, so a missing
+    stamp must force re-extraction rather than silently reuse a stale outline."""
+    value: Any = getattr(glyph, "lastChange", None)
+    if value is None:
+        return None
+    interval = cast(Any, getattr(value, "timeIntervalSince1970", None))
+    if callable(interval):
+        try:
+            return float(cast(Any, interval()))
+        except Exception:
+            return None
+    try:
+        return float(value.timestamp())          # datetime
+    except Exception:
+        try:
+            return float(value)                   # already epoch
+        except (TypeError, ValueError):
+            return None
+
+
+def _component_deps(font, glyph, master_ids: list, seen: set) -> set:
+    """Names of every glyph referenced (recursively) as a component by any of
+    ``glyph``'s master layers — so a composite is invalidated when a base it
+    draws changes, even though the composite's own lastChange did not."""
+    deps: set = set()
+    for master_id in master_ids:
+        try:
+            layer = glyph.layers[master_id]
+        except Exception:
+            layer = None
+        for component in (getattr(layer, "components", None) or []):
+            base_name = getattr(component, "componentName", None) or getattr(component, "name", None)
+            if not base_name or base_name in seen:
+                continue
+            seen.add(base_name)
+            deps.add(base_name)
+            base = font.glyphs[base_name]
+            if base is not None:
+                deps |= _component_deps(font, base, master_ids, seen)
+    return deps
+
+
+def _effective_stamp(font, glyph, master_ids: list) -> float | None:
+    """Newest lastChange among a glyph and everything it draws via components.
+    ``None`` if any of them lacks a stamp (forces re-extraction)."""
+    newest = _change_stamp(glyph)
+    if newest is None:
+        return None
+    for base_name in _component_deps(font, glyph, master_ids, set()):
+        base = font.glyphs[base_name]
+        if base is None:
+            continue
+        stamp = _change_stamp(base)
+        if stamp is None:
+            return None
+        newest = max(newest, stamp)
+    return newest
+
+
+def _em_boxes(font) -> dict[str, float]:
+    """``{master_id: em_height}`` — one square cell scale per master (the
+    ascender-to-descender span), so a/A keep their real relative sizes."""
+    upm = float(getattr(font, "upm", None) or 1000.0)
+    boxes: dict[str, float] = {}
+    for master in font.masters:
+        ascender = getattr(master, "ascender", None)
+        descender = getattr(master, "descender", None)
+        ascender = float(ascender) if ascender is not None else upm * 0.75
+        descender = float(descender) if descender is not None else -upm * 0.25
+        height = ascender - descender
+        boxes[master.id] = height if height > 0 else upm
+    return boxes
+
+
+def _outline_signature(font) -> list:
+    """A signature of the masters' geometry; if it changes (master added/removed,
+    metrics or upm edited) the whole outline cache is dropped."""
+    upm = round(float(getattr(font, "upm", None) or 1000.0), 3)
+    return [upm] + [[mid, round(em, 3)] for mid, em in _em_boxes(font).items()]
+
+
+def _outline_cache_load(font, signature: list) -> dict:
+    """The per-session outline cache from ``font.tempData`` (stored as a JSON
+    string so it round-trips cleanly), or a fresh cache when absent, unreadable,
+    or built for a different master signature."""
+    store = getattr(font, "tempData", None)
+    if store is not None:
+        try:
+            raw = store[_OUTLINE_CACHE_KEY]
+        except Exception:
+            raw = None
+        if raw:
+            try:
+                cache = json.loads(raw if isinstance(raw, str) else str(raw))
+                if isinstance(cache, dict) and cache.get("sig") == signature:
+                    return cache
+            except Exception:
+                pass
+    return {"sig": signature, "glyphs": {}}
+
+
+def _outline_cache_store(font, cache: dict) -> None:
+    store = getattr(font, "tempData", None)
+    if store is None:
+        return
+    try:
+        store[_OUTLINE_CACHE_KEY] = json.dumps(cache, separators=(",", ":"))
+    except Exception:
+        pass
+
+
 def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free: bool) -> dict:
     """Per-master ``{glyph_name: {"d", "vb"}}`` of glyph outlines for the heatmap
     cells (every glyph in font order, so any shown cell can draw its letter), each
-    entry sharing the master's em box. Bounded by a TOTAL outline budget across all
-    masters: early masters draw their full glyph set, then it stops, so fonts with
-    very many masters keep the report a sane size. ``current``/``order``/``is_free``
-    are kept for signature stability."""
-    budget = 100000   # global ceiling on emitted outlines, generous so every master draws
-    upm = float(getattr(font, "upm", None) or 1000.0)
-    paths: dict = {}
+    entry sharing the master's em box.
+
+    Outlines are cached for the session in ``font.tempData``: only glyphs whose
+    ``lastChange`` — their own or a component they draw — is newer than the cache
+    are re-extracted, so regenerating the report after a few edits is near-instant
+    instead of re-walking every layer. Bounded by a TOTAL outline budget so very
+    large fonts keep the report a sane size. ``current``/``order``/``is_free`` are
+    kept for signature stability."""
+    budget = 100000   # global ceiling on emitted outlines, generous so every glyph draws
+    ems = _em_boxes(font)
+    master_ids = list(ems.keys())
+    signature = _outline_signature(font)
+    cache = _outline_cache_load(font, signature)
+    entries = cache.get("glyphs")
+    if not isinstance(entries, dict):
+        entries = {}
+        cache["glyphs"] = entries
+    dirty = False
+
+    paths: dict = {mid: {} for mid in master_ids}
     produced = 0
-    for master in font.masters:
-        master_id = master.id
-        shown: dict = {}
-        if produced < budget:
-            # A single square em box per master (side = ascender..descender span)
-            # shared by every cell, so glyphs render at their true relative sizes
-            # (a shorter than A) while each sits centred in its cell.
-            ascender = getattr(master, "ascender", None)
-            descender = getattr(master, "descender", None)
-            ascender = float(ascender) if ascender is not None else upm * 0.75
-            descender = float(descender) if descender is not None else -upm * 0.25
-            em_height = ascender - descender
-            if em_height <= 0:
-                em_height = upm
-            for name in glyph_names:
-                if produced >= budget:
-                    break
+    for name in glyph_names:
+        if produced >= budget:
+            break
+        glyph = font.glyphs[name]
+        if glyph is None:
+            continue
+        stamp = _effective_stamp(font, glyph, master_ids)
+        cached = entries.get(name)
+        by_master: dict | None = None
+        if (isinstance(cached, dict) and stamp is not None and cached.get("t") == stamp
+                and isinstance(cached.get("m"), dict)
+                and all(mid in cached["m"] for mid in master_ids)):
+            by_master = cached["m"]
+        if by_master is None:
+            by_master = {}
+            for master_id in master_ids:
                 try:
-                    layer = font.glyphs[name].layers[master_id]
+                    layer = glyph.layers[master_id]
                 except Exception:
                     layer = None
-                outline = glyphsvg.layer_outline_em(layer, em_height) if layer is not None else {}
+                outline = glyphsvg.layer_outline_em(layer, ems[master_id]) if layer is not None else {}
                 if outline:
-                    shown[name] = outline
-                    produced += 1
-        paths[master_id] = shown
+                    by_master[master_id] = outline
+            entries[name] = {"t": stamp, "m": by_master}
+            dirty = True
+        for master_id, outline in by_master.items():
+            if produced >= budget:
+                break
+            if outline:
+                paths[master_id][name] = outline
+                produced += 1
+
+    present = set(glyph_names)
+    for stale in [key for key in entries if key not in present]:
+        del entries[stale]
+        dirty = True
+    if dirty:
+        _outline_cache_store(font, cache)
     return paths
 
 

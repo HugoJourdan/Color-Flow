@@ -622,6 +622,64 @@ def _outline_layer(color: int) -> _FakeLayerColor:
     return layer
 
 
+class _FakeComponent:
+    def __init__(self, name: str) -> None:
+        self.componentName = name
+
+
+def _outline_with(width: float, height: float) -> _FakeLayerColor:
+    layer = _FakeLayerColor(0)
+    layer.drawBezierPath = _BezPath([(0, [(0, 0)]), (1, [(width, 0)]), (1, [(width, height)]), (3, [])])
+    return layer
+
+
+def _cache_font(glyph: _FakeGlyph) -> _FakeFont:
+    font = _FakeFont([_FakeMaster("m1", "R")], [glyph])
+    font.tempData = {}   # the session outline cache lives here (JSON string)
+    return font
+
+
+def test_outline_cache_reuses_unchanged_glyph_and_invalidates_on_lastchange() -> None:
+    glyph = _FakeGlyph("A", {"m1": _outline_with(400, 700)})
+    glyph.lastChange = _FakeNSDate(100.0)
+    font = _cache_font(glyph)
+    first = db._outline_paths(font, {}, ["A"], ["0"], True)["m1"]["A"]["d"]
+    # change the outline but keep lastChange -> the cache must serve the OLD outline
+    glyph.layers["m1"].drawBezierPath = _BezPath([(0, [(0, 0)]), (1, [(999, 0)]), (1, [(999, 9)]), (3, [])])
+    reused = db._outline_paths(font, {}, ["A"], ["0"], True)["m1"]["A"]["d"]
+    assert reused == first
+    # bump lastChange -> re-extract, picking up the new outline
+    glyph.lastChange = _FakeNSDate(200.0)
+    fresh = db._outline_paths(font, {}, ["A"], ["0"], True)["m1"]["A"]["d"]
+    assert fresh != first
+
+
+def test_outline_cache_invalidates_composite_when_a_base_changes() -> None:
+    base = _FakeGlyph("A", {"m1": _outline_with(400, 700)})
+    base.lastChange = _FakeNSDate(100.0)
+    composite_layer = _outline_with(420, 720)
+    composite_layer.components = [_FakeComponent("A")]
+    acute = _FakeGlyph("Aacute", {"m1": composite_layer})
+    acute.lastChange = _FakeNSDate(100.0)
+    font = _FakeFont([_FakeMaster("m1", "R")], [base, acute])
+    font.tempData = {}
+    first = db._outline_paths(font, {}, ["A", "Aacute"], ["0"], True)["m1"]["Aacute"]["d"]
+    # the composite's OWN lastChange is unchanged, but the base it draws changed
+    acute.layers["m1"].drawBezierPath = _BezPath([(0, [(0, 0)]), (1, [(800, 0)]), (1, [(800, 8)]), (3, [])])
+    base.lastChange = _FakeNSDate(300.0)
+    second = db._outline_paths(font, {}, ["A", "Aacute"], ["0"], True)["m1"]["Aacute"]["d"]
+    assert second != first   # component dependency forced a re-extract
+
+
+def test_outline_cache_never_reuses_glyph_without_lastchange() -> None:
+    glyph = _FakeGlyph("A", {"m1": _outline_with(400, 700)})   # foundry-disabled lastChange
+    font = _cache_font(glyph)
+    first = db._outline_paths(font, {}, ["A"], ["0"], True)["m1"]["A"]["d"]
+    glyph.layers["m1"].drawBezierPath = _BezPath([(0, [(0, 0)]), (1, [(700, 0)]), (1, [(700, 7)]), (3, [])])
+    second = db._outline_paths(font, {}, ["A"], ["0"], True)["m1"]["A"]["d"]
+    assert second != first   # no stamp -> can't prove unchanged -> always re-extract
+
+
 def test_logo_master_prefers_regular_then_bold_then_first() -> None:
     thin, bold, reg = _FakeMaster("t", "Thin"), _FakeMaster("b", "Bold"), _FakeMaster("r", "Regular")
     assert db._logo_master(_FakeFont([thin, bold, reg], [])).id == "r"
