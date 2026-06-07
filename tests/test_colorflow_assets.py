@@ -283,3 +283,38 @@ def test_dashboard_js_journey_modal_wired_from_cell_click() -> None:
     # A click on a heatmap cell with a modifier-free trigger opens the journey.
     assert "openJourney(" in js
     assert ".heat .cell" in js
+
+
+def test_dashboard_js_has_help_panel_and_button() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function helpPanel(" in js
+    assert "function openHelp(" in js
+    assert "function closeHelp(" in js
+    assert 'id="cfd-help"' in js               # the ? header button
+    assert "state.helpOpen" in js
+    assert "H.steps" in js                      # legend rows from steps
+    assert "% complete" in js                   # glossary entry
+    assert "regression" in js and "forecast" in js
+
+
+def test_build_html_help_button_present_and_self_contained() -> None:
+    html = assets.build_html(_model())
+    assert 'id="cfd-help"' in html
+    assert "http://" not in html and "https://" not in html   # invariant preserved
+
+
+def test_dashboard_js_escape_closes_help_modal() -> None:
+    js = assets.DASHBOARD_JS
+    # The single Escape keydown branch must dismiss every modal, including help.
+    start = js.index('if (e.key==="Escape"){')
+    branch = js[start:js.index("}", start) + 1]
+    assert "closeExport()" in branch
+    assert "closeJourney()" in branch
+    assert "closeHelp()" in branch
+
+
+def test_dashboard_css_styles_help_panel() -> None:
+    css = assets.DASHBOARD_CSS
+    # The legend rows the help panel emits must carry layout/alignment rules.
+    for selector in (".hp-list", ".hp-row", ".hp-n", ".hp-pos", ".hp-gloss", ".rg-sw"):
+        assert selector in css, selector

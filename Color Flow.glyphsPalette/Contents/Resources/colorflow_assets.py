@@ -288,6 +288,14 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .cfd-card-ic{font-size:22px;line-height:1.1}
 .cfd-card b{font-size:var(--fs-sm)}
 .cfd-card small{font-size:var(--fs-2xs);color:var(--muted-2)}
+.cfd-cards.hp-list{display:flex;flex-direction:column;gap:8px;text-align:left}
+.rg-sw{display:inline-block;width:12px;height:12px;border-radius:3px;flex:none;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.hp-row{display:flex;align-items:center;gap:9px;font-size:var(--fs-sm)}
+.hp-n{flex:1;color:var(--text)}
+.hp-pos{font-size:var(--fs-xs);color:var(--muted-2)}
+.hp-gloss{margin-top:6px;border-top:1px solid var(--border);padding-top:10px;font-size:var(--fs-xs);color:var(--muted)}
+.hp-gloss p{margin:0 0 6px}
+.hp-gloss b{color:var(--text)}
 #cfd-print{display:none}
 .pcover{display:flex;flex-direction:column;gap:8px}
 .pcover-ttl{font-size:34px;font-weight:700;letter-spacing:-.01em}
@@ -403,6 +411,7 @@ DASHBOARD_JS = r"""
     return '<header class="hd">'+fam
       + '<span class="sp"></span>'
       + streakBadge()
+      + '<button type="button" id="cfd-help" class="icon" aria-label="Help and legend">?</button>'
       + '<button type="button" id="cfd-theme" class="icon" aria-label="Toggle light or dark theme">◐</button></header>';
   }
   function toolbar(){
@@ -1216,6 +1225,38 @@ DASHBOARD_JS = r"""
       + '<div class="cfd-cards jm-list">'+rows+'</div></div>';
     modal.style.display = "flex";
   }
+  function helpPanel(){
+    var steps = H.steps || [];
+    // reuse `swatchFor` (which wraps the canonical `varFor`); step keys are real
+    // ints, the none row passes null so `swatchFor` emits the `--c-none` var.
+    var legend = steps.map(function(s, i){
+      return '<div class="hp-row">'+swatchFor(s.key)
+        + '<span class="hp-n">'+esc(s.label)+'</span><span class="hp-pos">step '+(i+1)+' of '+steps.length+'</span></div>';
+    }).join("");
+    var none = H.noneLabel
+      ? '<div class="hp-row">'+swatchFor(null)
+        + '<span class="hp-n">'+esc(H.noneLabel)+'</span><span class="hp-pos">uncoloured</span></div>'
+      : "";
+    var glossary = '<div class="hp-gloss">'
+      + '<p><b>% complete</b> — weighted progress across the colour steps.</p>'
+      + '<p><b>forecast</b> — estimated finish date at the recent pace; never a hard date.</p>'
+      + '<p><b>regression</b> — a glyph that moved backward in the flow since the last save.</p></div>';
+    return '<div class="cfd-modal-box" role="dialog" aria-label="Help and legend" aria-modal="true">'
+      + '<div class="cfd-modal-h">Legend &amp; help</div>'
+      + '<div class="cfd-cards hp-list">'+legend+none+glossary+'</div></div>';
+  }
+  function closeHelp(){ var m = document.getElementById("cfd-help-modal"); if (m) m.style.display = "none"; state.helpOpen = false; }
+  function openHelp(){
+    state.helpOpen = true;
+    var modal = document.getElementById("cfd-help-modal");
+    if (!modal){
+      modal = document.createElement("div"); modal.id = "cfd-help-modal"; modal.className = "cfd-modal";
+      modal.addEventListener("click", function(e){ if (e.target===modal) closeHelp(); });
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = helpPanel();
+    modal.style.display = "flex";
+  }
   function openExport(){
     var modal = document.getElementById("cfd-export-modal");
     if (!modal){
@@ -1247,8 +1288,9 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-coverage").addEventListener("click", function(){ state.view = state.view==="coverage" ? "tabs" : "coverage"; update(); });
     document.getElementById("cfd-timeline").addEventListener("click", function(){ state.view = state.view==="timeline" ? "tabs" : "timeline"; update(); });
     document.getElementById("cfd-export").addEventListener("click", openExport);
+    document.getElementById("cfd-help").addEventListener("click", openHelp);
     document.addEventListener("keydown", function(e){
-      if (e.key==="Escape"){ closeExport(); closeJourney(); if (state.focus!==null){ setFocus(null); } }
+      if (e.key==="Escape"){ closeExport(); closeJourney(); closeHelp(); if (state.focus!==null){ setFocus(null); } }
     });
     var bodyEl = document.getElementById("cfd-body");
     bodyEl.addEventListener("mouseover", function(e){
