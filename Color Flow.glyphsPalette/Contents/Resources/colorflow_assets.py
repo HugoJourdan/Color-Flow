@@ -833,6 +833,7 @@ DASHBOARD_JS = r"""
     if (!cv || !cv.getContext || !H.masters.length) return;
     var ctx = cv.getContext("2d");
     if (!ctx) return;                       // headless / no-canvas env: skip
+    var EMPTYFILL = (getComputedStyle(document.documentElement).getPropertyValue("--track")||"").trim() || "#15171c";   // empty disc ~ page bg
     var W = cv.width, Hc = cv.height, FS = 320;
     var DISC_ALPHA = 0.95, tilt = 0.5, trimVal = 0.6, opacityVal = 0.2;
     var rot = -0.5, focusAmt = [];
@@ -888,9 +889,9 @@ DASHBOARD_JS = r"""
 
     function paintDisc(g,fA,cx,cy,rx,ry,holeFrac,glow,empty){
       if (glow===undefined) glow=1;
-      if (empty){   // no colours: just a faint frosted fill, no rim/border
+      if (empty){   // no colours: a solid disc in a near-background tone (not white, not transparent)
         g.save(); g.translate(cx,cy); g.scale(1,ry/rx);
-        g.fillStyle="rgba(255,255,255,0.06)"; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
+        g.fillStyle=EMPTYFILL; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
         g.restore();
         return;
       }
