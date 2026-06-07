@@ -195,3 +195,13 @@ def test_dashboard_js_has_journey_helpers() -> None:
     # journeyOf reads the sparse index; stateAt carries the last event forward.
     assert "H.journeyIndex" in js
     assert "<=" in js  # stateAt: last event at or before the date
+
+
+def test_dashboard_js_has_forecast_card() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function forecastCard(" in js
+    assert 'ovCard("forecast"' in js
+    assert "H.trend.forecast" in js
+    assert "etaIso" in js
+    assert "confidence" in js
+    assert "Not enough history yet" in js   # the none/<2-points empty state

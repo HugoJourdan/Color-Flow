@@ -418,6 +418,20 @@ def forecast_master(series: list[dict], master_id: str, total: int, now: datetim
     return result
 
 
+def aggregate_forecast(series: list[dict], master_ids: list, total: int,
+                       now: datetime, is_free: bool, window_days: int = 28) -> dict:
+    """Whole-font forecast: a single hedged ETA from the summed ``final`` of every
+    master per date. Built by collapsing ``series`` into one synthetic master, then
+    reusing :func:`forecast_master` so the velocity/band/confidence rules stay
+    identical to the per-master cards."""
+    collapsed = []
+    for point in series:
+        summed = sum(point["masters"][master_id]["final"]
+                     for master_id in master_ids if master_id in point["masters"])
+        collapsed.append({"date": point["date"], "masters": {"__all__": {"final": summed}}})
+    return forecast_master(collapsed, "__all__", total, now, is_free, window_days)
+
+
 def progress_streak(history: dict, order: list[str], is_free: bool) -> dict:
     """A motivation streak (#17): how many consecutive *recorded days* ended with
     more labelled glyphs than the day before. Same-day captures already collapse
@@ -940,10 +954,17 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
     history = {**load_history(font), today: current}
     series = history_series(history, order, is_free)
     dates = [point["date"] for point in series]
+    forecast = {master.id: forecast_master(series, master.id, glyph_total, now, is_free)
+                for master in font.masters}
+    # Only emit the whole-font aggregate when there is at least one master; an empty
+    # font must keep trend.forecast == {} (no per-master entries, no "__all__").
+    if forecast:
+        forecast["__all__"] = aggregate_forecast(
+            series, [master.id for master in font.masters],
+            glyph_total * len(font.masters), now, is_free)
     trend = {
         "series": series,
-        "forecast": {master.id: forecast_master(series, master.id, glyph_total, now, is_free)
-                     for master in font.masters},
+        "forecast": forecast,
         "dates": dates,
         "today": today,
         "streak": progress_streak(history, order, is_free),

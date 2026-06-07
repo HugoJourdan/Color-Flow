@@ -409,6 +409,31 @@ def test_forecast_done_master_reports_done() -> None:
     assert out["remaining"] == 0 and out["confidence"] == "done" and out["etaIso"] is None
 
 
+def test_aggregate_forecast_sums_finals_across_masters() -> None:
+    # Two masters, two dates; each master advances its `final` over time.
+    series = [
+        {"date": "2026-05-01",
+         "masters": {"m1": {"final": 0, "started": 0, "total": 10},
+                     "m2": {"final": 0, "started": 0, "total": 10}}},
+        {"date": "2026-05-29",
+         "masters": {"m1": {"final": 5, "started": 5, "total": 10},
+                     "m2": {"final": 5, "started": 5, "total": 10}}},
+    ]
+    now = datetime(2026, 5, 29)
+    result = db.aggregate_forecast(series, ["m1", "m2"], 20, now, is_free=False)
+    assert result["total"] == 20
+    assert result["final"] == 10        # 5 + 5
+    assert result["remaining"] == 10
+    assert result["confidence"] != "none"
+    assert result["etaIso"] is not None
+
+
+def test_aggregate_forecast_no_masters_is_none_confidence() -> None:
+    result = db.aggregate_forecast([], [], 0, datetime(2026, 5, 29), is_free=False)
+    assert result["confidence"] == "none"
+    assert result["etaIso"] is None
+
+
 def test_master_point_free_mode_final_equals_started() -> None:
     per_glyph = {"A": 0, "B": 1, "C": cc.NO_COLOR}    # free: exact labelled, no cumulative final
     point = db._master_point(per_glyph, _FC_ORDER, is_free=True)
@@ -589,6 +614,38 @@ def test_build_model_emits_journey_index_field(tmp_path) -> None:
     assert "journeyIndex" in model
     # One master, today's snapshot only -> one initial event for A.
     assert model["journeyIndex"]["m1"]["A"] == [["2026-06-05", 8]]
+
+
+def test_build_model_trend_forecast_has_aggregate(tmp_path) -> None:
+    (tmp_path / "colorNames.txt").write_text(
+        "purple=Outline\nyellow=Ready\nNone=Nothing\n", encoding="utf-8")
+    master = _FakeMaster("m1", "Regular")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)})]
+    font = _FakeFont([master], glyphs, filepath=str(tmp_path / "Font.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert "__all__" in model["trend"]["forecast"]
+    # Aggregate `final` is the SUM of per-master finals, so its denominator is the
+    # whole-font capacity: glyphTotal * masters (== glyphTotal here, 1 master).
+    assert (model["trend"]["forecast"]["__all__"]["total"]
+            == model["glyphTotal"] * len(font.masters))
+
+
+def test_build_model_trend_forecast_aggregate_total_scales_with_masters(tmp_path) -> None:
+    # Two masters: the aggregate total must be glyphTotal * 2, NOT glyphTotal.
+    # This is the multi-master case the single-master test above can't exercise.
+    (tmp_path / "colorNames.txt").write_text(
+        "purple=Outline\nyellow=Ready\nNone=Nothing\n", encoding="utf-8")
+    masters = [_FakeMaster("m1", "Regular"), _FakeMaster("m2", "Bold")]
+    glyphs = [
+        _FakeGlyph("A", {"m1": _FakeLayerColor(8), "m2": _FakeLayerColor(8)}),
+        _FakeGlyph("B", {"m1": _FakeLayerColor(4), "m2": _FakeLayerColor(4)}),
+    ]
+    font = _FakeFont(masters, glyphs, filepath=str(tmp_path / "Font.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["glyphTotal"] == 2
+    assert model["trend"]["forecast"]["__all__"]["total"] == 4   # 2 glyphs * 2 masters
 
 
 def test_build_model_counts_match_palette_step_and_free(tmp_path) -> None:
