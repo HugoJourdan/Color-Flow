@@ -241,6 +241,34 @@ def test_dashboard_css_styles_calendar_axis_classes() -> None:
     assert "dasharray" in today_rule
 
 
+def test_dashboard_js_fills_hero_area_under_selected_master() -> None:
+    """#10: for the selected master only, trendParts draws a soft gradient area
+    fill under its line — a <linearGradient> (unique id from the master hue) from
+    the hue at ~22% alpha down to transparent, plus a filled .tl-area path that
+    closes down to the baseline Y(0). The tl-dot circles stay at exact values."""
+    js = assets.DASHBOARD_JS
+    # unique gradient id + the gradient element itself, with two stops
+    assert "tl-area-grad" in js
+    assert "<linearGradient" in js
+    assert "<stop" in js
+    # the filled area carries the .tl-area class and references the gradient
+    assert "tl-area" in js
+    assert "url(#" in js
+    # the fill closes to the baseline Y(0) and only the selected master gets it
+    assert "Y(0)" in js
+    # dots remain rendered (exact values stay honest)
+    assert "tl-dot" in js
+
+
+def test_dashboard_css_styles_hero_area_class() -> None:
+    """#10: the hero area fill carries a theme-safe .tl-area rule (no stroke,
+    so the polyline still draws the crisp line on top)."""
+    css = assets.DASHBOARD_CSS
+    assert ".tl-area" in css
+    area_rule = css.split(".tl-area{")[1].split("}")[0]
+    assert "stroke:none" in area_rule
+
+
 def test_dashboard_js_has_regression_card() -> None:
     js = assets.DASHBOARD_JS
     assert "function regressionCard(" in js

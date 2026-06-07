@@ -266,6 +266,7 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-line{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;transition:opacity .2s ease}
 .tl-line.tl-dim{opacity:.16}
 .tl-line.tl-sel{stroke-width:3}
+.tl-area{stroke:none}
 .tl-dot{transition:opacity .2s ease}
 .tl-dot.tl-dim{opacity:.16}
 .tl-lg{transition:opacity .2s ease}
@@ -979,7 +980,32 @@ DASHBOARD_JS = r"""
           + '<text class="tl-today-pill-t" x="'+(pillX+pillW/2).toFixed(1)+'" y="'+(ptop+8.5)+'" text-anchor="middle">'+esc(lab)+'</text>';
       }
     }
-    var lines = "", selLine = "", legend = "";
+    // ----- #10 gentle monotone smoothing for the selected master's line/area.
+    // Cubic path whose control-point tangents are clamped so the curve stays
+    // monotone between real data points and never overshoots a tl-dot value.
+    function smoothPath(ps){
+      if (ps.length < 2){ return ps.length ? "M"+ps[0].x.toFixed(1)+" "+ps[0].y.toFixed(1) : ""; }
+      var slopes = [];                                       // secant slope of each segment
+      for (var s = 0; s < ps.length - 1; s++){
+        var dx = ps[s+1].x - ps[s].x;
+        slopes.push(dx ? (ps[s+1].y - ps[s].y) / dx : 0);
+      }
+      var tang = [slopes[0]];                                // tangent (dy/dx) at each point
+      for (var k = 1; k < ps.length - 1; k++){
+        var a = slopes[k-1], b = slopes[k];
+        tang.push(a*b <= 0 ? 0 : (a + b) / 2);               // zero tangent at local extrema -> no overshoot
+      }
+      tang.push(slopes[slopes.length-1]);
+      var d = "M"+ps[0].x.toFixed(1)+" "+ps[0].y.toFixed(1);
+      for (var j = 0; j < ps.length - 1; j++){
+        var hx = (ps[j+1].x - ps[j].x) / 3;                  // 1/3-span control handles
+        var c1x = ps[j].x + hx,   c1y = ps[j].y + tang[j]*hx;
+        var c2x = ps[j+1].x - hx, c2y = ps[j+1].y - tang[j+1]*hx;
+        d += " C"+c1x.toFixed(1)+" "+c1y.toFixed(1)+" "+c2x.toFixed(1)+" "+c2y.toFixed(1)+" "+ps[j+1].x.toFixed(1)+" "+ps[j+1].y.toFixed(1);
+      }
+      return d;
+    }
+    var defs = "", lines = "", selLine = "", legend = "";
     H.masters.forEach(function(m, i){
       var col = "hsl("+masterHue(i)+",70%,55%)";
       var pts = series.map(function(p){
@@ -992,12 +1018,27 @@ DASHBOARD_JS = r"""
       var sel = state.master!=null && m.id===state.master;
       var poly = pts.map(function(o){ return o.x.toFixed(1)+","+o.y.toFixed(1); }).join(" ");
       var dots = pts.map(function(o){ return '<circle class="tl-dot'+(dim?" tl-dim":"")+'" cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="'+(sel?3:2.5)+'" fill="'+col+'"><title>'+esc(m.name+" · "+o.date+" · "+Math.round(o.pc)+"%")+'</title></circle>'; }).join("");
-      var seg = '<polyline class="tl-line'+(dim?" tl-dim":"")+(sel?" tl-sel":"")+'" points="'+poly+'" stroke="'+col+'"/>'+dots;
-      if (sel) selLine += seg; else lines += seg;            // keep the selected master's line on top
+      if (sel){
+        // #10 hero area: gentle smoothed line + a soft gradient fill that closes
+        // down to the baseline Y(0). Dots above stay at exact values (honest).
+        var gradId = "tl-area-grad-"+i;
+        var topY = ptop, botY = Y(0);
+        defs += '<linearGradient id="'+gradId+'" x1="0" y1="'+topY+'" x2="0" y2="'+botY.toFixed(1)+'" gradientUnits="userSpaceOnUse">'
+          + '<stop offset="0" stop-color="hsl('+masterHue(i)+',70%,55%)" stop-opacity="0.22"/>'
+          + '<stop offset="1" stop-color="hsl('+masterHue(i)+',70%,55%)" stop-opacity="0"/>'
+          + '</linearGradient>';
+        var top = smoothPath(pts);
+        var area = top + " L"+pts[pts.length-1].x.toFixed(1)+" "+botY.toFixed(1)
+          + " L"+pts[0].x.toFixed(1)+" "+botY.toFixed(1) + " Z";
+        var line = '<path class="tl-line tl-sel" d="'+top+'" stroke="'+col+'"/>';
+        selLine += '<path class="tl-area" d="'+area+'" fill="url(#'+gradId+')"/>' + line + dots;
+      } else {
+        lines += '<polyline class="tl-line'+(dim?" tl-dim":"")+'" points="'+poly+'" stroke="'+col+'"/>'+dots;
+      }
       legend += '<span class="tl-lg'+(dim?" tl-dim":"")+(sel?" tl-sel":"")+'"><i style="background:'+col+'"></i>'+esc(m.name)+' '+Math.round(pts[pts.length-1].pc)+'%</span>';
     });
-    lines += selLine;
-    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" aria-label="Completion over time per master">'+weekBands+grid+xticks+lines+todayRule+'</svg>';
+    lines += selLine;                                        // keep the selected master (area+line) on top
+    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" aria-label="Completion over time per master">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+grid+xticks+lines+todayRule+'</svg>';
     var foot = '<div class="tl-foot"><span>'+esc(series[0].date)+'</span><span>'+esc(series[series.length-1].date)+'</span></div>';
     return { chart:chart, legend:legend, foot:foot };
   }
