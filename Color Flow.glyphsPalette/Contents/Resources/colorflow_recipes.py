@@ -1,4 +1,3 @@
-# encoding: utf-8
 """Workflow recipes: per-script / per-category step routing (#5).
 
 A *recipe* declares that glyphs matching some criteria (category / script /

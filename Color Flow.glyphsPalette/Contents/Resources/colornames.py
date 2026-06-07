@@ -1,4 +1,3 @@
-# encoding: utf-8
 """Single source of truth for Color Flow's colorNames mapping.
 
 This module is deliberately free of any GlyphsApp / AppKit imports so it can be
@@ -332,7 +331,7 @@ def write_color_names(path: str, text: str) -> bool:
 def read_color_names(path: str) -> str:
     """Read a colorNames.txt file as UTF-8 text (empty string if unreadable)."""
     try:
-        with open(path, "r", encoding="utf-8") as key_file:
+        with open(path, encoding="utf-8") as key_file:
             return key_file.read()
     except OSError:
         return ""

@@ -1,4 +1,3 @@
-# encoding: utf-8
 """Read / write the twelve Glyphs label colours (``Glyphs.defaults['LabelColors']``).
 
 These are the app-wide colours Glyphs draws for layer / glyph colour labels 0-11.
@@ -41,11 +40,7 @@ def _clamp(value: float) -> float:
 
 def hex_for(rgba: tuple) -> str:
     """``(r, g, b[, a])`` floats in 0..1 -> a ``#rrggbb`` string (alpha ignored)."""
-    return "#{:02x}{:02x}{:02x}".format(
-        round(_clamp(rgba[0]) * 255),
-        round(_clamp(rgba[1]) * 255),
-        round(_clamp(rgba[2]) * 255),
-    )
+    return f"#{round(_clamp(rgba[0]) * 255):02x}{round(_clamp(rgba[1]) * 255):02x}{round(_clamp(rgba[2]) * 255):02x}"
 
 
 def read_label_colors() -> list[tuple[float, float, float, float]]:
