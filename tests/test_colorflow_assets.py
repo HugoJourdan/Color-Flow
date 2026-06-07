@@ -205,3 +205,22 @@ def test_dashboard_js_has_forecast_card() -> None:
     assert "etaIso" in js
     assert "confidence" in js
     assert "Not enough history yet" in js   # the none/<2-points empty state
+
+
+def test_dashboard_js_has_regression_card() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function regressionCard(" in js
+    assert "function rankOf(" in js
+    assert "H.changes" in js
+    # backward = new rank below old rank; "-> none" counts as backward.
+    assert "rankOf(nw) < rankOf(was)" in js
+    assert 'data-jglyph' in js   # rows are journey-modal triggers
+    # swatch helper reuses the canonical varFor (no inline '--c'+key derivation).
+    assert "function swatchFor(" in js
+    assert "varFor(key)" in js
+
+
+def test_dashboard_js_regression_card_hidden_when_zero() -> None:
+    js = assets.DASHBOARD_JS
+    # The builder returns "" when no regressions are found.
+    assert 'if (!rows.length) return "";' in js

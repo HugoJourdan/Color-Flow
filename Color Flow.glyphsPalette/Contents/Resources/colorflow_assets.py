@@ -621,6 +621,45 @@ DASHBOARD_JS = r"""
     var body = parts.chart + (open ? '<div class="tl-legend tl-legend-card">'+parts.legend+'</div>'+parts.foot : '');
     return ovCard("timeline", "Completion over time", body, true);
   }
+  // rank within the workflow order; uncoloured/none and off-palette steps rank
+  // below every real step so "-> none" reads as backward.
+  function rankOf(key){
+    var order = H.order || [];
+    var idx = order.indexOf(String(key));
+    return idx === -1 ? -1 : idx;
+  }
+  // canonical swatch: reuse the existing `varFor` helper, adding the null/undefined
+  // guard `varFor` lacks (varFor(null) -> "--cnull"). `key==null` catches both.
+  function swatchFor(key){
+    var v = (key==null) ? "--c-none" : varFor(key);
+    return '<span class="rg-sw" style="background:var('+v+')"></span>';
+  }
+  function regressionCard(){
+    var changes = (H.changes && state.master) ? H.changes[state.master]
+      : mergedChanges();
+    var rows = "", count = 0;
+    for (var name in changes){
+      var pair = changes[name], was = pair[0], nw = pair[1];
+      if (rankOf(nw) < rankOf(was)){
+        rows += '<div class="rg-row" data-jglyph="'+esc(name)+'"><span class="rg-n">'+esc(name)+'</span>'
+          + swatchFor(was)+'<span class="rg-ar">→</span>'+swatchFor(nw)+'</div>';
+        count++;
+      }
+    }
+    if (!rows.length) return "";
+    return ovCard("regression", "Moved backward ("+count+")", rows, count>6);
+  }
+  // When no master is selected, merge every master's changes so the global card
+  // still flags regressions; per-glyph last-write wins (stable for review).
+  function mergedChanges(){
+    var all = {};
+    var byMaster = H.changes || {};
+    for (var mid in byMaster){
+      var ch = byMaster[mid];
+      for (var name in ch){ all[name] = ch[name]; }
+    }
+    return all;
+  }
   function forecastCard(){
     var fc = H.trend && H.trend.forecast;
     if (!fc) return "";
@@ -644,7 +683,7 @@ DASHBOARD_JS = r"""
   }
   function overviewExtras(){
     if (!H.masters.length) return "";
-    return '<div class="ov-extra">'+forecastCard()+leaderboard()+histogram()+timelineCard()+'</div>';
+    return '<div class="ov-extra">'+forecastCard()+regressionCard()+leaderboard()+histogram()+timelineCard()+'</div>';
   }
   function tabsView(){
     if (state.master==null) return overall()+overviewExtras();   // no master selected -> global view + extras
