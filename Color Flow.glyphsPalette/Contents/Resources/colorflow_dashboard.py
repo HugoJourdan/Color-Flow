@@ -440,6 +440,47 @@ def progress_streak(history: dict, order: list[str], is_free: bool) -> dict:
     return {"current": current, "best": best, "days": len(dates)}
 
 
+def cross_master_summary(current: dict, master_ids: list[str],
+                         glyph_names: list[str], order: list[str]) -> dict:
+    """Cross-master agreement over the reported glyphs. For each glyph, gather its
+    colour key in *every* master (absent/uncoloured == ``NO_COLOR``); a glyph is
+    ``identical`` when all masters share one key, and ``doneEverywhere`` when that
+    shared key is the workflow's final step (``order[-1]`` — the same "done" step
+    the report grades 100%). Returns counts plus ``byStep`` (how identical glyphs
+    split across the shared keys, including the uncoloured ``-1`` bucket) and
+    ``differGlyphs`` (the names that disagree, in glyph order) for the expandable
+    list. A single-master font has every glyph identical; an empty/no-master font
+    returns all-zero with empty lists."""
+    final_step = int(order[-1]) if order else None
+    identical = differ = done_everywhere = 0
+    by_step: dict[int, int] = {}
+    differ_glyphs: list[str] = []
+    for name in glyph_names:
+        keys = [int(current.get(master_id, {}).get(name, colornames.NO_COLOR))
+                for master_id in master_ids]
+        if not keys:
+            continue
+        shared = keys[0] if len(set(keys)) == 1 else None
+        if shared is not None:
+            identical += 1
+            by_step[shared] = by_step.get(shared, 0) + 1
+            if final_step is not None and shared == final_step:
+                done_everywhere += 1
+        else:
+            differ += 1
+            differ_glyphs.append(name)
+    return {
+        "total": identical + differ,
+        "masterCount": len(master_ids),
+        "finalStep": final_step,
+        "identical": identical,
+        "differ": differ,
+        "doneEverywhere": done_everywhere,
+        "byStep": {str(key): count for key, count in sorted(by_step.items())},
+        "differGlyphs": differ_glyphs,
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Full JSON model
 # --------------------------------------------------------------------------- #
@@ -990,6 +1031,8 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "recipeCompletion": recipe_completion,
         "coverage": build_coverage(font, current, order, is_free),
         "changes": compute_changes(current, previous),
+        "crossMaster": cross_master_summary(
+            current, [master.id for master in font.masters], glyph_names, order),
     }
 
 

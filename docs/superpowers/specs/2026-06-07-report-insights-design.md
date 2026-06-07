@@ -35,24 +35,30 @@ The six features sit on one shared substrate (the journey index). Three render a
 - **Depends on:** `model.history` date list, `model.order` (step ranking).
 - **Why sparse:** dense snapshots (glyphs × dates × masters) would bloat the embedded file for large fonts. Reconstructing from change-events keeps it small. **This is the central technical decision of the spec.**
 
-### 1. Forecast card (Overview)
+### 1. Forecast card (Overview) — **REMOVED** (2026-06-07 revision)
 
-- **Purpose:** headline ETA. "At current pace, ~Aug 12 ±5d · medium confidence · 312 left · ~28/week."
-- **Data:** `forecast_master` already exists per master (`etaIso`, `bandDays`, `confidence`, velocity, `remaining`). Add an **aggregate** forecast (whole font) to the model if not already emitted.
-- **Render:** an Overview card via the existing `ovCard` pattern. Aggregate when no master is selected; that master's figures when one is.
-- **States:** `confidence == none` (or < 2 history points) → "Not enough history yet."
+The whole-font aggregate forecast card was shipped then reverted. The per-master
+`forecast_master` helper and its Timeline/Trend usage stay; only the headline
+Overview card and its `aggregate_forecast` plumbing were removed. See revision note.
 
-### 2. Regression card (Overview)
+### 1b. Cross-master "Across masters" card (Overview) — **ADDED** (2026-06-07 revision)
+
+- **Purpose:** the global Overview's lead card — how consistently the masters agree, glyph for glyph.
+- **Data:** new pure `cross_master_summary(...)` in `colorflow_dashboard.py`, emitted as `model.crossMaster`. Over the reported glyphs it computes, per glyph, the colour key in every master (absent/uncoloured = `-1`): `identical` (all masters share a key), `differ` (not), `doneEverywhere` (identical **and** the shared key is the workflow's final step `order[-1]`), `byStep` (how identical glyphs split across keys, incl. `-1`), and `differGlyphs` (in glyph order). Plus `total`, `masterCount`, `finalStep`.
+- **Render:** `crossMasterCard()` via the `ovCard` pattern. Headline "`doneEverywhere` / `total` done everywhere" + progress bar, identical/differ lines, an expandable differ list (rows open the journey modal #6), and a by-step swatch row reusing `swatchFor`. `masterCount < 2` still renders, with a "(single master)" note.
+- **States:** single master → all identical, differ 0; no masters → all zero.
+
+### 2. Regression card (Overview → **per-master**, 2026-06-07 revision)
 
 - **Purpose:** flag glyphs that moved **backward** since the last run (e.g. finished → reopened).
 - **Data:** `model.changes` (before/after step per glyph) + `model.order` for rank. Regression = `rank(after) < rank(before)`, with explicit handling for "→ uncoloured/none" (counts as backward) and off-palette steps.
-- **Render:** Overview card; **hidden when zero**. Lists glyph name + before→after swatches. Clicking a row opens the journey modal (#6).
+- **Render:** now shown in the **per-master panel** (scoped to `state.master`), not the global Overview — it is per-master change data. **Hidden when zero**. Lists glyph name + before→after swatches. Clicking a row opens the journey modal (#6).
 
-### 3. Recent activity card (Overview)
+### 3. Recent activity card (Overview → **per-master**, 2026-06-07 revision)
 
 - **Purpose:** a "what moved lately" feed.
-- **Data:** most recent N change-events across all glyphs (from the journey index), or `model.changes` + `lastEdit` ages.
-- **Render:** Overview card; each row = glyph · before→after swatches · when ("today" / "Nd ago" / date). Row click → journey modal.
+- **Data:** most recent N change-events across the selected master's glyphs (from the journey index) + `lastEdit` ages.
+- **Render:** now shown in the **per-master panel** (scoped to `state.master`), not the global Overview. Each row = glyph · before→after swatches · when ("today" / "Nd ago" / date). Row click → journey modal.
 
 ### 4. Date A vs Date B (Timeline tab)
 
@@ -101,3 +107,11 @@ The six features sit on one shared substrate (the journey index). Three render a
 ## Build order
 
 Build the journey index first (unblocks 2/3/4/5), then the three Overview cards, then the Timeline date-diff, the journey modal, and the legend.
+
+## Revision — 2026-06-07 (post-ship adjustments)
+
+After shipping, three Overview changes landed on `feature/report-and-plugin-features`:
+
+1. **Forecast card removed** (`revert(report): remove forecast headline card`). The whole-font aggregate forecast card and its `aggregate_forecast()` plumbing were reverted; per-master `forecast_master()` and the Timeline/Trend usage remain.
+2. **Regression + Recent moved to per-master** (`refactor(report): show regression and recent cards per-master, not global`). Both render only in the per-master panel (scoped to `state.master`), not the global Overview — they are per-master change feeds.
+3. **Cross-master "Across masters" card added** (`feat(report): add cross-master agreement card to the Overview`). New pure `cross_master_summary()` → `model.crossMaster`, rendered by `crossMasterCard()` as the global Overview's lead card (identical/differ/doneEverywhere, expandable differ list → journey modal, by-step swatches). See §1b.

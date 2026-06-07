@@ -301,6 +301,19 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .rg-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
 .rg-ar{color:var(--muted-2)}
 .rg-when{margin-left:auto;color:var(--muted-2)}
+.cm-headline{margin:0 0 8px;font-size:var(--fs-sm);color:var(--text)}
+.cm-headline b{font-size:var(--fs-big-sm)}
+.cm-bar{display:block;width:100%;flex:none;height:7px;margin:0 0 12px}
+.cm-line{margin:0 0 6px;font-size:var(--fs-xs);color:var(--muted)}
+.cm-line b{color:var(--text)}
+.cm-note{color:var(--muted-2)}
+.cm-differ-list{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.cm-differ-row{font-size:var(--fs-xs);background:var(--surface-2);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--text);padding:3px 8px;cursor:pointer}
+.cm-differ-row:hover{border-color:var(--accent)}
+.cm-steps{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:4px;font-size:var(--fs-xs);color:var(--muted)}
+.cm-steps-l{color:var(--muted-2)}
+.cm-step{display:inline-flex;align-items:center;gap:5px}
+.cm-step-n{color:var(--text)}
 .tl-diff{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
 .tl-diff-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
 .tl-diff-pick{display:flex;gap:14px;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--muted)}
@@ -718,9 +731,44 @@ DASHBOARD_JS = r"""
     }).join("");
     return ovCard("recent", "Recent activity", rows, feed.length > 12);
   }
+  // Cross-master agreement (global Overview lead card). H.crossMaster is computed
+  // in Python; this only renders it. byStep keys arrive as JSON strings, so we
+  // parseInt before handing them to the int-keyed swatchFor/labelFor helpers
+  // (swatchFor("-1") would otherwise miss varFor's `k===-1` guard).
+  function crossMasterCard(){
+    var cm = H.crossMaster;
+    if (!cm) return "";
+    var open = !!state.ovExpand.crossMaster;
+    var donePct = pct(cm.doneEverywhere, cm.total);
+    var head = '<p class="cm-headline"><b>'+cm.doneEverywhere+'</b> / '+cm.total+' done everywhere</p>'
+      + '<div class="bar cm-bar"><span style="width:'+donePct+'%;background:var(--accent)"></span></div>';
+    var ident = '<p class="cm-line">identical in all masters: <b>'+cm.identical+'</b></p>';
+    var single = (cm.masterCount < 2) ? ' <span class="cm-note">(single master)</span>' : '';
+    var differLine = '<p class="cm-line">differ between masters: <b>'+cm.differ+'</b>'+single+'</p>';
+    var differList = "";
+    if (open){
+      var names = cm.differGlyphs || [];
+      differList = names.length
+        ? '<div class="cm-differ-list">'+names.map(function(name){
+            return '<button type="button" class="cm-differ-row" data-jglyph="'+esc(name)+'">'+esc(name)+'</button>';
+          }).join("")+'</div>'
+        : '<p class="ov-empty">No glyphs differ.</p>';
+    }
+    var byStep = cm.byStep || {};
+    var chips = Object.keys(byStep).map(function(k){
+      var key = parseInt(k, 10);
+      return '<span class="cm-step" title="'+esc(labelFor(key))+'">'+swatchFor(key)
+        + '<span class="cm-step-n">'+byStep[k]+'</span></span>';
+    }).join("");
+    var steps = chips
+      ? '<div class="cm-steps"><span class="cm-steps-l">by step:</span>'+chips+'</div>'
+      : "";
+    var body = head + ident + differLine + differList + steps;
+    return ovCard("crossMaster", "Across masters", body, (cm.differGlyphs||[]).length > 0);
+  }
   function overviewExtras(){
     if (!H.masters.length) return "";
-    return '<div class="ov-extra">'+leaderboard()+histogram()+timelineCard()+'</div>';
+    return '<div class="ov-extra">'+crossMasterCard()+leaderboard()+histogram()+timelineCard()+'</div>';
   }
   // Regression + Recent are per-master change feeds, so they belong with the
   // selected master, not the global Overview. Both already key off state.master

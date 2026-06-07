@@ -245,6 +245,26 @@ def test_dashboard_js_recent_card_when_label() -> None:
     assert '"today"' in js
 
 
+def test_dashboard_js_has_cross_master_card() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function crossMasterCard(" in js
+    assert "H.crossMaster" in js
+    # headline + progress bar, the identical/differ/byStep lines
+    assert "done everywhere" in js
+    assert "identical in all masters" in js
+    assert "differ between masters" in js
+    assert "by step:" in js
+    assert "(single master)" in js          # masterCount < 2 note
+    # the differ list rows open the existing per-glyph journey modal
+    assert "data-jglyph" in js
+    assert "cm.differGlyphs" in js
+    # byStep swatches reuse the shared swatchFor helper (parseInt -> int key)
+    assert "swatchFor(key)" in js
+    # wired into the global Overview where forecastCard used to lead
+    extras = js.split("function overviewExtras(")[1].split("}")[0]
+    assert "crossMasterCard()" in extras
+
+
 def test_dashboard_js_has_date_diff_panel() -> None:
     js = assets.DASHBOARD_JS
     assert "function dateDiffPanel(" in js
@@ -323,12 +343,21 @@ def test_dashboard_css_styles_help_panel() -> None:
         assert selector in css, selector
 
 
+def test_dashboard_css_styles_cross_master_card() -> None:
+    css = assets.DASHBOARD_CSS
+    # Every class crossMasterCard emits needs a layout rule.
+    for selector in (".cm-headline", ".cm-bar", ".cm-line", ".cm-note",
+                     ".cm-differ-list", ".cm-differ-row", ".cm-steps",
+                     ".cm-steps-l", ".cm-step", ".cm-step-n"):
+        assert selector in css, selector
+
+
 def test_build_html_wires_all_report_insight_features() -> None:
     """End-to-end smoke: every new render unit + its wiring marker is present in
     the generated document, and the self-contained/no-network invariant holds."""
     html = assets.build_html(_model())
     # render units
-    for marker in ("function regressionCard(",
+    for marker in ("function crossMasterCard(", "function regressionCard(",
                    "function recentCard(", "function dateDiffPanel(",
                    "function openJourney(", "function helpPanel(",
                    "function journeyOf(", "function stateAt("):

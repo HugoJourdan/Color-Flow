@@ -415,6 +415,82 @@ def test_master_point_free_mode_final_equals_started() -> None:
     assert point["final"] == point["started"] == 2 and point["total"] == 3
 
 
+# --------------------------------------------------------------------------- #
+# cross_master_summary
+# --------------------------------------------------------------------------- #
+
+def test_cross_master_summary_single_master_all_identical() -> None:
+    # One master -> every glyph is trivially "identical"; doneEverywhere counts
+    # only the glyphs sitting on the final step (2). Differ is always 0.
+    current = {"m1": {"A": 2, "B": 1, "C": cc.NO_COLOR}}
+    out = db.cross_master_summary(current, ["m1"], ["A", "B", "C"], _FC_ORDER)
+    assert out["total"] == 3 and out["masterCount"] == 1
+    assert out["identical"] == 3 and out["differ"] == 0
+    assert out["doneEverywhere"] == 1           # only A is at final step 2
+    assert out["byStep"] == {"-1": 1, "1": 1, "2": 1}
+    assert out["differGlyphs"] == []
+
+
+def test_cross_master_summary_two_masters_agree_but_not_final() -> None:
+    # Both masters share each glyph's key, but none is the final step -> identical
+    # everywhere, done nowhere.
+    current = {"m1": {"A": 1, "B": 0}, "m2": {"A": 1, "B": 0}}
+    out = db.cross_master_summary(current, ["m1", "m2"], ["A", "B"], _FC_ORDER)
+    assert out["identical"] == 2 and out["differ"] == 0
+    assert out["doneEverywhere"] == 0
+    assert out["byStep"] == {"0": 1, "1": 1}
+    assert out["differGlyphs"] == []
+
+
+def test_cross_master_summary_two_masters_done_everywhere() -> None:
+    # Every glyph is the final step (2) in every master.
+    current = {"m1": {"A": 2, "B": 2}, "m2": {"A": 2, "B": 2}}
+    out = db.cross_master_summary(current, ["m1", "m2"], ["A", "B"], _FC_ORDER)
+    assert out["identical"] == 2 and out["differ"] == 0
+    assert out["doneEverywhere"] == 2
+    assert out["byStep"] == {"2": 2}
+
+
+def test_cross_master_summary_two_masters_partial_differ() -> None:
+    # A agrees (1/1), B differs (2 vs 0), C differs (final vs absent), D done both.
+    current = {
+        "m1": {"A": 1, "B": 2, "C": 2, "D": 2},
+        "m2": {"A": 1, "B": 0, "C": cc.NO_COLOR, "D": 2},
+    }
+    out = db.cross_master_summary(current, ["m1", "m2"], ["A", "B", "C", "D"], _FC_ORDER)
+    assert out["total"] == 4 and out["masterCount"] == 2
+    assert out["identical"] == 2 and out["differ"] == 2
+    assert out["doneEverywhere"] == 1           # only D is final-step in both
+    # byStep counts only the identical glyphs (A at 1, D at 2).
+    assert out["byStep"] == {"1": 1, "2": 1}
+    # differGlyphs follow glyph order, not the order they were discovered.
+    assert out["differGlyphs"] == ["B", "C"]
+
+
+def test_cross_master_summary_absent_master_key_is_uncolored() -> None:
+    # A glyph missing from one master's map reads as -1 there, so it differs.
+    current = {"m1": {"A": 1}, "m2": {}}
+    out = db.cross_master_summary(current, ["m1", "m2"], ["A"], _FC_ORDER)
+    assert out["differ"] == 1 and out["differGlyphs"] == ["A"]
+    assert out["byStep"] == {}
+
+
+def test_cross_master_summary_no_masters_is_all_zero() -> None:
+    out = db.cross_master_summary({}, [], [], _FC_ORDER)
+    assert out["total"] == 0 and out["masterCount"] == 0
+    assert out["identical"] == 0 and out["differ"] == 0 and out["doneEverywhere"] == 0
+    assert out["byStep"] == {} and out["differGlyphs"] == []
+
+
+def test_cross_master_summary_no_order_means_no_done() -> None:
+    # Without a workflow order there is no final step, so doneEverywhere is 0 even
+    # when masters agree.
+    current = {"m1": {"A": 2}, "m2": {"A": 2}}
+    out = db.cross_master_summary(current, ["m1", "m2"], ["A"], [])
+    assert out["finalStep"] is None
+    assert out["identical"] == 1 and out["doneEverywhere"] == 0
+
+
 def test_glyph_journeys_only_changed_unfinished_aligned_to_dates() -> None:
     dates = ["2026-06-01", "2026-06-02"]
     history = {
@@ -589,6 +665,26 @@ def test_build_model_emits_journey_index_field(tmp_path) -> None:
     assert "journeyIndex" in model
     # One master, today's snapshot only -> one initial event for A.
     assert model["journeyIndex"]["m1"]["A"] == [["2026-06-05", 8]]
+
+
+def test_build_model_emits_cross_master_summary(tmp_path) -> None:
+    # Two masters; A agrees on the final step (3 = yellow "Ready"), B differs.
+    (tmp_path / "colorNames.txt").write_text(
+        "purple=Outline\nlightGreen=Anchors\nyellow=Ready\nNone=Nothing\n", encoding="utf-8")
+    masters = [_FakeMaster("m1", "Regular"), _FakeMaster("m2", "Bold")]
+    glyphs = [
+        _FakeGlyph("A", {"m1": _FakeLayerColor(3), "m2": _FakeLayerColor(3)}),
+        _FakeGlyph("B", {"m1": _FakeLayerColor(8), "m2": _FakeLayerColor(4)}),
+    ]
+    font = _FakeFont(masters, glyphs, filepath=str(tmp_path / "Font.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    cross = model["crossMaster"]
+    assert cross["total"] == 2 and cross["masterCount"] == 2
+    assert cross["finalStep"] == 3           # last key in order ["8","4","3"]
+    assert cross["identical"] == 1 and cross["differ"] == 1
+    assert cross["doneEverywhere"] == 1      # A is final-step in both masters
+    assert cross["differGlyphs"] == ["B"]
 
 
 def test_build_model_counts_match_palette_step_and_free(tmp_path) -> None:
