@@ -921,18 +921,18 @@ DASHBOARD_JS = r"""
       g.fillStyle="rgba(255,255,255,0.10)"; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
       g.globalAlpha=0.9; g.drawImage(FROST,-rx,-rx,rx*2,rx*2); g.globalAlpha=1;
       var sheen=g.createLinearGradient(0,-rx,0,rx);
-      sheen.addColorStop(0,"rgba(255,255,255,0.25)"); sheen.addColorStop(0.34,"rgba(255,255,255,0.025)");
-      sheen.addColorStop(0.66,"rgba(255,255,255,0.025)"); sheen.addColorStop(1,"rgba(255,255,255,0.16)");
+      sheen.addColorStop(0,"rgba(0,0,0,0.22)"); sheen.addColorStop(0.34,"rgba(255,255,255,0.02)");
+      sheen.addColorStop(0.66,"rgba(255,255,255,0.04)"); sheen.addColorStop(1,"rgba(255,255,255,0.18)");
       g.fillStyle=sheen; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
-      var hot=g.createRadialGradient(0,-rx*0.4,0,0,-rx*0.4,rx*0.8);
-      hot.addColorStop(0,"rgba(255,255,255,0.13)"); hot.addColorStop(1,"rgba(255,255,255,0)");
+      var hot=g.createRadialGradient(0,rx*0.42,0,0,rx*0.42,rx*0.8);
+      hot.addColorStop(0,"rgba(255,255,255,0.15)"); hot.addColorStop(1,"rgba(255,255,255,0)");
       g.fillStyle=hot; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
       if (holeFrac>0){ var hr=rx*0.26; g.globalCompositeOperation="destination-out";
         var pg=g.createRadialGradient(0,0,0,0,0,hr); pg.addColorStop(0,"rgba(0,0,0,1)"); pg.addColorStop(0.94,"rgba(0,0,0,1)"); pg.addColorStop(1,"rgba(0,0,0,0)");
         g.fillStyle=pg; g.beginPath(); g.arc(0,0,hr,0,7); g.fill(); g.globalCompositeOperation="source-over"; }
       g.restore();
       g.save(); g.translate(cx,cy); g.scale(1,ry/rx);
-      var rim=g.createLinearGradient(0,-rx,0,rx); rim.addColorStop(0,"rgba(255,255,255,0.375)"); rim.addColorStop(0.5,"rgba(255,255,255,0.05)"); rim.addColorStop(1,"rgba(0,0,0,0.18)");
+      var rim=g.createLinearGradient(0,-rx,0,rx); rim.addColorStop(0,"rgba(0,0,0,0.24)"); rim.addColorStop(0.5,"rgba(255,255,255,0.05)"); rim.addColorStop(1,"rgba(255,255,255,0.32)");
       g.strokeStyle=rim; g.lineWidth=2; g.beginPath(); g.arc(0,0,rx*0.992,0,7); g.stroke(); g.restore();
     }
     function shadowInto(g,cx,cy,rx,ry){
