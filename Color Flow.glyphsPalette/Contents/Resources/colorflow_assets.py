@@ -218,6 +218,7 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .chg .cn{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chg .sw{width:11px;height:11px;border-radius:3px;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .chg .arr{color:var(--muted-2)}
+.cmp-legend{margin:6px 0 2px}
 .cmp-wrap{overflow-x:auto;margin-top:8px}
 .cmp{border-collapse:collapse;width:100%;font-size:var(--fs-xs)}
 .cmprow{transition:opacity .2s ease;cursor:pointer}
@@ -1934,6 +1935,10 @@ DASHBOARD_JS = r"""
   }
   function compareView(){
     // columns = steps (+None); rows = masters, labelled by the master name.
+    // A colour-label legend sits above the table (the header cells are swatch-only).
+    var legend = H.steps.map(function(s){
+      return '<span class="lg" title="'+esc(s.label)+'"><i style="background:var('+varFor(s.key)+')"></i>'+esc(s.label)+'</span>';
+    }).join("");
     var head = '<th scope="col">Master</th>'+H.steps.map(function(s){
       return '<th scope="col" title="'+esc(s.label)+'" aria-label="'+esc(s.label)+'"><span class="dot" style="background:var('+varFor(s.key)+')"></span></th>';
     }).join("");
@@ -1941,12 +1946,15 @@ DASHBOARD_JS = r"""
       var aa = esc(m.name);
       var cells = H.steps.map(function(s){
         var p = pct(countFor(m,s.key),H.glyphTotal);
-        return '<td><span class="cmpbar" style="width:'+p+'%;background:var('+varFor(s.key)+')"></span><span class="cmpn">'+p+'%</span></td>';
+        // a fully-set step reads as a checkmark instead of "100%"
+        var cellLabel = p >= 100 ? '✅' : (p+'%');
+        return '<td><span class="cmpbar" style="width:'+p+'%;background:var('+varFor(s.key)+')"></span><span class="cmpn">'+cellLabel+'</span></td>';
       }).join("");
       var cls = state.master==null ? "" : (m.id===state.master ? " cmp-sel" : " cmp-dim");
       return '<tr class="cmprow'+cls+'" data-m="'+esc(m.id)+'" title="Click to focus this master"><th scope="row" class="cmp-m" aria-label="'+esc(m.name)+'">'+aa+'</th>'+cells+'</tr>';
     }).join("");
-    return '<div class="cmp-wrap"><table class="cmp"><caption>Step completion by master</caption><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
+    return '<div class="cmp-legend legend">'+legend+'</div>'
+      + '<div class="cmp-wrap"><table class="cmp"><caption>Step completion by master</caption><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
   }
   function renderBody(){
     return state.view==="compare" ? compareView()

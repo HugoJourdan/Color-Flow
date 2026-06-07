@@ -188,6 +188,13 @@ def test_coverage_bar_has_no_inline_percent_uses_hover_tooltip() -> None:
     assert ".cov-row{display:flex;align-items:center;gap:12px;font-size:var(--fs-xs)" in html  # Compare font size
 
 
+def test_compare_tab_has_label_legend_and_checkmark_for_full_steps() -> None:
+    html = assets.build_html(_model())
+    assert 'class="cmp-legend legend"' in html          # colour-label legend above the table
+    assert "p >= 100 ? '✅' : (p+'%')" in html           # 100% cells become a checkmark
+    assert ".cmp-legend{margin:6px 0 2px}" in html       # legend styling present
+
+
 def test_dashboard_js_has_expandable_overview_cards_and_timeline_card() -> None:
     js = assets.DASHBOARD_JS
     assert "function ovCard(" in js                       # shared expandable card
