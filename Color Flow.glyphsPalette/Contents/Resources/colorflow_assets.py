@@ -260,7 +260,7 @@ DASHBOARD_JS = r"""
   try { savedTheme = localStorage.getItem("cfd-theme"); } catch(e){}
   var prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
   var state = {
-    master: H.masters.length ? H.masters[0].id : null,
+    master: null,                          // no master selected -> global overview
     view: "tabs", before: false, sort: "workflow",
     coverGroup: "byCategory", glyphSort: "category", focus: null,
     theme: savedTheme || (prefersLight ? "light" : "dark")
@@ -498,6 +498,7 @@ DASHBOARD_JS = r"""
     return '<div class="tabs" role="tablist">'+tabs+'</div>';
   }
   function tabsView(){
+    if (state.master==null) return overall();   // no master selected -> the global progress bar
     var m = masterById(state.master);
     return '<div class="panel" role="tabpanel">'+masterOverall(m)+heatmap(m)+'</div>';
   }
@@ -521,7 +522,8 @@ DASHBOARD_JS = r"""
   }
   function coverageView(){
     var cov = (H.coverage && H.coverage[state.coverGroup]) || {};
-    var rows2 = cov[state.master] || [];
+    var covMaster = state.master==null ? ((H.masters[0]||{}).id) : state.master;
+    var rows2 = cov[covMaster] || [];
     var head = '<div class="cov-h"><span class="cov-title">Colours set by '+(state.coverGroup==="byScript"?"script":"category")+'</span>'
       + '<span class="cov-switch">'
       + '<button type="button" class="chip'+(state.coverGroup==="byScript"?" on":"")+'" data-cg="byScript" aria-pressed="'+(state.coverGroup==="byScript")+'">Script</button>'
@@ -639,9 +641,6 @@ DASHBOARD_JS = r"""
     var tl = document.getElementById("cfd-timeline"); if (tl) tl.setAttribute("aria-pressed", state.view==="timeline");
     var ov = document.getElementById("cfd-overview"); if (ov) ov.setAttribute("aria-pressed", state.view==="tabs");
     var sb = document.getElementById("cfd-sort"); if (sb) sb.textContent = "↕ Sort: "+(state.sort==="progress"?"progress":"workflow");
-    // keep the static global bar's focused-segment ring in sync with state.focus
-    var gbar = document.querySelector(".overall:not(.master-overall)");
-    if (gbar) gbar.outerHTML = overall();
   }
 
   // Set the focused colour and crossfade the heatmap: fade the current grid out,
@@ -787,7 +786,7 @@ DASHBOARD_JS = r"""
       try { localStorage.setItem("cfd-theme", state.theme); } catch(e){}
       document.documentElement.setAttribute("data-theme", state.theme);
     });
-    document.getElementById("cfd-overview").addEventListener("click", function(){ state.view = "tabs"; update(); });
+    document.getElementById("cfd-overview").addEventListener("click", function(){ state.view = "tabs"; state.master = null; update(); });
     document.getElementById("cfd-compare").addEventListener("click", function(){ state.view = state.view==="compare" ? "tabs" : "compare"; update(); });
     document.getElementById("cfd-coverage").addEventListener("click", function(){ state.view = state.view==="coverage" ? "tabs" : "coverage"; update(); });
     document.getElementById("cfd-timeline").addEventListener("click", function(){ state.view = state.view==="timeline" ? "tabs" : "timeline"; update(); });
@@ -982,12 +981,22 @@ DASHBOARD_JS = r"""
           state.master = (state.master===id) ? null : id;   // click the selected disc -> clear focus
           state.view="tabs"; update(); return; } }
     });
+    // up/down arrows switch the focused master (up = toward the top disc)
+    window.addEventListener("keydown", function(e){
+      if (e.key!=="ArrowUp" && e.key!=="ArrowDown") return;
+      var t=e.target; if (t && (t.tagName==="INPUT"||t.tagName==="TEXTAREA"||t.isContentEditable)) return;
+      var M=H.masters.length; if (!M) return;
+      var cur=selIndex(), step=(e.key==="ArrowDown")?1:-1;
+      var ni = cur<0 ? (step>0?0:M-1) : Math.max(0, Math.min(M-1, cur+step));
+      e.preventDefault();
+      state.master=H.masters[ni].id; state.view="tabs"; update();
+    });
     loop();
   }
 
   function init(){
     document.getElementById("cfd-app").innerHTML =
-      header() + overall() + toolbar()
+      header() + toolbar()
       + '<div id="cfd-main"><aside id="cfd-tower" aria-label="Masters"><canvas id="cfd-tower-cv" width="240" height="560"></canvas></aside><div id="cfd-body"></div></div>'
       + '<footer class="ft">Color Font Dashboard · Color Flow — Hugo Jourdan<br>'+esc(H.generated)+'</footer>';
     bind(); update(); initTower();
