@@ -356,7 +356,7 @@ DASHBOARD_JS = r"""
       + '<button type="button" id="cfd-coverage" class="chip" aria-pressed="false">🗂 Coverage</button>'
       + '<button type="button" id="cfd-timeline" class="chip" aria-pressed="false">📈 Timeline</button>'
       + '<button type="button" id="cfd-compare" class="chip" aria-pressed="false">▤ Compare</button>'
-      + '<button type="button" id="cfd-export" class="chip" title="Export the report as PDF, CSV or JSON">⤓ Export Report</button></div>';
+      + '<button type="button" id="cfd-export" class="chip" style="margin-left:auto" title="Export the report as PDF, CSV or JSON">⤓ Export Report</button></div>';
   }
   function ring(p){
     var r=26, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(100,p))/100);
