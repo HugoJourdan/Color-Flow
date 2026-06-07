@@ -848,7 +848,7 @@ DASHBOARD_JS = r"""
       var off=document.createElement("canvas"); off.width=off.height=FS;
       var g=off.getContext("2d"), cx=FS/2, cy=FS/2, R=FS*0.46, sum=0, i;
       for (i=0;i<12;i++) sum+=counts[i];
-      if (!sum){ g.fillStyle="rgba(255,255,255,0.12)"; g.fillRect(0,0,FS,FS); }   // no colours -> translucent
+      if (!sum){ /* no colours -> leave the field transparent (disc shows the page bg) */ }
       else {
         var acc=0, stops=[];
         for (i=0;i<12;i++){ if(!counts[i]) continue; stops.push([acc+(counts[i]/sum)/2,i]); acc+=counts[i]/sum; }
@@ -876,6 +876,7 @@ DASHBOARD_JS = r"""
       return bl;
     }
     var FIELDS = H.masters.map(function(m){ return buildField(countsOf(m)); });
+    var EMPTY = H.masters.map(function(m){ var c=countsOf(m),s=0,i; for(i=0;i<12;i++)s+=c[i]; return s===0; });
     var FROST = (function(){
       var c=document.createElement("canvas"); c.width=c.height=FS; var g=c.getContext("2d");
       for (var k=0;k<1600;k++){ var x=Math.random()*FS,y=Math.random()*FS,r=Math.random()*1.6+0.3;
@@ -885,8 +886,14 @@ DASHBOARD_JS = r"""
     })();
     var buf=document.createElement("canvas"); buf.width=W; buf.height=Hc; var bctx=buf.getContext("2d");
 
-    function paintDisc(g,fA,cx,cy,rx,ry,holeFrac,glow){
-      if (glow===undefined) glow=1; var o=rx*1.14;
+    function paintDisc(g,fA,cx,cy,rx,ry,holeFrac,glow,empty){
+      if (glow===undefined) glow=1;
+      if (empty){   // no colours: transparent disc (shows the page bg), just a faint ghost rim
+        g.save(); g.translate(cx,cy); g.scale(1,ry/rx);
+        g.strokeStyle="rgba(255,255,255,0.12)"; g.lineWidth=2; g.beginPath(); g.arc(0,0,rx*0.992,0,7); g.stroke(); g.restore();
+        return;
+      }
+      var o=rx*1.14;
       g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.rotate(rot);
       var halo=[[1.006,3,0.22],[1.025,6,0.14],[1.06,12,0.08]];
       for (var h=0;h<halo.length;h++){ g.globalAlpha=halo[h][2]*glow; g.filter="blur("+halo[h][1]+"px)"; var hh=rx*halo[h][0]; g.drawImage(fA,-hh,-hh,hh*2,hh*2); }
@@ -956,13 +963,13 @@ DASHBOARD_JS = r"""
       function group(idxs){
         if (!idxs.length) return;
         bctx.clearRect(0,0,W,Hc);
-        for (var k=0;k<idxs.length;k++){ var ii=idxs[k], cyy=cyOf(ii); shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,0); }
+        for (var k=0;k<idxs.length;k++){ var ii=idxs[k], cyy=cyOf(ii); if(!EMPTY[ii]) shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,0,EMPTY[ii]); }
         bctx.save(); bctx.globalCompositeOperation="source-atop"; bctx.fillStyle="rgba(0,0,0,"+trimVal+")"; bctx.fillRect(0,0,W,Hc); bctx.restore();
         edgeFade(bctx);
         ctx.save(); ctx.globalAlpha=opacityVal; ctx.drawImage(buf,0,0); ctx.restore();
       }
       function focusDisc(ii){ var amt=focusAmt[ii], cyy=cyOf(ii);
-        bctx.clearRect(0,0,W,Hc); shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,1-amt);
+        bctx.clearRect(0,0,W,Hc); if(!EMPTY[ii]) shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,1-amt,EMPTY[ii]);
         var trim=amt*trimVal; if (trim>0){ bctx.save(); bctx.globalCompositeOperation="source-atop"; bctx.fillStyle="rgba(0,0,0,"+trim+")"; bctx.fillRect(0,0,W,Hc); bctx.restore(); }
         edgeFade(bctx);
         ctx.save(); ctx.globalAlpha=1-amt*(1-opacityVal); ctx.drawImage(buf,0,0); ctx.restore();
