@@ -426,9 +426,9 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-cal-key i.lv2{background:color-mix(in srgb,var(--accent) 40%,var(--track))}
 .tl-cal-key i.lv3{background:color-mix(in srgb,var(--accent) 70%,var(--track))}
 .tl-cal-key i.lv4{background:var(--accent)}
-.tl-cal{display:flex;gap:3px;overflow-x:auto;padding-bottom:2px}
-.tl-cal-wk{display:flex;flex-direction:column;gap:3px}
-.tl-cal-d{width:12px;height:12px;border-radius:3px;background:var(--track)}
+.tl-cal{display:flex;gap:4px;overflow-x:auto;padding-bottom:2px}
+.tl-cal-wk{display:flex;flex-direction:column;gap:4px}
+.tl-cal-d{width:16px;height:16px;border-radius:4px;background:var(--track)}
 .tl-cal-d.lv1{background:color-mix(in srgb,var(--accent) 12%,var(--track))}
 .tl-cal-d.lv2{background:color-mix(in srgb,var(--accent) 40%,var(--track))}
 .tl-cal-d.lv3{background:color-mix(in srgb,var(--accent) 70%,var(--track))}
@@ -443,9 +443,9 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-mcal-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px}
 .tl-mcal-title{font-size:var(--fs-sm);font-weight:600;color:var(--text);min-width:150px;text-align:center}
 .tl-mcal-prev,.tl-mcal-next{padding:1px 10px;line-height:1.2;font-size:var(--fs-sm)}
-.tl-mcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.tl-mcal-grid{display:grid;grid-template-columns:repeat(7,28px);gap:5px;justify-content:center}
 .tl-mcal-dow{text-align:center;font-size:var(--fs-2xs);color:var(--muted-2);padding-bottom:2px}
-.tl-mcal-d{aspect-ratio:1;display:flex;align-items:flex-start;justify-content:flex-end;border-radius:6px;padding:3px 5px;font-size:var(--fs-2xs);color:var(--muted-2);background:transparent}
+.tl-mcal-d{aspect-ratio:1;display:flex;align-items:flex-start;justify-content:flex-end;border-radius:5px;padding:2px 4px;font-size:var(--fs-2xs);color:var(--muted-2);background:transparent}
 .tl-mcal-inrange{background:color-mix(in srgb,var(--text) 5%,transparent)}
 .tl-mcal-snap{color:var(--text);cursor:pointer}
 .tl-mcal-snap.lv1{background:color-mix(in srgb,var(--accent) 12%,var(--track))}

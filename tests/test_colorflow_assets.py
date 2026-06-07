@@ -216,7 +216,7 @@ def test_dashboard_has_standard_calendar_and_toggle() -> None:
     assert "state.calMode = clm.getAttribute" in js      # toggle handler
     assert "calMode: \"heatmap\"" in js                  # default mode preserved
     css = assets.DASHBOARD_CSS
-    assert ".tl-mcal-grid{display:grid;grid-template-columns:repeat(7,1fr)" in css
+    assert ".tl-mcal-grid{display:grid;grid-template-columns:repeat(7,28px)" in css
     assert ".tl-cal-mode-btn" in css
 
 
