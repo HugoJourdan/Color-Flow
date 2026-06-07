@@ -142,18 +142,6 @@ class ColorFlow(PalettePlugin):
 				setattr(self.paletteView.frame, str(k)+"colorTag", Box((0, yPos-self.shift-1, 6, 19), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
 				yPos += 19
 
-	# Open the Settings panel (reorder colours + choose which show).
-	@objc.python_method
-	def Open_Settings(self, sender):
-		try:
-			import importlib
-			import settings_panel
-			importlib.reload(settings_panel)
-			self._settingsWindow = settings_panel.ColorFlowSettings(self, Glyphs.font)
-		except Exception:
-			import traceback
-			print("Color Flow [settings] error:\n" + traceback.format_exc())
-
 	# Re-read colorNames.txt and rebuild the palette after a Settings-panel save.
 	@objc.python_method
 	def reload_after_settings(self):
@@ -1218,7 +1206,6 @@ class ColorFlow(PalettePlugin):
 					view.addTrackingArea_(area)
 				except Exception:
 					pass
-			self._build_meta_strip(order, glyphCount, masterId)
 			self._update_title_bar()
 		except Exception:
 			import traceback
@@ -1445,41 +1432,6 @@ class ColorFlow(PalettePlugin):
 		return top
 
 	@objc.python_method
-	def _dump_view_hierarchy(self):
-		if getattr(self, "_dumpedHierarchy", False):
-			return
-		self._dumpedHierarchy = True
-		try:
-			lines = ["Color Flow [header dump v2] window tree (class ='text' frame):"]
-			count = [0]
-			def walk(v, depth):
-				if v is None or count[0] > 90 or depth > 12:
-					return
-				count[0] += 1
-				text = ""
-				try:
-					if v.isKindOfClass_(AppKit.NSTextField):
-						text = " ='%s'" % str(v.stringValue())
-				except Exception:
-					pass
-				try:
-					fr = v.frame()
-					rect = " (%d,%d,%d,%d)" % (fr.origin.x, fr.origin.y, fr.size.width, fr.size.height)
-				except Exception:
-					rect = ""
-				lines.append("  " * depth + v.className() + text + rect)
-				try:
-					for sub in v.subviews():
-						walk(sub, depth + 1)
-				except Exception:
-					pass
-			walk(self._window_root(), 0)
-			print("\n".join(lines))
-		except Exception:
-			import traceback
-			print("Color Flow [header dump] error:\n" + traceback.format_exc())
-
-	@objc.python_method
 	def _search_title(self, view, depth):
 		if view is None or depth > 12:
 			return None
@@ -1606,62 +1558,6 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			pass
 
-	# Palette body: a single stacked colour bar for the SELECTED master (replaces
-	# the per-step rows). Each segment is one step, sized by its glyph count, with
-	# a label-and-count tooltip. Per-step detail lives in eye mode + the dashboard.
-	@objc.python_method
-	def _build_body_bar(self, order, glyphCount, masterId):
-		frame = self.paletteView.frame
-		attrs = []
-		if not glyphCount:
-			self._bodyAttrs = attrs
-			return
-		try:
-			masterName = self.font.selectedFontMaster.name or ""
-		except Exception:
-			masterName = ""
-		frame.cfBodyLabel = TextBox((4, 4, -4, 14), masterName, sizeStyle='small')
-		attrs.append("cfBodyLabel")
-		colors = []
-		for glyph in self.font.glyphs:
-			layer = glyph.layers[masterId]
-			colors.append(layer.color if layer is not None else None)
-		exclusive = colornames.single_counts_from_colors(colors, order)
-		barY, barH = 24, 16
-		usable = self.width - 8
-		setattr(frame, "cfBodyTrack", Box((4, barY, usable, barH),
-			fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(0.5, 0.5, 0.5, 0.14),
-			cornerRadius=4, borderWidth=0))
-		attrs.append("cfBodyTrack")
-		xPos = 4.0
-		for key in order:
-			count = exclusive.get(key, 0)
-			if not count:
-				continue
-			segWidth = usable / glyphCount * count
-			rgb = self.colorKeys.get(str(key), (0.5, 0.5, 0.5, 0.5))
-			name = "cfBody" + str(key)
-			box = Box((xPos, barY, segWidth + 0.01, barH),
-				fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.9),
-				cornerRadius=0, borderWidth=0)
-			setattr(frame, name, box)
-			try:
-				self._ns_button(box).setToolTip_("%s \u00b7 %d" % (self.meaning.get(str(key), str(key)), count))
-			except Exception:
-				pass
-			attrs.append(name)
-			xPos += segWidth
-		self._bodyAttrs = attrs
-
-	# Top strip: a fire progress-streak badge (#17) and a thin 100%-stacked
-	# whole-master progress ribbon (#23), drawn in the top band above the rows so
-	# the palette height is unchanged. Torn down each rebuild via self._metaAttrs.
-	@objc.python_method
-	def _build_meta_strip(self, order, glyphCount, masterId):
-		frame = self.paletteView.frame
-		attrs = []
-		self._metaAttrs = attrs
-
 	# UPDATEINTERFACE handler: cheap dirty-check on selection + layer colours.
 	@objc.python_method
 	def update(self, sender):
@@ -1701,52 +1597,6 @@ class ColorFlow(PalettePlugin):
 		# are derived from layer colours, so drop them and let Update_Plugin_UI
 		# recompute. (Nothing else invalidates them now the palette is display-only.)
 		self._invalidate_counts(masterId)
-		self.Update_Plugin_UI()
-
-	# Toggle a step: recompute the native layer colour (the saved source of truth).
-	@objc.python_method
-	def CheckBox_Callback(self, sender):
-		if not self.font:
-			return
-		# An NSButton can still fire its action at the end of a drag-to-reorder
-		# gesture. Ignore that spurious toggle (within ~250ms of real drag motion)
-		# so reordering never accidentally recolours the selected glyphs.
-		lastDrag = getattr(self, "_lastDragTime", None)
-		if lastDrag is not None and (datetime.now() - lastDrag).total_seconds() < 0.25:
-			return
-		color = None
-		for candidate, checkbox in getattr(self, "_rowChecks", {}).items():
-			if checkbox is sender:
-				color = candidate
-				break
-		if color is None:
-			return
-		checked = bool(sender.get())
-		order = list(self.meaning.keys())
-		master = self.font.selectedFontMaster
-		selectedLayers = self.font.selectedLayers
-		if master is None or not selectedLayers:
-			# No glyph/layer selected (e.g. clicked from Font View with nothing
-			# selected): nothing to toggle. Rebuild so the box snaps back to its
-			# derived (unchecked) state instead of looking toggled.
-			self._lastSignature = None
-			self.Update_Plugin_UI()
-			return
-		masterId = master.id
-		self.font.disableUpdateInterface()
-		try:
-			for layer in selectedLayers:
-				if self._free_mode():
-					# single-select: this colour exclusively, or clear if re-clicked
-					layer.color = int(color) if checked else None
-				else:
-					state = colornames.checked_state_for_color(layer.color, order)
-					state[color] = checked
-					layer.color = colornames.layer_color_for_state(state, order)
-			self._invalidate_counts(masterId)
-		finally:
-			self.font.enableUpdateInterface()
-		self._lastSignature = None
 		self.Update_Plugin_UI()
 
 	########################################################################################################
