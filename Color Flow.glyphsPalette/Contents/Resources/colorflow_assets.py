@@ -2515,10 +2515,18 @@ DASHBOARD_JS = r"""
       try { localStorage.setItem("cfd-theme", state.theme); } catch(e){}
       document.documentElement.setAttribute("data-theme", state.theme);
     });
+    // Switch view by chip. Leaving the Overview tab clears any colour focus, so the
+    // tower discs + heatmap return to the full distribution (focus only lives in
+    // Overview); the tower's render loop picks up the cleared state.focus next frame.
+    function toggleView(name){
+      var v = state.view===name ? "tabs" : name;
+      if (v!=="tabs"){ state.focus = null; }
+      state.view = v; update();
+    }
     document.getElementById("cfd-overview").addEventListener("click", function(){ state.view = "tabs"; state.master = null; update(); });
-    document.getElementById("cfd-compare").addEventListener("click", function(){ state.view = state.view==="compare" ? "tabs" : "compare"; update(); });
-    document.getElementById("cfd-coverage").addEventListener("click", function(){ state.view = state.view==="coverage" ? "tabs" : "coverage"; update(); });
-    document.getElementById("cfd-timeline").addEventListener("click", function(){ state.view = state.view==="timeline" ? "tabs" : "timeline"; update(); });
+    document.getElementById("cfd-compare").addEventListener("click", function(){ toggleView("compare"); });
+    document.getElementById("cfd-coverage").addEventListener("click", function(){ toggleView("coverage"); });
+    document.getElementById("cfd-timeline").addEventListener("click", function(){ toggleView("timeline"); });
     document.getElementById("cfd-export").addEventListener("click", openExport);
     document.getElementById("cfd-help").addEventListener("click", openHelp);
     document.addEventListener("keydown", function(e){

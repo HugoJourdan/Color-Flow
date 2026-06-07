@@ -200,6 +200,17 @@ def test_dashboard_js_routes_focus_through_setfocus() -> None:
     assert "barsAnim = (state.master !== barMaster)" in js       # one-shot fill flag
 
 
+def test_dashboard_js_clears_focus_when_leaving_overview() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function toggleView(" in js
+    # leaving Overview (any non-"tabs" view) clears the colour focus
+    assert 'if (v!=="tabs"){ state.focus = null; }' in js
+    # the chips route through the helper rather than setting state.view inline
+    assert 'toggleView("compare")' in js
+    assert 'toggleView("coverage")' in js
+    assert 'toggleView("timeline")' in js
+
+
 def test_dashboard_js_has_journey_helpers() -> None:
     js = assets.DASHBOARD_JS
     assert "function journeyOf(" in js
