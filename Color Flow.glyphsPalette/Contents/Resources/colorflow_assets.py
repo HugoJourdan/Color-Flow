@@ -174,6 +174,11 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .chg .arr{color:var(--muted-2)}
 .cmp-wrap{overflow-x:auto;margin-top:8px}
 .cmp{border-collapse:collapse;width:100%;font-size:var(--fs-xs)}
+.cmprow{transition:opacity .2s ease}
+.cmp tr.cmp-dim{opacity:.3}
+.cmp tr.cmp-sel{opacity:1}
+.cmp tr.cmp-sel .cmp-m{color:var(--text);font-weight:600}
+.cmp tr.cmp-sel td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 .cmp caption{text-align:left;color:var(--muted-2);font-size:var(--fs-xs);padding-bottom:8px}
 .cmp th,.cmp td{border:1px solid var(--border);padding:4px 10px;text-align:left}
 .cmp thead th:first-child,.cmp tbody th[scope="row"]{width:1%;white-space:nowrap}
@@ -581,7 +586,8 @@ DASHBOARD_JS = r"""
         var p = pct(countFor(m,s.key),H.glyphTotal);
         return '<td><span class="cmpbar" style="width:'+p+'%;background:var('+varFor(s.key)+')"></span><span class="cmpn">'+p+'%</span></td>';
       }).join("");
-      return '<tr><th scope="row" class="cmp-m" title="'+esc(m.name)+'" aria-label="'+esc(m.name)+'">'+aa+'</th>'+cells+'</tr>';
+      var cls = state.master==null ? "" : (m.id===state.master ? " cmp-sel" : " cmp-dim");
+      return '<tr class="cmprow'+cls+'"><th scope="row" class="cmp-m" title="'+esc(m.name)+'" aria-label="'+esc(m.name)+'">'+aa+'</th>'+cells+'</tr>';
     }).join("");
     return '<div class="cmp-wrap"><table class="cmp"><caption>Step completion by master</caption><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
   }
@@ -979,7 +985,7 @@ DASHBOARD_JS = r"""
         var ex=(px-geo.cx)/geo.rx, ey=(py-cy)/geo.ry;
         if (ex*ex+ey*ey<=1){ var id=H.masters[i].id;
           state.master = (state.master===id) ? null : id;   // click the selected disc -> clear focus
-          state.view="tabs"; update(); return; } }
+          update(); return; } }                              // keep the current view (tabs/coverage/...)
     });
     // up/down arrows switch the focused master (up = toward the top disc)
     window.addEventListener("keydown", function(e){
@@ -989,7 +995,7 @@ DASHBOARD_JS = r"""
       var cur=selIndex(), step=(e.key==="ArrowDown")?1:-1;
       var ni = cur<0 ? (step>0?0:M-1) : Math.max(0, Math.min(M-1, cur+step));
       e.preventDefault();
-      state.master=H.masters[ni].id; state.view="tabs"; update();
+      state.master=H.masters[ni].id; update();   // keep the current view
     });
     loop();
   }
