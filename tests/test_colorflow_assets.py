@@ -1013,10 +1013,11 @@ def test_dashboard_css_styles_time_machine_classes() -> None:
     assert "var(--" in machine_rule
 
 
-def test_dashboard_js_scrub_diff_rings_compare_prev_vs_cur() -> None:
+def test_dashboard_js_scrub_diff_flash_compares_prev_vs_cur() -> None:
     """#12: when state.tlScrub changes, the recolour diffs stateAt(master, prevDate)
-    vs stateAt(master, curDate). Cells whose glyph advanced get a green ring, regressed
-    an amber ring. The diff reuses the shared stateAt + rankOf helpers (not reinvented),
+    vs stateAt(master, curDate). The cell background simply fades to its new colour and
+    a recolouring cell gets a transient brightness flash (no directional green/amber
+    stroke). The diff reuses the shared stateAt + rankOf helpers (not reinvented),
     and is computed per scrub step against the previous snapshot's date."""
     js = assets.DASHBOARD_JS
     recolour = js.split("function scrubRecolour(")[1].split("\n  function ")[0]
@@ -1025,25 +1026,18 @@ def test_dashboard_js_scrub_diff_rings_compare_prev_vs_cur() -> None:
     assert "rankOf(" in recolour                  # advanced/regressed via the shared rank
     # the previous index/date is what makes it a per-step diff (idx-1)
     assert "idx-1" in recolour or "idx - 1" in recolour or "prev" in recolour.lower()
-    # apply the transient ring classes (green = advanced, amber = regressed)
-    assert "tl-ring-up" in recolour
-    assert "tl-ring-down" in recolour
-    assert "tl-ring" in recolour
+    # the recolouring cell flashes (brightness) — the old green/red ring is gone
+    assert "tl-flash" in recolour
+    assert "tl-ring" not in recolour
 
 
-def test_dashboard_js_scrub_diff_ring_class_added_then_removed() -> None:
-    """The ring is a transient highlight: the class is applied then removed (or a
-    self-clearing keyframe drives it) so it flashes for one scrub step rather than
-    sticking. classList.add + a timed remove (or animationend) clears it."""
+def test_dashboard_js_scrub_flash_class_added_then_removed() -> None:
+    """The flash is a transient highlight: the class is applied then removed on a timer
+    so it brightens for one scrub step rather than sticking."""
     js = assets.DASHBOARD_JS
     recolour = js.split("function scrubRecolour(")[1].split("\n  function ")[0]
-    assert "classList.add(" in recolour
-    # the ring is cleared again: explicit remove, or a self-terminating animation
-    assert (
-        "classList.remove(" in recolour
-        or "setTimeout(" in recolour
-        or "animationend" in recolour
-    )
+    assert 'classList.add("tl-flash")' in recolour
+    assert "classList.remove" in recolour and "setTimeout(" in recolour
 
 
 def test_dashboard_js_scrub_diff_chip_counts_advanced_regressed() -> None:
@@ -1069,20 +1063,27 @@ def test_dashboard_js_scrub_diff_rings_respect_reduced_motion() -> None:
     assert "__cfdNoAnim" in recolour or "prefers-reduced-motion" in recolour
 
 
-def test_dashboard_css_styles_scrub_diff_ring_classes() -> None:
-    """#12: the ring classes are theme-safe (built from tokens) and reduced-motion
-    swaps the pulse for a static border. A keyframe drives the pulse; the
-    prefers-reduced-motion media query neutralises the animation."""
+def test_dashboard_css_styles_scrub_diff_flash() -> None:
+    """#12: the Time Machine cells fade their background (CSS transition) and a
+    recolouring cell brightens ~10% via the .tl-flash class. Reduced-motion neutralises
+    the cell transition. The old green/amber ring rules are gone."""
     css = assets.DASHBOARD_CSS
-    for selector in (".tl-ring", ".tl-ring-up", ".tl-ring-down", ".tl-scrub-diff"):
-        assert selector in css, selector
-    up_rule = css.split(".tl-ring-up{")[1].split("}")[0]
-    down_rule = css.split(".tl-ring-down{")[1].split("}")[0]
-    assert "var(--" in up_rule
-    assert "var(--" in down_rule
-    # the pulsing ring is animated, and reduced-motion neutralises that animation
+    assert ".tl-scrub-diff" in css
+    # cells transition background + filter so the recolour fades and the flash eases
+    # (pick the real rule, not the reduced-motion `.tl-machine-grid .cell{transition:none}`)
+    grid_cell = next(
+        part for part in css.split(".tl-machine-grid .cell{")[1:]
+        if part.startswith("aspect-ratio")
+    ).split("}")[0]
+    assert "transition:background" in grid_cell and "filter" in grid_cell
+    # the flash brightens the cell ~10%
+    flash = css.split(".tl-machine-grid .cell.tl-flash{")[1].split("}")[0]
+    assert "brightness(1.1)" in flash
+    # the old directional ring rules are removed entirely
+    assert ".tl-ring" not in css
+    # reduced-motion neutralises the cell transition
     rm_block = css.split("@media (prefers-reduced-motion:reduce){")[1].split("}}")[0]
-    assert "tl-ring" in rm_block
+    assert ".tl-machine-grid .cell{transition:none}" in rm_block
 
 
 def test_dashboard_js_has_seed_state_builder() -> None:

@@ -104,7 +104,7 @@ html,body{margin:0}
 body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains Mono",monospace;
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
-@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro{animation:none}.heat,.heat.fading{transition:none;opacity:1}.tl-ring{animation:none!important}.tl-seed-shimmer .tl-seed-ghost{animation:none}}
+@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro{animation:none}.heat,.heat.fading{transition:none;opacity:1}.tl-machine-grid .cell{transition:none}.tl-seed-shimmer .tl-seed-ghost{animation:none}}
 #cfd-app{max-width:1180px;margin:0 auto;padding:0 20px}
 #cfd-main{display:flex;gap:24px;align-items:flex-start}
 #cfd-tower{position:sticky;top:0;flex:0 0 240px;width:240px}
@@ -416,7 +416,8 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-scrub-diff .du{color:var(--ok)}
 .tl-scrub-diff .dd{color:var(--c0)}
 .tl-machine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(20px,1fr));gap:3px}
-.tl-machine-grid .cell{aspect-ratio:1;border-radius:4px;cursor:default;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.tl-machine-grid .cell{aspect-ratio:1;border-radius:4px;cursor:default;box-shadow:inset 0 0 0 1px var(--swatch-outline);transition:background .45s ease,filter .45s ease}
+.tl-machine-grid .cell.tl-flash{filter:brightness(1.1)}
 .tl-machine-grid .cell svg{padding:2px}
 .tl-cal-card{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
 .tl-cal-h{display:flex;align-items:center;gap:10px;font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
@@ -454,11 +455,6 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-mcal-snap.lv4{background:var(--accent);color:#fff}
 .tl-mcal-snap:hover{outline:1px solid var(--text);outline-offset:1px}
 .tl-mcal-n{pointer-events:none}
-.tl-ring{position:relative;z-index:1}
-.tl-ring-up{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 2px var(--ok);animation:tlRingUp .6s ease-out}
-.tl-ring-down{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 2px var(--c1);animation:tlRingDown .6s ease-out}
-@keyframes tlRingUp{0%{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 0 var(--ok)}40%{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 3px var(--ok)}100%{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 0 var(--ok)}}
-@keyframes tlRingDown{0%{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 0 var(--c1)}40%{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 3px var(--c1)}100%{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 0 var(--c1)}}
 .dz{font-size:var(--fs-xs);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:4px 9px;color:var(--muted)}
 .dz-up{border-color:var(--ok);color:var(--ok)}
 .dz-down{border-color:var(--c0);color:var(--c0)}
@@ -1782,21 +1778,22 @@ DASHBOARD_JS = r"""
       var cell = cells[i], name = cell.getAttribute("data-glyph");
       var key = (name != null && st[name] != null) ? st[name] : -1;
       var v = varFor(key);
+      // The background change fades via the cell's CSS transition. No directional
+      // colour — every recolouring cell just fades to its new hue.
       cell.style.background = "color-mix(in srgb,var("+v+") 35%,transparent)";
-      cell.classList.remove("tl-ring", "tl-ring-up", "tl-ring-down");
+      cell.classList.remove("tl-flash");
       if (prev){
         var was = (name != null && prev[name] != null) ? prev[name] : -1;
         var dir = rankOf(key) - rankOf(was);
         if (dir !== 0){
-          var ringCell = cell;
-          ringCell.classList.add("tl-ring", dir > 0 ? "tl-ring-up" : "tl-ring-down");
           if (dir > 0) advanced++; else regressed++;
           if (!noAnim){
-            // transient pulse: drop the class after the keyframe so the next identical
-            // step can re-trigger it (reduced-motion keeps the static border in place).
-            setTimeout((function(el){ return function(){
-              el.classList.remove("tl-ring", "tl-ring-up", "tl-ring-down");
-            }; })(ringCell), 650);
+            // brighten the recolouring cell ~10% during the background fade, then let
+            // it ease back (filter transition) — replaces the old green/red stroke.
+            (function(el){
+              el.classList.add("tl-flash");
+              setTimeout(function(){ el.classList.remove("tl-flash"); }, 450);
+            })(cell);
           }
         }
       }
