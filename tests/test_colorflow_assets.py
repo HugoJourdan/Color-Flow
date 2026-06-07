@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import gzip
 import json
 
 import colorflow_assets as assets
@@ -24,8 +26,9 @@ def test_build_html_is_self_contained_and_accessible() -> None:
     assert html.startswith("<!DOCTYPE html>")
     assert 'lang="en"' in html
     assert '<style>' in html and assets.DASHBOARD_CSS[:20].strip() in html
-    assert 'id="cfd-model"' in html            # model embedded
-    assert "JSON.parse" in html                # app script inlined
+    assert 'id="cfd-model-gz"' in html         # gzipped model embedded
+    assert "JSON.parse" in html                # app script inlined (parses the decompressed model)
+    assert "DecompressionStream" in html       # client gunzips the model
     assert "<noscript>" in html
     assert ":root{" in html                     # dark default tokens
     assert "html[data-theme=light]" in html     # light theme
@@ -40,15 +43,15 @@ def test_build_html_title_from_model_is_escaped() -> None:
     assert "<title>CF - a&lt;b&gt;</title>" in html
 
 
-def test_embed_model_is_parseable_and_neutralises_script_breakout() -> None:
+def test_embed_model_gzips_and_neutralises_script_breakout() -> None:
     model = _model()
     model["glyphNames"] = ["</script><b>x", "A"]  # hostile glyph name
     block = assets.embed_model(model)
-    assert 'id="cfd-model"' in block
-    assert "</script><b>" not in block          # the raw breakout never appears
-    # the payload between the tags round-trips back to the original model
+    assert 'id="cfd-model-gz"' in block
+    assert "</script><b>" not in block          # base64 cannot reproduce the breakout
+    # the base64 payload between the tags gunzips back to the original model
     payload = block.split(">", 1)[1].rsplit("<", 1)[0]
-    assert json.loads(payload) == model
+    assert json.loads(gzip.decompress(base64.b64decode(payload))) == model
 
 
 def test_color_overrides_injected_after_base_css() -> None:

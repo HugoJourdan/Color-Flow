@@ -8,17 +8,21 @@ no dependencies. The model is the single source of truth the JS app renders.
 
 from __future__ import annotations
 
+import base64
+import gzip
 import json
 from xml.sax.saxutils import escape as xesc
 
 
 def embed_model(model: dict) -> str:
-    """Serialise the model into a ``<script type="application/json">`` block.
-    ``<`` / ``>`` / ``&`` are escaped to their JSON ``\\uXXXX`` forms so no glyph
-    name or label can terminate the script element (e.g. ``</script>``)."""
-    payload = (json.dumps(model, ensure_ascii=False)
-               .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
-    return f'<script type="application/json" id="cfd-model">{payload}</script>'
+    """Serialise the model, gzip it, and embed as base64 in a non-executed
+    ``<script>`` block. The client decompresses it with ``DecompressionStream``.
+    base64's alphabet (``A-Za-z0-9+/=``) contains no ``<`` ``>`` ``&`` ``"``, so
+    it can't terminate the script element or break any attribute — no escaping
+    needed — and it shrinks the (outline-heavy) model ~4-5x on disk."""
+    raw = json.dumps(model, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    payload = base64.b64encode(gzip.compress(raw, compresslevel=9)).decode("ascii")
+    return f'<script type="application/octet-stream" id="cfd-model-gz">{payload}</script>'
 
 
 def _color_overrides(model: dict) -> str:
@@ -294,9 +298,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible,.cell:focus-visib
 DASHBOARD_JS = r"""
 (function(){
   "use strict";
-  var node = document.getElementById("cfd-model");
-  var H = JSON.parse(node.textContent);
-  var lastOrder = H.order.length ? H.order[H.order.length-1] : null;
+  var H, lastOrder;   // assigned once the gzipped model is decompressed (see start())
 
   var savedTheme = null;
   try { savedTheme = localStorage.getItem("cfd-theme"); } catch(e){}
@@ -1292,7 +1294,30 @@ DASHBOARD_JS = r"""
     // tagging them ".intro" so later re-renders don't re-animate.
     requestAnimationFrame(function(){ document.body.classList.add("ready"); introDone = true; });
   }
-  if (document.readyState!=="loading") init();
-  else document.addEventListener("DOMContentLoaded", init);
+  // Decompress the gzipped model (base64 -> bytes -> gunzip stream -> JSON),
+  // then boot. Falls back to a plain JSON block if one is present.
+  function b64bytes(b64){ var bin=atob(b64), n=bin.length, a=new Uint8Array(n); for (var i=0;i<n;i++) a[i]=bin.charCodeAt(i); return a; }
+  function loadModel(){
+    var gz = document.getElementById("cfd-model-gz");
+    if (gz){
+      if (typeof DecompressionStream==="undefined" || typeof Response==="undefined" || typeof Blob==="undefined")
+        return Promise.reject(new Error("This report needs a modern browser (gzip decompression)."));
+      var stream = new Blob([b64bytes(gz.textContent.trim())]).stream().pipeThrough(new DecompressionStream("gzip"));
+      return new Response(stream).text().then(function(t){ return JSON.parse(t); });
+    }
+    var plain = document.getElementById("cfd-model");   // legacy uncompressed model
+    return Promise.resolve(JSON.parse(plain.textContent));
+  }
+  function start(){
+    loadModel().then(function(model){
+      H = model; lastOrder = H.order.length ? H.order[H.order.length-1] : null;
+      init();
+    }).catch(function(err){
+      var app = document.getElementById("cfd-app");
+      if (app) app.innerHTML = '<p style="padding:48px 24px;color:#888;font:14px/1.5 system-ui,sans-serif">'+esc(err && err.message || "Could not load the report data.")+'</p>';
+    });
+  }
+  if (document.readyState!=="loading") start();
+  else document.addEventListener("DOMContentLoaded", start);
 })();
 """
