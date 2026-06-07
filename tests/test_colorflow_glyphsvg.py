@@ -30,7 +30,7 @@ class _FakeBezier:
     def elementCount(self) -> int:
         return len(self._elements)
 
-    def elementAtIndex_associatedPoints_(self, index: int):
+    def elementAtIndex_associatedPoints_(self, index: int) -> tuple[int, list[_FakePoint]]:
         element_type, points = self._elements[index]
         return element_type, [_FakePoint(x, y) for x, y in points]
 
@@ -110,3 +110,86 @@ def test_layer_outline_em_empty_without_path() -> None:
         bezierPath = None
 
     assert glyphsvg.layer_outline_em(_NoPath(), 1000.0) == {}
+
+
+class _BadPoint:
+    """A point whose coordinate access raises, to model a malformed element."""
+
+    @property
+    def x(self) -> float:
+        raise ValueError("malformed point")
+
+    @property
+    def y(self) -> float:
+        raise ValueError("malformed point")
+
+
+class _BezierWithBadElement:
+    """Like ``_FakeBezier`` but one element index yields a point that raises, so we
+    can assert a single bad element is skipped without losing the rest."""
+
+    def __init__(self, elements: list, bad_index: int) -> None:
+        self._elements = elements
+        self._bad_index = bad_index
+
+    def elementCount(self) -> int:
+        return len(self._elements)
+
+    def elementAtIndex_associatedPoints_(self, index: int) -> tuple[int, list[object]]:
+        element_type, points = self._elements[index]
+        if index == self._bad_index:
+            return element_type, [_BadPoint()]
+        return element_type, [_FakePoint(x, y) for x, y in points]
+
+
+def test_one_bad_element_is_skipped_not_whole_glyph() -> None:
+    # move, (bad line at index 1), line, close — the good segments must survive.
+    bezier = _BezierWithBadElement(
+        [(0, [(0, 0)]), (1, [(50, 0)]), (1, [(100, 0)]), (3, [])], bad_index=1
+    )
+    # Only the malformed line is dropped; the rest of the contour remains.
+    assert glyphsvg.layer_svg_path(_FakeLayer(bezier)) == "M0 0L100 0Z"
+
+
+def test_quadratic_element_is_converted_to_cubic() -> None:
+    # quad from (0, 0) via control (60, 60) to (120, 0): elevate to a cubic.
+    bezier = _FakeBezier([(0, [(0, 0)]), (4, [(60, 60), (120, 0)]), (3, [])])
+    d = glyphsvg.layer_svg_path(_FakeLayer(bezier))
+    # control_1 = (0,0)+2/3*((60,60)-(0,0)) = (40, 40)
+    # control_2 = (120,0)+2/3*((60,60)-(120,0)) = (80, 40)
+    assert d == "M0 0C40 -40 80 -40 120 0Z"
+
+
+def test_quadratic_keeps_contour_continuous() -> None:
+    # A quad element must not blank the path nor leave a gap before the close.
+    bezier = _FakeBezier([(0, [(0, 0)]), (1, [(100, 0)]),
+                          (4, [(150, 50), (100, 100)]), (3, [])])
+    d = glyphsvg.layer_svg_path(_FakeLayer(bezier))
+    assert d.startswith("M0 0L100 0C")
+    assert d.endswith("100 -100Z")
+
+
+def test_unknown_element_falls_back_to_line_to_endpoint() -> None:
+    # Unknown element type 7 must degrade to a line-to its endpoint, not a hole.
+    bezier = _FakeBezier([(0, [(0, 0)]), (7, [(40, 40), (80, 0)]), (3, [])])
+    # endpoint is the last associated point (80, 0); flipped Y keeps it on 0.
+    assert glyphsvg.layer_svg_path(_FakeLayer(bezier)) == "M0 0L80 0Z"
+
+
+def test_view_box_uses_on_curve_bounds_not_control_points() -> None:
+    # A curve whose control points bulge far outside the on-curve endpoints.
+    # On-curve points: (0, 0) and (100, 0); controls (50, 999)/(50, -999) ignored.
+    elements = [("move", [(0, 0)]),
+                ("curve", [(50, 999), (50, -999), (100, 0)]), ("close", [])]
+    # Tight box on on-curve bounds [0..100] x [0..0] with pad 40.
+    assert glyphsvg.view_box(elements, pad=40) == "-40 -40 180 80"
+
+
+def test_layer_outline_em_centres_on_on_curve_bounds() -> None:
+    # Control points bulge far off-curve; centring must ignore them.
+    bezier = _FakeBezier([(0, [(0, 0)]), (1, [(200, 0)]),
+                          (2, [(100, 5000), (100, 5000), (200, 400)]), (3, [])])
+    outline = glyphsvg.layer_outline_em(_FakeLayer(bezier), em_height=1000.0)
+    # On-curve xs: 0, 200, 200 -> centre 100; ys: 0, 0, 400 -> centre 200.
+    # box_x = 100 - 500 = -400; box_y = -200 - 500 = -700.
+    assert outline["vb"] == "-400 -700 1000 1000"
