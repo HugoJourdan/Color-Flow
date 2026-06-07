@@ -720,12 +720,19 @@ DASHBOARD_JS = r"""
   }
   function overviewExtras(){
     if (!H.masters.length) return "";
-    return '<div class="ov-extra">'+regressionCard()+recentCard()+leaderboard()+histogram()+timelineCard()+'</div>';
+    return '<div class="ov-extra">'+leaderboard()+histogram()+timelineCard()+'</div>';
+  }
+  // Regression + Recent are per-master change feeds, so they belong with the
+  // selected master, not the global Overview. Both already key off state.master
+  // (set here), so they render that master's regressions/recent activity.
+  function masterExtras(){
+    var cards = regressionCard()+recentCard();
+    return cards ? '<div class="ov-extra">'+cards+'</div>' : "";
   }
   function tabsView(){
     if (state.master==null) return overall()+overviewExtras();   // no master selected -> global view + extras
     var m = masterById(state.master);
-    return '<div class="panel" role="tabpanel">'+masterOverall(m)+heatmap(m)+'</div>';
+    return '<div class="panel" role="tabpanel">'+masterOverall(m)+heatmap(m)+masterExtras()+'</div>';
   }
   function covStacked(r){
     // a left-aligned stacked bar of the colours actually set in this group, each

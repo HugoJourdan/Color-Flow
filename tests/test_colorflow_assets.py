@@ -210,6 +210,19 @@ def test_dashboard_js_has_regression_card() -> None:
     assert "varFor(key)" in js
 
 
+def test_dashboard_js_regression_and_recent_are_per_master_only() -> None:
+    js = assets.DASHBOARD_JS
+    # The global Overview extras must NOT call the per-master change feeds.
+    extras = js.split("function overviewExtras(")[1].split("}")[0]
+    assert "regressionCard(" not in extras
+    assert "recentCard(" not in extras
+    # They live in the per-master panel instead, scoped to state.master.
+    assert "function masterExtras(" in js
+    master_extras = js.split("function masterExtras(")[1].split("}")[0]
+    assert "regressionCard()" in master_extras and "recentCard()" in master_extras
+    assert "masterExtras()" in js.split("function tabsView(")[1].split("}")[0]
+
+
 def test_dashboard_js_regression_card_hidden_when_zero() -> None:
     js = assets.DASHBOARD_JS
     # The builder returns "" when no regressions are found.
