@@ -168,8 +168,24 @@ def test_build_html_has_script_coverage_grid() -> None:
     assert "function paintScriptCards(" in html        # post-render canvas paint
     assert "paintScriptCards();" in html               # called from update()
     assert ".sgrid{" in html and 'class="scard"' in html
-    assert 'state.coverGroup==="byScript"' in html and "scriptGrid()" in html  # Script tab -> grid
-    assert "function scriptRows(" in html              # per-master / aggregated rows
+    assert "function scriptRows(" in html              # per-master rows
+
+
+def test_coverage_tab_has_no_toggle_categories_then_scripts() -> None:
+    html = assets.build_html(_model())
+    assert "coverGroup" not in html                    # Script/Category toggle removed
+    assert "Colours set by category" in html           # categories always rendered first
+    assert "scripts.length > 1" in html and "scriptGrid()" in html  # scripts below, only if >1
+    # scriptRows defaults to the first master when none is focused (matches categories)
+    assert "state.master != null ? state.master : ((H.masters[0]||{}).id)" in html
+
+
+def test_coverage_bar_has_no_inline_percent_uses_hover_tooltip() -> None:
+    html = assets.build_html(_model())
+    assert 'class="cov-pct"' not in html               # inline % text removed from the bars
+    assert 'labelFor(parseInt(k,10))+" — "+Math.round(w)+"%"' in html  # % + label now on hover
+    assert ".cov-bar{flex:1;display:flex;height:10px;border-radius:5px" in html  # smaller, pill like Overview
+    assert ".cov-row{display:flex;align-items:center;gap:12px;font-size:var(--fs-xs)" in html  # Compare font size
 
 
 def test_dashboard_js_has_expandable_overview_cards_and_timeline_card() -> None:

@@ -240,14 +240,11 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .cov{margin-top:6px}
 .cov-h{display:flex;align-items:center;gap:12px;margin:10px 0 4px}
 .cov-title{font-size:var(--fs-sm);color:var(--muted)}
-.cov-switch{margin-left:auto;display:flex;gap:6px}
-.cov-switch .chip.on{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
 .cov-rows{margin:6px 0 4px}
-.cov-row{display:flex;align-items:center;gap:12px;font-size:var(--fs-row);padding:9px 0;border-top:1px solid var(--track)}
+.cov-row{display:flex;align-items:center;gap:12px;font-size:var(--fs-xs);padding:9px 0;border-top:1px solid var(--track)}
 .cov-name{width:120px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cov-bar{flex:1;display:flex;height:18px;border-radius:5px;overflow:hidden;background:var(--track);min-width:0}
+.cov-bar{flex:1;display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--track);min-width:0}
 .cov-bar>span{display:flex;align-items:center;justify-content:center;height:100%;min-width:0;overflow:hidden}
-.cov-bar .cov-pct{font-size:var(--fs-2xs);line-height:1;color:#fff;mix-blend-mode:difference;white-space:nowrap;padding:0 2px}
 .cov-bar .cov-none{background:var(--c-none)}
 .cov-row .num{width:auto;min-width:48px;text-align:right;color:var(--muted)}
 .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px;margin:12px 0 4px}
@@ -475,7 +472,7 @@ DASHBOARD_JS = r"""
   var state = {
     master: null,                          // no master selected -> global overview
     view: "tabs", before: false, sort: "workflow",
-    coverGroup: "byCategory", glyphSort: "category", focus: null,
+    glyphSort: "category", focus: null,
     ovExpand: {},                          // which Overview cards are expanded
     tlMode: "line",                        // Timeline chart mode: "line" | "flow" (streamgraph)
     tlScrub: null,                         // Time Machine scrubber index (null -> latest snapshot)
@@ -892,21 +889,21 @@ DASHBOARD_JS = r"""
     return '<div class="panel" role="tabpanel">'+masterOverall(m)+heatmap(m)+masterExtras()+'</div>';
   }
   function covStacked(r){
-    // a left-aligned stacked bar of the colours actually set in this group, each
-    // segment labelled with its share (shown only when the segment is wide enough)
+    // a left-aligned stacked bar of the colours actually set in this group; no inline
+    // text — each segment's colour label + share show in a hover tooltip instead.
     var dist = r.dist || {};
     function seg(w, bg, cls, title){
-      var label = w >= 7 ? '<span class="cov-pct">'+Math.round(w)+'%</span>' : '';
-      return '<span'+(cls?' class="'+cls+'"':'')+' style="width:'+w+'%;background:'+bg+'" title="'+title+'">'+label+'</span>';
+      return '<span'+(cls?' class="'+cls+'"':'')+' style="width:'+w+'%;background:'+bg+'" title="'+title+'"></span>';
     }
     var segs = H.order.map(function(k){
       var c = dist[k] || 0;
       if (!c) return "";
       var w = r.total ? (c/r.total*100) : 0;
-      return seg(w, 'var(--c'+k+')', '', esc(labelFor(parseInt(k,10))+": "+c));
+      return seg(w, 'var(--c'+k+')', '', esc(labelFor(parseInt(k,10))+" — "+Math.round(w)+"%"));
     }).join("");
     var uncolored = r.uncolored || 0;
-    if (uncolored) segs += seg(r.total?uncolored/r.total*100:0, 'var(--c-none)', 'cov-none', esc(H.noneLabel+": "+uncolored));
+    if (uncolored){ var wu = r.total ? uncolored/r.total*100 : 0;
+      segs += seg(wu, 'var(--c-none)', 'cov-none', esc(H.noneLabel+" — "+Math.round(wu)+"%")); }
     return '<div class="cov-bar" role="img" aria-label="'+esc(r.key+": colour distribution")+'">'+segs+'</div>';
   }
   // ----- Script grid: one rounded card per script, filled with that script's
@@ -918,27 +915,12 @@ DASHBOARD_JS = r"""
     return v || ("hsl("+Math.round((key*31)%360)+",65%,55%)");
   }
   function prettyScript(key){ return key==="Other" ? "Other" : key.charAt(0).toUpperCase()+key.slice(1); }
-  // Rows for the grid: the selected master's per-script coverage, or — when no
-  // master is selected — the same scripts aggregated across every master (the
-  // glyph count is constant per master, so it stays; the colour distribution
-  // sums so the blend reflects the whole family).
+  // Rows for the grid: the selected master's per-script coverage, defaulting to the
+  // first master when none is focused (same default the category rows use).
   function scriptRows(){
     var cov = (H.coverage && H.coverage.byScript) || {};
-    if (state.master != null) return cov[state.master] || [];
-    var acc = {}, masters = H.masters || [], key;
-    for (var mi=0; mi<masters.length; mi++){
-      var rows = cov[masters[mi].id] || [];
-      for (var ri=0; ri<rows.length; ri++){
-        var r = rows[ri], a = acc[r.key] || (acc[r.key] = {key:r.key, total:0, uncolored:0, dist:{}});
-        a.total = Math.max(a.total, r.total||0);
-        a.uncolored += (r.uncolored || 0);
-        var d = r.dist || {};
-        for (key in d){ if (d[key]) a.dist[key] = (a.dist[key]||0) + d[key]; }
-      }
-    }
-    var out = []; for (key in acc) out.push(acc[key]);
-    out.sort(function(p,q){ return q.total - p.total || (p.key<q.key?-1:1); });
-    return out;
+    var mid = state.master != null ? state.master : ((H.masters[0]||{}).id);
+    return cov[mid] || [];
   }
   function scriptGlyphSVG(meta){
     if (!meta || !meta.glyph) return "";
@@ -1003,20 +985,23 @@ DASHBOARD_JS = r"""
     }
   }
   function coverageView(){
-    var cov = (H.coverage && H.coverage[state.coverGroup]) || {};
+    // No toggle: categories always come first, with the per-script grid below it
+    // (only when the family actually has more than one script). Both default to the
+    // first master when none is focused.
+    var byCat = (H.coverage && H.coverage.byCategory) || {};
     var covMaster = state.master==null ? ((H.masters[0]||{}).id) : state.master;
-    var rows2 = cov[covMaster] || [];
-    var head = '<div class="cov-h"><span class="cov-title">Colours set by '+(state.coverGroup==="byScript"?"script":"category")+'</span>'
-      + '<span class="cov-switch">'
-      + '<button type="button" class="chip'+(state.coverGroup==="byScript"?" on":"")+'" data-cg="byScript" aria-pressed="'+(state.coverGroup==="byScript")+'">Script</button>'
-      + '<button type="button" class="chip'+(state.coverGroup==="byCategory"?" on":"")+'" data-cg="byCategory" aria-pressed="'+(state.coverGroup==="byCategory")+'">Category</button></span></div>';
-    if (state.coverGroup==="byScript")
-      return '<section class="cov"><div class="panel">'+head+scriptGrid()+'</div></section>';
-    var body = rows2.length ? rows2.map(function(r){
+    var catRows = byCat[covMaster] || [];
+    var catBody = catRows.length ? catRows.map(function(r){
       return '<div class="cov-row"><span class="cov-name" title="'+esc(r.key)+'">'+esc(r.key)+'</span>'
         + covStacked(r) + '<span class="num">'+r.total+'</span></div>';
     }).join("") : '<p class="empty">No glyphs.</p>';
-    return '<section class="cov"><div class="panel">'+head+'<div class="cov-rows">'+body+'</div></div></section>';
+    var catPanel = '<div class="panel"><div class="cov-h"><span class="cov-title">Colours set by category</span></div>'
+      + '<div class="cov-rows">'+catBody+'</div></div>';
+    var scripts = scriptRows().filter(function(r){ return r.key !== "Other"; });
+    var scrPanel = scripts.length > 1
+      ? '<div class="panel"><div class="cov-h"><span class="cov-title">Colours set by script</span></div>'+scriptGrid()+'</div>'
+      : '';
+    return '<section class="cov">'+catPanel+scrPanel+'</section>';
   }
   // ----- Timeline: completion over time, one line per master -----
   function masterHue(i){ return Math.round((i*137.508) % 360); }
@@ -2543,7 +2528,6 @@ DASHBOARD_JS = r"""
       var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); update(); return; }
       var ox = e.target.closest("[data-ovexpand]"); if (ox){ var ok=ox.getAttribute("data-ovexpand"); state.ovExpand[ok]=!state.ovExpand[ok]; update(); return; }
       var cr = e.target.closest(".cmprow[data-m],.lb-row[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; update(); return; }
-      var cg = e.target.closest("[data-cg]"); if (cg){ state.coverGroup = cg.getAttribute("data-cg"); update(); return; }
       var tm = e.target.closest("[data-tlmode]"); if (tm){ state.tlMode = tm.getAttribute("data-tlmode"); update(); return; }
       var gs = e.target.closest("[data-gsort]"); if (gs){ state.glyphSort = gs.getAttribute("data-gsort"); update(); return; }
       var fc = e.target.closest("[data-fclear]"); if (fc){ setFocus(null); return; }
