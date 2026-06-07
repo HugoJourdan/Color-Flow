@@ -257,6 +257,48 @@ def test_build_model_uses_default_order_over_glyph_iteration_order(tmp_path) -> 
     assert model["glyphNames"] == ["A", "B", "C"]
 
 
+def test_outline_paths_reports_monotonic_progress(tmp_path) -> None:
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(0)}),
+              _FakeGlyph("B", {"m1": _FakeLayerColor(0)})]
+    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0, "B": 1})
+    font.filepath = str(tmp_path / "Font.glyphs")
+    seen: list[float] = []
+    db._outline_paths(font, ["A", "B"], progress=seen.append)
+    assert seen, "progress callback should fire"
+    assert seen == sorted(seen)                              # monotonic non-decreasing
+    assert all(0.0 <= value <= 1.0 for value in seen)
+    assert seen[-1] == 1.0                                   # always finishes at 100%
+
+
+def test_build_model_reports_monotonic_progress(tmp_path) -> None:
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(0)}),
+              _FakeGlyph("B", {"m1": _FakeLayerColor(0)})]
+    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0, "B": 1})
+    font.filepath = str(tmp_path / "Font.glyphs")
+    current = db.build_master_glyph_colors(font)
+    seen: list[float] = []
+    db.build_model(font, datetime(2026, 6, 5), current, current, progress=seen.append)
+    assert seen, "progress callback should fire"
+    assert seen == sorted(seen)
+    assert all(0.0 <= value <= 1.0 for value in seen)
+    assert seen[-1] == 1.0
+
+
+def test_main_reports_progress_and_opens_report(tmp_path, monkeypatch) -> None:
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(0)}),
+              _FakeGlyph("B", {"m1": _FakeLayerColor(1)})]
+    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0, "B": 1})
+    font.filepath = str(tmp_path / "Font.glyphs")
+    opened: list[str] = []
+    monkeypatch.setattr(db.webbrowser, "open", lambda uri: opened.append(uri))
+    seen: list[float] = []
+    db.main(font, progress=seen.append)
+    assert opened, "the finished report should open in a browser"
+    assert seen == sorted(seen)
+    assert all(0.0 <= value <= 1.0 for value in seen)
+    assert seen[-1] == 1.0                                   # reaches 100% before opening
+
+
 def test_free_mode_reads_global_pref(monkeypatch) -> None:
     fake = _FakeGlyphsApp()
     fake.defaults[db.FREE_KEY] = True

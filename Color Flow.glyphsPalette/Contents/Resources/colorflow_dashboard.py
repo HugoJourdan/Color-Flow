@@ -601,7 +601,7 @@ def _outline_cache_store(font, cache: dict) -> None:
         pass
 
 
-def _outline_paths(font, glyph_names: list) -> dict:
+def _outline_paths(font, glyph_names: list, progress=None) -> dict:
     """Per-master ``{glyph_name: {"d", "vb"}}`` of glyph outlines for the heatmap
     cells (every glyph in font order, so any shown cell can draw its letter), each
     entry sharing the master's em box.
@@ -624,7 +624,15 @@ def _outline_paths(font, glyph_names: list) -> dict:
 
     paths: dict = {mid: {} for mid in master_ids}
     produced = 0
-    for name in glyph_names:
+    total_names = len(glyph_names) or 1
+    for position, name in enumerate(glyph_names):
+        # Outline extraction is the report's heaviest phase; report the fraction
+        # walked (every 16 glyphs) so the loader bar tracks real progress.
+        if progress is not None and position % 16 == 0:
+            try:
+                progress(position / total_names)
+            except Exception:
+                pass
         if produced >= budget:
             break
         glyph = font.glyphs[name]
@@ -666,6 +674,11 @@ def _outline_paths(font, glyph_names: list) -> dict:
         dirty = True
     if dirty:
         _outline_cache_store(font, cache)
+    if progress is not None:
+        try:
+            progress(1.0)
+        except Exception:
+            pass
     return paths
 
 
@@ -939,10 +952,14 @@ def glyph_last_edit(font, now: datetime) -> dict:
     return result
 
 
-def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
+def build_model(font, now: datetime, current: dict, previous: dict, progress=None) -> dict:
     """The full data model the JS app renders. Pure aside from reading the
     font's colorNames.txt (via _meaning_and_none) — the same source the palette
-    uses, so counts stay in lockstep."""
+    uses, so counts stay in lockstep.
+
+    ``progress`` (optional ``Callable[[float], None]``) receives a 0->1 fraction
+    so a caller can drive a determinate loader; the outline phase dominates the
+    cost, so it gets most of the band."""
     is_free = free_mode()
     meaning, none_label = _meaning_and_none(font)
     order = list(meaning.keys())
@@ -970,7 +987,14 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
             "preview": previews.get(master.id, {}),
         })
 
-    paths = _outline_paths(font, glyph_names)
+    def _outline_progress(frac: float) -> None:
+        if progress is not None:
+            try:
+                progress(0.05 + 0.90 * frac)
+            except Exception:
+                pass
+
+    paths = _outline_paths(font, glyph_names, progress=_outline_progress)
 
     # Fold today's live snapshot into the loaded history under today's date BEFORE
     # deriving trend/forecast/journeys/streak, so the first run already shows a
@@ -1004,6 +1028,12 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
                   else int(per_glyph.get(name)) for name in glyph_names]
         recipe_completion[master.id] = colorflow_recipes.recipe_completion(
             metas, colors, recipes, order, is_free)
+
+    if progress is not None:
+        try:
+            progress(1.0)
+        except Exception:
+            pass
 
     return {
         "family": font.familyName or "",
@@ -1042,7 +1072,17 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
 # Entry point
 # --------------------------------------------------------------------------- #
 
-def main(font=None) -> None:
+def main(font=None, progress=None) -> None:
+    """Build and open the report. ``progress`` (optional ``Callable[[float],
+    None]``) receives a monotonic 0->1 fraction at each phase boundary so a caller
+    can drive a determinate loading bar that tracks the real build."""
+    def _emit(frac: float) -> None:
+        if progress is not None:
+            try:
+                progress(frac)
+            except Exception:
+                pass
+
     if font is None and Glyphs is not None:
         font = Glyphs.font
     if font is None:
@@ -1053,13 +1093,18 @@ def main(font=None) -> None:
         Message("No glyphs to report on.", "Color Font Dashboard")
         return
 
+    _emit(0.02)
     now = datetime.now()
     current = build_master_glyph_colors(font)
+    _emit(0.05)
     previous = load_snapshot(font) or current
-    model = build_model(font, now, current, previous)
+    model = build_model(font, now, current, previous, progress=lambda frac: _emit(0.05 + 0.70 * frac))
+    _emit(0.80)
     html = colorflow_assets.build_html(model)
+    _emit(0.94)
     save_snapshot(font, current)
     record_history(font, current, now)
+    _emit(0.96)
 
     base = Path(font.filepath).stem if font.filepath else (font.familyName or "font")
     out_path = Path(tempfile.gettempdir()) / f"{now.strftime('%Y%m%d')} {base} — Color Flow.html"
@@ -1068,4 +1113,6 @@ def main(font=None) -> None:
     except OSError as error:
         Message(f"Could not write the dashboard:\n{error}", "Color Font Dashboard")
         return
+    _emit(0.98)
     webbrowser.open(out_path.as_uri())
+    _emit(1.0)

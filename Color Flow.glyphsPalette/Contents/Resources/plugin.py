@@ -43,7 +43,7 @@ from AppKit import (
 	NSOnState,
 	NSPanGestureRecognizer,
 )
-from Foundation import NSObject, NSRunLoop, NSRunLoopCommonModes
+from Foundation import NSDate, NSObject, NSRunLoop, NSRunLoopCommonModes
 
 # Star imports are runtime-only Glyphs globals. Order is significant: vanilla
 # first so its widgets lose any name collision to the GlyphsApp UI helpers, and
@@ -55,23 +55,54 @@ from GlyphsApp.UI import *
 from GlyphsApp import *
 
 
+_PUMP_STATE = {"last": 0.0}
+_PUMP_INTERVAL = 1.0 / 60.0
+_MAX_EVENTS_PER_PUMP = 20
+
+
+def _pump_runloop() -> None:
+	"""Drain queued events + run the run loop once so the report loader bar
+	repaints while the synchronous build holds the main thread. Throttled to
+	~60 Hz, bounded event count, fully fail-safe. Mirrors the Argus audit pump:
+	without explicit pumping the OS shows the beachball within ~2 s of unbroken
+	main-thread work and the determinate bar would freeze instead of tracking
+	real progress."""
+	import time
+	now = time.monotonic()
+	if now - _PUMP_STATE["last"] < _PUMP_INTERVAL:
+		return
+	_PUMP_STATE["last"] = now
+	try:
+		app = AppKit.NSApplication.sharedApplication()
+		for _ in range(_MAX_EVENTS_PER_PUMP):
+			event = app.nextEventMatchingMask_untilDate_inMode_dequeue_(
+				AppKit.NSEventMaskAny, NSDate.distantPast(), "kCFRunLoopDefaultMode", True)
+			if event is None:
+				break
+			app.sendEvent_(event)
+		NSRunLoop.currentRunLoop().runUntilDate_(NSDate.distantPast())
+	except Exception:
+		pass
+
+
 class _ColorFlowLoaderBar(AppKit.NSView):
 	# A self-contained "rainbow fill" loading bar for the report-generation sheet:
-	# the workflow colours fill a rounded track 0->100% with an eased motion and a
-	# live percentage. Progress is time-based, so the brief main-thread block while
-	# the report builds just skips the fill ahead rather than desyncing. Drawn with
-	# Core Graphics in an NSView, driven by a 30 Hz NSTimer added to the common
-	# run-loop modes so it keeps ticking while the sheet is presented.
+	# the workflow colours fill a rounded track 0->100% with a live percentage.
+	# Progress is REAL: the build calls set_progress() at each phase (and every few
+	# glyphs of the heavy outline pass) while _pump_runloop() keeps this view
+	# repainting through the otherwise-blocking main-thread build, so the bar tracks
+	# actual work instead of racing ahead on a timer. The 30 Hz NSTimer (added to the
+	# common run-loop modes) eases the displayed value toward the latest milestone so
+	# motion stays smooth between callbacks.
 	_SPECTRUM = (0, 1, 3, 4, 5, 6, 8, 9)   # red->green->blue->purple->pink (skip browns/greys)
 
 	@objc.python_method
-	def configure(self, rgba_colors: list, fill: float = 1.1) -> None:
-		import time
+	def configure(self, rgba_colors: list) -> None:
 		self._colors = [rgba_colors[i] for i in self._SPECTRUM if i < len(rgba_colors)]
 		if not self._colors:
 			self._colors = list(rgba_colors)
-		self._fill = float(fill)
-		self._t0 = time.monotonic()
+		self._value = 0.0    # displayed fraction (eased toward _target)
+		self._target = 0.0   # latest real-progress milestone (monotonic, never decreases)
 		self.start()
 
 	@objc.python_method
@@ -99,15 +130,25 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 			self.stop()
 
 	@objc.python_method
+	def set_progress(self, frac: float) -> None:
+		# Real-progress milestone from the build. Monotonic: only ever advances so
+		# the bar can't jump backward if a later phase reports a smaller fraction.
+		frac = 0.0 if frac < 0.0 else (1.0 if frac > 1.0 else float(frac))
+		if frac > getattr(self, "_target", 0.0):
+			self._target = frac
+		self.setNeedsDisplay_(True)
+
+	@objc.python_method
 	def _progress(self) -> float:
-		import time
-		t0 = getattr(self, "_t0", None)
-		if t0 is None:
-			return 0.0
-		fill = getattr(self, "_fill", 1.1)
-		raw = (time.monotonic() - t0) / fill if fill > 0 else 1.0
-		raw = 0.0 if raw < 0.0 else (1.0 if raw > 1.0 else raw)
-		return 1.0 - (1.0 - raw) ** 3   # easeOutCubic
+		# Ease the displayed value toward the latest milestone (~25% of the gap per
+		# tick) so the bar glides between callbacks rather than stepping.
+		target = getattr(self, "_target", 0.0)
+		value = getattr(self, "_value", 0.0)
+		value += (target - value) * 0.25
+		if target - value < 0.002:
+			value = target
+		self._value = value
+		return value
 
 	def drawRect_(self, dirtyRect: Any) -> None:
 		colors = getattr(self, "_colors", None) or []
@@ -770,20 +811,37 @@ class ColorFlow(PalettePlugin):
 			self._reportLoader = loader
 			self._reportPanel = panel
 			parent.beginSheet_completionHandler_(panel, None)
-			# Pre-roll the colour-fill (~1.1s) so it is actually seen: the synchronous
-			# report build briefly blocks the main thread and freezes the timer, so we
-			# let the bar fill first, then build + dismiss on the next run-loop hop.
-			self.performSelector_withObject_afterDelay_("runReportGeneration:", None, 1.15)
+			# Let the sheet paint once, then build on the next run-loop hop. The build
+			# drives the bar with REAL progress (set_progress + run-loop pumping), so no
+			# long pre-roll is needed — the bar tracks the actual work as it happens.
+			self.performSelector_withObject_afterDelay_("runReportGeneration:", None, 0.08)
 		except Exception:
 			import traceback
 			print("Color Flow [report sheet] error:\n" + traceback.format_exc())
 			self.Open_Color_Font_Dashboard(None)
 
 	def runReportGeneration_(self, sender) -> None:
+		loader = getattr(self, "_reportLoader", None)
+
+		def _on_progress(frac: float) -> None:
+			if loader is not None:
+				loader.set_progress(frac)
+			_pump_runloop()
+
 		try:
-			self.Open_Color_Font_Dashboard(None)
+			self._run_dashboard(_on_progress)
 		finally:
-			self._dismiss_report_sheet()
+			if loader is not None:
+				try:
+					loader.set_progress(1.0)
+				except Exception:
+					pass
+			# Build is done and the main thread is free again: let the bar visibly
+			# reach 100% (a few timer ticks) before the sheet closes.
+			self.performSelector_withObject_afterDelay_("dismissReportSheet:", None, 0.3)
+
+	def dismissReportSheet_(self, sender) -> None:
+		self._dismiss_report_sheet()
 
 	@objc.python_method
 	def _dismiss_report_sheet(self) -> None:
@@ -1859,12 +1917,19 @@ class ColorFlow(PalettePlugin):
 	# dashboard.py take effect without restarting Glyphs.
 	@objc.python_method
 	def Open_Color_Font_Dashboard(self, sender) -> None:
+		self._run_dashboard(None)
+
+	@objc.python_method
+	def _run_dashboard(self, progress=None) -> None:
+		# ``progress`` (optional ``Callable[[float], None]``) is forwarded to
+		# colorflow_dashboard.main so the report-sheet loader can track real build
+		# progress; None when opened outside the sheet flow.
 		try:
 			import importlib
 
 			import colorflow_dashboard
 			importlib.reload(colorflow_dashboard)
-			colorflow_dashboard.main(Glyphs.font)
+			colorflow_dashboard.main(Glyphs.font, progress=progress)
 		except Exception:
 			import traceback
 			print("Color Flow [dashboard] error:\n" + traceback.format_exc())
