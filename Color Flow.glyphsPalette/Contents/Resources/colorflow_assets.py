@@ -852,7 +852,7 @@ DASHBOARD_JS = r"""
       for (var i=0;i<keys.length;i++){ var k=keys[i]; if (k>=0 && k<12) c[k]++; }
       return c;
     }
-    var UNCOL = "hsl(225,8%,26%)";   // dark neutral grey for the uncoloured share
+    var UNCOL = "hsl(225,8%,16%)";   // dark neutral grey for the uncoloured share
     function buildField(counts, uncolored){
       var off=document.createElement("canvas"); off.width=off.height=FS;
       var g=off.getContext("2d"), cx=FS/2, cy=FS/2, R=FS*0.46, sum=0, i;
