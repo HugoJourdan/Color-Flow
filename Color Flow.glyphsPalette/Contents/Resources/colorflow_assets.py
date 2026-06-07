@@ -528,7 +528,7 @@ DASHBOARD_JS = r"""
     var glow = key===-1 ? "--c-none-b" : varFor(key);
     return '<span class="segc'+(on?" on":"")+(off?" off":"")+'" data-fkey="'+key+'" style="width:'+w
       + '%;background:var('+varFor(key)+');--i:'+(idx||0)
-      + ';box-shadow:0 0 6px var('+glow+'),inset -6px 0 9px -3px rgba(0,0,0,.2)" title="'+esc(lab)+' — click to focus these glyphs"></span>';
+      + ';box-shadow:0 0 9px color-mix(in srgb,var('+glow+') 42%,transparent),inset -6px 0 9px -3px rgba(0,0,0,.2)" title="'+esc(lab)+' — click to focus these glyphs"></span>';
   }
   function countFor(m,k){ return k===-1 ? m.uncolored : (m.counts[String(k)]||0); }
   function startedOf(m){ return H.glyphTotal - m.uncolored; }
@@ -2858,6 +2858,7 @@ DASHBOARD_JS = r"""
       if (topI >= 0 && !EMPTY[topI]){
         ctx.save(); ctx.translate(cx, cyOf(topI)); ctx.scale(1, ry/rx);
         ctx.globalCompositeOperation = "destination-out";
+        ctx.globalAlpha = 0.7;                 // clear 70% -> hole is 70% see-through, not a stark void
         var hrT = rx*0.26;
         var pgT = ctx.createRadialGradient(0,0,0,0,0,hrT);
         pgT.addColorStop(0,"rgba(0,0,0,1)"); pgT.addColorStop(0.94,"rgba(0,0,0,1)"); pgT.addColorStop(1,"rgba(0,0,0,0)");
