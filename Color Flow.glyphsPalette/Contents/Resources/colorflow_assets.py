@@ -287,6 +287,13 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-brush-h:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .tl-chart:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .tl-foot{display:flex;justify-content:space-between;font-size:var(--fs-2xs);color:var(--muted-2);margin-top:6px}
+.tl-chartbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px}
+.tl-chartbar .tl-legend{margin-bottom:0;flex:1 1 auto}
+.tl-mode{display:inline-flex;gap:4px;flex:0 0 auto}
+.tl-mode .tl-mode-btn[aria-pressed=true]{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.tl-band{stroke:var(--surface);stroke-width:.5;fill-opacity:.92}
+.tl-stream-none{fill-opacity:.85}
+.tl-lg-hatch{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline);background:var(--c-none)}
 .ov-ring{display:block}
 .ov-ring .ov-ring-track{stroke:var(--track)}
 .ov-ring .ov-ring-arc{stroke:var(--accent)}
@@ -387,6 +394,7 @@ DASHBOARD_JS = r"""
     view: "tabs", before: false, sort: "workflow",
     coverGroup: "byCategory", glyphSort: "category", focus: null,
     ovExpand: {},                          // which Overview cards are expanded
+    tlMode: "line",                        // Timeline chart mode: "line" | "flow" (streamgraph)
     dateA: null, dateB: null,              // Timeline date A-vs-B diff selection
     journeyGlyph: null, helpOpen: false,   // journey modal + help panel
     theme: savedTheme || (prefersLight ? "light" : "dark")
@@ -936,9 +944,12 @@ DASHBOARD_JS = r"""
     if (isNaN(d.getTime())) return iso;
     return d.getUTCDate() + " " + CFD_MONTHS[d.getUTCMonth()];
   }
-  // Shared trend builder: returns the chart SVG, the per-master legend and the
-  // date foot, so both the Timeline view and the Overview card draw the same.
-  function trendParts(W, Ht){
+  // ----- #7 shared calendar X axis -------------------------------------------
+  // Builds the plot geometry + X scale and the calendar layers (zebra ISO-week
+  // bands, thinned date tick labels, dashed "today" rule) that both the line chart
+  // (trendParts) and the streamgraph (streamParts) draw, so the X axis stays
+  // identical between the Line and Flow modes. Y(pct) maps a 0-100 % onto the plot.
+  function calendarAxis(W, Ht){
     var series = (H.trend && H.trend.series) || [];
     var pl=30, pr=12, ptop=12, pb=16, iw=W-pl-pr, ih=Ht-ptop-pb;
     var t0 = new Date(series[0].date).getTime();
@@ -946,15 +957,7 @@ DASHBOARD_JS = r"""
     var lastOff = Math.max(1, dayOff(series[series.length-1].date));
     function X(o){ return pl + o/lastOff*iw; }
     function Y(p){ return ptop + ih - p/100*ih; }
-    var grid = [0,25,50,75,100].map(function(g){
-      var y = Y(g).toFixed(1);
-      return '<line class="tl-grid" x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'"/>'
-        + '<text class="tl-axis" x="'+(pl-5)+'" y="'+(parseFloat(y)+3).toFixed(1)+'" text-anchor="end">'+g+'</text>';
-    }).join("");
-    // ----- #7 real calendar X axis: zebra ISO-week bands + date tick labels -----
-    var bandTop = ptop, bandH = ih;
-    // day-offset of the Monday that opens the ISO week containing the first snapshot,
-    // so band boundaries line up with calendar weeks rather than the data start.
+    // zebra ISO-week bands: align to the Monday opening the first snapshot's week.
     var firstDate = new Date(series[0].date + "T00:00:00Z");
     var firstDow = (firstDate.getUTCDay() + 6) % 7;          // 0 = Monday
     var weekStart = -firstDow;                                // offset of that Monday
@@ -964,7 +967,7 @@ DASHBOARD_JS = r"""
       var bx0 = Math.max(pl, X(Math.max(0, wOff)));
       var bx1 = Math.min(W - pr, X(Math.min(lastOff, wOff + 7)));
       if (bx1 <= bx0){ continue; }
-      weekBands += '<rect class="tl-weekband" x="'+bx0.toFixed(1)+'" y="'+bandTop+'" width="'+(bx1-bx0).toFixed(1)+'" height="'+bandH+'"/>';
+      weekBands += '<rect class="tl-weekband" x="'+bx0.toFixed(1)+'" y="'+ptop+'" width="'+(bx1-bx0).toFixed(1)+'" height="'+ih+'"/>';
     }
     // thin the tick labels so they never collide on long spans: aim for ~6 ticks,
     // stepping whole snapshots so every label sits on a real data X.
@@ -991,6 +994,25 @@ DASHBOARD_JS = r"""
           + '<text class="tl-today-pill-t" x="'+(pillX+pillW/2).toFixed(1)+'" y="'+(ptop+8.5)+'" text-anchor="middle">'+esc(lab)+'</text>';
       }
     }
+    // snapshot X anchors in SVG user-space — crosshair + brush snap to these.
+    var snaps = series.map(function(p){ return { x:+X(dayOff(p.date)).toFixed(1), d:p.date }; });
+    return { series:series, pl:pl, pr:pr, ptop:ptop, pb:pb, iw:iw, ih:ih,
+             dayOff:dayOff, lastOff:lastOff, X:X, Y:Y,
+             weekBands:weekBands, xticks:xticks, todayRule:todayRule, snaps:snaps };
+  }
+  // Shared trend builder: returns the chart SVG, the per-master legend and the
+  // date foot, so both the Timeline view and the Overview card draw the same.
+  function trendParts(W, Ht){
+    var ax = calendarAxis(W, Ht);
+    var series = ax.series, pl = ax.pl, pr = ax.pr, ptop = ax.ptop, ih = ax.ih, iw = ax.iw;
+    var dayOff = ax.dayOff, X = ax.X, Y = ax.Y;
+    var grid = [0,25,50,75,100].map(function(g){
+      var y = Y(g).toFixed(1);
+      return '<line class="tl-grid" x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'"/>'
+        + '<text class="tl-axis" x="'+(pl-5)+'" y="'+(parseFloat(y)+3).toFixed(1)+'" text-anchor="end">'+g+'</text>';
+    }).join("");
+    // ----- #7 real calendar X axis: zebra ISO-week bands + date tick labels -----
+    var weekBands = ax.weekBands, xticks = ax.xticks, todayRule = ax.todayRule;
     // ----- #10 gentle monotone smoothing for the selected master's line/area.
     // Cubic path whose control-point tangents are clamped so the curve stays
     // monotone between real data points and never overshoots a tl-dot value.
@@ -1054,7 +1076,7 @@ DASHBOARD_JS = r"""
     // X positions (in SVG user-space) ride along as data so crosshairMove() can snap
     // to the nearest discrete date without re-deriving the X scale. baseY/topY let
     // it place the marker on the chart even when no master line is selected.
-    var snaps = series.map(function(p){ return { x:+X(dayOff(p.date)).toFixed(1), d:p.date }; });
+    var snaps = ax.snaps;
     var crossData = ' data-snaps="'+esc(JSON.stringify(snaps))+'" data-topy="'+ptop+'" data-boty="'+Y(0).toFixed(1)+'"';
     var crossLayer = '<line class="tl-cross" y1="'+ptop+'" y2="'+(ptop+ih).toFixed(1)+'"/>'
       + '<circle class="tl-cross-mark" r="3.5"/>'
@@ -1071,6 +1093,106 @@ DASHBOARD_JS = r"""
     var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData+' aria-label="Completion over time per master. Hover or use the left and right arrow keys to read each snapshot.">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+grid+xticks+lines+todayRule+brushLayer+crossLayer+'</svg>';
     var foot = '<div class="tl-foot"><span>'+esc(series[0].date)+'</span><span>'+esc(series[series.length-1].date)+'</span></div>';
     return { chart:chart, legend:legend, foot:foot };
+  }
+  // ----- #5 colour streamgraph (Flow mode) -----------------------------------
+  // Tally per-step counts for every date in H.trend.dates by calling stateAt over
+  // the chosen master (state.master, else the first master), bucketing each glyph's
+  // key into H.order (+ a "none" bucket for uncoloured/unknown keys). Render a
+  // stacked area: bands stack bottom->top by H.order with each step's own var, and
+  // the none bucket is hatched on top. Shares the #7 calendar X axis with the line
+  // chart and the same data-snaps so the crosshair read-out works in both modes.
+  // The crosshair card shows the per-step COUNTS at the snapped date.
+  function streamTally(masterId){
+    var dates = (H.trend && H.trend.dates) || [];
+    var order = H.order || [];
+    // per date: { byKey:{ stepKey: count }, none: count }
+    return dates.map(function(d){
+      var snap = stateAt(masterId, d);
+      var byKey = {}; order.forEach(function(k){ byKey[k] = 0; });
+      var none = 0;
+      for (var name in snap){
+        var sk = String(snap[name]);
+        if (snap[name] === -1 || order.indexOf(sk) === -1){ none++; } else { byKey[sk]++; }
+      }
+      return { date:d, byKey:byKey, none:none };
+    });
+  }
+  function streamParts(W, Ht){
+    var ax = calendarAxis(W, Ht);
+    var pl = ax.pl, ptop = ax.ptop, ih = ax.ih, iw = ax.iw;
+    var dayOff = ax.dayOff, X = ax.X, Y = ax.Y;
+    var order = H.order || [];
+    var mid = state.master != null ? state.master : (H.masters[0] && H.masters[0].id);
+    var tally = streamTally(mid);
+    // denominator: whole-font total keeps band heights honest + comparable to the
+    // % grid; degrade to the max stacked count when glyphTotal is missing.
+    var denom = H.glyphTotal || tally.reduce(function(mx, t){
+      var s = t.none; for (var k in t.byKey){ s += t.byKey[k]; } return Math.max(mx, s);
+    }, 0) || 1;
+    var grid = [0,25,50,75,100].map(function(g){
+      var y = Y(g).toFixed(1);
+      return '<line class="tl-grid" x1="'+pl+'" y1="'+y+'" x2="'+(W-ax.pr)+'" y2="'+y+'"/>'
+        + '<text class="tl-axis" x="'+(pl-5)+'" y="'+(parseFloat(y)+3).toFixed(1)+'" text-anchor="end">'+g+'</text>';
+    }).join("");
+    // an SVG diagonal hatch pattern for the uncoloured band (mirrors the --c-none
+    // repeating-gradient look; theme-safe via the muted-2 stroke).
+    var defs = '<pattern id="tl-stream-hatch" class="stream-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+      + '<rect width="6" height="6" fill="var(--track)"/>'
+      + '<line x1="0" y1="0" x2="0" y2="6" stroke="var(--muted-2)" stroke-width="2"/></pattern>';
+    // build a stacked Y for every date: running cumulative % from the baseline up.
+    // bands stack bottom->top by H.order; the none band sits on top, hatched.
+    var nPts = tally.length;
+    function pctOf(c){ return c / denom * 100; }
+    var bandKeys = order.slice();                          // bottom -> top by palette order
+    var bands = "";
+    // cumulative top of the stack at each date, seeded at 0 (baseline = Y(0)).
+    var cum = tally.map(function(){ return 0; });
+    bandKeys.forEach(function(k){
+      var lower = cum.slice();
+      var upper = tally.map(function(t, i){ return cum[i] + pctOf(t.byKey[k] || 0); });
+      for (var i = 0; i < nPts; i++){ cum[i] = upper[i]; }
+      // skip an all-zero band so empty steps add no markup on sparse history.
+      var any = upper.some(function(v, i){ return v - lower[i] > 0.0001; });
+      if (!any){ return; }
+      var topPts = tally.map(function(t, i){ return X(dayOff(t.date)).toFixed(1)+","+Y(upper[i]).toFixed(1); });
+      var botPts = tally.map(function(t, i){ return X(dayOff(t.date)).toFixed(1)+","+Y(lower[i]).toFixed(1); }).reverse();
+      var poly = topPts.concat(botPts).join(" ");
+      bands += '<polygon class="tl-band" points="'+poly+'" fill="var('+varFor(k)+')"><title>'+esc(labelFor(k))+'</title></polygon>';
+    });
+    // the uncoloured bucket, hatched, stacked last (on top of the coloured bands).
+    var noneLower = cum.slice();
+    var noneUpper = tally.map(function(t, i){ return cum[i] + pctOf(t.none); });
+    if (noneUpper.some(function(v, i){ return v - noneLower[i] > 0.0001; })){
+      var nTop = tally.map(function(t, i){ return X(dayOff(t.date)).toFixed(1)+","+Y(noneUpper[i]).toFixed(1); });
+      var nBot = tally.map(function(t, i){ return X(dayOff(t.date)).toFixed(1)+","+Y(noneLower[i]).toFixed(1); }).reverse();
+      bands += '<polygon class="tl-band tl-stream-none" points="'+nTop.concat(nBot).join(" ")+'" fill="url(#tl-stream-hatch)"><title>'+esc(H.noneLabel)+'</title></polygon>';
+    }
+    // crosshair overlay shares the #7 data-snaps + the per-date counts so the
+    // read-out (streamReadout) can show each step's count at the snapped date.
+    var snaps = ax.snaps;
+    var crossData = ' data-snaps="'+esc(JSON.stringify(snaps))+'" data-topy="'+ptop+'" data-boty="'+Y(0).toFixed(1)+'"'
+      + ' data-stream="'+esc(JSON.stringify(tally))+'"';
+    var crossLayer = '<line class="tl-cross" y1="'+ptop+'" y2="'+(ptop+ih).toFixed(1)+'"/>'
+      + '<rect class="tl-crossarea" x="'+pl+'" y="'+ptop+'" width="'+iw.toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
+    var chart = '<svg class="tl-chart tl-flow" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData
+      + ' aria-label="Stacked colour completion over time. Hover or use the left and right arrow keys to read each snapshot.">'
+      + '<defs>'+defs+'</defs>'+ax.weekBands+grid+bands+ax.xticks+ax.todayRule+crossLayer+'</svg>';
+    // legend: one swatch per step (+ uncoloured), mirroring the band fills.
+    var legend = order.map(function(k){
+      return '<span class="tl-lg"><i style="background:var('+varFor(k)+')"></i>'+esc(labelFor(k))+'</span>';
+    }).join("") + '<span class="tl-lg"><i class="tl-lg-hatch"></i>'+esc(H.noneLabel)+'</span>';
+    var series = ax.series;
+    var foot = '<div class="tl-foot"><span>'+esc(series[0].date)+'</span><span>'+esc(series[series.length-1].date)+'</span></div>';
+    return { chart:chart, legend:legend, foot:foot };
+  }
+  // The Line/Flow toggle: a two-button segmented control that sets state.tlMode and
+  // marks the active mode with aria-pressed. Default mode is Line (D2).
+  function tlModeToggle(){
+    var line = state.tlMode !== "flow";
+    return '<div class="tl-mode" role="group" aria-label="Timeline chart mode">'
+      + '<button type="button" class="chip tl-mode-btn" data-tlmode="line" aria-pressed="'+line+'" title="Per-master completion lines">Line</button>'
+      + '<button type="button" class="chip tl-mode-btn" data-tlmode="flow" aria-pressed="'+(!line)+'" title="Stacked colour streamgraph over time">Flow</button>'
+      + '</div>';
   }
   function hasTrend(){ return ((H.trend && H.trend.series) || []).length >= 2; }
   // graded value of one state map {glyph:key}: sum of the per-step weights used by
@@ -1123,8 +1245,11 @@ DASHBOARD_JS = r"""
     if (!hasTrend()){
       return '<section class="tl-empty"><p class="empty">Not enough history yet. Color Flow saves a snapshot each time you save the font; this timeline fills in as days of history accumulate.</p></section>';
     }
-    var parts = trendParts(680, 200);
-    return '<section class="timeline"><div class="tl-legend">'+parts.legend+'</div>'+parts.chart+parts.foot+dateDiffPanel()+'</section>';
+    // D2: Line is the default; Flow renders the stacked colour streamgraph (#5).
+    var parts = state.tlMode === "flow" ? streamParts(680, 200) : trendParts(680, 200);
+    return '<section class="timeline"><div class="tl-chartbar">'+tlModeToggle()
+      + '<div class="tl-legend">'+parts.legend+'</div></div>'
+      + parts.chart+parts.foot+dateDiffPanel()+'</section>';
   }
   function compareView(){
     // columns = steps (+None); rows = masters, labelled by the master name.
@@ -1206,18 +1331,32 @@ DASHBOARD_JS = r"""
     return mp && mp.total ? mp.final/mp.total*100 : 0;
   }
   // Float the cfd-tip read-out: the snapshot date + every master's exact % there.
+  // In Flow mode the chart carries data-stream (per-date per-step tallies) instead
+  // of per-master %, so the read-out lists each step's count at the snapped date.
   function crossReadout(svg, idx, clientX){
     var series = (H.trend && H.trend.series) || [];
     var p = series[idx]; if (!p){ hideTip(); return; }
     var tip = document.getElementById("cfd-tip");
     if (!tip){ tip = document.createElement("div"); tip.id = "cfd-tip"; tip.className = "cfd-tip"; document.body.appendChild(tip); }
-    var rows = H.masters.map(function(m, i){
-      if (!(p.masters && p.masters[m.id])) return "";
-      var col = "hsl("+masterHue(i)+",70%,55%)";
-      var bold = state.master!=null && m.id===state.master;
-      return '<div class="tl-cross-row'+(bold?" tl-sel":"")+'"><i style="background:'+col+'"></i>'
-        + esc(m.name)+' <b>'+Math.round(crossPctAt(p, m.id))+'%</b></div>';
-    }).join("");
+    var streamData = svg.getAttribute("data-stream");
+    var rows;
+    if (streamData){
+      var tally; try { tally = JSON.parse(streamData); } catch(e){ tally = []; }
+      var t = tally[idx] || { byKey:{}, none:0 };
+      rows = (H.order||[]).map(function(k){
+        return '<div class="tl-cross-row"><i style="background:var('+varFor(k)+')"></i>'
+          + esc(labelFor(k))+' <b>'+(t.byKey[k]||0)+'</b></div>';
+      }).join("")
+        + '<div class="tl-cross-row"><i class="tl-lg-hatch"></i>'+esc(H.noneLabel)+' <b>'+(t.none||0)+'</b></div>';
+    } else {
+      rows = H.masters.map(function(m, i){
+        if (!(p.masters && p.masters[m.id])) return "";
+        var col = "hsl("+masterHue(i)+",70%,55%)";
+        var bold = state.master!=null && m.id===state.master;
+        return '<div class="tl-cross-row'+(bold?" tl-sel":"")+'"><i style="background:'+col+'"></i>'
+          + esc(m.name)+' <b>'+Math.round(crossPctAt(p, m.id))+'%</b></div>';
+      }).join("");
+    }
     tip.innerHTML = '<div class="tip-h">'+esc(dateLabel(p.date))+' · '+esc(p.date)+'</div>'+rows;
     tip.style.display = "block";
     var box = svg.getBoundingClientRect();
@@ -1700,6 +1839,7 @@ DASHBOARD_JS = r"""
       var ox = e.target.closest("[data-ovexpand]"); if (ox){ var ok=ox.getAttribute("data-ovexpand"); state.ovExpand[ok]=!state.ovExpand[ok]; update(); return; }
       var cr = e.target.closest(".cmprow[data-m],.lb-row[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; update(); return; }
       var cg = e.target.closest("[data-cg]"); if (cg){ state.coverGroup = cg.getAttribute("data-cg"); update(); return; }
+      var tm = e.target.closest("[data-tlmode]"); if (tm){ state.tlMode = tm.getAttribute("data-tlmode"); update(); return; }
       var gs = e.target.closest("[data-gsort]"); if (gs){ state.glyphSort = gs.getAttribute("data-gsort"); update(); return; }
       var fc = e.target.closest("[data-fclear]"); if (fc){ setFocus(null); return; }
       var jr = e.target.closest("[data-jglyph]"); if (jr){ openJourney(jr.getAttribute("data-jglyph")); return; }

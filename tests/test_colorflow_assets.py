@@ -351,6 +351,57 @@ def test_dashboard_css_hides_brush_handles_until_painted() -> None:
     assert "display:none" in handle_rule
 
 
+def test_dashboard_js_has_streamgraph_builder() -> None:
+    """#5: a Line/Flow toggle (default Line) swaps the per-master line chart for a
+    stacked-area colour streamgraph. The streamgraph builder tallies per-step counts
+    per date by calling stateAt over H.trend.dates, stacks bands bottom->top by
+    H.order, fills each band with its step var, and hatches the uncoloured bucket on
+    top. Reuses the calendar X axis (#7) and a snapping crosshair read-out."""
+    js = assets.DASHBOARD_JS
+    # the named streamgraph builder
+    assert "function streamParts(" in js
+    # the Line/Flow toggle button drives state.tlMode (default "line"); aria-pressed
+    assert "tlMode" in js
+    assert 'state.tlMode === "flow"' in js or "state.tlMode==='flow'" in js or 'state.tlMode==="flow"' in js
+    assert "tl-mode" in js                                  # the toggle control class
+    assert "Line" in js and "Flow" in js                   # the two toggle labels
+    assert "aria-pressed" in js
+    # per-step tally per date via stateAt over the trend dates
+    assert "stateAt(" in js
+    assert "H.trend.dates" in js or "H.trend && H.trend.dates" in js
+    # bands stack by palette order and fill with the per-step var
+    assert "H.order" in js
+    assert "varFor(" in js
+    # the uncoloured ("none") bucket is hatched on top via an SVG pattern
+    assert "stream-hatch" in js or "tl-stream-none" in js
+    # reuses the calendar X axis day-offset math from #7
+    assert "dayOff(" in js
+    # reduced-motion: no draw-in animation via the shared gate
+    assert "__cfdNoAnim" in js or "prefers-reduced-motion" in js
+
+
+def test_dashboard_js_streamgraph_state_and_toggle_wired() -> None:
+    """#5: state.tlMode is initialised to 'line' and a Line/Flow toggle click flips
+    it then re-renders. timelineView routes to the streamgraph when state.tlMode is
+    'flow'."""
+    js = assets.DASHBOARD_JS
+    assert "tlMode:" in js                                 # initialised in the state object
+    assert 'state.tlMode = ' in js or "state.tlMode=" in js  # the toggle mutates it
+    # the timeline view picks the builder by mode
+    assert "streamParts(" in js
+
+
+def test_dashboard_css_styles_streamgraph_classes() -> None:
+    """#5: the Line/Flow toggle and the stacked-area band classes each carry a
+    theme-safe rule; the toggle marks the active mode with aria-pressed."""
+    css = assets.DASHBOARD_CSS
+    assert ".tl-mode" in css
+    assert ".tl-band" in css
+    # the active toggle button is highlighted with the accent var (theme-safe)
+    active_rule = css.split(".tl-mode-btn[aria-pressed=true]")[1].split("}")[0]
+    assert "var(--accent)" in active_rule
+
+
 def test_dashboard_js_has_regression_card() -> None:
     js = assets.DASHBOARD_JS
     assert "function regressionCard(" in js
