@@ -506,7 +506,12 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _apply_profile(self, incoming, font, font_dir):
-		colornames.write_color_names(colornames.get_key_file(font_dir), incoming.get("colorNames", ""))
+		# Never overwrite the user's colorNames with an empty file: parse()
+		# normalises a missing/null colorNames to "", so a profile built from a
+		# font that had no key file would otherwise wipe local labels/order.
+		incoming_names = incoming.get("colorNames", "")
+		if incoming_names.strip():
+			colornames.write_color_names(colornames.get_key_file(font_dir), incoming_names)
 		Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"] = bool(incoming.get("freeMode"))
 		if font is not None:
 			self.fontview.set_mode(font, incoming.get("rainbowSource", "Layer"))
