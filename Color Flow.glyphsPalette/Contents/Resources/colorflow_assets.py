@@ -104,7 +104,7 @@ html,body{margin:0}
 body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains Mono",monospace;
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
-@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro{animation:none}.heat,.heat.fading{transition:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro{animation:none}.heat,.heat.fading{transition:none;opacity:1}.tl-ring{animation:none!important}}
 #cfd-app{max-width:1180px;margin:0 auto;padding:0 20px}
 #cfd-main{display:flex;gap:24px;align-items:flex-start}
 #cfd-tower{position:sticky;top:0;flex:0 0 240px;width:240px}
@@ -391,9 +391,17 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-scrub-play[disabled]{opacity:.5;cursor:not-allowed}
 .tl-scrub{flex:1 1 auto;min-width:0;accent-color:var(--accent);color-scheme:dark light}
 .tl-scrub-date{flex:0 0 auto;font-size:var(--fs-xs);color:var(--text);font-variant-numeric:tabular-nums;min-width:54px;text-align:right}
+.tl-scrub-diff{flex:0 0 auto;font-size:var(--fs-xs);font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+.tl-scrub-diff .du{color:var(--ok)}
+.tl-scrub-diff .dd{color:var(--c0)}
 .tl-machine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(20px,1fr));gap:3px}
 .tl-machine-grid .cell{aspect-ratio:1;border-radius:4px;cursor:default;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .tl-machine-grid .cell svg{padding:2px}
+.tl-ring{position:relative;z-index:1}
+.tl-ring-up{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 2px var(--ok);animation:tlRingUp .6s ease-out}
+.tl-ring-down{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 2px var(--c1);animation:tlRingDown .6s ease-out}
+@keyframes tlRingUp{0%{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 0 var(--ok)}40%{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 3px var(--ok)}100%{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 0 var(--ok)}}
+@keyframes tlRingDown{0%{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 0 var(--c1)}40%{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 3px var(--c1)}100%{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 0 var(--c1)}}
 .dz{font-size:var(--fs-xs);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:4px 9px;color:var(--muted)}
 .dz-up{border-color:var(--ok);color:var(--ok)}
 .dz-down{border-color:var(--c0);color:var(--c0)}
@@ -1696,16 +1704,49 @@ DASHBOARD_JS = r"""
     var dates = (H.trend && H.trend.dates) || [];
     var idx = scrubIndex();
     if (idx < 0 || !dates[idx]) return;
-    var st = stateAt(scrubMaster(), dates[idx]);
+    var mid = scrubMaster();
+    var st = stateAt(mid, dates[idx]);
+    // #12: diff against the previous snapshot's state so each scrub step can flag the
+    // glyphs that moved THIS day. The first snapshot has no predecessor -> no diff.
+    var prev = idx > 0 ? stateAt(mid, dates[idx-1]) : null;
+    // Reduced-motion (or the test hook): swap the pulsing ring for a static border via
+    // the CSS variant, but the chip count below is still computed + shown either way.
+    var noAnim = window.__cfdNoAnim ||
+      (window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
+    var advanced = 0, regressed = 0;
     var cells = grid.querySelectorAll(".cell");
     for (var i=0;i<cells.length;i++){
       var cell = cells[i], name = cell.getAttribute("data-glyph");
       var key = (name != null && st[name] != null) ? st[name] : -1;
       var v = varFor(key);
       cell.style.background = "color-mix(in srgb,var("+v+") 35%,transparent)";
+      cell.classList.remove("tl-ring", "tl-ring-up", "tl-ring-down");
+      if (prev){
+        var was = (name != null && prev[name] != null) ? prev[name] : -1;
+        var dir = rankOf(key) - rankOf(was);
+        if (dir !== 0){
+          var ringCell = cell;
+          ringCell.classList.add("tl-ring", dir > 0 ? "tl-ring-up" : "tl-ring-down");
+          if (dir > 0) advanced++; else regressed++;
+          if (!noAnim){
+            // transient pulse: drop the class after the keyframe so the next identical
+            // step can re-trigger it (reduced-motion keeps the static border in place).
+            setTimeout((function(el){ return function(){
+              el.classList.remove("tl-ring", "tl-ring-up", "tl-ring-down");
+            }; })(ringCell), 650);
+          }
+        }
+      }
     }
     var lab = document.querySelector(".tl-machine .tl-scrub-date");
     if (lab) lab.textContent = dateLabel(dates[idx]);
+    // live "+A, -R today" chip: the per-step net of glyphs that moved this day.
+    var chip = document.querySelector(".tl-machine .tl-scrub-diff");
+    if (chip){
+      chip.innerHTML = prev
+        ? '<span class="du">+'+advanced+'</span>, <span class="dd">−'+regressed+'</span> today'
+        : "";
+    }
   }
   // Set the scrub index (clamped), keep the range input + state in sync, and recolour
   // the grid throttled to a single rAF per frame so a fast drag stays smooth.
@@ -1789,6 +1830,8 @@ DASHBOARD_JS = r"""
       + '<input type="range" class="tl-scrub" min="0" max="'+(dates.length-1)+'" step="1" value="'+idx+'"'
       + ' aria-label="Scrub through snapshot history" aria-valuetext="'+esc(dateLabel(dates[idx]))+'"/>'
       + '<span class="tl-scrub-date" aria-live="polite">'+esc(dateLabel(dates[idx]))+'</span>'
+      // #12: live "+A, -R today" chip near the slider; filled by scrubRecolour.
+      + '<span class="tl-scrub-diff" aria-live="polite"></span>'
       + '</div>';
     return '<div class="tl-machine" role="group" aria-label="Time Machine: replay the heatmap by date">'
       + '<div class="tl-machine-h">Time Machine</div>'

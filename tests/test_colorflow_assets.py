@@ -936,3 +936,75 @@ def test_dashboard_css_styles_time_machine_classes() -> None:
         assert selector in css, selector
     machine_rule = css.split(".tl-machine{")[1].split("}")[0]
     assert "var(--" in machine_rule
+
+
+def test_dashboard_js_scrub_diff_rings_compare_prev_vs_cur() -> None:
+    """#12: when state.tlScrub changes, the recolour diffs stateAt(master, prevDate)
+    vs stateAt(master, curDate). Cells whose glyph advanced get a green ring, regressed
+    an amber ring. The diff reuses the shared stateAt + rankOf helpers (not reinvented),
+    and is computed per scrub step against the previous snapshot's date."""
+    js = assets.DASHBOARD_JS
+    recolour = js.split("function scrubRecolour(")[1].split("\n  function ")[0]
+    # diff the previous snapshot's state against the current one
+    assert "stateAt(" in recolour
+    assert "rankOf(" in recolour                  # advanced/regressed via the shared rank
+    # the previous index/date is what makes it a per-step diff (idx-1)
+    assert "idx-1" in recolour or "idx - 1" in recolour or "prev" in recolour.lower()
+    # apply the transient ring classes (green = advanced, amber = regressed)
+    assert "tl-ring-up" in recolour
+    assert "tl-ring-down" in recolour
+    assert "tl-ring" in recolour
+
+
+def test_dashboard_js_scrub_diff_ring_class_added_then_removed() -> None:
+    """The ring is a transient highlight: the class is applied then removed (or a
+    self-clearing keyframe drives it) so it flashes for one scrub step rather than
+    sticking. classList.add + a timed remove (or animationend) clears it."""
+    js = assets.DASHBOARD_JS
+    recolour = js.split("function scrubRecolour(")[1].split("\n  function ")[0]
+    assert "classList.add(" in recolour
+    # the ring is cleared again: explicit remove, or a self-terminating animation
+    assert (
+        "classList.remove(" in recolour
+        or "setTimeout(" in recolour
+        or "animationend" in recolour
+    )
+
+
+def test_dashboard_js_scrub_diff_chip_counts_advanced_regressed() -> None:
+    """A live chip near the slider reads "+A, -R today": the per-step counts of glyphs
+    that advanced / regressed since the previous snapshot. The chip text updates on
+    every scrub (it lives in the recolour, alongside the date label)."""
+    js = assets.DASHBOARD_JS
+    machine = js.split("function timeMachine(")[1].split("\n  function ")[0]
+    # the chip element is rendered in the scrub bar
+    assert "tl-scrub-diff" in machine
+    recolour = js.split("function scrubRecolour(")[1].split("\n  function ")[0]
+    # the recolour writes the live "+A, -R today" chip text
+    assert "tl-scrub-diff" in recolour
+    assert "today" in recolour
+
+
+def test_dashboard_js_scrub_diff_rings_respect_reduced_motion() -> None:
+    """D6: reduced-motion swaps the pulsing ring for a static thin border but STILL
+    updates the chip. The recolour branches on the shared __cfdNoAnim / matchMedia gate
+    and toggles a static-border variant; the chip count is computed regardless."""
+    js = assets.DASHBOARD_JS
+    recolour = js.split("function scrubRecolour(")[1].split("\n  function ")[0]
+    assert "__cfdNoAnim" in recolour or "prefers-reduced-motion" in recolour
+
+
+def test_dashboard_css_styles_scrub_diff_ring_classes() -> None:
+    """#12: the ring classes are theme-safe (built from tokens) and reduced-motion
+    swaps the pulse for a static border. A keyframe drives the pulse; the
+    prefers-reduced-motion media query neutralises the animation."""
+    css = assets.DASHBOARD_CSS
+    for selector in (".tl-ring", ".tl-ring-up", ".tl-ring-down", ".tl-scrub-diff"):
+        assert selector in css, selector
+    up_rule = css.split(".tl-ring-up{")[1].split("}")[0]
+    down_rule = css.split(".tl-ring-down{")[1].split("}")[0]
+    assert "var(--" in up_rule
+    assert "var(--" in down_rule
+    # the pulsing ring is animated, and reduced-motion neutralises that animation
+    rm_block = css.split("@media (prefers-reduced-motion:reduce){")[1].split("}}")[0]
+    assert "tl-ring" in rm_block
