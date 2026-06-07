@@ -1,4 +1,3 @@
-# encoding: utf-8
 """Vanilla Settings panel for Color Flow.
 
 Lets the user reorder the colours and choose which ones show in the palette
@@ -11,6 +10,7 @@ Imported lazily from plugin.py (vanilla only exists inside Glyphs' interpreter).
 """
 
 import os
+from typing import Any, Optional
 
 import colornames
 from vanilla import Button, CheckBox, HorizontalLine, RadioGroup, TextBox, Window
@@ -19,7 +19,7 @@ try:
     from GlyphsApp import Glyphs, Message
 except Exception:  # pragma: no cover - only importable inside Glyphs
     Glyphs = None
-    def Message(*args, **kwargs):
+    def Message(*args: Any, **kwargs: Any) -> None:
         pass
 
 MODE_KEY = "hugojourdan.RainbowFontView.labelUsed"
@@ -34,13 +34,14 @@ TOP = 84  # first colour row sits below the source radio, free-mode box + separa
 class ColorFlowSettings:
     """A small window editing colour order + visibility for the active font."""
 
-    def __init__(self, plugin, font) -> None:
+    def __init__(self, plugin: Any, font: Any) -> None:
         self.plugin = plugin
         self.font = font
         rows, self.none_label = colornames.parse_settings(self._read_key_file())
-        self.rows = [list(row) for row in rows]  # [index, label, visible], mutable
-        self._checks = {}
-        self._names = {}
+        # [index, label, visible], mutable so reorder/toggle callbacks can edit in place
+        self.rows: list[list[Any]] = [list(row) for row in rows]
+        self._checks: dict[int, CheckBox] = {}
+        self._names: dict[int, TextBox] = {}
         self._build()
 
     # ------------------------------------------------------------------ data
@@ -86,10 +87,10 @@ class ColorFlowSettings:
                            self._row_text(index, label))
             for widget in (check, up, down):
                 widget._cf_row = position
-            setattr(self.w, "check%d" % position, check)
-            setattr(self.w, "up%d" % position, up)
-            setattr(self.w, "down%d" % position, down)
-            setattr(self.w, "name%d" % position, name)
+            setattr(self.w, f"check{position}", check)
+            setattr(self.w, f"up{position}", up)
+            setattr(self.w, f"down{position}", down)
+            setattr(self.w, f"name{position}", name)
             self._checks[position] = check
             self._names[position] = name
 
@@ -102,7 +103,7 @@ class ColorFlowSettings:
         self.w.open()
 
     # ------------------------------------------------------------------ helpers
-    def _row_of(self, sender):
+    def _row_of(self, sender: Any) -> Optional[int]:
         return getattr(sender, "_cf_row", None)
 
     def _refresh(self) -> None:
@@ -112,41 +113,45 @@ class ColorFlowSettings:
             self._names[position].set(self._row_text(index, label))
 
     # ------------------------------------------------------------------ callbacks
-    def _toggle_visible(self, sender) -> None:
+    def _toggle_visible(self, sender: Any) -> None:
         position = self._row_of(sender)
         if position is not None:
             self.rows[position][2] = bool(sender.get())
 
-    def _move_up(self, sender) -> None:
+    def _move_up(self, sender: Any) -> None:
         position = self._row_of(sender)
         if position is not None and position > 0:
             self.rows[position - 1], self.rows[position] = (
                 self.rows[position], self.rows[position - 1])
             self._refresh()
 
-    def _move_down(self, sender) -> None:
+    def _move_down(self, sender: Any) -> None:
         position = self._row_of(sender)
         if position is not None and position < len(self.rows) - 1:
             self.rows[position + 1], self.rows[position] = (
                 self.rows[position], self.rows[position + 1])
             self._refresh()
 
-    def _reset(self, sender) -> None:
+    def _reset(self, sender: Any) -> None:
         rows, self.none_label = colornames.parse_settings(colornames.DEFAULT_COLOR_NAMES)
         self.rows = [list(row) for row in rows]
         self._refresh()
 
-    def _cancel(self, sender) -> None:
+    def _cancel(self, sender: Any) -> None:
         self.w.close()
 
-    def _save(self, sender) -> None:
-        text = colornames.render_settings([tuple(row) for row in self.rows], self.none_label)
+    def _save(self, sender: Any) -> None:
+        rows: list[tuple[int, str, bool]] = [
+            (int(index), str(label), bool(visible))
+            for index, label, visible in self.rows
+        ]
+        text = colornames.render_settings(rows, self.none_label)
         font_dir = None
         if self.font is not None and self.font.filepath:
             font_dir = os.path.dirname(self.font.filepath)
         path = colornames.resolve_key_file(font_dir)
         if not colornames.write_color_names(path, text):
-            Message("Could not write colorNames.txt:\n%s" % path,
+            Message(f"Could not write colorNames.txt:\n{path}",
                     title="Color Flow", OKButton=None)
             return
         if self.font is not None:
