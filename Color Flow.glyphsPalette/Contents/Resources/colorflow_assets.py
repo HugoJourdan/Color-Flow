@@ -1192,6 +1192,30 @@ DASHBOARD_JS = r"""
     else if (fmt==="json"){ download(exportName("json"), exportJSON(), "application/json"); }
   }
   function closeExport(){ var m = document.getElementById("cfd-export-modal"); if (m) m.style.display = "none"; }
+  function closeJourney(){ var m = document.getElementById("cfd-journey-modal"); if (m) m.style.display = "none"; state.journeyGlyph = null; }
+  function openJourney(name){
+    state.journeyGlyph = name;
+    var mid = state.master || (H.masters[0] && H.masters[0].id);
+    var events = journeyOf(mid, name);
+    var rows = events.length
+      ? events.map(function(ev){
+          // reuse the canonical null-guarding swatch (wraps `varFor`).
+          return '<div class="jm-row"><span class="jm-date">'+esc(ev[0])+'</span>'
+            + swatchFor(ev[1])
+            + '<span class="jm-lab">'+esc(labelFor(ev[1]))+'</span></div>';
+        }).join("")
+      : '<p class="ov-empty">No history yet for this glyph.</p>';
+    var modal = document.getElementById("cfd-journey-modal");
+    if (!modal){
+      modal = document.createElement("div"); modal.id = "cfd-journey-modal"; modal.className = "cfd-modal";
+      modal.addEventListener("click", function(e){ if (e.target===modal) closeJourney(); });
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = '<div class="cfd-modal-box" role="dialog" aria-label="Glyph journey" aria-modal="true">'
+      + '<div class="cfd-modal-h">Journey · '+esc(name)+'</div>'
+      + '<div class="cfd-cards jm-list">'+rows+'</div></div>';
+    modal.style.display = "flex";
+  }
   function openExport(){
     var modal = document.getElementById("cfd-export-modal");
     if (!modal){
@@ -1224,7 +1248,7 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-timeline").addEventListener("click", function(){ state.view = state.view==="timeline" ? "tabs" : "timeline"; update(); });
     document.getElementById("cfd-export").addEventListener("click", openExport);
     document.addEventListener("keydown", function(e){
-      if (e.key==="Escape"){ closeExport(); if (state.focus!==null){ setFocus(null); } }
+      if (e.key==="Escape"){ closeExport(); closeJourney(); if (state.focus!==null){ setFocus(null); } }
     });
     var bodyEl = document.getElementById("cfd-body");
     bodyEl.addEventListener("mouseover", function(e){
@@ -1240,6 +1264,8 @@ DASHBOARD_JS = r"""
       var cg = e.target.closest("[data-cg]"); if (cg){ state.coverGroup = cg.getAttribute("data-cg"); update(); return; }
       var gs = e.target.closest("[data-gsort]"); if (gs){ state.glyphSort = gs.getAttribute("data-gsort"); update(); return; }
       var fc = e.target.closest("[data-fclear]"); if (fc){ setFocus(null); return; }
+      var jr = e.target.closest("[data-jglyph]"); if (jr){ openJourney(jr.getAttribute("data-jglyph")); return; }
+      var jc = e.target.closest(".heat .cell"); if (jc && (e.metaKey || e.ctrlKey)){ e.preventDefault(); openJourney(jc.getAttribute("data-glyph")); return; }
       var ba = e.target.closest(".ba-toggle");
       if (ba){ e.preventDefault(); state.before = !state.before; ba.setAttribute("aria-pressed", state.before); ba.textContent = state.before ? "Before" : "After"; applyBeforeAfter(); return; }
     });

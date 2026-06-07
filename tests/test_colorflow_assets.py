@@ -264,3 +264,22 @@ def test_dashboard_js_has_date_diff_panel() -> None:
 def test_dashboard_js_date_diff_state_keys_initialised() -> None:
     js = assets.DASHBOARD_JS
     assert "dateA:" in js and "dateB:" in js
+
+
+def test_dashboard_js_has_journey_modal() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function openJourney(" in js
+    assert "function closeJourney(" in js
+    assert "cfd-journey-modal" in js
+    assert "cfd-modal" in js                 # reuses the export modal shell class
+    assert "journeyOf(" in js
+    assert "No history yet for this glyph" in js
+    assert "data-jglyph" in js               # regression/recent rows trigger it
+    assert "state.journeyGlyph" in js
+
+
+def test_dashboard_js_journey_modal_wired_from_cell_click() -> None:
+    js = assets.DASHBOARD_JS
+    # A click on a heatmap cell with a modifier-free trigger opens the journey.
+    assert "openJourney(" in js
+    assert ".heat .cell" in js
