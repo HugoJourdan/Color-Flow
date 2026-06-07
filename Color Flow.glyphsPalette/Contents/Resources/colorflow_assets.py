@@ -940,7 +940,7 @@ DASHBOARD_JS = r"""
     if (!ctx) return;                       // headless / no-canvas env: skip
     var EMPTYFILL = (getComputedStyle(document.documentElement).getPropertyValue("--track")||"").trim() || "#15171c";   // empty disc ~ page bg
     var W = cv.width, Hc = cv.height, FS = 320;
-    var DISC_ALPHA = 0.95, tilt = 0.5, trimVal = 0.6, opacityVal = 0.2;
+    var DISC_ALPHA = 0.95, tilt = 0.5, trimVal = 0.5, opacityVal = 0.32;
     var rot = -0.5, focusAmt = [];
     var VISIBLE = Math.min(16, H.masters.length);   // discs shown at once
     var vt = 0;                                      // scroll: master index at window top
