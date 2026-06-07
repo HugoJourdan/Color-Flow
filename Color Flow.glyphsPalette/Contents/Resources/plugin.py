@@ -198,6 +198,14 @@ class ColorFlow(PalettePlugin):
 		self.init = False
 		self.update(self._windowController)
 
+		try:
+			if not Glyphs.defaults["com.hugojourdan.ColorFlow-FirstRunDone"]:
+				Glyphs.defaults["com.hugojourdan.ColorFlow-FirstRunDone"] = True
+				Message("Color Flow tracks glyph progress by colour. Open the action "
+					"menu and pick a starter workflow to begin.", title="Welcome to Color Flow")
+		except Exception:
+			pass
+
 		# Font-View colour grouping (the merged Rainbow FontView half). Opt-in and
 		# fully wrapped so a problem here can never stop the palette from loading.
 		self.fontview = fontview.FontViewGrouping()
@@ -251,7 +259,7 @@ class ColorFlow(PalettePlugin):
 						button = self.dialog
 				elif hasattr(sender, "superview"):
 					button = sender
-			self._popover = Popover((220, 460), parentView=button,
+			self._popover = Popover((220, 500), parentView=button,
 				preferredEdge='left', behavior='semitransient')
 			popover = self._popover
 			popover.fgoLabel = TextBox((12, 12, -12, 16), "Font Glyph Order",
@@ -306,6 +314,15 @@ class ColorFlow(PalettePlugin):
 			popover.reportSep = HorizontalLine((12, reportY, -12, 1))
 			popover.dashboard = Button((12, reportY + 8, -12, 22), "Generate Colorflow Report",
 				callback=self._popover_dashboard, sizeStyle='small')
+			self._starterFiles = self._starter_files()
+			_starterTitles = ["Starter workflow…"] + [
+				os.path.splitext(os.path.basename(path))[0] for path in self._starterFiles
+			]
+			starterY = reportY + 8 + 22 + 8
+			popover.starter = PopUpButton((12, starterY, -40, 22), _starterTitles,
+				callback=self._starter_selected, sizeStyle='small')
+			popover.legend = Button((-32, starterY, 20, 22), "?",
+				callback=self._open_legend, sizeStyle='small')
 			# The button has no background or border of its own; the animated GIF
 			# (which bakes in its own button shape) provides the entire visual. The
 			# native bezel is removed and an NSImageView the exact size of the button
@@ -531,6 +548,72 @@ class ColorFlow(PalettePlugin):
 		self.reload_after_settings()
 		Message("Imported Color Flow profile. Restart Glyphs if the label colours do not "
 			"update in its own Font and Edit views.", title="Color Flow")
+
+	@objc.python_method
+	def _starter_dir(self) -> str:
+		# Bundled presets live beside this module, mirroring how report-loading.gif
+		# is resolved (os.path.dirname(__file__)).
+		return os.path.join(os.path.dirname(__file__), "StarterProfiles")
+
+	@objc.python_method
+	def _starter_files(self) -> list:
+		try:
+			directory = self._starter_dir()
+			return sorted(
+				os.path.join(directory, name)
+				for name in os.listdir(directory)
+				if name.endswith(".colorflow")
+			)
+		except OSError:
+			return []
+
+	@objc.python_method
+	def _apply_starter_profile(self, path) -> None:
+		# Same flow as _import_profile, but the source is a bundled file.
+		try:
+			with open(path, encoding="utf-8") as handle:
+				incoming = colorflow_profile.parse(handle.read())
+			font = Glyphs.font
+			font_dir = self._font_dir(font)
+			diffs = colorflow_profile.diff_profile(self._live_profile(font, font_dir), incoming)
+			if not self._confirm_import(incoming, diffs):
+				return
+			self._apply_profile(incoming, font, font_dir)
+		except ValueError as error:
+			Message(str(error), title="Color Flow")
+		except Exception:
+			import traceback
+			print("Color Flow [starter profile] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _starter_selected(self, sender) -> None:
+		# Index 0 is the "Starter workflow…" placeholder; real items start at 1.
+		try:
+			index = sender.get()
+		except Exception:
+			return
+		files = getattr(self, "_starterFiles", [])
+		if index <= 0 or index > len(files):
+			return
+		self._apply_starter_profile(files[index - 1])
+
+	@objc.python_method
+	def _open_legend(self, sender) -> None:
+		try:
+			meaning = getattr(self, "meaning", {}) or {}
+			visible = colornames.visible_labels(meaning)
+			free = bool(Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"])
+			mode_line = ("Free mode: each colour is independent."
+				if free else
+				"Step mode: a colour means every step up to it is done.")
+			lines = [mode_line, ""]
+			for position, (color, label) in enumerate(visible.items(), start=1):
+				name = colornames.COLOR_NAMES.get(int(color), str(color))
+				lines.append(f"{position}. {label}  ({name})")
+			Message("\n".join(lines), title="Color Flow — Legend")
+		except Exception:
+			import traceback
+			print("Color Flow [legend] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _generate_smart_filters(self, sender) -> None:
