@@ -941,10 +941,9 @@ DASHBOARD_JS = r"""
       function edgeFade(g){
         function cl(v){ return Math.max(0,Math.min(1,v)); }
         var gr=g.createLinearGradient(0,0,0,Hc);
-        gr.addColorStop(cl((topY-fade)/Hc),"rgba(0,0,0,0)");
-        gr.addColorStop(cl(topY/Hc),"rgba(0,0,0,1)");
+        gr.addColorStop(0,"rgba(0,0,0,1)");                       // top: no fade, fully visible
         gr.addColorStop(cl(winBot/Hc),"rgba(0,0,0,1)");
-        gr.addColorStop(cl((winBot+fade)/Hc),"rgba(0,0,0,0)");
+        gr.addColorStop(cl((winBot+fade)/Hc),"rgba(0,0,0,0)");    // bottom fade only
         g.save(); g.globalCompositeOperation="destination-in"; g.fillStyle=gr; g.fillRect(0,0,W,Hc); g.restore();
       }
       function group(idxs){
