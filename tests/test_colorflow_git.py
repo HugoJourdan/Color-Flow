@@ -61,8 +61,9 @@ def _load_json(path: Path) -> dict:
 def test_git_root_found_for_tracked_file(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
     font = _commit_font(repo, _snap({"A": 0}), "2026-06-01")
-    assert git.git_root(font) is not None
-    assert git.git_root(font).resolve() == repo.resolve()
+    root = git.git_root(font)
+    assert root is not None
+    assert root.resolve() == repo.resolve()
     assert git.is_tracked(repo, font) is True
 
 
@@ -97,6 +98,7 @@ def test_day_commits_keep_last_per_day_oldest_first(tmp_path: Path) -> None:
     # the day's snapshot is the LAST commit that day (A:2, not A:1)
     sha_0602 = dict(days)["2026-06-02"]
     extracted = git.extract_commit(repo, repo / "font.glyphs", sha_0602, tmp_path / "x")
+    assert extracted is not None
     assert _load_json(extracted) == _snap({"A": 2})
 
 
