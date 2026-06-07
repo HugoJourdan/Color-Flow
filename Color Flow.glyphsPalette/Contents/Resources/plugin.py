@@ -167,19 +167,22 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 			context = AppKit.NSGraphicsContext.currentContext()
 			context.saveGraphicsState()
 			track.addClip()
-			count = len(colors)
-			seg = width / count
+			# Smooth blended rainbow across the FULL bar width — soft hue transitions
+			# like the favicon's blurred ring, not hard segment seams — but revealed
+			# only up to the filled fraction, so the colours stay anchored as it fills.
 			filled = prog * width
-			for index in range(count):
-				seg_x = index * seg
-				seg_w = filled - seg_x
-				if seg_w <= 0.0:
-					break
-				if seg_w > seg:
-					seg_w = seg
-				rgba = colors[index]
-				AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(rgba[0], rgba[1], rgba[2], 1.0).set()
-				AppKit.NSRectFill(AppKit.NSMakeRect(seg_x, bar_y, seg_w, bar_h))
+			AppKit.NSBezierPath.bezierPathWithRect_(
+				AppKit.NSMakeRect(0.0, bar_y, filled, bar_h)).addClip()
+			nscolors = [
+				AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(rgba[0], rgba[1], rgba[2], 1.0)
+				for rgba in colors
+			]
+			blend = AppKit.NSGradient.alloc().initWithColors_(nscolors) if len(nscolors) >= 2 else None
+			if blend is not None:
+				blend.drawInRect_angle_(bar_rect, 0.0)
+			else:
+				nscolors[0].set()
+				AppKit.NSRectFill(AppKit.NSMakeRect(0.0, bar_y, filled, bar_h))
 			top = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(1.0, 1.0, 1.0, 0.22)
 			bottom = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(0.0, 0.0, 0.0, 0.16)
 			sheen = AppKit.NSGradient.alloc().initWithStartingColor_endingColor_(top, bottom)
