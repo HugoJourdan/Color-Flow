@@ -343,3 +343,24 @@ def test_build_html_wires_all_report_insight_features() -> None:
     assert "<noscript>" in html
     assert "prefers-reduced-motion" in html
     assert "DecompressionStream" in html
+
+
+def test_dashboard_css_styles_report_insight_classes() -> None:
+    """Every class the six report-insight features emit must carry a CSS rule, so
+    swatches render at a real size and the new panels/rows/modal get layout."""
+    css = assets.DASHBOARD_CSS
+    # regression + recent-activity cards
+    for selector in (".rg-sw", ".rg-row", ".rg-n", ".rg-ar", ".rg-when"):
+        assert selector in css, selector
+    # date A/B diff panel + its result chips
+    for selector in (".tl-diff", ".tl-diff-h", ".tl-diff-pick", ".tl-diff-out",
+                     ".dz", ".dz-up", ".dz-down", ".dz-flat", ".dz-net"):
+        assert selector in css, selector
+    # journey modal rows + help/legend panel
+    for selector in (".jm-list", ".jm-row", ".jm-date", ".jm-lab",
+                     ".hp-row", ".hp-gloss"):
+        assert selector in css, selector
+    # the swatch must declare an explicit size: guards the zero-size regression
+    # that made every swatch invisible.
+    swatch_rule = css.split(".rg-sw")[1].split("}")[0]
+    assert "width:" in swatch_rule and "height:" in swatch_rule
