@@ -80,6 +80,45 @@ def test_favicon_link_empty_without_favicon() -> None:
     assert assets._favicon_link({"favicon": ""}) == ""
 
 
+def test_favicon_link_accepts_well_formed_data_image_uris() -> None:
+    # base64 PNG and percent-encoded SVG are both legitimate self-contained icons
+    png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAA="
+    svg = "data:image/svg+xml,%3Csvg%20xmlns%3D%22...%22%3E%3C%2Fsvg%3E"
+    ico = "data:image/x-icon;base64,AAABAAEAEBA="
+    for uri in (png, svg, ico):
+        assert assets._favicon_link({"favicon": uri}) == f'<link rel="icon" href="{uri}">'
+
+
+def test_favicon_link_rejects_attribute_breakout() -> None:
+    # A hostile favicon value must not be able to escape the href="..." attribute
+    # context. Each of these contains a character that would close the attribute or
+    # add new ones; _favicon_link must emit nothing rather than the raw value.
+    hostile = [
+        'data:image/png;base64," onload="alert(1)',     # double-quote closes href
+        'data:image/svg+xml,"><script>alert(1)</script>',  # quote + tag breakout
+        "data:image/png;base64,AA onload=alert(1)",      # bare space lets attrs follow
+        "data:text/html,<script>alert(1)</script>",       # not an image subtype
+        "javascript:alert(1)",                            # not a data: URI at all
+        "https://evil.example/x.png",                     # remote URL (breaks offline)
+        "data:image/png;base64,AA&x=1",                   # '&' starts an entity
+        "data:image/png;base64,",                         # empty payload
+        "data:image/png;base64,AA\n onload=x",            # newline / control char
+    ]
+    for uri in hostile:
+        link = assets._favicon_link({"favicon": uri})
+        assert link == "", uri
+        # and the breakout never reaches a generated page either
+        html = assets.build_html({**_model(), "favicon": uri})
+        assert "<script>alert" not in html
+        assert 'onload="alert' not in html and "onload=alert" not in html
+        assert 'href="' + uri not in html
+
+
+def test_favicon_link_rejects_non_string_favicon() -> None:
+    assert assets._favicon_link({"favicon": 123}) == ""
+    assert assets._favicon_link({"favicon": ["data:image/png;base64,AA"]}) == ""
+
+
 def test_build_html_embeds_favicon_and_glyph_ink_token() -> None:
     model = _model()
     model["favicon"] = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAA="
@@ -146,4 +185,4 @@ def test_dashboard_js_routes_focus_through_setfocus() -> None:
     assert "function setFocus(" in js
     assert "__cfdNoAnim" in js
     assert "items.filter(matchesFocus)" in js                   # recompose to selected colour
-    assert "introDone" in js                                    # one-shot fill flag
+    assert "barsAnim = (state.master !== barMaster)" in js       # one-shot fill flag

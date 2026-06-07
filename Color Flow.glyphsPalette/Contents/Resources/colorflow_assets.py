@@ -1,4 +1,3 @@
-# encoding: utf-8
 """Inline assets + HTML shell for the Color Font Dashboard.
 
 Turns the data model (see colorflow_dashboard.build_model) into one
@@ -11,7 +10,19 @@ from __future__ import annotations
 import base64
 import gzip
 import json
+import re
 from xml.sax.saxutils import escape as xesc
+
+# A self-contained ``data:image/...`` URI, restricted to characters that are safe
+# to drop into a double-quoted ``href`` attribute. The payload allowlist covers
+# base64 (``A-Za-z0-9+/=``) and percent-encoded SVG markup, but deliberately
+# excludes ``"`` ``'`` ``<`` ``>`` ``&`` ``\`` and every whitespace/control char,
+# so a hostile favicon value cannot close the attribute or inject new ones.
+_DATA_IMAGE_URI = re.compile(
+    r"data:image/[a-zA-Z0-9.+-]+"      # image/<subtype>, e.g. png, svg+xml, x-icon
+    r"(?:;[a-zA-Z0-9.+=-]+)*"          # optional parameters (e.g. ;charset=utf-8;base64)
+    r",[A-Za-z0-9+/=%_.!~*()-]+\Z"     # required comma + non-empty payload
+)
 
 
 def embed_model(model: dict) -> str:
@@ -39,10 +50,15 @@ def _color_overrides(model: dict) -> str:
 
 def _favicon_link(model: dict) -> str:
     """A ``<link rel="icon">`` carrying the bundled brand favicon as a self-contained
-    ``data:`` URI (built by the model). Empty when the model has none. The URI is
-    safe to embed unquoted: base64 PNG and URL-encoded SVG contain no ``"``."""
+    ``data:`` URI (built by the model). Empty when the model has none, or when the
+    value isn't a well-formed ``data:image/...`` URI — the favicon is interpolated
+    raw into the ``href`` attribute, so anything that could close the attribute or
+    add new ones (a ``"``, ``<``, ``>`` or whitespace) is rejected outright rather
+    than escaped, to keep an attacker-supplied value from breaking the markup."""
     favicon = model.get("favicon")
-    if not favicon:
+    if not favicon or not isinstance(favicon, str):
+        return ""
+    if not _DATA_IMAGE_URI.fullmatch(favicon):
         return ""
     return f'<link rel="icon" href="{favicon}">'
 
@@ -316,9 +332,6 @@ DASHBOARD_JS = r"""
     ovExpand: {},                          // which Overview cards are expanded
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
-  // One-shot: the colour bars animate-fill only on the first render, not on
-  // every re-render (tab switch, focus, before/after). Flipped true after init.
-  var introDone = false;
   // The colour bar re-runs its fill animation on first paint AND whenever the
   // selected master changes (switching discs) — not on unrelated re-renders.
   var barsAnim = false, barMaster = "\uffff";
@@ -347,11 +360,6 @@ DASHBOARD_JS = r"""
   }
   function countFor(m,k){ return k===-1 ? m.uncolored : (m.counts[String(k)]||0); }
   function startedOf(m){ return H.glyphTotal - m.uncolored; }
-  function finished(k){
-    if (!H.order.length) return false;
-    if (H.mode==="free") return H.order.indexOf(String(k))!==-1;
-    return String(k)===lastOrder;
-  }
   function stepsSorted(m){
     var s = H.steps.slice();
     if (state.sort==="progress"){ s.sort(function(a,b){ return countFor(m,b.key)-countFor(m,a.key); }); }
@@ -365,11 +373,8 @@ DASHBOARD_JS = r"""
   function aggregate(){
     var grand = H.glyphTotal * H.masters.length;
     var agg = {}; H.order.forEach(function(o){ agg[o]=0; });
-    var aggUn = 0;
-    H.masters.forEach(function(m){ H.order.forEach(function(o){ agg[o]+=(m.counts[o]||0); }); aggUn+=m.uncolored; });
-    var started = grand - aggUn;
-    var completion = (H.mode==="free" || !lastOrder) ? started : (agg[lastOrder]||0);
-    return { grand:grand, agg:agg, started:started, completion:completion };
+    H.masters.forEach(function(m){ H.order.forEach(function(o){ agg[o]+=(m.counts[o]||0); }); });
+    return { grand:grand, agg:agg };
   }
 
   function aggExclusive(){
@@ -461,8 +466,7 @@ DASHBOARD_JS = r"""
   function masterOverall(m){
     var total = H.glyphTotal;
     var started = total - m.uncolored;
-    var completion = (H.mode==="free" || !lastOrder) ? started : (countFor(m,lastOrder)||0);
-    var compP = pct(completion,total), startP = pct(started,total);
+    var startP = pct(started,total);
     var legend = stepsSorted(m).map(function(s){
       return '<span class="lg" title="'+esc(s.label)+'"><i style="background:var('+varFor(s.key)+')"></i>'+pct(countFor(m,s.key)||0,total)+'%</span>';
     }).join("");
@@ -1332,21 +1336,20 @@ DASHBOARD_JS = r"""
     window.__cfdExport = { csv: exportCSV, json: exportJSON, rows: exportRows, printHTML: buildPrintReport };
     // After the first paint the bars have run their fill animation once; stop
     // tagging them ".intro" so later re-renders don't re-animate.
-    requestAnimationFrame(function(){ document.body.classList.add("ready"); introDone = true; });
+    requestAnimationFrame(function(){ document.body.classList.add("ready"); });
   }
   // Decompress the gzipped model (base64 -> bytes -> gunzip stream -> JSON),
-  // then boot. Falls back to a plain JSON block if one is present.
+  // then boot. embed_model only ever emits the gzipped block; if it's missing the
+  // page is corrupt, so fail loudly rather than silently null-deref a plain block.
   function b64bytes(b64){ var bin=atob(b64), n=bin.length, a=new Uint8Array(n); for (var i=0;i<n;i++) a[i]=bin.charCodeAt(i); return a; }
   function loadModel(){
     var gz = document.getElementById("cfd-model-gz");
-    if (gz){
-      if (typeof DecompressionStream==="undefined" || typeof Response==="undefined" || typeof Blob==="undefined")
-        return Promise.reject(new Error("This report needs a modern browser (gzip decompression)."));
-      var stream = new Blob([b64bytes(gz.textContent.trim())]).stream().pipeThrough(new DecompressionStream("gzip"));
-      return new Response(stream).text().then(function(t){ return JSON.parse(t); });
-    }
-    var plain = document.getElementById("cfd-model");   // legacy uncompressed model
-    return Promise.resolve(JSON.parse(plain.textContent));
+    if (!gz)
+      return Promise.reject(new Error("Report data block is missing — this file looks incomplete."));
+    if (typeof DecompressionStream==="undefined" || typeof Response==="undefined" || typeof Blob==="undefined")
+      return Promise.reject(new Error("This report needs a modern browser (gzip decompression)."));
+    var stream = new Blob([b64bytes(gz.textContent.trim())]).stream().pipeThrough(new DecompressionStream("gzip"));
+    return new Response(stream).text().then(function(t){ return JSON.parse(t); });
   }
   function start(){
     loadModel().then(function(model){
