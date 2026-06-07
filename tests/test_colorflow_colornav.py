@@ -16,7 +16,7 @@ def test_next_unfinished_wraps_around_to_earlier_glyph() -> None:
 
 
 def test_next_unfinished_skips_final_step_glyphs() -> None:
-    glyphs = [("A", 1), ("B", 1), ("C", 1)]      # all finished
+    glyphs: list[tuple[str, int | None]] = [("A", 1), ("B", 1), ("C", 1)]  # all finished
     assert colornav.next_unfinished_index(glyphs, "1", 0) is None
 
 
@@ -28,7 +28,7 @@ def test_next_unfinished_treats_uncoloured_and_offpalette_as_unfinished() -> Non
 
 def test_next_unfinished_with_no_final_step_returns_first_after_position() -> None:
     # final_step None (no visible steps): every glyph counts as unfinished
-    glyphs = [("A", 1), ("B", 2), ("C", 3)]
+    glyphs: list[tuple[str, int | None]] = [("A", 1), ("B", 2), ("C", 3)]
     assert colornav.next_unfinished_index(glyphs, None, 0) == 1
 
 
