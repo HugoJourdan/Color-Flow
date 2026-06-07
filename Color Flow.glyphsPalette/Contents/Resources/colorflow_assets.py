@@ -174,7 +174,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .chg .arr{color:var(--muted-2)}
 .cmp-wrap{overflow-x:auto;margin-top:8px}
 .cmp{border-collapse:collapse;width:100%;font-size:var(--fs-xs)}
-.cmprow{transition:opacity .2s ease}
+.cmprow{transition:opacity .2s ease;cursor:pointer}
 .cmp tr.cmp-dim{opacity:.3}
 .cmp tr.cmp-sel{opacity:1}
 .cmp tr.cmp-sel .cmp-m{color:var(--text);font-weight:600}
@@ -587,7 +587,7 @@ DASHBOARD_JS = r"""
         return '<td><span class="cmpbar" style="width:'+p+'%;background:var('+varFor(s.key)+')"></span><span class="cmpn">'+p+'%</span></td>';
       }).join("");
       var cls = state.master==null ? "" : (m.id===state.master ? " cmp-sel" : " cmp-dim");
-      return '<tr class="cmprow'+cls+'"><th scope="row" class="cmp-m" title="'+esc(m.name)+'" aria-label="'+esc(m.name)+'">'+aa+'</th>'+cells+'</tr>';
+      return '<tr class="cmprow'+cls+'" data-m="'+esc(m.id)+'" title="Click to focus this master"><th scope="row" class="cmp-m" aria-label="'+esc(m.name)+'">'+aa+'</th>'+cells+'</tr>';
     }).join("");
     return '<div class="cmp-wrap"><table class="cmp"><caption>Step completion by master</caption><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
   }
@@ -809,6 +809,7 @@ DASHBOARD_JS = r"""
     });
     bodyEl.addEventListener("click", function(e){
       var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); update(); return; }
+      var cr = e.target.closest(".cmprow[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; update(); return; }
       var cg = e.target.closest("[data-cg]"); if (cg){ state.coverGroup = cg.getAttribute("data-cg"); update(); return; }
       var gs = e.target.closest("[data-gsort]"); if (gs){ state.glyphSort = gs.getAttribute("data-gsort"); update(); return; }
       var fc = e.target.closest("[data-fclear]"); if (fc){ setFocus(null); return; }
