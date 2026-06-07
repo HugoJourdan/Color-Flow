@@ -1008,3 +1008,91 @@ def test_dashboard_css_styles_scrub_diff_ring_classes() -> None:
     # the pulsing ring is animated, and reduced-motion neutralises that animation
     rm_block = css.split("@media (prefers-reduced-motion:reduce){")[1].split("}}")[0]
     assert "tl-ring" in rm_block
+
+
+def test_dashboard_js_has_seed_state_builder() -> None:
+    """#20: the bland "not enough history" line is replaced by a seed-state builder.
+    timelineView routes to it whenever hasTrend() is false (<2 snapshots) AND for the
+    ==2 day case, so the full timelineView only renders at >=3 snapshots. The builder is
+    a single named fn (seedState) gating internally on H.trend.dates.length."""
+    js = assets.DASHBOARD_JS
+    assert "function seedState(" in js
+    timeline = js.split("function timelineView(")[1].split("\n  function ")[0]
+    # timelineView no longer hard-codes the old bland sentence; it routes to seedState
+    assert "Not enough history yet" not in timeline
+    assert "seedState()" in timeline
+    # the gate now keeps the FULL view for >=3 snapshots only
+    assert ">= 3" in timeline or ">=3" in timeline or "< 3" in timeline or "<3" in timeline
+
+
+def test_dashboard_js_seed_state_skeleton_and_locked_chips_under_two() -> None:
+    """#20 (<2 snapshots): a skeleton preview (dashed placeholder line + ghost dots +
+    one real solid "today" dot from the single snapshot) plus a row of locked preview
+    chips (Forecast / Streak / Compare, each muted "unlocks at 2 days")."""
+    js = assets.DASHBOARD_JS
+    seed = js.split("function seedState(")[1].split("\n  function ")[0]
+    # skeleton container + ghost/placeholder line + ghost dots + the one real today dot
+    assert "tl-seed" in seed
+    assert "tl-seed-ghost" in seed or "tl-seed-line" in seed
+    assert "tl-seed-dot" in seed
+    assert "tl-seed-today" in seed
+    # locked preview chips
+    assert "tl-lock" in seed
+    assert "unlocks at 2 days" in seed
+    for label in ("Forecast", "Streak", "Compare"):
+        assert label in seed, label
+
+
+def test_dashboard_js_seed_state_history_meter() -> None:
+    """#20: a "History: N of 60 days" meter where N = H.trend.dates.length, capped at
+    60. Renders in both the <2 and ==2 branches."""
+    js = assets.DASHBOARD_JS
+    seed = js.split("function seedState(")[1].split("\n  function ")[0]
+    assert "tl-histmeter" in seed
+    assert "History" in seed
+    assert "of 60" in seed or "60 days" in seed or "/ 60" in seed
+    # N is the snapshot count, capped at 60
+    assert "H.trend.dates" in seed or "dates.length" in seed
+    assert "60" in seed
+    assert "Math.min(" in seed
+
+
+def test_dashboard_js_seed_state_day_two_compact_diff() -> None:
+    """#20 (==2 snapshots): a compact "in 1 day you advanced N (+X%)" line built via
+    diffCounts, with the A/B picker hidden (dateDiffPanel not invoked in this branch)."""
+    js = assets.DASHBOARD_JS
+    seed = js.split("function seedState(")[1].split("\n  function ")[0]
+    # the two-snapshot branch keys off the snapshot count == 2
+    assert "=== 2" in seed or "== 2" in seed or "length===2" in seed or "length === 2" in seed
+    # reuses the diff engine, not a reinvention
+    assert "diffCounts(" in seed
+    # the compact advanced phrasing
+    assert "advanced" in seed
+    assert "in 1 day" in seed or "1 day" in seed
+    # A/B picker stays hidden in this branch: no dateDiffPanel call inside seedState
+    assert "dateDiffPanel()" not in seed
+
+
+def test_dashboard_js_seed_state_respects_reduced_motion() -> None:
+    """#20 / D6: the skeleton shimmer is suppressed under reduced-motion via the shared
+    __cfdNoAnim / matchMedia gate (a no-shimmer class variant)."""
+    js = assets.DASHBOARD_JS
+    seed = js.split("function seedState(")[1].split("\n  function ")[0]
+    assert "__cfdNoAnim" in seed or "prefers-reduced-motion" in seed
+
+
+def test_dashboard_css_styles_seed_state_classes() -> None:
+    """#20: the seed-state classes are theme-safe (built from tokens). The skeleton
+    shimmer keyframe is neutralised under prefers-reduced-motion."""
+    css = assets.DASHBOARD_CSS
+    for selector in (".tl-seed", ".tl-lock", ".tl-histmeter"):
+        assert selector in css, selector
+    seed_block = css.split(".tl-seed{")[1].split("}")[0]
+    assert "var(--" in seed_block
+    lock_block = css.split(".tl-lock{")[1].split("}")[0]
+    assert "var(--" in lock_block
+    meter_block = css.split(".tl-histmeter{")[1].split("}")[0]
+    assert "var(--" in meter_block
+    # the shimmer is animated and reduced-motion neutralises it
+    rm_block = css.split("@media (prefers-reduced-motion:reduce){")[1].split("}}")[0]
+    assert "tl-seed" in rm_block

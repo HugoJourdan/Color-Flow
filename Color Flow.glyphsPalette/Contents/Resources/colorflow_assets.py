@@ -104,7 +104,7 @@ html,body{margin:0}
 body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains Mono",monospace;
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
-@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro{animation:none}.heat,.heat.fading{transition:none;opacity:1}.tl-ring{animation:none!important}}
+@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro{animation:none}.heat,.heat.fading{transition:none;opacity:1}.tl-ring{animation:none!important}.tl-seed-shimmer .tl-seed-ghost{animation:none}}
 #cfd-app{max-width:1180px;margin:0 auto;padding:0 20px}
 #cfd-main{display:flex;gap:24px;align-items:flex-start}
 #cfd-tower{position:sticky;top:0;flex:0 0 240px;width:240px}
@@ -345,6 +345,26 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-d-up{color:var(--ok)}
 .tl-d-down{color:var(--c0)}
 .tl-d-flat{color:var(--muted-2)}
+.tl-seed{border:1px solid var(--border-2);border-radius:var(--r);background:var(--surface-2);padding:16px}
+.tl-seed-head{font-weight:600;color:var(--text);margin-bottom:10px}
+.tl-seed-sub{font-size:var(--fs-xs);color:var(--muted);margin:10px 0}
+.tl-seed-line2{font-size:var(--fs-sm);color:var(--text);margin:6px 0}
+.tl-seed-line2 b{font-size:var(--fs-big-sm);font-weight:700;letter-spacing:-.01em}
+.tl-seed-svg{display:block;width:100%;max-width:360px;height:auto}
+.tl-seed-ghost{stroke:var(--muted-2);fill:var(--muted-2);opacity:.4}
+.tl-seed-line{fill:none;stroke-width:2;stroke-dasharray:4 4;stroke-linecap:round;stroke-linejoin:round}
+.tl-seed-dot{stroke:none}
+.tl-seed-today{fill:var(--accent);stroke:var(--bg);stroke-width:1.5}
+@keyframes tlSeedShimmer{0%{opacity:.25}50%{opacity:.55}100%{opacity:.25}}
+.tl-seed-shimmer .tl-seed-ghost{animation:tlSeedShimmer 1.8s ease-in-out infinite}
+.tl-seed-locks{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.tl-lock{display:inline-flex;flex-direction:column;gap:2px;border:1px dashed var(--border-2);border-radius:var(--r-sm);padding:6px 10px;background:var(--surface);color:var(--muted-2)}
+.tl-lock-n{font-size:var(--fs-xs);font-weight:600;color:var(--muted)}
+.tl-lock-h{font-size:var(--fs-2xs);color:var(--muted-2)}
+.tl-histmeter{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:var(--fs-xs);color:var(--muted)}
+.tl-histmeter-l{flex:0 0 auto;white-space:nowrap}
+.tl-histmeter-bar{flex:1;height:6px;border-radius:3px;background:var(--track);overflow:hidden}
+.tl-histmeter-bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
 .tl-diff{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
 .tl-diff-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
 .tl-diff-pick{display:flex;gap:14px;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--muted)}
@@ -1839,9 +1859,86 @@ DASHBOARD_JS = r"""
       + '<div class="tl-machine-grid heat" aria-label="Glyph colours at the scrubbed date">'+cells+'</div>'
       + '</div>';
   }
+  // ----- #20 rich onboarding seed states for sparse history -------------------
+  // One builder for both early states. <2 snapshots: a skeleton preview (dashed
+  // placeholder line + ghost dots + ONE real solid "today" dot from the single
+  // snapshot) + locked preview chips + a "History: N of 60 days" meter. ==2: a
+  // compact one-day diff (A/B picker hidden) + the same meter. >=3 never reaches
+  // here (timelineView gates it). All theme-safe + a11y-labelled; reduced-motion
+  // drops the skeleton shimmer via the shared __cfdNoAnim / matchMedia gate.
+  function seedState(){
+    var dates = (H.trend && H.trend.dates) || [];
+    var noAnim = window.__cfdNoAnim ||
+      (window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
+    // shared "History: N of 60 days" meter; N is the real snapshot count, capped at 60.
+    var n = Math.min(60, dates.length);
+    var meterWidth = Math.round(n / 60 * 100);
+    var meterLabel = "History: " + n + " of 60 days";
+    var histMeter = '<div class="tl-histmeter" role="img" aria-label="'+esc(meterLabel)+'">'
+      + '<span class="tl-histmeter-l">'+esc(meterLabel)+'</span>'
+      + '<span class="tl-histmeter-bar"><i style="width:'+meterWidth+'%"></i></span></div>';
+    if (dates.length === 2){
+      // ==2 snapshots: a compact one-day diff (A/B picker stays hidden). Reuse the
+      // existing diff engine over the only two dates we have.
+      var midTwo = state.master || (H.masters[0] && H.masters[0].id);
+      var c = diffCounts(midTwo, dates[0], dates[1]);
+      var net = (c.deltaPct>=0?"+":"") + c.deltaPct + "%";
+      return '<section class="tl-seed tl-seed-2" role="group" aria-label="Day-two progress">'
+        + '<div class="tl-seed-head">First two days in</div>'
+        + '<p class="tl-seed-line2">In 1 day you advanced <b>'+c.advanced+'</b> '
+        + '<span class="tl-seed-net '+(c.deltaPct>=0?"tl-d-up":"tl-d-down")+'">('+net+')</span>.</p>'
+        + '<p class="tl-seed-sub">Save again tomorrow to unlock the full timeline (forecast, streak, brush-compare).</p>'
+        + histMeter
+        + '</section>';
+    }
+    // <2 snapshots: skeleton preview. A dashed placeholder line + a couple of ghost
+    // dots hint at the coming chart; ONE real solid "today" dot sits at the single
+    // snapshot's completion % — the ghosts are decorative, the solid dot is the one
+    // honest reading. No data invented.
+    var single = (H.trend && H.trend.series && H.trend.series[0]) || null;
+    var midOne = state.master || (H.masters[0] && H.masters[0].id);
+    var pc = 0;
+    if (single && midOne && single.masters[midOne] && single.masters[midOne].total){
+      pc = single.masters[midOne].final / single.masters[midOne].total * 100;
+    }
+    var W = 320, Ht = 120, pad = 14, iw = W - pad*2, ih = Ht - pad*2;
+    var gx = function(t){ return pad + t*iw; };                // t in [0,1]
+    var gy = function(p){ return pad + ih - p/100*ih; };       // p in [0,100]
+    var ghostLine = '<polyline class="tl-seed-ghost tl-seed-line" points="'
+      + gx(0).toFixed(1)+','+gy(8).toFixed(1)+' '
+      + gx(0.5).toFixed(1)+','+gy(22).toFixed(1)+' '
+      + gx(1).toFixed(1)+','+gy(38).toFixed(1)+'"/>';
+    var ghostDots = [0, 0.5].map(function(t, i){
+      var gp = i === 0 ? 8 : 22;
+      return '<circle class="tl-seed-ghost tl-seed-dot" cx="'+gx(t).toFixed(1)+'" cy="'+gy(gp).toFixed(1)+'" r="3"/>';
+    }).join("");
+    var todayDot = '<circle class="tl-seed-today" cx="'+gx(1).toFixed(1)+'" cy="'+gy(pc).toFixed(1)+'" r="4"><title>'
+      + esc("Today · " + Math.round(pc) + "%") + '</title></circle>';
+    var shimmer = noAnim ? "" : " tl-seed-shimmer";
+    var skeleton = '<svg class="tl-seed-svg'+shimmer+'" viewBox="0 0 '+W+' '+Ht+'" role="img" aria-label="'
+      + esc("One snapshot so far at " + Math.round(pc) + "%. The chart unlocks once a second day of history is saved.")+'">'
+      + ghostLine + ghostDots + todayDot + '</svg>';
+    // locked preview chips: Forecast / Streak / Compare, each muted "unlocks at 2 days".
+    var locks = ["Forecast", "Streak", "Compare"].map(function(name){
+      return '<span class="tl-lock" aria-disabled="true">'
+        + '<span class="tl-lock-n">'+esc(name)+'</span>'
+        + '<span class="tl-lock-h">unlocks at 2 days</span></span>';
+    }).join("");
+    return '<section class="tl-seed tl-seed-1" role="group" aria-label="Getting started">'
+      + '<div class="tl-seed-head">Building your timeline</div>'
+      + skeleton
+      + '<p class="tl-seed-sub">Color Flow saves a snapshot each time you save the font. '
+      + 'The chart unlocks at 2 days of history.</p>'
+      + '<div class="tl-seed-locks">'+locks+'</div>'
+      + histMeter
+      + '</section>';
+  }
   function timelineView(){
-    if (!hasTrend()){
-      return '<section class="tl-empty"><p class="empty">Not enough history yet. Color Flow saves a snapshot each time you save the font; this timeline fills in as days of history accumulate.</p></section>';
+    // #20: <3 snapshots routes to the rich seed states (a skeleton + locked chips at
+    // <2, a compact one-day diff at ==2). The full view needs >=3 to be meaningful.
+    var dates = (H.trend && H.trend.dates) || [];
+    if (dates.length < 3){
+      return '<section class="tl-empty">'+seedState()+'</section>';
     }
     // D2: Line is the default; Flow renders the stacked colour streamgraph (#5).
     var parts = state.tlMode === "flow" ? streamParts(680, 200) : trendParts(680, 200);
