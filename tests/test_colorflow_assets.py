@@ -606,6 +606,45 @@ def test_dashboard_css_styles_regression_log_and_flag() -> None:
     assert "var(--" in flag_block
 
 
+def test_dashboard_js_has_category_progress_lanes() -> None:
+    """#17: per-category progress lanes over time. A categoryLanes builder maps each
+    glyph to its category from the parallel H.glyphNames / H.categories arrays, then —
+    per category, per snapshot date — sums graded step weights over that category's
+    glyphs via stateAt to draw a tiny completion sparkline. Each row carries the
+    category name, its sparkline, the current %, and a delta arrow vs ~a week ago;
+    rows sort laggard-first (lowest current % on top). It degrades to a current-%
+    bar when there are only 1-2 snapshots, and is wired into the timeline view."""
+    js = assets.DASHBOARD_JS
+    # the named builder, wired into the timeline view (D1: lanes section)
+    assert "function categoryLanes(" in js
+    timeline = js.split("function timelineView(")[1].split("function ")[0]
+    assert "categoryLanes()" in timeline
+    lanes = js.split("function categoryLanes(")[1].split("\n  function ")[0]
+    # builds the glyphName -> category map from the two parallel arrays
+    assert "H.categories" in lanes
+    assert "H.glyphNames" in lanes
+    # graded completion per date via stateAt + the shared step weights (not reinvented)
+    assert "stateAt(" in lanes
+    assert "stepWeights(" in lanes
+    # walks the real snapshot dates for the over-time sparkline
+    assert "H.trend.dates" in lanes or "H.trend && H.trend.dates" in lanes
+    # one .tl-lane row per category, with a delta arrow vs ~a week ago
+    assert "tl-lane" in lanes
+    # laggard-first ordering (lowest current % on top)
+    assert "sort(" in lanes
+    # degrades to a current-% bar at 1-2 snapshots (no sparkline to draw)
+    assert "tl-lane-bar" in lanes
+
+
+def test_dashboard_css_styles_category_lane_class() -> None:
+    """#17: the category lane row and its mini chart carry theme-safe rules built
+    from the design tokens (no hard-coded colours)."""
+    css = assets.DASHBOARD_CSS
+    assert ".tl-lane" in css
+    lane_block = css.split(".tl-lane{")[1].split("}")[0]
+    assert "var(--" in lane_block
+
+
 def test_dashboard_js_has_journey_modal() -> None:
     js = assets.DASHBOARD_JS
     assert "function openJourney(" in js

@@ -356,6 +356,18 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-reglog-rows .rg-row{cursor:pointer}
 .tl-reglog-rows .rg-row:hover{color:var(--text)}
 .tl-flag{stroke:var(--c0);stroke-width:2;stroke-linecap:round}
+.tl-lanes{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
+.tl-lanes-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
+.tl-lane{display:flex;align-items:center;gap:10px;font-size:var(--fs-xs);color:var(--text);padding:4px 0}
+.tl-lane+.tl-lane{border-top:1px solid var(--track)}
+.tl-lane-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-lane-n small{color:var(--muted-2)}
+.tl-lane-mid{flex:0 0 64px;display:flex;align-items:center;justify-content:center;height:16px}
+.tl-lane-spark polyline{stroke:var(--accent);stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.tl-lane-bar{display:block;width:100%;height:6px;background:var(--track);border-radius:3px;overflow:hidden}
+.tl-lane-bar>span{display:block;height:100%;background:var(--accent);border-radius:3px}
+.tl-lane-pct{flex:0 0 auto;color:var(--text);font-variant-numeric:tabular-nums;text-align:right;min-width:34px}
+.tl-lane-d{flex:0 0 auto}
 .dz{font-size:var(--fs-xs);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:4px 9px;color:var(--muted)}
 .dz-up{border-color:var(--ok);color:var(--ok)}
 .dz-down{border-color:var(--c0);color:var(--c0)}
@@ -1389,6 +1401,76 @@ DASHBOARD_JS = r"""
           + (open ? "Show top 8" : "Show all "+hits.length)+'</button>' : '')+'</div>';
     return '<div class="tl-reglog">'+head+'<div class="tl-reglog-rows">'+rows+'</div></div>';
   }
+  // ----- #17 per-category progress lanes over time ---------------------------
+  function categoryLanes(){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (dates.length < 1) return "";
+    // Map each glyph to its category from the parallel H.glyphNames / H.categories
+    // arrays, grouping the glyph names by category (empty categories never appear).
+    var allNames = H.glyphNames || [], allCats = H.categories || [], groups = {};
+    for (var gi = 0; gi < allNames.length; gi++){
+      var gcat = allCats[gi] || "Other";
+      (groups[gcat] || (groups[gcat] = [])).push(allNames[gi]);
+    }
+    var cats = Object.keys(groups);
+    if (!cats.length) return "";
+    var mid = reglogMaster();
+    if (!mid) return "";
+    var sparse = dates.length < 3;                 // 1-2 snapshots: bar, no over-time line
+    var weight = stepWeights().weight;             // shared palette-order step weights
+    // Graded completion % for one category at one snapshot date: sum the step weights
+    // over that category's glyphs (reconstructed via stateAt) over the category's glyph
+    // count, on the same 0-100 graded scale as the master/overall cards.
+    var laneStatePct = function(names, iso){
+      var st = stateAt(mid, iso), sum = 0;
+      for (var i = 0; i < names.length; i++){
+        var w = weight[st[names[i]]]; if (w) sum += w;
+      }
+      return names.length ? Math.round(sum / names.length * 100) : 0;
+    };
+    // Tiny completion-over-time polyline (reuses the chart's Y-flip idiom, scaled to a
+    // mini box); only drawn when there are >=2 snapshots to connect.
+    var laneSpark = function(values){
+      var n = values.length, w = 64, h = 16, pad = 1.5, iw = w - pad*2, ih = h - pad*2;
+      if (n < 2) return "";
+      var pts = values.map(function(v, i){
+        var x = pad + i/(n-1)*iw;
+        var y = pad + ih - Math.max(0, Math.min(100, v))/100*ih;
+        return x.toFixed(1)+","+y.toFixed(1);
+      }).join(" ");
+      return '<svg class="tl-lane-spark" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true">'
+        + '<polyline points="'+pts+'" fill="none"/></svg>';
+    };
+    // ~a week before the latest snapshot, snapped onto a real snapshot date.
+    var today = (H.trend && H.trend.today) || dates[dates.length-1];
+    var weekAgo = snapDate(dates, isoMinusDays(today, 7));
+    var lanes = cats.map(function(cat){
+      var names = groups[cat];
+      var values = dates.map(function(d){ return laneStatePct(names, d); });
+      var cur = values[values.length-1];
+      var prevPct = laneStatePct(names, weekAgo);
+      var delta = cur - prevPct;
+      return { cat:cat, count:names.length, values:values, cur:cur, delta:delta };
+    });
+    // laggard-first: lowest current % on top (name as a stable tie-breaker).
+    lanes.sort(function(a, b){ return (a.cur - b.cur) || (a.cat < b.cat ? -1 : 1); });
+    var rows = lanes.map(function(ln){
+      var arrow = ln.delta > 0 ? "▲" : (ln.delta < 0 ? "▼" : "▬");
+      var arrowCls = ln.delta > 0 ? "tl-d-up" : (ln.delta < 0 ? "tl-d-down" : "tl-d-flat");
+      var deltaTxt = (ln.delta>0?"+":"")+ln.delta+"% vs "+esc(dateLabel(weekAgo));
+      var mid2 = sparse
+        ? '<span class="tl-lane-bar"><span style="width:'+ln.cur+'%"></span></span>'
+        : laneSpark(ln.values);
+      return '<div class="tl-lane">'
+        + '<span class="tl-lane-n" title="'+esc(ln.cat)+'">'+esc(ln.cat)+' <small>('+ln.count+')</small></span>'
+        + '<span class="tl-lane-mid">'+mid2+'</span>'
+        + '<span class="tl-lane-pct">'+ln.cur+'%</span>'
+        + '<span class="tl-lane-d '+arrowCls+'" title="'+deltaTxt+'" aria-label="'+deltaTxt+'">'+arrow+'</span>'
+        + '</div>';
+    }).join("");
+    return '<div class="tl-lanes"><div class="tl-lanes-h">By category'
+      + (sparse ? ' · current %' : ' · over time')+'</div>'+rows+'</div>';
+  }
   function timelineView(){
     if (!hasTrend()){
       return '<section class="tl-empty"><p class="empty">Not enough history yet. Color Flow saves a snapshot each time you save the font; this timeline fills in as days of history accumulate.</p></section>';
@@ -1398,7 +1480,7 @@ DASHBOARD_JS = r"""
     // #14: This-week digest tops the tab (above the chart), per D1.
     return '<section class="timeline">'+weekDigest()+'<div class="tl-chartbar">'+tlModeToggle()
       + '<div class="tl-legend">'+parts.legend+'</div></div>'
-      + parts.chart+parts.foot+dateDiffPanel()+regressionLog()+'</section>';
+      + parts.chart+parts.foot+dateDiffPanel()+categoryLanes()+regressionLog()+'</section>';
   }
   function compareView(){
     // columns = steps (+None); rows = masters, labelled by the master name.
