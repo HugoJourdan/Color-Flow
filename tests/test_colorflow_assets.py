@@ -118,6 +118,16 @@ def test_build_html_has_script_coverage_grid() -> None:
     assert "function scriptRows(" in html              # per-master / aggregated rows
 
 
+def test_dashboard_js_uses_graded_step_progress() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function stepWeights(" in js                 # palette-order step ranking
+    assert "function gradedMasterPct(" in js
+    assert "function gradedOverallPct(" in js
+    assert "(i+1)/N" in js                                # first step = 1/N, final = 100%
+    assert "% complete" in js                             # graded % shown in the headline
+    assert "function masterPct(m){ return gradedMasterPct(m); }" in js  # leaderboard/histogram use it
+
+
 def test_dashboard_js_routes_focus_through_setfocus() -> None:
     js = assets.DASHBOARD_JS
     assert "function setFocus(" in js

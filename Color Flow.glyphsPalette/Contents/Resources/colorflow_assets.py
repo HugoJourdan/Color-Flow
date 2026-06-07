@@ -402,6 +402,26 @@ DASHBOARD_JS = r"""
       + '<button type="button" id="cfd-compare" class="chip" aria-pressed="false">▤ Compare</button>'
       + '<button type="button" id="cfd-export" class="chip" style="margin-left:auto" title="Export the report as PDF, CSV or JSON">⤓ Export Report</button></div>';
   }
+  // ----- Graded step progress -----------------------------------------------
+  // Each colour is a workflow step ranked by the Palette order; a glyph sitting
+  // at step i of N counts as i/N (first step = 1/N, final = 100%). N = the
+  // distinct colours actually used across the whole font, kept in Palette order.
+  // Uncoloured / off-palette glyphs count as 0.
+  var STEPW = null;
+  function stepWeights(){
+    if (STEPW) return STEPW;
+    var used = {};
+    H.masters.forEach(function(m){ var ks=m.keys||[]; for (var i=0;i<ks.length;i++){ if (ks[i]!==-1) used[ks[i]]=1; } });
+    var steps = (H.order||[]).filter(function(k){ return used[k]; });
+    var weight = {}, N = steps.length;
+    steps.forEach(function(k,i){ weight[k] = (i+1)/N; });
+    STEPW = { weight:weight, N:N, steps:steps };
+    return STEPW;
+  }
+  function gradedSum(m){ var W=stepWeights().weight, ks=m.keys||[], s=0; for (var i=0;i<ks.length;i++){ var w=W[ks[i]]; if (w) s+=w; } return s; }
+  function gradedMasterPct(m){ var n=H.glyphTotal||((m.keys||[]).length)||1; return Math.round(gradedSum(m)/n*100); }
+  function gradedOverallPct(){ var s=0, tot=0; H.masters.forEach(function(m){ s+=gradedSum(m); tot+=H.glyphTotal; }); return tot? Math.round(s/tot*100):0; }
+  function masterStarted(m){ return (m.uncolored||0) < H.glyphTotal; }   // any colour set at all
   function ring(p){
     var r=26, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(100,p))/100);
     return '<svg class="ov-ring" width="66" height="66" viewBox="0 0 66 66" role="progressbar" aria-valuenow="'+p+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+p+'% complete">'
@@ -410,13 +430,11 @@ DASHBOARD_JS = r"""
       + '<text class="ov-ring-t" x="33" y="34" text-anchor="middle" dominant-baseline="central">'+p+'%</text></svg>';
   }
   function overall(){
-    var a = aggregate(), compP = pct(a.completion,a.grand), startP = pct(a.started,a.grand);
+    var a = aggregate(), compP = gradedOverallPct();
     var legend = H.steps.map(function(s){
       return '<span class="lg" title="'+esc(s.label)+'"><i style="background:var('+varFor(s.key)+')"></i>'+pct(a.agg[String(s.key)]||0,a.grand)+'%</span>';
     }).join("");
-    var head = (H.mode==="free" || !lastOrder)
-      ? '<b>'+a.started+'/'+a.grand+'</b>'
-      : '<b>'+a.completion+'/'+a.grand+'</b> complete · '+a.started+'/'+a.grand+' started ('+startP+'%)';
+    var head = '<b>'+compP+'% complete</b> · '+a.started+'/'+a.grand+' started ('+pct(a.started,a.grand)+'%)';
     var recipeLine = "";
     if (H.recipes && H.recipes.length){
       var recipeComplete = 0;
@@ -446,9 +464,7 @@ DASHBOARD_JS = r"""
       return '<span class="lg" title="'+esc(s.label)+'"><i style="background:var('+varFor(s.key)+')"></i>'+pct(countFor(m,s.key)||0,total)+'%</span>';
     }).join("");
     var head = '<span class="ov-name">'+esc(m.name)+'</span>'
-      + ((H.mode==="free" || !lastOrder)
-      ? '<b>'+started+'/'+total+'</b>'
-      : '<b>'+completion+'/'+total+'</b> complete · '+started+'/'+total+' started ('+startP+'%)');
+      + '<b>'+gradedMasterPct(m)+'% complete</b> · '+started+'/'+total+' started ('+startP+'%)';
     var recipeLine = "";
     if (H.recipes && H.recipes.length){
       var rc = ((H.recipeCompletion||{})[m.id])||{};
@@ -547,12 +563,12 @@ DASHBOARD_JS = r"""
     return '<div class="tabs" role="tablist">'+tabs+'</div>';
   }
   // ----- Overview extras (only when no master is selected) ------------------
-  function masterPct(m){ return pct(H.glyphTotal-(m.uncolored||0), H.glyphTotal); }
-  // Ranked masters by how much colour is set; click a row to focus that master.
+  function masterPct(m){ return gradedMasterPct(m); }   // graded step progress
+  // Ranked masters by graded step progress; click a row to focus that master.
   function leaderboard(){
-    var rows = H.masters.map(function(m){ return {id:m.id, name:m.name, p:masterPct(m)}; });
+    var rows = H.masters.map(function(m){ return {id:m.id, name:m.name, p:masterPct(m), any:masterStarted(m)}; });
     rows.sort(function(a,b){ return b.p-a.p || (a.name<b.name?-1:1); });
-    var started = rows.filter(function(r){ return r.p>0; });
+    var started = rows.filter(function(r){ return r.any; });
     var top = (started.length?started:rows).slice(0,6);
     var bars = top.map(function(r){
       return '<button type="button" class="lb-row" data-m="'+esc(r.id)+'" title="Focus '+esc(r.name)+'">'
@@ -568,7 +584,7 @@ DASHBOARD_JS = r"""
   function histogram(){
     var buckets=[{l:"0%",n:0},{l:"1–25%",n:0},{l:"26–50%",n:0},{l:"51–75%",n:0},{l:"76–99%",n:0},{l:"100%",n:0}];
     H.masters.forEach(function(m){ var p=masterPct(m);
-      var b = p<=0?0 : p>=100?5 : p<=25?1 : p<=50?2 : p<=75?3 : 4; buckets[b].n++; });
+      var b = !masterStarted(m)?0 : p>=100?5 : p<=25?1 : p<=50?2 : p<=75?3 : 4; buckets[b].n++; });
     var max=buckets.reduce(function(a,c){return Math.max(a,c.n);},1);
     var rows=buckets.map(function(b){
       return '<div class="hg-row"><span class="hg-l">'+b.l+'</span>'
