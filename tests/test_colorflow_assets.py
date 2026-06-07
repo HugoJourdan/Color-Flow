@@ -676,6 +676,83 @@ def test_dashboard_js_has_script_progress_lanes() -> None:
     assert "tl-lane-bar" in lanes
 
 
+def test_dashboard_js_has_deadline_marker_and_verdict() -> None:
+    """#19: a target-date control + per-master on-track verdict. An
+    <input type="date" id="cfd-deadline"> persists in localStorage keyed by the
+    family name (offline-safe). When a date is set the chart draws a dashed red
+    vertical rule (reusing #7's date->X math) and a per-master verdict chip
+    compares forecast.etaIso against the target (green / amber / red) and shows the
+    required catch-up pace = remaining / daysUntilTarget. Empty by default → the
+    feature stays dormant (no rule, no chips). It is wired into the timeline view."""
+    js = assets.DASHBOARD_JS
+    # the date input + its builder, wired into the timeline view (D1: deadline section)
+    assert 'id="cfd-deadline"' in js
+    assert 'type="date"' in js
+    assert "function deadlinePanel(" in js
+    timeline = js.split("function timelineView(")[1].split("function ")[0]
+    assert "deadlinePanel()" in timeline
+    panel = js.split("function deadlinePanel(")[1].split("\n  function ")[0]
+    # per-master verdict chips with the three on-track classes
+    assert "tl-verdict" in panel
+    assert "tl-v-ok" in panel and "tl-v-amber" in panel and "tl-v-late" in panel
+    # the verdict compares the forecast ETA against the target date
+    assert ".etaIso" in panel
+    # required catch-up pace = remaining / daysUntilTarget (glyphs/day)
+    assert ".remaining" in panel
+    assert "daysUntil" in panel
+    # rolls the master forecast off the embedded model
+    assert "H.trend" in panel and "forecast" in panel
+
+
+def test_dashboard_js_deadline_persists_in_localstorage_by_family() -> None:
+    """D4: the deadline persists in localStorage under a family-scoped key, with the
+    read/write both guarded so a missing or throwing localStorage degrades safely."""
+    js = assets.DASHBOARD_JS
+    assert "function deadlineKey(" in js
+    key = js.split("function deadlineKey(")[1].split("\n  function ")[0]
+    # the storage key is scoped by the family name
+    assert "cfd-deadline" in key
+    assert "H.family" in key
+    # read + write both go through localStorage and are wrapped in try/catch
+    getset = js.split("function deadlineKey(")[1].split("function deadlinePanel(")[0]
+    assert "localStorage.getItem(" in getset
+    assert "localStorage.setItem(" in getset
+    assert "try" in getset and "catch" in getset
+
+
+def test_dashboard_js_deadline_rule_clamps_and_reuses_axis() -> None:
+    """The dashed deadline rule reuses #7's calendarAxis date->X math; a target past
+    the plotted span clamps to the right edge with an offset label rather than
+    drawing off-chart, and the rule is injected into the chart SVG."""
+    js = assets.DASHBOARD_JS
+    assert "function deadlineRule(" in js
+    rule = js.split("function deadlineRule(")[1].split("\n  function ")[0]
+    # reuses the axis date->X mapping (dayOff + X) rather than reinventing a scale
+    assert "dayOff(" in rule
+    # clamps beyond the span to the right edge
+    assert "lastOff" in rule
+    # the dashed-red rule class is emitted, and injected into the trend chart
+    assert "tl-deadline" in rule
+    assert "deadlineRule(" in js.split("function trendParts(")[1].split("\n  function ")[0]
+
+
+def test_dashboard_js_deadline_change_rerenders_and_persists() -> None:
+    """Editing the date input writes through to localStorage and re-renders so the
+    rule + verdict chips update without a reload."""
+    js = assets.DASHBOARD_JS
+    change = js.split('addEventListener("change"')[1].split("});")[0]
+    assert "cfd-deadline" in change
+    assert "setDeadline(" in change or "deadline" in change
+    assert "update()" in change
+
+
+def test_dashboard_css_styles_deadline_and_verdict_classes() -> None:
+    css = assets.DASHBOARD_CSS
+    for selector in (".tl-deadline", ".tl-verdict", ".tl-v-ok", ".tl-v-amber",
+                     ".tl-v-late"):
+        assert selector in css, selector
+
+
 def test_dashboard_js_has_journey_modal() -> None:
     js = assets.DASHBOARD_JS
     assert "function openJourney(" in js

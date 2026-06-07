@@ -368,6 +368,22 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-lane-bar>span{display:block;height:100%;background:var(--accent);border-radius:3px}
 .tl-lane-pct{flex:0 0 auto;color:var(--text);font-variant-numeric:tabular-nums;text-align:right;min-width:34px}
 .tl-lane-d{flex:0 0 auto}
+.tl-deadline-rule{stroke:var(--c0);stroke-width:1.5;stroke-dasharray:4 3}
+.tl-deadline-pill{fill:var(--c0);opacity:.92}
+.tl-deadline-t{fill:#fff;font-size:9px;font-weight:600}
+.tl-verdicts{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
+.tl-deadline-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tl-deadline-l{font-size:var(--fs-xs);color:var(--muted)}
+.tl-deadline-bar input{background:var(--surface-2);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--text);font:inherit;font-size:var(--fs-xs);padding:3px 6px;color-scheme:dark light}
+.tl-deadline-runway{display:inline-block;margin-top:8px;font-size:var(--fs-xs);color:var(--muted-2)}
+.tl-verdict-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.tl-verdict{display:inline-flex;flex-direction:column;gap:2px;font-size:var(--fs-xs);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:5px 9px;background:var(--surface-2)}
+.tl-v-name{color:var(--text);font-weight:600}
+.tl-v-note{color:var(--muted)}
+.tl-v-pace{color:var(--muted-2);font-variant-numeric:tabular-nums}
+.tl-v-ok{border-color:var(--ok)}.tl-v-ok .tl-v-name{color:var(--ok)}
+.tl-v-amber{border-color:var(--c1)}.tl-v-amber .tl-v-name{color:var(--c1)}
+.tl-v-late{border-color:var(--c0)}.tl-v-late .tl-v-name{color:var(--c0)}
 .dz{font-size:var(--fs-xs);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:4px 9px;color:var(--muted)}
 .dz-up{border-color:var(--ok);color:var(--ok)}
 .dz-down{border-color:var(--c0);color:var(--c0)}
@@ -1127,7 +1143,10 @@ DASHBOARD_JS = r"""
     var flags = ax.snaps.filter(function(s){ return regDates[s.d]; }).map(function(s){
       return '<line class="tl-flag" x1="'+s.x+'" y1="'+(baseY-6).toFixed(1)+'" x2="'+s.x+'" y2="'+baseY.toFixed(1)+'"><title>'+esc(dateLabel(s.d)+" · moved backward")+'</title></line>';
     }).join("");
-    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData+' aria-label="Completion over time per master. Hover or use the left and right arrow keys to read each snapshot.">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+grid+xticks+lines+flags+todayRule+brushLayer+crossLayer+'</svg>';
+    // #19 dashed deadline rule (reuses the calendar axis date->X math); dormant
+    // until a target date is stored, so this is "" by default.
+    var deadline = deadlineRule(ax);
+    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData+' aria-label="Completion over time per master. Hover or use the left and right arrow keys to read each snapshot.">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+grid+xticks+lines+flags+todayRule+deadline+brushLayer+crossLayer+'</svg>';
     var foot = '<div class="tl-foot"><span>'+esc(series[0].date)+'</span><span>'+esc(series[series.length-1].date)+'</span></div>';
     return { chart:chart, legend:legend, foot:foot };
   }
@@ -1211,9 +1230,10 @@ DASHBOARD_JS = r"""
       + ' data-stream="'+esc(JSON.stringify(tally))+'"';
     var crossLayer = '<line class="tl-cross" y1="'+ptop+'" y2="'+(ptop+ih).toFixed(1)+'"/>'
       + '<rect class="tl-crossarea" x="'+pl+'" y="'+ptop+'" width="'+iw.toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
+    var deadline = deadlineRule(ax);                         // #19: shared rule, Flow mode too
     var chart = '<svg class="tl-chart tl-flow" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData
       + ' aria-label="Stacked colour completion over time. Hover or use the left and right arrow keys to read each snapshot.">'
-      + '<defs>'+defs+'</defs>'+ax.weekBands+grid+bands+ax.xticks+ax.todayRule+crossLayer+'</svg>';
+      + '<defs>'+defs+'</defs>'+ax.weekBands+grid+bands+ax.xticks+ax.todayRule+deadline+crossLayer+'</svg>';
     // legend: one swatch per step (+ uncoloured), mirroring the band fills.
     var legend = order.map(function(k){
       return '<span class="tl-lg"><i style="background:var('+varFor(k)+')"></i>'+esc(labelFor(k))+'</span>';
@@ -1543,6 +1563,104 @@ DASHBOARD_JS = r"""
     return '<div class="tl-lanes"><div class="tl-lanes-h">By script'
       + (sparse ? ' · current %' : ' · over time')+'</div>'+rows+'</div>';
   }
+  // ----- #19 deadline marker + on-track verdict -----------------------------
+  // The target date persists in localStorage, keyed by the family name (D4) so it
+  // stays offline-safe and per-font. Empty by default → the feature is dormant
+  // (no rule on the chart, no verdict chips) until a date is entered.
+  function deadlineKey(){ return "cfd-deadline:" + (H.family || ""); }
+  function getDeadline(){
+    try { return localStorage.getItem(deadlineKey()) || ""; } catch(e){ return ""; }
+  }
+  function setDeadline(iso){
+    try {
+      if (iso){ localStorage.setItem(deadlineKey(), iso); }
+      else { localStorage.removeItem(deadlineKey()); }
+    } catch(e){}
+  }
+  // Dashed-red vertical rule + flag at the target date's X, reusing #7's calendar
+  // axis date->X math (ax.dayOff + ax.X). A target beyond the plotted span clamps
+  // to the right edge and carries an offset label so it never draws off-chart.
+  function deadlineRule(ax){
+    var iso = getDeadline();
+    if (!iso) return "";
+    var off = ax.dayOff(iso);
+    if (isNaN(off)) return "";
+    var beyond = off > ax.lastOff;
+    var x = beyond ? ax.X(ax.lastOff) : ax.X(Math.max(0, off));
+    var topY = ax.ptop, botY = ax.ptop + ax.ih;
+    var lab = dateLabel(iso) + (beyond ? " →" : "");
+    var pillW = lab.length * 5.5 + 12;
+    var pillX = Math.min(ax.X(ax.lastOff) + ax.pr - pillW, Math.max(ax.pl, x - pillW/2));
+    return '<g class="tl-deadline" aria-hidden="true">'
+      + '<line class="tl-deadline-rule" x1="'+x.toFixed(1)+'" y1="'+topY+'" x2="'+x.toFixed(1)+'" y2="'+botY.toFixed(1)+'"/>'
+      + '<rect class="tl-deadline-pill" x="'+pillX.toFixed(1)+'" y="'+(topY-1)+'" width="'+pillW.toFixed(1)+'" height="13" rx="6"/>'
+      + '<text class="tl-deadline-t" x="'+(pillX+pillW/2).toFixed(1)+'" y="'+(topY+8.5)+'" text-anchor="middle">'+esc(lab)+'</text>'
+      + '</g>';
+  }
+  // Whole UTC days from today (H.trend.today, else the last snapshot) up to the
+  // target. Negative when the target is already in the past; timezone-stable.
+  function daysUntil(iso){
+    var dates = (H.trend && H.trend.dates) || [];
+    var today = (H.trend && H.trend.today) || dates[dates.length-1];
+    if (!today || !iso) return null;
+    var ms = new Date(iso+"T00:00:00Z").getTime() - new Date(today+"T00:00:00Z").getTime();
+    if (isNaN(ms)) return null;
+    return Math.round(ms / 86400000);
+  }
+  // The date control + per-master verdict chips. Each chip compares the master's
+  // forecast.etaIso (estimated finish at the recent pace) against the target:
+  //   green  — ETA on or before the target (on track)
+  //   amber  — ETA slightly past (within a grace window of the days remaining)
+  //   red    — ETA well past, or no honest ETA at all (flat/regressing pace)
+  // and shows the required catch-up pace = remaining / daysUntilTarget (glyphs/day)
+  // so a behind master gets an actionable number, not just a colour.
+  function deadlinePanel(){
+    var iso = getDeadline();
+    var input = '<div class="tl-deadline-bar"><label class="tl-deadline-l" for="cfd-deadline">Target date</label>'
+      + '<input type="date" id="cfd-deadline" value="'+esc(iso)+'"'+(H.trend && H.trend.today ? ' max="9999-12-31"' : '')+' aria-label="Project deadline target date"/></div>';
+    if (!iso) return '<div class="tl-verdicts" role="group" aria-label="Deadline">'+input+'</div>';
+    var forecast = (H.trend && H.trend.forecast) || {};
+    var days = daysUntil(iso);
+    var chips = H.masters.map(function(m){
+      var fc = forecast[m.id] || {};
+      var eta = fc.etaIso || null;
+      var remaining = fc.remaining != null ? fc.remaining : null;
+      // verdict: a master already finished is on track; otherwise classify by ETA.
+      var cls, note;
+      if (remaining === 0){ cls = "tl-v-ok"; note = "done"; }
+      else if (!eta){ cls = "tl-v-late"; note = "no ETA at current pace"; }
+      else {
+        // grace window scales with the runway: a forecast within ~15% of the days
+        // remaining counts as amber rather than a hard red.
+        var grace = days != null && days > 0 ? Math.max(2, Math.round(days * 0.15)) : 2;
+        var etaMs = new Date(eta+"T00:00:00Z").getTime();
+        var tgtMs = new Date(iso+"T00:00:00Z").getTime();
+        var overDays = Math.round((etaMs - tgtMs) / 86400000);
+        if (overDays <= 0){ cls = "tl-v-ok"; note = "ETA " + esc(dateLabel(eta)); }
+        else if (overDays <= grace){ cls = "tl-v-amber"; note = esc(dateLabel(eta)) + " · " + overDays + "d late"; }
+        else { cls = "tl-v-late"; note = esc(dateLabel(eta)) + " · " + overDays + "d late"; }
+      }
+      // required catch-up pace to land on the target = remaining / daysUntilTarget.
+      // Only meaningful with a positive runway and work left to do.
+      var pace = "";
+      if (remaining != null && remaining > 0 && days != null && days > 0){
+        var perDay = remaining / days;
+        pace = '<span class="tl-v-pace">'+(perDay >= 10 ? Math.round(perDay) : perDay.toFixed(1))+'/day to hit it</span>';
+      } else if (remaining != null && remaining > 0 && days != null && days <= 0){
+        pace = '<span class="tl-v-pace">target passed</span>';
+      }
+      return '<span class="tl-verdict '+cls+'" title="'+esc(m.name+" — "+note)+'">'
+        + '<b class="tl-v-name">'+esc(m.name)+'</b>'
+        + '<span class="tl-v-note">'+note+'</span>'+pace+'</span>';
+    }).join("");
+    var runway = days != null
+      ? (days > 0 ? days + " day" + (days===1?"":"s") + " to go" : (days===0 ? "due today" : (-days) + " day" + (days===-1?"":"s") + " overdue"))
+      : "";
+    return '<div class="tl-verdicts" role="group" aria-label="Deadline and on-track verdict">'
+      + input
+      + (runway ? '<span class="tl-deadline-runway">'+runway+'</span>' : "")
+      + '<div class="tl-verdict-row">'+chips+'</div></div>';
+  }
   function timelineView(){
     if (!hasTrend()){
       return '<section class="tl-empty"><p class="empty">Not enough history yet. Color Flow saves a snapshot each time you save the font; this timeline fills in as days of history accumulate.</p></section>';
@@ -1552,7 +1670,7 @@ DASHBOARD_JS = r"""
     // #14: This-week digest tops the tab (above the chart), per D1.
     return '<section class="timeline">'+weekDigest()+'<div class="tl-chartbar">'+tlModeToggle()
       + '<div class="tl-legend">'+parts.legend+'</div></div>'
-      + parts.chart+parts.foot+dateDiffPanel()+categoryLanes()+scriptLanes()+regressionLog()+'</section>';
+      + parts.chart+parts.foot+dateDiffPanel()+deadlinePanel()+categoryLanes()+scriptLanes()+regressionLog()+'</section>';
   }
   function compareView(){
     // columns = steps (+None); rows = masters, labelled by the master name.
@@ -2153,6 +2271,9 @@ DASHBOARD_JS = r"""
     bodyEl.addEventListener("change", function(e){
       if (e.target.id === "cfd-date-a"){ state.dateA = e.target.value; update(); }
       else if (e.target.id === "cfd-date-b"){ state.dateB = e.target.value; update(); }
+      // #19: persist the deadline target (family-scoped) and re-render so the rule
+      // + verdict chips refresh without a reload.
+      else if (e.target.id === "cfd-deadline"){ setDeadline(e.target.value); update(); }
     });
     // #6 snapping crosshair: the chart SVG is rebuilt on every update(), so delegate
     // its pointer + keyboard interaction at the #cfd-body level (same idiom as the
