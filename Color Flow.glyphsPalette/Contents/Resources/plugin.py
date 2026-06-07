@@ -223,17 +223,20 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 			self._fillImage = self._blurred_fill(blend, width, bar_h, bar_h * 1.2)
 			self._fillKey = key
 		fill_image = getattr(self, "_fillImage", None)
-		# Coloured glow: the blurred fill drawn larger + faint BEHIND the track, so the
-		# rainbow haloes softly past the bar edges (drawn first, then the track covers
-		# the inside, leaving only the outer glow).
+		# Coloured glow: the blurred fill drawn a little larger + faint BEHIND the track,
+		# CLIPPED to a rounded pill so it reads as a soft halo hugging the bar — not a
+		# rectangular ghost peeking out behind the rounded track (the "second bar").
 		if colors and prog > 0.0 and fill_image is not None:
-			grow = bar_h * 0.7
+			grow = bar_h * 0.4
 			glow_rect = AppKit.NSMakeRect(-grow, bar_y - grow, filled + grow * 2.0, bar_h + grow * 2.0)
 			src_rect = AppKit.NSMakeRect(0.0, 0.0, max(filled, 1.0), bar_h)
+			glow_radius = (bar_h + grow * 2.0) / 2.0
 			context = AppKit.NSGraphicsContext.currentContext()
 			context.saveGraphicsState()
+			AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+				glow_rect, glow_radius, glow_radius).addClip()
 			fill_image.drawInRect_fromRect_operation_fraction_(
-				glow_rect, src_rect, AppKit.NSCompositingOperationSourceOver, 0.55)
+				glow_rect, src_rect, AppKit.NSCompositingOperationSourceOver, 0.5)
 			context.restoreGraphicsState()
 		track = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(bar_rect, radius, radius)
 		AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(0.137, 0.149, 0.180, 1.0).set()
