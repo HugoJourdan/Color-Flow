@@ -596,12 +596,64 @@ def _coverage_for(current: dict, groups: dict[str, list[str]], order: list[str],
     return result
 
 
+_SCRIPT_DISPLAY = {
+    "latin": "Latin", "greek": "Greek", "cyrillic": "Cyrillic", "arabic": "Arabic",
+    "hebrew": "Hebrew", "devanagari": "Devanagari", "bengali": "Bangla",
+    "gujarati": "Gujarati", "gurmukhi": "Gurmukhi", "tamil": "Tamil",
+    "telugu": "Telugu", "kannada": "Kannada", "malayalam": "Malayalam",
+    "oriya": "Odia", "sinhala": "Sinhala", "thai": "Thai", "lao": "Lao",
+    "tibetan": "Tibetan", "myanmar": "Myanmar", "khmer": "Khmer",
+    "georgian": "Georgian", "armenian": "Armenian", "hangul": "Hangul",
+    "han": "Han", "hiragana": "Hiragana", "katakana": "Katakana", "kana": "Kana",
+    "cherokee": "Cherokee", "Other": "Other",
+}
+
+
+def _script_display(key: str) -> str:
+    """Human label for a Glyphs script id (``latin`` -> ``Latin``)."""
+    if key in _SCRIPT_DISPLAY:
+        return _SCRIPT_DISPLAY[key]
+    return key if key == "Other" else key[:1].upper() + key[1:]
+
+
+def _representative_glyph(font, names: list[str]) -> str:
+    """Pick one canonical glyph to stand for a script: prefer a ``Letter``, then
+    the lowest Unicode codepoint (so Latin -> ``A``, Greek -> ``Alpha``). Falls
+    back to the first name when nothing is encoded."""
+    best_rank: tuple | None = None
+    best_name = names[0] if names else ""
+    for name in names:
+        glyph = font.glyphs[name]
+        if glyph is None:
+            continue
+        category = str(getattr(glyph, "category", None) or "")
+        unicode_hex = getattr(glyph, "unicode", None)
+        try:
+            codepoint = int(unicode_hex, 16) if unicode_hex else 0x110000
+        except (TypeError, ValueError):
+            codepoint = 0x110000
+        rank = (0 if category == "Letter" else 1, codepoint, name)
+        if best_rank is None or rank < best_rank:
+            best_rank, best_name = rank, name
+    return best_name
+
+
+def _script_meta(font) -> dict[str, dict]:
+    """``{scriptKey: {"name": display, "glyph": representativeName}}`` so the
+    dashboard's script grid can label each square and draw a sample letter; the
+    outline itself is pulled client-side from the per-master ``paths``."""
+    return {key: {"name": _script_display(key), "glyph": _representative_glyph(font, names)}
+            for key, names in _glyph_groups(font, "script").items()}
+
+
 def build_coverage(font, current: dict, order: list[str], is_free: bool) -> dict:
     """Completion broken down by Unicode script and by glyph category, per master
-    — the data behind the dashboard's Coverage view (#13)."""
+    — the data behind the dashboard's Coverage view (#13). ``scriptMeta`` adds a
+    display name + representative glyph per script for the script grid."""
     return {
         "byScript": _coverage_for(current, _glyph_groups(font, "script"), order, is_free),
         "byCategory": _coverage_for(current, _glyph_groups(font, "category"), order, is_free),
+        "scriptMeta": _script_meta(font),
     }
 
 

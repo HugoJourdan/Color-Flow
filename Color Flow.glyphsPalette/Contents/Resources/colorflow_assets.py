@@ -204,6 +204,13 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cov-bar .cov-pct{font-size:var(--fs-2xs);line-height:1;color:#fff;mix-blend-mode:difference;white-space:nowrap;padding:0 2px}
 .cov-bar .cov-none{background:var(--c-none)}
 .cov-row .num{width:auto;min-width:48px;text-align:right;color:var(--muted)}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px;margin:12px 0 4px}
+.scard{position:relative;aspect-ratio:1;border-radius:16px;overflow:hidden;background:var(--track)}
+.scard-fill{position:absolute;inset:0;width:100%;height:100%;display:block}
+.scard-in{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:13px 11px;text-align:center}
+.scard-name{font-size:13px;font-weight:600;color:#fff;line-height:1.15;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.scard-gl{width:46%;height:auto;max-height:50%;fill:rgba(255,255,255,.96);filter:drop-shadow(0 1px 4px rgba(0,0,0,.5))}
+.scard-ct{font-size:11px;color:rgba(255,255,255,.82);text-shadow:0 1px 2px rgba(0,0,0,.55)}
 .timeline{margin-top:14px}
 .tl-empty{margin-top:20px}
 .tl-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
@@ -526,6 +533,102 @@ DASHBOARD_JS = r"""
     if (uncolored) segs += seg(r.total?uncolored/r.total*100:0, 'var(--c-none)', 'cov-none', esc(H.noneLabel+": "+uncolored));
     return '<div class="cov-bar" role="img" aria-label="'+esc(r.key+": colour distribution")+'">'+segs+'</div>';
   }
+  // ----- Script grid: one rounded card per script, filled with that script's
+  //       label-colour blend, a sample glyph and its glyph count (#13) ---------
+  function stepColor(key){
+    var v = (H.colors && H.colors[String(key)]) || "";
+    if (!v) v = getComputedStyle(document.documentElement).getPropertyValue("--c"+key) || "";
+    v = (""+v).trim();
+    return v || ("hsl("+Math.round((key*31)%360)+",65%,55%)");
+  }
+  function prettyScript(key){ return key==="Other" ? "Other" : key.charAt(0).toUpperCase()+key.slice(1); }
+  // Rows for the grid: the selected master's per-script coverage, or — when no
+  // master is selected — the same scripts aggregated across every master (the
+  // glyph count is constant per master, so it stays; the colour distribution
+  // sums so the blend reflects the whole family).
+  function scriptRows(){
+    var cov = (H.coverage && H.coverage.byScript) || {};
+    if (state.master != null) return cov[state.master] || [];
+    var acc = {}, masters = H.masters || [], key;
+    for (var mi=0; mi<masters.length; mi++){
+      var rows = cov[masters[mi].id] || [];
+      for (var ri=0; ri<rows.length; ri++){
+        var r = rows[ri], a = acc[r.key] || (acc[r.key] = {key:r.key, total:0, uncolored:0, dist:{}});
+        a.total = Math.max(a.total, r.total||0);
+        a.uncolored += (r.uncolored || 0);
+        var d = r.dist || {};
+        for (key in d){ if (d[key]) a.dist[key] = (a.dist[key]||0) + d[key]; }
+      }
+    }
+    var out = []; for (key in acc) out.push(acc[key]);
+    out.sort(function(p,q){ return q.total - p.total || (p.key<q.key?-1:1); });
+    return out;
+  }
+  function scriptGlyphSVG(meta){
+    if (!meta || !meta.glyph) return "";
+    var first = (H.masters[0]||{}).id, paths = H.paths || {};
+    var mid = state.master != null ? state.master : first;
+    var o = (paths[mid] && paths[mid][meta.glyph]) || (paths[first] && paths[first][meta.glyph]);
+    if (!o){ for (var k in paths){ if (paths[k][meta.glyph]){ o = paths[k][meta.glyph]; break; } } }
+    if (!o) return "";
+    return '<svg class="scard-gl" viewBox="'+esc(o.vb)+'" aria-hidden="true"><path d="'+esc(o.d)+'"/></svg>';
+  }
+  function scriptGrid(){
+    var rows = scriptRows();
+    if (!rows.length) return '<p class="empty">No glyphs.</p>';
+    var meta = (H.coverage && H.coverage.scriptMeta) || {};
+    var cards = rows.map(function(r){
+      var m = meta[r.key] || {}, name = m.name || prettyScript(r.key), dist = r.dist || {}, parts = [], k;
+      for (k in dist){ if (dist[k]) parts.push(k+":"+dist[k]); }
+      return '<div class="scard" data-dist="'+esc(parts.join(","))+'" data-total="'+r.total
+        + '" data-uncol="'+(r.uncolored||0)+'" title="'+esc(name+" — "+r.total+" glyphs")+'">'
+        + '<canvas class="scard-fill" width="320" height="320" aria-hidden="true"></canvas>'
+        + '<div class="scard-in"><span class="scard-name">'+esc(name)+'</span>'
+        + scriptGlyphSVG(m) + '<span class="scard-ct">'+r.total+'</span></div></div>';
+    }).join("");
+    return '<div class="sgrid">'+cards+'</div>';
+  }
+  // Soft proportional colour blend (a flat 2D echo of the tower disc): a blurred
+  // conic of the present labels over a solid base, darkened in the centre so the
+  // white sample glyph stays legible.
+  function paintBlend(ctx, W, Ht, segs, sum, grey){
+    var cx=W/2, cy=Ht/2, R=Math.max(W,Ht)*0.72, i;
+    var base = segs.length ? segs[0][1] : grey;
+    ctx.clearRect(0,0,W,Ht); ctx.fillStyle=base; ctx.fillRect(0,0,W,Ht);
+    if (segs.length && sum>0){
+      var off=document.createElement("canvas"); off.width=W; off.height=Ht; var g=off.getContext("2d");
+      var acc=0, stops=[];
+      for (i=0;i<segs.length;i++){ stops.push([acc+segs[i][0]/sum/2, segs[i][1]]); acc+=segs[i][0]/sum; }
+      var filled=false;
+      try {
+        var grad=g.createConicGradient(-Math.PI/2, cx, cy);
+        for (i=0;i<stops.length;i++) grad.addColorStop(Math.min(1,stops[i][0]), stops[i][1]);
+        grad.addColorStop(1, stops[0][1]);
+        g.fillStyle=grad; g.fillRect(0,0,W,Ht); filled=true;
+      } catch(e){ filled=false; }
+      if (!filled){ var a=-Math.PI/2;
+        for (i=0;i<segs.length;i++){ var a1=a+segs[i][0]/sum*Math.PI*2;
+          g.fillStyle=segs[i][1]; g.beginPath(); g.moveTo(cx,cy); g.arc(cx,cy,R,a,a1); g.closePath(); g.fill(); a=a1; } }
+      ctx.filter="blur("+Math.round(Math.max(W,Ht)*0.085)+"px) saturate(1.2)"; ctx.drawImage(off,0,0); ctx.filter="none";
+    }
+    var dk=ctx.createRadialGradient(cx,cy,0,cx,cy,R*0.85);
+    dk.addColorStop(0,"rgba(0,0,0,0.46)"); dk.addColorStop(0.55,"rgba(0,0,0,0.2)"); dk.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.fillStyle=dk; ctx.fillRect(0,0,W,Ht);
+  }
+  function paintScriptCards(){
+    var cards = document.querySelectorAll(".scard");
+    var grey = (getComputedStyle(document.documentElement).getPropertyValue("--track")||"").trim() || "hsl(225,8%,15%)";
+    for (var i=0;i<cards.length;i++){
+      var cv = cards[i].querySelector("canvas.scard-fill"); if (!cv) continue;
+      var ctx = cv.getContext("2d"); if (!ctx) continue;
+      var uncol = parseFloat(cards[i].getAttribute("data-uncol")) || 0;
+      var raw = (cards[i].getAttribute("data-dist")||"").split(","), segs=[], sum=0, j, pair, c;
+      for (j=0;j<raw.length;j++){ if (!raw[j]) continue; pair=raw[j].split(":"); c=parseFloat(pair[1])||0;
+        if (c>0){ segs.push([c, stepColor(pair[0])]); sum+=c; } }
+      if (uncol>0){ segs.push([uncol, grey]); sum+=uncol; }
+      paintBlend(ctx, cv.width, cv.height, segs, sum, grey);
+    }
+  }
   function coverageView(){
     var cov = (H.coverage && H.coverage[state.coverGroup]) || {};
     var covMaster = state.master==null ? ((H.masters[0]||{}).id) : state.master;
@@ -534,6 +637,8 @@ DASHBOARD_JS = r"""
       + '<span class="cov-switch">'
       + '<button type="button" class="chip'+(state.coverGroup==="byScript"?" on":"")+'" data-cg="byScript" aria-pressed="'+(state.coverGroup==="byScript")+'">Script</button>'
       + '<button type="button" class="chip'+(state.coverGroup==="byCategory"?" on":"")+'" data-cg="byCategory" aria-pressed="'+(state.coverGroup==="byCategory")+'">Category</button></span></div>';
+    if (state.coverGroup==="byScript")
+      return '<section class="cov"><div class="panel">'+head+scriptGrid()+'</div></section>';
     var body = rows2.length ? rows2.map(function(r){
       return '<div class="cov-row"><span class="cov-name" title="'+esc(r.key)+'">'+esc(r.key)+'</span>'
         + covStacked(r) + '<span class="num">'+r.total+'</span></div>';
@@ -648,6 +753,7 @@ DASHBOARD_JS = r"""
     var tl = document.getElementById("cfd-timeline"); if (tl) tl.setAttribute("aria-pressed", state.view==="timeline");
     var ov = document.getElementById("cfd-overview"); if (ov) ov.setAttribute("aria-pressed", state.view==="tabs");
     var sb = document.getElementById("cfd-sort"); if (sb) sb.textContent = "↕ Sort: "+(state.sort==="progress"?"progress":"workflow");
+    paintScriptCards();
   }
 
   // Set the focused colour and crossfade the heatmap: fade the current grid out,

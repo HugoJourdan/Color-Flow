@@ -107,6 +107,17 @@ def test_build_html_has_tower_master_navigator() -> None:
     assert '"wheel"' in html                          # scroll reveals the rest
 
 
+def test_build_html_has_script_coverage_grid() -> None:
+    html = assets.build_html(_model())
+    assert "function scriptGrid(" in html              # grid builder
+    assert "function paintBlend(" in html              # label-colour blend painter
+    assert "function paintScriptCards(" in html        # post-render canvas paint
+    assert "paintScriptCards();" in html               # called from update()
+    assert ".sgrid{" in html and 'class="scard"' in html
+    assert 'state.coverGroup==="byScript"' in html and "scriptGrid()" in html  # Script tab -> grid
+    assert "function scriptRows(" in html              # per-master / aggregated rows
+
+
 def test_dashboard_js_routes_focus_through_setfocus() -> None:
     js = assets.DASHBOARD_JS
     assert "function setFocus(" in js

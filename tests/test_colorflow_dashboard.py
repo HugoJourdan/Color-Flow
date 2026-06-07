@@ -472,6 +472,22 @@ def test_coverage_groups_by_attribute_and_counts_per_group() -> None:
     assert by_cat["Letter"]["total"] == 2 and by_cat["Punctuation"]["total"] == 1
 
 
+def test_build_coverage_emits_script_meta_with_representative_glyph() -> None:
+    letter_a = _FakeGlyph("A", {"m1": _FakeLayerColor(2)})
+    letter_b = _FakeGlyph("B", {"m1": _FakeLayerColor(0)})
+    comma = _FakeGlyph("comma", {"m1": _FakeLayerColor(2)})
+    for glyph, script, category, unicode_hex in ((letter_a, "latin", "Letter", "0041"),
+                                                 (letter_b, "latin", "Letter", "0042"),
+                                                 (comma, None, "Punctuation", "002C")):
+        glyph.script, glyph.category, glyph.unicode = script, category, unicode_hex
+    font = _FakeFont([_FakeMaster("m1", "R")], [letter_a, letter_b, comma])
+    current = db.build_master_glyph_colors(font)
+
+    meta = db.build_coverage(font, current, _FC_ORDER, is_free=False)["scriptMeta"]
+    assert meta["latin"] == {"name": "Latin", "glyph": "A"}     # Letter, lowest codepoint wins
+    assert meta["Other"] == {"name": "Other", "glyph": "comma"}  # non-letter group falls to min cp
+
+
 class _FakeLayerColor:
     def __init__(self, color: int | None, width: float = 500.0) -> None:
         self.color = color
