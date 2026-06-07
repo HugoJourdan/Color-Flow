@@ -217,7 +217,14 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .tl-lg{display:inline-flex;align-items:center;gap:5px}
 .tl-lg i{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .tl-chart{width:100%;height:auto;display:block;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
-.tl-line{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.tl-line{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;transition:opacity .2s ease}
+.tl-line.tl-dim{opacity:.16}
+.tl-line.tl-sel{stroke-width:3}
+.tl-dot{transition:opacity .2s ease}
+.tl-dot.tl-dim{opacity:.16}
+.tl-lg{transition:opacity .2s ease}
+.tl-lg.tl-dim{opacity:.4}
+.tl-lg.tl-sel{font-weight:600}
 .tl-grid{stroke:var(--track);stroke-width:1}
 .tl-axis{fill:var(--muted-2);font-size:10px}
 .tl-foot{display:flex;justify-content:space-between;font-size:var(--fs-2xs);color:var(--muted-2);margin-top:6px}
@@ -660,7 +667,7 @@ DASHBOARD_JS = r"""
       return '<line class="tl-grid" x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'"/>'
         + '<text class="tl-axis" x="'+(pl-5)+'" y="'+(parseFloat(y)+3).toFixed(1)+'" text-anchor="end">'+g+'</text>';
     }).join("");
-    var lines = "", legend = "";
+    var lines = "", selLine = "", legend = "";
     H.masters.forEach(function(m, i){
       var col = "hsl("+masterHue(i)+",70%,55%)";
       var pts = series.map(function(p){
@@ -669,11 +676,15 @@ DASHBOARD_JS = r"""
         return { x:X(dayOff(p.date)), y:Y(c), pc:c, date:p.date };
       }).filter(Boolean);
       if (!pts.length) return;
+      var dim = state.master!=null && m.id!==state.master;   // a master is selected, not this one
+      var sel = state.master!=null && m.id===state.master;
       var poly = pts.map(function(o){ return o.x.toFixed(1)+","+o.y.toFixed(1); }).join(" ");
-      var dots = pts.map(function(o){ return '<circle cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="2.5" fill="'+col+'"><title>'+esc(m.name+" · "+o.date+" · "+Math.round(o.pc)+"%")+'</title></circle>'; }).join("");
-      lines += '<polyline class="tl-line" points="'+poly+'" stroke="'+col+'"/>'+dots;
-      legend += '<span class="tl-lg"><i style="background:'+col+'"></i>'+esc(m.name)+' '+Math.round(pts[pts.length-1].pc)+'%</span>';
+      var dots = pts.map(function(o){ return '<circle class="tl-dot'+(dim?" tl-dim":"")+'" cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="'+(sel?3:2.5)+'" fill="'+col+'"><title>'+esc(m.name+" · "+o.date+" · "+Math.round(o.pc)+"%")+'</title></circle>'; }).join("");
+      var seg = '<polyline class="tl-line'+(dim?" tl-dim":"")+(sel?" tl-sel":"")+'" points="'+poly+'" stroke="'+col+'"/>'+dots;
+      if (sel) selLine += seg; else lines += seg;            // keep the selected master's line on top
+      legend += '<span class="tl-lg'+(dim?" tl-dim":"")+(sel?" tl-sel":"")+'"><i style="background:'+col+'"></i>'+esc(m.name)+' '+Math.round(pts[pts.length-1].pc)+'%</span>';
     });
+    lines += selLine;
     var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" aria-label="Completion over time per master">'+grid+lines+'</svg>';
     var foot = '<div class="tl-foot"><span>'+esc(series[0].date)+'</span><span>'+esc(series[series.length-1].date)+'</span></div>';
     return '<section class="timeline"><div class="tl-legend">'+legend+'</div>'+chart+foot+'</section>';
