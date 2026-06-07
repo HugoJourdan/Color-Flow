@@ -224,3 +224,19 @@ def test_dashboard_js_regression_card_hidden_when_zero() -> None:
     js = assets.DASHBOARD_JS
     # The builder returns "" when no regressions are found.
     assert 'if (!rows.length) return "";' in js
+
+
+def test_dashboard_js_has_recent_card() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function recentCard(" in js
+    assert 'ovCard("recent"' in js
+    assert "H.journeyIndex" in js      # latest events across the active master's glyphs
+    assert "H.lastEdit" in js          # "Nd ago" / "today" labelling
+    assert "data-jglyph" in js         # rows open the journey modal
+    assert "ago" in js
+
+
+def test_dashboard_js_recent_card_when_label() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function whenLabel(" in js
+    assert '"today"' in js

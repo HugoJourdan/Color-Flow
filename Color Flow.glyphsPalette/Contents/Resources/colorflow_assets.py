@@ -660,6 +660,34 @@ DASHBOARD_JS = r"""
     }
     return all;
   }
+  function whenLabel(name){
+    var days = (H.lastEdit && H.lastEdit[name] != null) ? H.lastEdit[name] : null;
+    if (days == null) return "";
+    return days === 0 ? "today" : days+"d ago";
+  }
+  function recentCard(){
+    var mid = state.master || (H.masters[0] && H.masters[0].id);
+    if (!mid) return "";
+    var perMaster = (H.journeyIndex && H.journeyIndex[mid]) || {};
+    var feed = [];
+    for (var name in perMaster){
+      var events = perMaster[name];
+      if (events.length < 1) continue;
+      var last = events[events.length-1];
+      var prev = events.length > 1 ? events[events.length-2][1] : last[1];
+      feed.push({name:name, date:last[0], was:prev, nw:last[1]});
+    }
+    feed.sort(function(a,b){ return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+    if (!feed.length) return '<div class="ov-card"><div class="ov-card-h"><span>Recent activity</span></div><div class="ov-card-body"><p class="ov-empty">No recorded changes yet.</p></div></div>';
+    var open = !!state.ovExpand.recent;
+    var list = open ? feed : feed.slice(0, 12);
+    var rows = list.map(function(it){
+      return '<div class="rg-row" data-jglyph="'+esc(it.name)+'"><span class="rg-n">'+esc(it.name)+'</span>'
+        + swatchFor(it.was)+'<span class="rg-ar">→</span>'+swatchFor(it.nw)
+        + '<span class="rg-when">'+esc(whenLabel(it.name) || it.date)+'</span></div>';
+    }).join("");
+    return ovCard("recent", "Recent activity", rows, feed.length > 12);
+  }
   function forecastCard(){
     var fc = H.trend && H.trend.forecast;
     if (!fc) return "";
@@ -683,7 +711,7 @@ DASHBOARD_JS = r"""
   }
   function overviewExtras(){
     if (!H.masters.length) return "";
-    return '<div class="ov-extra">'+forecastCard()+regressionCard()+leaderboard()+histogram()+timelineCard()+'</div>';
+    return '<div class="ov-extra">'+forecastCard()+regressionCard()+recentCard()+leaderboard()+histogram()+timelineCard()+'</div>';
   }
   function tabsView(){
     if (state.master==null) return overall()+overviewExtras();   // no master selected -> global view + extras
