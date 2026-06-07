@@ -269,6 +269,41 @@ def test_dashboard_css_styles_hero_area_class() -> None:
     assert "stroke:none" in area_rule
 
 
+def test_dashboard_js_has_snapping_crosshair() -> None:
+    """#6: trendParts adds a transparent overlay rect capturing pointer X plus a
+    hidden vertical guide + nearest-snapshot marker; a dedicated crosshair handler
+    snaps to the nearest discrete snapshot X (no interpolation) and shows a floating
+    readout. The chart is focusable so Left/Right arrows step snapshots."""
+    js = assets.DASHBOARD_JS
+    # the named crosshair handler that wires pointer + keyboard interaction
+    assert "function crosshairMove(" in js
+    # transparent overlay rect that captures pointer X over the plot
+    assert "tl-crossarea" in js
+    # the 1px vertical guide + the nearest-snapshot marker dot
+    assert "tl-cross" in js
+    assert "tl-cross-mark" in js
+    # snapping picks the nearest discrete snapshot, never interpolates
+    assert "nearest" in js
+    # the readout reuses the existing cfd-tip floating pattern
+    assert "cfd-tip" in js
+    # the chart is focusable and steps snapshots on Left/Right
+    assert "tabindex" in js
+    assert "ArrowLeft" in js and "ArrowRight" in js
+    # reduced-motion: guide updates instantly (no transition) via the shared gate
+    assert "tl-cross" in assets.DASHBOARD_CSS
+
+
+def test_dashboard_css_styles_crosshair_class() -> None:
+    """#6: the crosshair guide is a 1px --muted-2 vertical rule; the overlay rect
+    is transparent so it only captures the pointer."""
+    css = assets.DASHBOARD_CSS
+    assert ".tl-cross" in css
+    cross_rule = css.split(".tl-cross{")[1].split("}")[0]
+    assert "var(--muted-2)" in cross_rule
+    # the capture overlay is transparent and never paints
+    assert ".tl-crossarea" in css
+
+
 def test_dashboard_js_has_regression_card() -> None:
     js = assets.DASHBOARD_JS
     assert "function regressionCard(" in js

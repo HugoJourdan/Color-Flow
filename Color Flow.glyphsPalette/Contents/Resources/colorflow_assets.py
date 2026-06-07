@@ -279,6 +279,10 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-today{stroke:var(--accent);stroke-width:1.5;stroke-dasharray:3 3;opacity:.7}
 .tl-today-pill{fill:var(--accent)}
 .tl-today-pill-t{fill:#fff;font-size:8.5px;font-weight:600}
+.tl-cross{stroke:var(--muted-2);stroke-width:1;opacity:.85;pointer-events:none;display:none}
+.tl-cross-mark{fill:var(--muted-2);pointer-events:none;display:none}
+.tl-crossarea{fill:transparent;cursor:crosshair}
+.tl-chart:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .tl-foot{display:flex;justify-content:space-between;font-size:var(--fs-2xs);color:var(--muted-2);margin-top:6px}
 .ov-ring{display:block}
 .ov-ring .ov-ring-track{stroke:var(--track)}
@@ -357,6 +361,10 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .cfd-tip .tip-h{font-size:var(--fs-2xs);color:var(--muted);margin-bottom:5px;white-space:nowrap}
 .cfd-tip .spark{display:block}
 .cfd-tip .spark rect{box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.tl-cross-row{display:flex;align-items:center;gap:6px;font-size:var(--fs-2xs);color:var(--muted);white-space:nowrap;line-height:1.7}
+.tl-cross-row i{width:8px;height:8px;border-radius:50%;flex:0 0 auto;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.tl-cross-row b{margin-left:auto;color:var(--text)}
+.tl-cross-row.tl-sel{color:var(--text);font-weight:600}
 .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);background:var(--surface);border:1px solid var(--border-2);color:var(--text);border-radius:var(--r-sm);padding:8px 14px;font-size:var(--fs-sm);opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 button:focus-visible,input:focus-visible,summary:focus-visible,.cell:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -1038,7 +1046,17 @@ DASHBOARD_JS = r"""
       legend += '<span class="tl-lg'+(dim?" tl-dim":"")+(sel?" tl-sel":"")+'"><i style="background:'+col+'"></i>'+esc(m.name)+' '+Math.round(pts[pts.length-1].pc)+'%</span>';
     });
     lines += selLine;                                        // keep the selected master (area+line) on top
-    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" aria-label="Completion over time per master">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+grid+xticks+lines+todayRule+'</svg>';
+    // ----- #6 snapping crosshair: a transparent overlay rect captures pointer X,
+    // a 1px vertical guide + nearest-snapshot marker draw on top, and the snapshot
+    // X positions (in SVG user-space) ride along as data so crosshairMove() can snap
+    // to the nearest discrete date without re-deriving the X scale. baseY/topY let
+    // it place the marker on the chart even when no master line is selected.
+    var snaps = series.map(function(p){ return { x:+X(dayOff(p.date)).toFixed(1), d:p.date }; });
+    var crossData = ' data-snaps="'+esc(JSON.stringify(snaps))+'" data-topy="'+ptop+'" data-boty="'+Y(0).toFixed(1)+'"';
+    var crossLayer = '<line class="tl-cross" y1="'+ptop+'" y2="'+(ptop+ih).toFixed(1)+'"/>'
+      + '<circle class="tl-cross-mark" r="3.5"/>'
+      + '<rect class="tl-crossarea" x="'+pl+'" y="'+ptop+'" width="'+iw.toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
+    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData+' aria-label="Completion over time per master. Hover or use the left and right arrow keys to read each snapshot.">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+grid+xticks+lines+todayRule+crossLayer+'</svg>';
     var foot = '<div class="tl-foot"><span>'+esc(series[0].date)+'</span><span>'+esc(series[series.length-1].date)+'</span></div>';
     return { chart:chart, legend:legend, foot:foot };
   }
@@ -1164,6 +1182,104 @@ DASHBOARD_JS = r"""
     tip.style.top = Math.max(8, y - tip.offsetHeight - 12)+"px";
   }
   function hideTip(){ var tip = document.getElementById("cfd-tip"); if (tip) tip.style.display = "none"; }
+
+  // ----- #6 snapping crosshair read-out -------------------------------------
+  // Index of the snapshot the crosshair currently rests on (-1 = hidden). Kept on
+  // the module so Left/Right keyboard stepping shares the same anchor as the pointer.
+  var crossIdx = -1;
+  // The exact completion % of master m.id at snapshot p (same maths trendParts uses
+  // for the dots). Honest: reads the stored finals, never interpolates between dates.
+  function crossPctAt(p, masterId){
+    var mp = p.masters && p.masters[masterId];
+    return mp && mp.total ? mp.final/mp.total*100 : 0;
+  }
+  // Float the cfd-tip read-out: the snapshot date + every master's exact % there.
+  function crossReadout(svg, idx, clientX){
+    var series = (H.trend && H.trend.series) || [];
+    var p = series[idx]; if (!p){ hideTip(); return; }
+    var tip = document.getElementById("cfd-tip");
+    if (!tip){ tip = document.createElement("div"); tip.id = "cfd-tip"; tip.className = "cfd-tip"; document.body.appendChild(tip); }
+    var rows = H.masters.map(function(m, i){
+      if (!(p.masters && p.masters[m.id])) return "";
+      var col = "hsl("+masterHue(i)+",70%,55%)";
+      var bold = state.master!=null && m.id===state.master;
+      return '<div class="tl-cross-row'+(bold?" tl-sel":"")+'"><i style="background:'+col+'"></i>'
+        + esc(m.name)+' <b>'+Math.round(crossPctAt(p, m.id))+'%</b></div>';
+    }).join("");
+    tip.innerHTML = '<div class="tip-h">'+esc(dateLabel(p.date))+' · '+esc(p.date)+'</div>'+rows;
+    tip.style.display = "block";
+    var box = svg.getBoundingClientRect();
+    var anchorX = clientX != null ? clientX : box.left + box.width/2;
+    var left = Math.min(anchorX+14, window.innerWidth - tip.offsetWidth - 8);
+    tip.style.left = Math.max(8, left)+"px";
+    tip.style.top = Math.max(8, box.top - tip.offsetHeight - 4)+"px";
+  }
+  // Snap the guide + marker to snapshot `idx` and float the read-out. Reduced motion
+  // (or the test hook) means the guide jumps instantly — it never animates anyway,
+  // but we honour the shared gate by skipping any future transition opt-in.
+  function crossSnapTo(svg, idx, clientX){
+    var snaps; try { snaps = JSON.parse(svg.getAttribute("data-snaps")||"[]"); } catch(e){ snaps = []; }
+    if (!snaps.length || idx < 0 || idx >= snaps.length){ crossHide(svg); return; }
+    crossIdx = idx;
+    var snap = snaps[idx];
+    var topY = parseFloat(svg.getAttribute("data-topy")) || 0;
+    var botY = parseFloat(svg.getAttribute("data-boty")) || 0;
+    var guide = svg.querySelector(".tl-cross");
+    var mark = svg.querySelector(".tl-cross-mark");
+    if (guide){ guide.setAttribute("x1", snap.x); guide.setAttribute("x2", snap.x); guide.style.display = "block"; }
+    if (mark){
+      // marker sits on the selected master's value (honest dot) when one is focused,
+      // else parks at the top of the plot so it stays a pure x-locator.
+      var my = topY;
+      var series = (H.trend && H.trend.series) || [];
+      if (state.master!=null && series[idx]){ my = botY - crossPctAt(series[idx], state.master)/100*(botY-topY); }
+      mark.setAttribute("cx", snap.x); mark.setAttribute("cy", my.toFixed(1)); mark.style.display = "block";
+    }
+    crossReadout(svg, idx, clientX);
+  }
+  function crossHide(svg){
+    crossIdx = -1;
+    var guide = svg && svg.querySelector(".tl-cross"); if (guide) guide.style.display = "none";
+    var mark = svg && svg.querySelector(".tl-cross-mark"); if (mark) mark.style.display = "none";
+    hideTip();
+  }
+  // Pointer handler: map the client X into SVG user-space (viewBox width / box width),
+  // then pick the NEAREST snapshot X — discrete series, so no interpolation. Resolves
+  // the chart from the event target so it works as a delegated #cfd-body listener.
+  function crosshairMove(evt){
+    var svg = evt.target.closest && evt.target.closest(".tl-chart");
+    if (!svg){ return; }
+    var snaps; try { snaps = JSON.parse(svg.getAttribute("data-snaps")||"[]"); } catch(e){ snaps = []; }
+    if (!snaps.length){ return; }
+    var box = svg.getBoundingClientRect();
+    if (!box.width){ return; }
+    var vb = svg.viewBox && svg.viewBox.baseVal;
+    var vbw = (vb && vb.width) || box.width;
+    var ux = (evt.clientX - box.left) / box.width * vbw;   // pointer X in SVG user-space
+    var nearest = 0, best = Infinity;
+    for (var i=0;i<snaps.length;i++){
+      var d = Math.abs(snaps[i].x - ux);
+      if (d < best){ best = d; nearest = i; }
+    }
+    crossSnapTo(svg, nearest, evt.clientX);
+  }
+  // Pointer left the chart: drop the guide + read-out.
+  function crosshairLeave(evt){
+    var svg = evt.target.closest && evt.target.closest(".tl-chart");
+    if (svg){ crossHide(svg); }
+  }
+  // Keyboard: Left/Right step the snapped snapshot and refresh the same read-out.
+  function crosshairKey(evt){
+    if (evt.key!=="ArrowLeft" && evt.key!=="ArrowRight"){ return; }
+    var svg = evt.target.closest && evt.target.closest(".tl-chart");
+    if (!svg){ return; }
+    var snaps; try { snaps = JSON.parse(svg.getAttribute("data-snaps")||"[]"); } catch(e){ snaps = []; }
+    if (!snaps.length){ return; }
+    evt.preventDefault();
+    var idx = crossIdx < 0 ? (evt.key==="ArrowLeft" ? snaps.length-1 : 0)
+      : Math.max(0, Math.min(snaps.length-1, crossIdx + (evt.key==="ArrowRight" ? 1 : -1)));
+    crossSnapTo(svg, idx, null);
+  }
 
   // Animate the heatmap cells between their last-run ("before") and current
   // ("after") colours by updating the cell background in place so the CSS
@@ -1462,6 +1578,16 @@ DASHBOARD_JS = r"""
       if (e.target.id === "cfd-date-a"){ state.dateA = e.target.value; update(); }
       else if (e.target.id === "cfd-date-b"){ state.dateB = e.target.value; update(); }
     });
+    // #6 snapping crosshair: the chart SVG is rebuilt on every update(), so delegate
+    // its pointer + keyboard interaction at the #cfd-body level (same idiom as the
+    // heatmap tip above). pointermove snaps to the nearest snapshot; leaving the
+    // chart hides the guide; Left/Right step snapshots while the chart is focused.
+    bodyEl.addEventListener("pointermove", crosshairMove);
+    bodyEl.addEventListener("pointerout", function(e){
+      var chart = e.target.closest && e.target.closest(".tl-chart");
+      if (chart && (!e.relatedTarget || !chart.contains(e.relatedTarget))){ crosshairLeave(e); }
+    });
+    bodyEl.addEventListener("keydown", crosshairKey);
     // Colour-bar segments live both in the static global bar and in the per-master
     // card (inside #cfd-body), so delegate their clicks at the document level.
     document.addEventListener("click", function(e){
