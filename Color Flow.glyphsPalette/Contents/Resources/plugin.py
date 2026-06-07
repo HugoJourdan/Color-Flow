@@ -884,22 +884,28 @@ class ColorFlow(PalettePlugin):
 			loader = _ColorFlowLoaderBar.alloc().initWithFrame_(AppKit.NSMakeRect(16, 16, 224, 30))
 			loader.configure(labelcolors.read_label_colors())
 			content.addSubview_(loader)
-			# Open / Save buttons, hidden until the build finishes — they then take the
-			# loader's place so the report is no longer opened automatically.
+			# View here / Open / Save buttons, hidden until the build finishes — they
+			# replace the loader so the report is no longer opened automatically.
+			view_btn = AppKit.NSButton.buttonWithTitle_target_action_("View", self, "viewReportInline:")
+			view_btn.setFrame_(AppKit.NSMakeRect(16, 18, 70, 24))
+			view_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
+			view_btn.setKeyEquivalent_("\r")   # View here = default button (Return)
+			view_btn.setHidden_(True)
+			content.addSubview_(view_btn)
 			open_btn = AppKit.NSButton.buttonWithTitle_target_action_("Open", self, "openReport:")
-			open_btn.setFrame_(AppKit.NSMakeRect(16, 18, 104, 24))
+			open_btn.setFrame_(AppKit.NSMakeRect(92, 18, 70, 24))
 			open_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
-			open_btn.setKeyEquivalent_("\r")   # Open = default button (Return)
 			open_btn.setHidden_(True)
 			content.addSubview_(open_btn)
-			save_btn = AppKit.NSButton.buttonWithTitle_target_action_("Save…", self, "saveReport:")
-			save_btn.setFrame_(AppKit.NSMakeRect(136, 18, 104, 24))
+			save_btn = AppKit.NSButton.buttonWithTitle_target_action_("Save", self, "saveReport:")
+			save_btn.setFrame_(AppKit.NSMakeRect(168, 18, 70, 24))
 			save_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
 			save_btn.setHidden_(True)
 			content.addSubview_(save_btn)
 			self._reportLoader = loader
 			self._reportPanel = panel
 			self._reportLabel = label
+			self._viewBtn = view_btn
 			self._openBtn = open_btn
 			self._saveBtn = save_btn
 			self._reportPath = None
@@ -956,7 +962,8 @@ class ColorFlow(PalettePlugin):
 		label = getattr(self, "_reportLabel", None)
 		if label is not None:
 			label.setStringValue_("Color Flow report ready")
-		for button in (getattr(self, "_openBtn", None), getattr(self, "_saveBtn", None)):
+		for button in (getattr(self, "_viewBtn", None), getattr(self, "_openBtn", None),
+				getattr(self, "_saveBtn", None)):
 			if button is not None:
 				button.setHidden_(False)
 
@@ -971,9 +978,14 @@ class ColorFlow(PalettePlugin):
 		self._dismiss_report_sheet()
 
 	def saveReport_(self, sender) -> None:
-		path = getattr(self, "_reportPath", None)
+		self._save_report_path(getattr(self, "_reportPath", None))
+		self._dismiss_report_sheet()
+
+	@objc.python_method
+	def _save_report_path(self, path) -> None:
+		# Shared "save a copy of the .html" via NSSavePanel — used by the sheet's Save
+		# button and the inline web view's Save… button. No-op when there's no report.
 		if path is None:
-			self._dismiss_report_sheet()
 			return
 		try:
 			save_panel = AppKit.NSSavePanel.savePanel()
@@ -991,7 +1003,107 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [save report] error:\n" + traceback.format_exc())
-		self._dismiss_report_sheet()
+
+	# ----- View here: the report inside an embedded WKWebView -------------------
+	def viewReportInline_(self, sender) -> None:
+		path = getattr(self, "_reportPath", None)
+		self._dismiss_report_sheet()                 # close the small action sheet first
+		if path is not None:
+			self._present_report_webview(path)
+
+	@objc.python_method
+	def _present_report_webview(self, path) -> None:
+		# Embed the self-contained report in a WKWebView inside a standalone resizable
+		# window (the docked palette is too narrow to host a full-size sheet). glyphsapp://
+		# glyph links route back to Glyphs via the navigation delegate below; the file://
+		# report loads in place. Falls back to the browser on any failure.
+		try:
+			import WebKit
+			style = (AppKit.NSWindowStyleMaskTitled | AppKit.NSWindowStyleMaskClosable
+				| AppKit.NSWindowStyleMaskResizable | AppKit.NSWindowStyleMaskMiniaturizable)
+			window = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+				AppKit.NSMakeRect(0, 0, 1180, 780), style, AppKit.NSBackingStoreBuffered, False)
+			window.setTitle_("Color Flow — " + path.name)
+			window.setReleasedWhenClosed_(False)
+			window.setDelegate_(self)
+			window.center()
+			content = window.contentView()
+			bar_h = 36
+			size = content.bounds().size
+			web = WebKit.WKWebView.alloc().initWithFrame_configuration_(
+				AppKit.NSMakeRect(0, bar_h, size.width, size.height - bar_h),
+				WebKit.WKWebViewConfiguration.alloc().init())
+			web.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
+			web.setNavigationDelegate_(self)
+			web.loadFileURL_allowingReadAccessToURL_(
+				AppKit.NSURL.fileURLWithPath_(str(path)),
+				AppKit.NSURL.fileURLWithPath_(str(path.parent)))
+			content.addSubview_(web)
+			save_btn = AppKit.NSButton.buttonWithTitle_target_action_("Save…", self, "saveReportFile:")
+			save_btn.setFrame_(AppKit.NSMakeRect(size.width - 230, 6, 104, 24))
+			save_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
+			save_btn.setAutoresizingMask_(AppKit.NSViewMinXMargin)
+			content.addSubview_(save_btn)
+			browser_btn = AppKit.NSButton.buttonWithTitle_target_action_("Open in Browser", self, "openReportBrowser:")
+			browser_btn.setFrame_(AppKit.NSMakeRect(size.width - 122, 6, 110, 24))
+			browser_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
+			browser_btn.setAutoresizingMask_(AppKit.NSViewMinXMargin)
+			content.addSubview_(browser_btn)
+			self._reportWindow = window
+			self._reportWeb = web
+			self._reportWebPath = path
+			window.makeKeyAndOrderFront_(None)
+		except Exception:
+			import traceback
+			print("Color Flow [inline report] error:\n" + traceback.format_exc())
+			try:
+				webbrowser.open(path.as_uri())
+			except Exception:
+				pass
+
+	def saveReportFile_(self, sender) -> None:
+		self._save_report_path(getattr(self, "_reportWebPath", None))
+
+	def openReportBrowser_(self, sender) -> None:
+		path = getattr(self, "_reportWebPath", None)
+		if path is not None:
+			try:
+				webbrowser.open(path.as_uri())
+			except Exception:
+				pass
+
+	def webView_decidePolicyForNavigationAction_decisionHandler_(self, web_view, action, decision_handler) -> None:
+		# Keep the file:// report (and its in-page #anchors) loading in place; send
+		# glyphsapp:// (open a glyph in Glyphs) and external http/https/mailto links out
+		# to the system instead of navigating the embedded view away from the report.
+		import WebKit
+		url = None
+		scheme = ""
+		try:
+			url = action.request().URL()
+			scheme = (url.scheme() or "").lower() if url is not None else ""
+		except Exception:
+			pass
+		if url is not None and scheme in ("glyphsapp", "http", "https", "mailto"):
+			try:
+				AppKit.NSWorkspace.sharedWorkspace().openURL_(url)
+			except Exception:
+				pass
+			decision_handler(WebKit.WKNavigationActionPolicyCancel)
+		else:
+			decision_handler(WebKit.WKNavigationActionPolicyAllow)
+
+	def windowWillClose_(self, notification) -> None:
+		# Drop our strong refs when the inline report window closes (avoids a leak; the
+		# guard keeps this safe even though self may be the delegate of other windows).
+		try:
+			closing = notification.object() if notification is not None else None
+		except Exception:
+			closing = None
+		if closing is not None and closing == getattr(self, "_reportWindow", None):
+			self._reportWeb = None
+			self._reportWindow = None
+			self._reportWebPath = None
 
 	def dismissReportSheet_(self, sender) -> None:
 		self._dismiss_report_sheet()
