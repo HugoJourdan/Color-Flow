@@ -312,6 +312,9 @@ DASHBOARD_JS = r"""
   // One-shot: the colour bars animate-fill only on the first render, not on
   // every re-render (tab switch, focus, before/after). Flipped true after init.
   var introDone = false;
+  // The colour bar re-runs its fill animation on first paint AND whenever the
+  // selected master changes (switching discs) — not on unrelated re-renders.
+  var barsAnim = false, barMaster = "\uffff";
 
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
     return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
@@ -428,7 +431,6 @@ DASHBOARD_JS = r"""
     var legend = H.steps.map(function(s){
       return '<span class="lg" title="'+esc(s.label)+'"><i style="background:var('+varFor(s.key)+')"></i>'+pct(a.agg[String(s.key)]||0,a.grand)+'%</span>';
     }).join("");
-    var head = '<b>'+compP+'% complete</b> · '+a.started+'/'+a.grand+' started ('+pct(a.started,a.grand)+'%)';
     var recipeLine = "";
     if (H.recipes && H.recipes.length){
       var recipeComplete = 0;
@@ -442,8 +444,8 @@ DASHBOARD_JS = r"""
     }).join("") + segSpan(-1, pct(ex.none, a.grand), H.noneLabel, H.steps.length);
     return '<section class="overall" aria-label="Overall totals">'
       + '<div class="ov-num">'+ring(compP)+'</div>'
-      + '<div class="ov-main"><div class="ov-head">'+head+'</div>'
-      + '<div class="seg'+(introDone?"":" intro")+'" role="img" aria-label="Colour distribution across the font">'+segParts+'</div>'
+      + '<div class="ov-main">'
+      + '<div class="seg'+(barsAnim?" intro":"")+'" role="img" aria-label="Colour distribution across the font">'+segParts+'</div>'
       + '<div class="legend">'+legend+'</div>'+recipeLine+'</div></section>';
   }
 
@@ -471,7 +473,7 @@ DASHBOARD_JS = r"""
     }).join("") + segSpan(-1, pct(none, total), H.noneLabel, H.steps.length);
     return '<section class="overall master-overall" aria-label="'+esc(m.name+" totals")+'">'
       + '<div class="ov-main"><div class="ov-head">'+head+'</div>'
-      + '<div class="seg'+(introDone?"":" intro")+'" role="img" aria-label="'+esc(m.name+" colour distribution")+'">'+segParts+'</div>'
+      + '<div class="seg'+(barsAnim?" intro":"")+'" role="img" aria-label="'+esc(m.name+" colour distribution")+'">'+segParts+'</div>'
       + '<div class="legend">'+legend+'</div>'+recipeLine+'</div></section>';
   }
   function heatmap(m){
@@ -828,6 +830,8 @@ DASHBOARD_JS = r"""
 
   function update(){
     hideTip();
+    barsAnim = (state.master !== barMaster);   // re-fill the colour bar only when the master changed
+    barMaster = state.master;
     document.getElementById("cfd-body").innerHTML = renderBody();
     document.documentElement.setAttribute("data-theme", state.theme);
     var cmp = document.getElementById("cfd-compare"); if (cmp) cmp.setAttribute("aria-pressed", state.view==="compare");
