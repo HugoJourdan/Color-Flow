@@ -141,8 +141,10 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .ov-head b{color:var(--text)}
 .ov-name{color:var(--text);font-weight:600;margin-right:9px}
 .ov-name::after{content:"·";color:var(--muted-2);margin-left:9px}
-.seg{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--track);box-shadow:0 0 7px -1px rgba(255,255,255,.16)}
-.seg>span{display:block;height:100%;transform-origin:left center;transition:opacity .2s ease;box-shadow:inset -6px 0 9px -3px rgba(0,0,0,.2);filter:saturate(1.12) brightness(1.05)}
+.seg{display:flex;height:10px;border-radius:5px;overflow:visible;background:var(--track)}
+.seg>span{display:block;height:100%;transform-origin:left center;transition:opacity .2s ease;filter:saturate(1.2) brightness(1.08)}
+.seg>span:first-child{border-radius:5px 0 0 5px}
+.seg>span:last-child{border-radius:0 5px 5px 0}
 .seg .seg-none{background:var(--c-none)}
 .segc{cursor:pointer}
 .seg>span.off{opacity:.28}
@@ -154,6 +156,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
 .legend .lg{display:inline-flex;align-items:center;gap:5px}
 .ov-extra{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:14px;margin-top:16px}
+.ov-extra .ovc-timeline{grid-column:1/-1}
 .ov-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
 .ov-card.open{grid-column:1/-1}
 .ov-card-h{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin:0 0 10px;padding:0;background:none;border:0;font:inherit;font-size:var(--fs-2xs);font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:left}
@@ -219,7 +222,6 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .chg .cn{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chg .sw{width:11px;height:11px;border-radius:3px;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .chg .arr{color:var(--muted-2)}
-.cmp-legend{margin:6px 0 2px}
 .cmp-wrap{overflow-x:auto;margin-top:8px}
 .cmp{border-collapse:collapse;width:100%;font-size:var(--fs-xs)}
 .cmprow{transition:opacity .2s ease;cursor:pointer}
@@ -291,8 +293,8 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-chartbar .tl-legend{margin-bottom:0;flex:1 1 auto}
 .tl-mode{display:inline-flex;gap:4px;flex:0 0 auto}
 .tl-mode .tl-mode-btn[aria-pressed=true]{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
-.tl-band{stroke:none;fill-opacity:.95}
-.tl-stream-none{fill-opacity:.8}
+.tl-band{stroke:none;fill-opacity:.6}
+.tl-stream-none{fill-opacity:.45}
 .tl-lg-hatch{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline);background:var(--c-none-b)}
 .ov-ring{display:block}
 .ov-ring .ov-ring-track{stroke:var(--track)}
@@ -321,9 +323,12 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .rg-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
 .rg-ar{color:var(--muted-2)}
 .rg-when{margin-left:auto;color:var(--muted-2)}
-.cm-differ-list{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px;max-height:240px;overflow-y:auto}
-.cm-differ-row{font-size:var(--fs-xs);background:var(--surface-2);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--text);padding:3px 8px;cursor:pointer}
-.cm-differ-row:hover{border-color:var(--accent)}
+.cm-headline{margin:0 0 8px;font-size:var(--fs-sm);color:var(--text)}
+.cm-headline b{font-size:var(--fs-big-sm)}
+.cm-bar{display:block;width:100%;flex:none;height:7px;margin:0 0 12px}
+.cm-line{margin:0 0 6px;font-size:var(--fs-xs);color:var(--muted)}
+.cm-line b{color:var(--text)}
+.cm-note{color:var(--muted-2)}
 .cm-steps{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:4px;font-size:var(--fs-xs);color:var(--muted)}
 .cm-steps-l{color:var(--muted-2)}
 .cm-step{display:inline-flex;align-items:center;gap:5px}
@@ -411,6 +416,23 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-machine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(20px,1fr));gap:3px}
 .tl-machine-grid .cell{aspect-ratio:1;border-radius:4px;cursor:default;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .tl-machine-grid .cell svg{padding:2px}
+.tl-cal-card{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
+.tl-cal-h{display:flex;align-items:center;gap:10px;font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
+.tl-cal-key{margin-left:auto;display:inline-flex;align-items:center;gap:3px;color:var(--muted-2);font-size:var(--fs-2xs)}
+.tl-cal-key i{width:10px;height:10px;border-radius:2px;display:inline-block;background:var(--track)}
+.tl-cal-key i.lv1{background:color-mix(in srgb,var(--accent) 12%,var(--track))}
+.tl-cal-key i.lv2{background:color-mix(in srgb,var(--accent) 40%,var(--track))}
+.tl-cal-key i.lv3{background:color-mix(in srgb,var(--accent) 70%,var(--track))}
+.tl-cal-key i.lv4{background:var(--accent)}
+.tl-cal{display:flex;gap:3px;overflow-x:auto;padding-bottom:2px}
+.tl-cal-wk{display:flex;flex-direction:column;gap:3px}
+.tl-cal-d{width:12px;height:12px;border-radius:3px;background:var(--track)}
+.tl-cal-d.lv1{background:color-mix(in srgb,var(--accent) 12%,var(--track))}
+.tl-cal-d.lv2{background:color-mix(in srgb,var(--accent) 40%,var(--track))}
+.tl-cal-d.lv3{background:color-mix(in srgb,var(--accent) 70%,var(--track))}
+.tl-cal-d.lv4{background:var(--accent)}
+.tl-cal-d[data-calday]{cursor:pointer}
+.tl-cal-d[data-calday]:hover{outline:1px solid var(--text);outline-offset:1px}
 .tl-ring{position:relative;z-index:1}
 .tl-ring-up{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 2px var(--ok);animation:tlRingUp .6s ease-out}
 .tl-ring-down{box-shadow:inset 0 0 0 1px var(--swatch-outline),0 0 0 2px var(--c1);animation:tlRingDown .6s ease-out}
@@ -502,8 +524,11 @@ DASHBOARD_JS = r"""
     if (!w) return "";
     var on = state.focus===key;
     var off = state.focus!==null && !on;   // a colour is focused and it isn't this one
+    // glow in the segment's own colour (None uses the solid grey, not its gradient)
+    var glow = key===-1 ? "--c-none-b" : varFor(key);
     return '<span class="segc'+(on?" on":"")+(off?" off":"")+'" data-fkey="'+key+'" style="width:'+w
-      + '%;background:var('+varFor(key)+');--i:'+(idx||0)+'" title="'+esc(lab)+' — click to focus these glyphs"></span>';
+      + '%;background:var('+varFor(key)+');--i:'+(idx||0)
+      + ';box-shadow:0 0 6px var('+glow+'),inset -6px 0 9px -3px rgba(0,0,0,.2)" title="'+esc(lab)+' — click to focus these glyphs"></span>';
   }
   function countFor(m,k){ return k===-1 ? m.uncolored : (m.counts[String(k)]||0); }
   function startedOf(m){ return H.glyphTotal - m.uncolored; }
@@ -726,7 +751,7 @@ DASHBOARD_JS = r"""
     var head = expandable
       ? '<button type="button" class="ov-card-h" data-ovexpand="'+esc(key)+'" aria-expanded="'+open+'"><span>'+esc(title)+'</span><span class="ov-exp">'+(open?"Show less":"Show all")+'</span></button>'
       : '<div class="ov-card-h"><span>'+esc(title)+'</span></div>';
-    return '<div class="ov-card'+(open?" open":"")+'">'+head
+    return '<div class="ov-card ovc-'+esc(key)+(open?" open":"")+'">'+head
       + '<div class="ov-card-body'+(open?" scroll":"")+'">'+bodyHtml+'</div></div>';
   }
   function lbRow(r){
@@ -843,14 +868,14 @@ DASHBOARD_JS = r"""
   function crossMasterCard(){
     var cm = H.crossMaster;
     if (!cm) return "";
-    // No summary stats, no "Show all": just the by-step chips + the (always-shown,
-    // scrollable) list of glyphs that vary across the masters, clickable to jump.
-    var names = cm.differGlyphs || [];
-    var differList = names.length
-      ? '<div class="cm-differ-list">'+names.map(function(name){
-          return '<button type="button" class="cm-differ-row" data-jglyph="'+esc(name)+'">'+esc(name)+'</button>';
-        }).join("")+'</div>'
-      : '<p class="ov-empty">No glyphs differ.</p>';
+    // The done-everywhere progress bar + the identical/differ counts + by-step chips.
+    // No per-glyph list, no expand toggle.
+    var donePct = pct(cm.doneEverywhere, cm.total);
+    var head = '<p class="cm-headline"><b>'+cm.doneEverywhere+'</b> / '+cm.total+' done everywhere</p>'
+      + '<div class="bar cm-bar"><span style="width:'+donePct+'%;background:var(--accent)"></span></div>';
+    var ident = '<p class="cm-line">identical in all masters: <b>'+cm.identical+'</b></p>';
+    var single = (cm.masterCount < 2) ? ' <span class="cm-note">(single master)</span>' : '';
+    var differLine = '<p class="cm-line">differ between masters: <b>'+cm.differ+'</b>'+single+'</p>';
     var byStep = cm.byStep || {};
     var chips = Object.keys(byStep).map(function(k){
       var key = parseInt(k, 10);
@@ -860,7 +885,7 @@ DASHBOARD_JS = r"""
     var steps = chips
       ? '<div class="cm-steps"><span class="cm-steps-l">by step:</span>'+chips+'</div>'
       : "";
-    return ovCard("crossMaster", "Across masters", steps + differList, false);
+    return ovCard("crossMaster", "Across masters", head + ident + differLine + steps, false);
   }
   function overviewExtras(){
     if (!H.masters.length) return "";
@@ -1217,12 +1242,9 @@ DASHBOARD_JS = r"""
       return '<line class="tl-grid" x1="'+pl+'" y1="'+y+'" x2="'+(W-ax.pr)+'" y2="'+y+'"/>'
         + '<text class="tl-axis" x="'+(pl-5)+'" y="'+(parseFloat(y)+3).toFixed(1)+'" text-anchor="end">'+g+'</text>';
     }).join("");
-    // Disc-inspired "dreamy" look: bands are saturated + softly blurred (filter),
-    // their edges flow as smooth curves, and the uncoloured band is a flat solid
-    // (no hatch). Axes/grid stay outside the filter so they read crisp.
-    var defs = '<filter id="tl-flow-soft" x="-3%" y="-12%" width="106%" height="130%">'
-      + '<feColorMatrix type="saturate" values="1.18"/>'
-      + '<feGaussianBlur stdDeviation="1.1"/></filter>';
+    // Flowing (smooth-curved) bands at lower opacity — no blur/saturate filter; the
+    // uncoloured band is a flat solid (no hatch).
+    var defs = "";
     // build a stacked Y for every date: running cumulative % from the baseline up.
     // bands stack bottom->top by H.order; the none band sits on top, solid.
     var nPts = tally.length;
@@ -1252,7 +1274,7 @@ DASHBOARD_JS = r"""
     if (noneUpper.some(function(v, i){ return v - noneLower[i] > 0.0001; })){
       bands += '<path class="tl-band tl-stream-none" d="'+bandPath(noneLower, noneUpper)+'" fill="var(--c-none-b)"><title>'+esc(H.noneLabel)+'</title></path>';
     }
-    var bandGroup = '<g filter="url(#tl-flow-soft)">'+bands+'</g>';
+    var bandGroup = bands;
     // crosshair overlay shares the #7 data-snaps + the per-date counts so the
     // read-out (streamReadout) can show each step's count at the snapped date.
     var snaps = ax.snaps;
@@ -1263,7 +1285,7 @@ DASHBOARD_JS = r"""
     var deadline = deadlineRule(ax);                         // #19: shared rule, Flow mode too
     var chart = '<svg class="tl-chart tl-flow" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData
       + ' aria-label="Stacked colour completion over time. Hover or use the left and right arrow keys to read each snapshot.">'
-      + '<defs>'+defs+'</defs>'+ax.weekBands+grid+bandGroup+ax.xticks+ax.todayRule+deadline+crossLayer+'</svg>';
+      + (defs?'<defs>'+defs+'</defs>':'')+ax.weekBands+grid+bandGroup+ax.xticks+ax.todayRule+deadline+crossLayer+'</svg>';
     // legend: one swatch per step (+ uncoloured), mirroring the band fills.
     var legend = order.map(function(k){
       return '<span class="tl-lg"><i style="background:var('+varFor(k)+')"></i>'+esc(labelFor(k))+'</span>';
@@ -1924,6 +1946,47 @@ DASHBOARD_JS = r"""
       + histMeter
       + '</section>';
   }
+  // ----- Activity calendar (GitHub-contribution style) -----------------------
+  // Per snapshot date, how many glyphs changed colour vs the previous snapshot
+  // (diff of stateAt over the chosen master). Non-snapshot calendar days are 0.
+  function calActivity(masterId){
+    var dates = (H.trend && H.trend.dates) || [];
+    var counts = {}, prev = null;
+    for (var d=0; d<dates.length; d++){
+      var st = stateAt(masterId, dates[d]), c = 0, name;
+      if (prev){ for (name in st){ if (st[name] !== prev[name]) c++; } }
+      counts[dates[d]] = c; prev = st;
+    }
+    return counts;
+  }
+  function activityCalendar(){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (dates.length < 2) return "";
+    var mid = state.master != null ? state.master : (H.masters[0] && H.masters[0].id);
+    var counts = calActivity(mid);
+    var dateIdx = {}; dates.forEach(function(dt, i){ dateIdx[dt] = i; });
+    var DAY = 86400000;
+    function toUTC(s){ return new Date(s+"T00:00:00Z").getTime(); }
+    function isoOf(ms){ var dt = new Date(ms), mo = dt.getUTCMonth()+1, da = dt.getUTCDate();
+      return dt.getUTCFullYear()+"-"+(mo<10?"0":"")+mo+"-"+(da<10?"0":"")+da; }
+    var startMs = toUTC(dates[0]), endMs = toUTC(dates[dates.length-1]);
+    var gridStart = startMs - new Date(startMs).getUTCDay()*DAY;       // back to Sunday
+    var maxC = 1; for (var k in counts){ if (counts[k] > maxC) maxC = counts[k]; }
+    function level(c){ if (!c) return 1; var r = c/maxC; return r>0.66?4:r>0.33?3:2; }
+    var weeks = "", col = "";
+    for (var ms = gridStart; ms <= endMs; ms += DAY){
+      if (new Date(ms).getUTCDay()===0 && ms!==gridStart){ weeks += '<div class="tl-cal-wk">'+col+'</div>'; col = ""; }
+      var key = isoOf(ms), inRange = ms >= startMs, cnt = counts[key] || 0;
+      var lv = inRange ? level(cnt) : 0, snapI = dateIdx[key];
+      var attr = (snapI!=null) ? ' data-calday="'+snapI+'" role="button" tabindex="0"' : '';
+      var title = inRange ? (key + (cnt ? " · "+cnt+" changed" : " · no change")) : "";
+      col += '<div class="tl-cal-d lv'+lv+'"'+attr+' title="'+esc(title)+'"></div>';
+    }
+    if (col) weeks += '<div class="tl-cal-wk">'+col+'</div>';
+    return '<div class="tl-cal-card"><div class="tl-cal-h">Activity calendar'
+      + '<span class="tl-cal-key">less <i class="lv1"></i><i class="lv2"></i><i class="lv3"></i><i class="lv4"></i> more</span></div>'
+      + '<div class="tl-cal" role="img" aria-label="Per-day glyph-colour activity; click a day to scrub the Time Machine to it.">'+weeks+'</div></div>';
+  }
   function timelineView(){
     // #20: <3 snapshots routes to the rich seed states (a skeleton + locked chips at
     // <2, a compact one-day diff at ==2). The full view needs >=3 to be meaningful.
@@ -1936,14 +1999,10 @@ DASHBOARD_JS = r"""
     // #14: This-week digest tops the tab (above the chart), per D1. No static legend
     // line — the colour/name read-out only appears on hover (the snapping crosshair).
     return '<section class="timeline">'+weekDigest()+'<div class="tl-chartbar">'+tlModeToggle()+'</div>'
-      + parts.chart+parts.foot+dateDiffPanel()+deadlinePanel()+timeMachine()+categoryLanes()+scriptLanes()+regressionLog()+'</section>';
+      + parts.chart+parts.foot+dateDiffPanel()+deadlinePanel()+timeMachine()+activityCalendar()+categoryLanes()+scriptLanes()+regressionLog()+'</section>';
   }
   function compareView(){
     // columns = steps (+None); rows = masters, labelled by the master name.
-    // A colour-label legend sits above the table (the header cells are swatch-only).
-    var legend = H.steps.map(function(s){
-      return '<span class="lg" title="'+esc(s.label)+'"><i style="background:var('+varFor(s.key)+')"></i>'+esc(s.label)+'</span>';
-    }).join("");
     var head = '<th scope="col">Master</th>'+H.steps.map(function(s){
       return '<th scope="col" title="'+esc(s.label)+'" aria-label="'+esc(s.label)+'"><span class="dot" style="background:var('+varFor(s.key)+')"></span></th>';
     }).join("");
@@ -1958,8 +2017,7 @@ DASHBOARD_JS = r"""
       var cls = state.master==null ? "" : (m.id===state.master ? " cmp-sel" : " cmp-dim");
       return '<tr class="cmprow'+cls+'" data-m="'+esc(m.id)+'" title="Click to focus this master"><th scope="row" class="cmp-m" aria-label="'+esc(m.name)+'">'+aa+'</th>'+cells+'</tr>';
     }).join("");
-    return '<div class="cmp-legend legend">'+legend+'</div>'
-      + '<div class="cmp-wrap"><table class="cmp"><caption>Step completion by master</caption><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
+    return '<div class="cmp-wrap"><table class="cmp"><caption>Step completion by master</caption><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
   }
   function renderBody(){
     return state.view==="compare" ? compareView()
@@ -2543,6 +2601,7 @@ DASHBOARD_JS = r"""
       var cr = e.target.closest(".cmprow[data-m],.lb-row[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; update(); return; }
       var tm = e.target.closest("[data-tlmode]"); if (tm){ state.tlMode = tm.getAttribute("data-tlmode"); update(); return; }
       var gs = e.target.closest("[data-gsort]"); if (gs){ state.glyphSort = gs.getAttribute("data-gsort"); update(); return; }
+      var cd = e.target.closest("[data-calday]"); if (cd){ scrubSet(parseInt(cd.getAttribute("data-calday"),10)); return; }
       var fc = e.target.closest("[data-fclear]"); if (fc){ setFocus(null); return; }
       var jr = e.target.closest("[data-jglyph]"); if (jr){ openJourney(jr.getAttribute("data-jglyph")); return; }
       var jc = e.target.closest(".heat .cell"); if (jc && (e.metaKey || e.ctrlKey)){ e.preventDefault(); openJourney(jc.getAttribute("data-glyph")); return; }
@@ -2731,11 +2790,11 @@ DASHBOARD_JS = r"""
       g.strokeStyle=rim; g.lineWidth=2; g.beginPath(); g.arc(0,0,rx*0.992,0,7); g.stroke(); g.restore();
     }
     function shadowInto(g,cx,cy,rx,ry){
-      // a touch stronger + slightly wider so the tighter-stacked discs cast a little
-      // more shadow into the gap below each one
-      g.save(); g.translate(cx,cy+ry*0.55); g.scale(1,ry/rx);
-      var sh=g.createRadialGradient(0,0,0,0,0,rx*1.04); sh.addColorStop(0,"rgba(0,0,0,0.11)"); sh.addColorStop(0.7,"rgba(0,0,0,0.05)"); sh.addColorStop(1,"rgba(0,0,0,0)");
-      g.fillStyle=sh; g.beginPath(); g.arc(0,0,rx*1.04,0,7); g.fill(); g.restore();
+      // a deeper, wider drop shadow under each disc so the stack reads with clear
+      // separation between discs (the disc below catches a stronger shadow)
+      g.save(); g.translate(cx,cy+ry*0.62); g.scale(1,ry/rx);
+      var sh=g.createRadialGradient(0,0,0,0,0,rx*1.12); sh.addColorStop(0,"rgba(0,0,0,0.28)"); sh.addColorStop(0.6,"rgba(0,0,0,0.14)"); sh.addColorStop(1,"rgba(0,0,0,0)");
+      g.fillStyle=sh; g.beginPath(); g.arc(0,0,rx*1.12,0,7); g.fill(); g.restore();
     }
     var geo={rx:0,ry:0,cx:0,topY:0,dz:0,vt:0};
     function selIndex(){ if (state.master==null) return -1; for (var i=0;i<H.masters.length;i++){ if (H.masters[i].id===state.master) return i; } return -1; }

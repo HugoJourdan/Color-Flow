@@ -188,12 +188,21 @@ def test_coverage_bar_has_no_inline_percent_uses_hover_tooltip() -> None:
     assert ".cov-row{display:flex;align-items:center;gap:12px;font-size:var(--fs-xs)" in html  # Compare font size
 
 
-def test_compare_tab_has_label_legend_and_checkmark_for_full_steps() -> None:
+def test_compare_tab_checkmark_for_full_steps() -> None:
     html = assets.build_html(_model())
-    assert 'class="cmp-legend legend"' in html          # colour-label legend above the table
+    assert "cmp-legend" not in html                      # colour-label legend removed
     assert '<td class="cmp-done">✅</td>' in html         # 100% = checkmark only, no colour bar
-    assert ".cmp-legend{margin:6px 0 2px}" in html       # legend styling present
     assert ".cmp td.cmp-done{text-align:center" in html  # checkmark cell centred
+
+
+def test_dashboard_has_activity_calendar() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function activityCalendar(" in js
+    assert "function calActivity(" in js
+    assert "data-calday" in js                           # day cells carry their snapshot index
+    assert "scrubSet(parseInt(cd.getAttribute" in js     # click jumps the Time Machine
+    css = assets.DASHBOARD_CSS
+    assert ".tl-cal-d" in css and ".tl-cal-wk" in css
 
 
 def test_dashboard_js_has_expandable_overview_cards_and_timeline_card() -> None:
@@ -408,9 +417,9 @@ def test_dashboard_js_has_streamgraph_builder() -> None:
     # bands stack by palette order and fill with the per-step var
     assert "H.order" in js
     assert "varFor(" in js
-    # disc-inspired dreamy bands: smooth curves + a blur/saturate filter
+    # flowing curved bands at lower opacity, no blur/saturate filter
     assert "function curveSegs(" in js                      # Catmull-Rom band edges
-    assert 'filter id="tl-flow-soft"' in js and "feGaussianBlur" in js
+    assert "tl-flow-soft" not in js                         # the dreamy blur filter was removed
     assert 'fill="url(#tl-stream-hatch)"' not in js         # None is no longer hatched
     assert 'class="tl-band tl-stream-none"' in js and 'fill="var(--c-none-b)"' in js  # None solid
     # reuses the calendar X axis day-offset math from #7
@@ -493,14 +502,14 @@ def test_dashboard_js_has_cross_master_card() -> None:
     js = assets.DASHBOARD_JS
     assert "function crossMasterCard(" in js
     assert "H.crossMaster" in js
-    # by-step swatch chips + the clickable differ list — no summary stats, no toggle
+    # headline + done-everywhere bar + identical/differ counts + by-step chips;
+    # no per-glyph list, no expand toggle
+    assert "done everywhere" in js
+    assert "identical in all masters" in js
+    assert "differ between masters" in js
     assert "by step:" in js
-    assert "done everywhere" not in js
-    assert "identical in all masters" not in js
-    assert "differ between masters" not in js
-    # the differ list rows open the existing per-glyph journey modal
-    assert "data-jglyph" in js
-    assert "cm.differGlyphs" in js
+    assert "(single master)" in js
+    assert "cm-differ-list" not in js        # the per-glyph list was removed
     # byStep swatches reuse the shared swatchFor helper (parseInt -> int key)
     assert "swatchFor(key)" in js
     # wired into the global Overview where forecastCard used to lead
@@ -848,8 +857,8 @@ def test_dashboard_css_styles_help_panel() -> None:
 def test_dashboard_css_styles_cross_master_card() -> None:
     css = assets.DASHBOARD_CSS
     # Every class crossMasterCard emits needs a layout rule.
-    for selector in (".cm-differ-list", ".cm-differ-row", ".cm-steps",
-                     ".cm-steps-l", ".cm-step", ".cm-step-n"):
+    for selector in (".cm-headline", ".cm-bar", ".cm-line", ".cm-note",
+                     ".cm-steps", ".cm-steps-l", ".cm-step", ".cm-step-n"):
         assert selector in css, selector
 
 
