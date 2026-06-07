@@ -205,6 +205,21 @@ def test_dashboard_has_activity_calendar() -> None:
     assert ".tl-cal-d" in css and ".tl-cal-wk" in css
 
 
+def test_dashboard_has_standard_calendar_and_toggle() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function standardCalendar(" in js            # macOS-style month grid
+    assert "function calModeToggle(" in js               # Heatmap | Standard switch
+    assert "function heatmapCalendar(" in js             # heatmap body factored out
+    assert "function calMonthRef(" in js                 # displayed-month state
+    assert 'data-calmode="standard"' in js and 'data-calmode="heatmap"' in js
+    assert "data-calnav" in js                           # prev/next month nav
+    assert "state.calMode = clm.getAttribute" in js      # toggle handler
+    assert "calMode: \"heatmap\"" in js                  # default mode preserved
+    css = assets.DASHBOARD_CSS
+    assert ".tl-mcal-grid{display:grid;grid-template-columns:repeat(7,1fr)" in css
+    assert ".tl-cal-mode-btn" in css
+
+
 def test_progress_bar_and_dots_glow_softened() -> None:
     js = assets.DASHBOARD_JS
     html = assets.build_html(_model())
