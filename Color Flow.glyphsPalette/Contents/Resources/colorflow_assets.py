@@ -350,6 +350,12 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-diff-pick{display:flex;gap:14px;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--muted)}
 .tl-diff-pick select{background:var(--surface-2);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--text);font:inherit;font-size:var(--fs-xs);padding:3px 6px}
 .tl-diff-out{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.tl-reglog{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
+.tl-reglog-h{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
+.tl-reglog-all{flex:0 0 auto}
+.tl-reglog-rows .rg-row{cursor:pointer}
+.tl-reglog-rows .rg-row:hover{color:var(--text)}
+.tl-flag{stroke:var(--c0);stroke-width:2;stroke-linecap:round}
 .dz{font-size:var(--fs-xs);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:4px 9px;color:var(--muted)}
 .dz-up{border-color:var(--ok);color:var(--ok)}
 .dz-down{border-color:var(--c0);color:var(--c0)}
@@ -1101,7 +1107,15 @@ DASHBOARD_JS = r"""
     var brushLayer = '<rect class="tl-brush" y="'+ptop+'" height="'+ih.toFixed(1)+'"/>'
       + '<rect class="tl-brush-h" data-edge="a" tabindex="0" role="slider" aria-label="Compare range start" y="'+ptop+'" width="6" height="'+ih.toFixed(1)+'"/>'
       + '<rect class="tl-brush-h" data-edge="b" tabindex="0" role="slider" aria-label="Compare range end" y="'+ptop+'" width="6" height="'+ih.toFixed(1)+'"/>';
-    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData+' aria-label="Completion over time per master. Hover or use the left and right arrow keys to read each snapshot.">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+grid+xticks+lines+todayRule+brushLayer+crossLayer+'</svg>';
+    // ----- #15 regression flags: a small red tick at the baseline on every snapshot
+    // X that carried >=1 backward move (regressionDates over the full history). Reuses
+    // ax.snaps so the tick sits exactly on the discrete date, like the crosshair.
+    var regDates = regressionDates();
+    var baseY = Y(0);
+    var flags = ax.snaps.filter(function(s){ return regDates[s.d]; }).map(function(s){
+      return '<line class="tl-flag" x1="'+s.x+'" y1="'+(baseY-6).toFixed(1)+'" x2="'+s.x+'" y2="'+baseY.toFixed(1)+'"><title>'+esc(dateLabel(s.d)+" · moved backward")+'</title></line>';
+    }).join("");
+    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData+' aria-label="Completion over time per master. Hover or use the left and right arrow keys to read each snapshot.">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+grid+xticks+lines+flags+todayRule+brushLayer+crossLayer+'</svg>';
     var foot = '<div class="tl-foot"><span>'+esc(series[0].date)+'</span><span>'+esc(series[series.length-1].date)+'</span></div>';
     return { chart:chart, legend:legend, foot:foot };
   }
@@ -1321,6 +1335,60 @@ DASHBOARD_JS = r"""
       + '<span class="dz dz-flat">= '+c.unchanged+' unchanged</span>'
       + '<span class="dz dz-net">'+(c.deltaPct>=0?"+":"")+c.deltaPct+'% net</span></div></div>';
   }
+  // ----- #15 full-history regression log + chart flags -----------------------
+  // The active master for the full-history walk: the selected one, else the first.
+  // Distinct from regressionCard()/H.changes (last-save delta only) — this walks the
+  // entire snapshot history.
+  function reglogMaster(){ return state.master || (H.masters[0] && H.masters[0].id); }
+  // Walk consecutive H.trend.dates for one master: for each adjacent pair compare
+  // stateAt(prev) vs stateAt(curr) and collect every glyph whose rank dropped
+  // (rankOf(now) < rankOf(was); a missing/uncoloured key reads as -1, so "-> none"
+  // counts as backward via rankOf's -1). Newest-first, one row per backward move.
+  function regressionWalk(){
+    var mid = reglogMaster();
+    var dates = (H.trend && H.trend.dates) || [];
+    if (!mid || dates.length < 2) return [];
+    var hits = [];
+    for (var i = 1; i < dates.length; i++){
+      var before = stateAt(mid, dates[i-1]), after = stateAt(mid, dates[i]);
+      var names = {};
+      for (var n1 in before){ names[n1] = true; }
+      for (var n2 in after){ names[n2] = true; }
+      for (var name in names){
+        var was = before[name]; if (was == null) was = -1;
+        var nw = after[name]; if (nw == null) nw = -1;
+        if (rankOf(nw) < rankOf(was)){                     // backward; -> uncoloured ranks -1
+          hits.push({ name:name, was:was, nw:nw, date:dates[i] });
+        }
+      }
+    }
+    hits.reverse();                                        // newest-first
+    return hits;
+  }
+  // The set of snapshot dates carrying >=1 regression, for the chart tick flags.
+  function regressionDates(){
+    var out = {};
+    regressionWalk().forEach(function(h){ out[h.date] = true; });
+    return out;
+  }
+  // Newest-first was->now swatch table: top 8 + a "show all" expander (reuses the
+  // ovCard data-ovexpand idiom via state.ovExpand.reglog), rows open the journey
+  // modal. Renders nothing when the whole history is clean.
+  function regressionLog(){
+    var hits = regressionWalk();
+    if (!hits.length) return "";
+    var open = !!state.ovExpand.reglog;
+    var list = open ? hits : hits.slice(0, 8);
+    var rows = list.map(function(it){
+      return '<div class="rg-row" data-jglyph="'+esc(it.name)+'"><span class="rg-n">'+esc(it.name)+'</span>'
+        + swatchFor(it.was)+'<span class="rg-ar">→</span>'+swatchFor(it.nw)
+        + '<span class="rg-when">'+esc(dateLabel(it.date))+'</span></div>';
+    }).join("");
+    var head = '<div class="tl-reglog-h"><span>Moved backward over time ('+hits.length+')</span>'
+      + (hits.length > 8 ? '<button type="button" class="chip tl-reglog-all" data-ovexpand="reglog">'
+          + (open ? "Show top 8" : "Show all "+hits.length)+'</button>' : '')+'</div>';
+    return '<div class="tl-reglog">'+head+'<div class="tl-reglog-rows">'+rows+'</div></div>';
+  }
   function timelineView(){
     if (!hasTrend()){
       return '<section class="tl-empty"><p class="empty">Not enough history yet. Color Flow saves a snapshot each time you save the font; this timeline fills in as days of history accumulate.</p></section>';
@@ -1330,7 +1398,7 @@ DASHBOARD_JS = r"""
     // #14: This-week digest tops the tab (above the chart), per D1.
     return '<section class="timeline">'+weekDigest()+'<div class="tl-chartbar">'+tlModeToggle()
       + '<div class="tl-legend">'+parts.legend+'</div></div>'
-      + parts.chart+parts.foot+dateDiffPanel()+'</section>';
+      + parts.chart+parts.foot+dateDiffPanel()+regressionLog()+'</section>';
   }
   function compareView(){
     // columns = steps (+None); rows = masters, labelled by the master name.

@@ -544,6 +544,68 @@ def test_dashboard_css_styles_week_digest_class() -> None:
     assert "var(--" in digest_block
 
 
+def test_dashboard_js_has_full_history_regression_log() -> None:
+    """#15: a full-history regression log walks consecutive H.trend.dates for the
+    active master, compares stateAt(prev) vs stateAt(curr) and collects glyphs whose
+    rank dropped (rankOf(now) < rankOf(was); -> uncoloured counts as backward). It
+    renders a newest-first was->now swatch table (top 8 + a "show all" expander) whose
+    rows open the journey modal, and stays distinct from the last-save regressionCard
+    (which keys off H.changes)."""
+    js = assets.DASHBOARD_JS
+    # the named full-history builder, wired into the timeline view (D1: last item)
+    assert "function regressionLog(" in js
+    timeline = js.split("function timelineView(")[1].split("function ")[0]
+    assert "regressionLog()" in timeline
+    # walks the real snapshot dates and reconstructs colour state at each
+    assert "H.trend.dates" in js or "H.trend && H.trend.dates" in js
+    assert "function regressionWalk(" in js               # the full-history walk
+    walk = js.split("function regressionWalk(")[1].split("\n  function ")[0]
+    assert "stateAt(" in walk                              # reconstruct each snapshot
+    assert "rankOf(" in walk                               # rank comparison
+    # the backward test: now ranks below was (-> uncoloured / null counts as backward)
+    assert "rankOf(nw) < rankOf(was)" in walk
+    # newest-first, top 8 with a "show all" expander, rows open the journey modal
+    log = js.split("function regressionLog(")[1].split("\n  function ")[0]
+    assert "regressionWalk()" in log                       # the log renders the walk
+    assert "data-jglyph" in log
+    assert "swatchFor(" in log                             # canonical varFor-backed swatch
+    assert "slice(0, 8)" in log                            # top 8 + show-all expander
+    assert "tl-reglog" in js
+    # distinct from the last-save regressionCard (H.changes), still present
+    assert "function regressionCard(" in js
+
+
+def test_dashboard_js_regression_log_renders_nothing_when_clean() -> None:
+    """#15: a clean history (no rank drops) renders nothing (or a quiet note), never
+    inventing data."""
+    js = assets.DASHBOARD_JS
+    log = js.split("function regressionLog(")[1].split("\n  function ")[0]
+    # the builder bails out when no glyph moved backwards
+    assert 'return ""' in log or "nothing moved backwards" in log.lower()
+
+
+def test_dashboard_js_regression_log_flags_chart_dates() -> None:
+    """#15: every snapshot date with >=1 regression gets a small red tick (.tl-flag)
+    on the line chart, drawn at that date's X via the shared calendar axis."""
+    js = assets.DASHBOARD_JS
+    # a shared set of regression dates the chart can flag
+    assert "function regressionDates(" in js
+    # the line chart draws a tl-flag tick at each flagged date's X
+    trend = js.split("function trendParts(")[1].split("\n  function ")[0]
+    assert "tl-flag" in trend
+    assert "regressionDates(" in trend
+
+
+def test_dashboard_css_styles_regression_log_and_flag() -> None:
+    """#15: the regression-log table and the chart tick are theme-safe (no hard-coded
+    colours leaking past the design tokens) and the tick reads as a red flag."""
+    css = assets.DASHBOARD_CSS
+    assert ".tl-reglog" in css
+    assert ".tl-flag" in css
+    flag_block = css.split(".tl-flag")[1].split("}")[0]
+    assert "var(--" in flag_block
+
+
 def test_dashboard_js_has_journey_modal() -> None:
     js = assets.DASHBOARD_JS
     assert "function openJourney(" in js
