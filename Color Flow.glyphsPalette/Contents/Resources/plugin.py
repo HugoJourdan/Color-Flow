@@ -1871,6 +1871,12 @@ class ColorFlow(PalettePlugin):
 	def __del__(self):
 		# Delete callbacks when Glyphs quits, otherwise it'll crash :(
 		Glyphs.removeCallback(self.update)
+		# start() also registers contextMenuHandler on CONTEXTMENUCALLBACK; mirror
+		# its removal here or right-click submenus stack up on every reload.
+		try:
+			Glyphs.removeCallback(self.contextMenuHandler)
+		except Exception:
+			pass
 		# Remove the Rainbow Font View menu item this instance added.
 		self._teardown_rainbow_menu()
 		self._teardown_settings_menu()
