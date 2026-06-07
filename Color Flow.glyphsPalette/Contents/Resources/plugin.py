@@ -828,89 +828,6 @@ class ColorFlow(PalettePlugin):
 		for sub in subviews:
 			self._strip_focus_rings(sub)
 
-	# ObjC selector fired by the per-row double-click gesture recognizer.
-	def labelDoubleClicked_(self, sender):
-		try:
-			view = sender.view()
-			for color, checkbox in getattr(self, "_rowChecks", {}).items():
-				if self._ns_button(checkbox) == view:
-					self._begin_rename(color)
-					return
-		except Exception:
-			import traceback
-			print("Color Flow [rename] error:\n" + traceback.format_exc())
-
-	@objc.python_method
-	def _begin_rename(self, color):
-		self._cancel_rename()
-		self.Update_Plugin_UI()  # rebuild a clean row before overlaying the editor
-		checkbox = getattr(self, "_rowChecks", {}).get(color)
-		if checkbox is None:
-			return
-		try:
-			rowY = checkbox.getPosSize()[1]
-		except Exception:
-			return
-		# Hide the label text + count so they don't show through the editor.
-		try:
-			checkbox.set("")
-		except Exception:
-			pass
-		countAttr = str(color) + "count"
-		if hasattr(self.paletteView.frame, countAttr):
-			delattr(self.paletteView.frame, countAttr)
-		editor = EditText((32, rowY, -8, 20), self.meaning.get(color, ""),
-			callback=self._commit_rename, continuous=False, sizeStyle='small')
-		setattr(self.paletteView.frame, "renameEditor", editor)
-		self._renameColor = color
-		try:
-			field = editor.getNSTextField()
-			field.window().makeFirstResponder_(field)
-		except Exception:
-			pass
-
-	@objc.python_method
-	def _commit_rename(self, sender):
-		color = getattr(self, "_renameColor", None)
-		self._renameColor = None
-		if color is None:
-			self._cancel_rename()
-			return
-		newLabel = sender.get().strip()
-
-		font = Glyphs.font
-		fontDir = None
-		if font is not None and font.filepath:
-			fontDir = os.path.dirname(font.filepath)
-		path = colornames.resolve_key_file(fontDir)
-		text = colornames.read_color_names(path) or colornames.DEFAULT_COLOR_NAMES
-		meaningInt, orderInt, _ = colornames.parse_key_file(text)
-		intColor = int(color)
-		if newLabel:
-			meaningInt[intColor] = newLabel
-			if intColor not in orderInt:
-				orderInt.append(intColor)
-		colornames.write_color_names(path, colornames.render_key_file(meaningInt, orderInt))
-
-		self._cancel_rename()
-		self.meaning = self.Load_Meaning()
-		self._lastSignature = None
-		self.Update_Plugin_UI()
-		try:
-			if getattr(self, "fontview", None) and font is not None and self.fontview.is_enabled(font):
-				self.fontview.maybe_rebuild(font)
-		except Exception:
-			pass
-
-	@objc.python_method
-	def _cancel_rename(self):
-		if hasattr(self.paletteView.frame, "renameEditor"):
-			try:
-				delattr(self.paletteView.frame, "renameEditor")
-			except Exception:
-				pass
-
-
 	########################################################################################################
 	#																									   #
 	#	DATA + UI 																				           #
@@ -961,13 +878,12 @@ class ColorFlow(PalettePlugin):
 	def _invalidate_counts(self, masterId):
 		self.font.tempData["com.hugojourdan.ColorFlow-counts-" + masterId] = None
 
-	# Attach the double-click-to-rename and drag-to-reorder gestures to a freshly
-	# built checkbox and remember which colour it is (widgets rebuild each refresh).
+	# Remember which colour a freshly built row checkbox belongs to (the widgets
+	# rebuild on each refresh). Row interaction (open-tab click + drag-reorder)
+	# lives on a full-width transparent overlay added after the count, so the
+	# WHOLE row responds — see _attach_row_overlay.
 	@objc.python_method
-	def _attach_rename(self, checkbox, color):
-		# Register the row's label for drop-target geometry only. Row interaction
-		# (open-tab click + drag-reorder) lives on a full-width transparent overlay
-		# added after the count, so the WHOLE row responds — see _attach_row_overlay.
+	def _register_row_checkbox(self, checkbox, color):
 		self._rowChecks[color] = checkbox
 
 	# A transparent, full-width overlay laid over each row (above the bar, label
@@ -1254,7 +1170,7 @@ class ColorFlow(PalettePlugin):
 						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
 					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
-					self._attach_rename(checkbox, color)
+					self._register_row_checkbox(checkbox, color)
 					self._make_count(color, count, yPos)
 					self._attach_row_overlay(color, yPos)
 					yPos += 19
@@ -1264,7 +1180,7 @@ class ColorFlow(PalettePlugin):
 						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
 					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
-					self._attach_rename(checkbox, color)
+					self._register_row_checkbox(checkbox, color)
 					self._make_count(color, count, yPos)
 					self._attach_row_overlay(color, yPos)
 					yPos += 19
