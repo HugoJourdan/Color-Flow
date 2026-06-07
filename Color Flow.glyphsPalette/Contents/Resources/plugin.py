@@ -779,6 +779,17 @@ class ColorFlow(PalettePlugin):
 		# whether or not the dashboard was ever opened. Stored in Glyphs.defaults.
 		if font is None or not getattr(font, "filepath", None):
 			return
+		# build_master_glyph_colors scans every glyph in every master, so on a
+		# large family this is a real per-save tax. record_history overwrites the
+		# same day anyway, so throttle the rescan to at most once a minute per font.
+		import time
+		last = getattr(self, "_lastHistoryRecord", None) or {}
+		key = str(font.filepath)
+		now_mono = time.monotonic()
+		if now_mono - last.get(key, 0.0) < 60.0:
+			return
+		last[key] = now_mono
+		self._lastHistoryRecord = last
 		import colorflow_dashboard
 		snapshot = colorflow_dashboard.build_master_glyph_colors(font)
 		colorflow_dashboard.record_history(font, snapshot, datetime.now())
