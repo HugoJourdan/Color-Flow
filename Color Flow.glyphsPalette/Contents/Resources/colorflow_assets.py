@@ -2802,6 +2802,20 @@ DASHBOARD_JS = r"""
         for (var n2=M-1;n2>=0;n2--){ if (!vis(n2)) continue; if (n2>sel) below.push(n2); else if (n2<sel) above.push(n2); }
         group(below); if (vis(sel)) focusDisc(sel); group(above);
       }
+      // The TOP disc shows the page background through its hole (not the disc
+      // below): find the topmost visible non-empty disc and punch its hole through
+      // the canvas with a soft destination-out matching paintDisc's hole gradient.
+      var topI = -1;
+      for (var ti=0; ti<M; ti++){ if (vis(ti)){ topI = ti; break; } }
+      if (topI >= 0 && !EMPTY[topI]){
+        ctx.save(); ctx.translate(cx, cyOf(topI)); ctx.scale(1, ry/rx);
+        ctx.globalCompositeOperation = "destination-out";
+        var hrT = rx*0.26;
+        var pgT = ctx.createRadialGradient(0,0,0,0,0,hrT);
+        pgT.addColorStop(0,"rgba(0,0,0,1)"); pgT.addColorStop(0.94,"rgba(0,0,0,1)"); pgT.addColorStop(1,"rgba(0,0,0,0)");
+        ctx.fillStyle=pgT; ctx.beginPath(); ctx.arc(0,0,hrT,0,7); ctx.fill();
+        ctx.restore();
+      }
     }
     // Size the canvas to fill the main column down to the footer, and show as
     // many discs as fit (the rest stay scrollable via the wheel).
