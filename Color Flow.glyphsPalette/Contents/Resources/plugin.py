@@ -43,7 +43,7 @@ from AppKit import (
 	NSOnState,
 	NSPanGestureRecognizer,
 )
-from Foundation import NSObject
+from Foundation import NSObject, NSRunLoop, NSRunLoopCommonModes
 
 # Star imports are runtime-only Glyphs globals. Order is significant: vanilla
 # first so its widgets lose any name collision to the GlyphsApp UI helpers, and
@@ -53,6 +53,108 @@ from vanilla import *
 from GlyphsApp.plugins import *
 from GlyphsApp.UI import *
 from GlyphsApp import *
+
+
+class _ColorFlowLoaderBar(AppKit.NSView):
+	# A self-contained "rainbow fill" loading bar for the report-generation sheet:
+	# the workflow colours fill a rounded track 0->100% with an eased motion and a
+	# live percentage. Progress is time-based, so the brief main-thread block while
+	# the report builds just skips the fill ahead rather than desyncing. Drawn with
+	# Core Graphics in an NSView, driven by a 30 Hz NSTimer added to the common
+	# run-loop modes so it keeps ticking while the sheet is presented.
+	_SPECTRUM = (0, 1, 3, 4, 5, 6, 8, 9)   # red->green->blue->purple->pink (skip browns/greys)
+
+	@objc.python_method
+	def configure(self, rgba_colors: list, fill: float = 1.1) -> None:
+		import time
+		self._colors = [rgba_colors[i] for i in self._SPECTRUM if i < len(rgba_colors)]
+		if not self._colors:
+			self._colors = list(rgba_colors)
+		self._fill = float(fill)
+		self._t0 = time.monotonic()
+		self.start()
+
+	@objc.python_method
+	def start(self) -> None:
+		self.stop()
+		self._timer = AppKit.NSTimer.timerWithTimeInterval_target_selector_userInfo_repeats_(
+			1.0 / 30.0, self, "tick:", None, True)
+		NSRunLoop.currentRunLoop().addTimer_forMode_(self._timer, NSRunLoopCommonModes)
+
+	@objc.python_method
+	def stop(self) -> None:
+		timer = getattr(self, "_timer", None)
+		if timer is not None:
+			try:
+				timer.invalidate()
+			except Exception:
+				pass
+		self._timer = None
+
+	def tick_(self, timer: Any) -> None:
+		self.setNeedsDisplay_(True)
+
+	def viewDidMoveToWindow(self) -> None:
+		if self.window() is None:
+			self.stop()
+
+	@objc.python_method
+	def _progress(self) -> float:
+		import time
+		t0 = getattr(self, "_t0", None)
+		if t0 is None:
+			return 0.0
+		fill = getattr(self, "_fill", 1.1)
+		raw = (time.monotonic() - t0) / fill if fill > 0 else 1.0
+		raw = 0.0 if raw < 0.0 else (1.0 if raw > 1.0 else raw)
+		return 1.0 - (1.0 - raw) ** 3   # easeOutCubic
+
+	def drawRect_(self, dirtyRect: Any) -> None:
+		colors = getattr(self, "_colors", None) or []
+		prog = self._progress()
+		bounds = self.bounds()
+		width = bounds.size.width
+		height = bounds.size.height
+		bar_h = 16.0
+		bar_y = height - bar_h
+		radius = bar_h / 2.0
+		bar_rect = AppKit.NSMakeRect(0.0, bar_y, width, bar_h)
+		track = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(bar_rect, radius, radius)
+		AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(0.137, 0.149, 0.180, 1.0).set()
+		track.fill()
+		if colors and prog > 0.0:
+			context = AppKit.NSGraphicsContext.currentContext()
+			context.saveGraphicsState()
+			track.addClip()
+			count = len(colors)
+			seg = width / count
+			filled = prog * width
+			for index in range(count):
+				seg_x = index * seg
+				seg_w = filled - seg_x
+				if seg_w <= 0.0:
+					break
+				if seg_w > seg:
+					seg_w = seg
+				rgba = colors[index]
+				AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(rgba[0], rgba[1], rgba[2], 1.0).set()
+				AppKit.NSRectFill(AppKit.NSMakeRect(seg_x, bar_y, seg_w, bar_h))
+			top = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(1.0, 1.0, 1.0, 0.22)
+			bottom = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(0.0, 0.0, 0.0, 0.16)
+			sheen = AppKit.NSGradient.alloc().initWithStartingColor_endingColor_(top, bottom)
+			if sheen is not None:
+				sheen.drawInRect_angle_(bar_rect, -90.0)
+			context.restoreGraphicsState()
+		paragraph = AppKit.NSMutableParagraphStyle.alloc().init()
+		paragraph.setAlignment_(AppKit.NSTextAlignmentCenter)
+		attributes = {
+			AppKit.NSForegroundColorAttributeName: AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(0.60, 0.63, 0.67, 1.0),
+			AppKit.NSFontAttributeName: AppKit.NSFont.systemFontOfSize_(11.0),
+			AppKit.NSParagraphStyleAttributeName: paragraph,
+		}
+		label = AppKit.NSAttributedString.alloc().initWithString_attributes_(
+			f"{int(round(prog * 100))}%", attributes)
+		label.drawInRect_(AppKit.NSMakeRect(0.0, 0.0, width, bar_y - 2.0))
 
 
 class ColorFlow(PalettePlugin):
@@ -662,14 +764,16 @@ class ColorFlow(PalettePlugin):
 			label = AppKit.NSTextField.labelWithString_("Generating Color Flow report\u2026")
 			label.setFrame_(AppKit.NSMakeRect(20, 60, 260, 18))
 			content.addSubview_(label)
-			bar = AppKit.NSProgressIndicator.alloc().initWithFrame_(AppKit.NSMakeRect(20, 32, 260, 16))
-			bar.setStyle_(AppKit.NSProgressIndicatorStyleBar)
-			bar.setIndeterminate_(True)
-			bar.startAnimation_(None)
-			content.addSubview_(bar)
+			loader = _ColorFlowLoaderBar.alloc().initWithFrame_(AppKit.NSMakeRect(20, 22, 260, 34))
+			loader.configure(labelcolors.read_label_colors())
+			content.addSubview_(loader)
+			self._reportLoader = loader
 			self._reportPanel = panel
 			parent.beginSheet_completionHandler_(panel, None)
-			self.performSelector_withObject_afterDelay_("runReportGeneration:", None, 0.1)
+			# Pre-roll the colour-fill (~1.1s) so it is actually seen: the synchronous
+			# report build briefly blocks the main thread and freezes the timer, so we
+			# let the bar fill first, then build + dismiss on the next run-loop hop.
+			self.performSelector_withObject_afterDelay_("runReportGeneration:", None, 1.15)
 		except Exception:
 			import traceback
 			print("Color Flow [report sheet] error:\n" + traceback.format_exc())
@@ -683,6 +787,13 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _dismiss_report_sheet(self) -> None:
+		loader = getattr(self, "_reportLoader", None)
+		if loader is not None:
+			try:
+				loader.stop()
+			except Exception:
+				pass
+			self._reportLoader = None
 		panel = getattr(self, "_reportPanel", None)
 		if panel is None:
 			return
