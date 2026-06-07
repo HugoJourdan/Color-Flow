@@ -89,8 +89,8 @@ body.ready{opacity:1;transition:opacity .35s ease}
 #cfd-main{display:flex;gap:24px;align-items:flex-start}
 #cfd-tower{position:sticky;top:14px;flex:0 0 240px;width:240px}
 #cfd-tower canvas{display:block;width:240px;height:560px;cursor:pointer}
-#cfd-body{flex:1 1 auto;min-width:0}
-@media (max-width:780px){#cfd-main{flex-direction:column}#cfd-tower{position:static;width:100%;flex:0 0 auto}#cfd-tower canvas{margin:0 auto}}
+#cfd-body{flex:1 1 auto;min-width:0;max-height:calc(100vh - 120px);overflow-y:auto;padding-right:6px}
+@media (max-width:780px){#cfd-main{flex-direction:column}#cfd-tower{position:static;width:100%;flex:0 0 auto}#cfd-tower canvas{margin:0 auto}#cfd-body{max-height:none;overflow:visible;padding-right:0}}
 .hd{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:14px 0;background:var(--bg);border-bottom:1px solid var(--border)}
 .hd .fam-logo{height:22px;width:auto;color:var(--text);display:block}
 .hd .fam{font-weight:600}
