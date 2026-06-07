@@ -2652,7 +2652,7 @@ DASHBOARD_JS = r"""
       }
       var bl=document.createElement("canvas"); bl.width=bl.height=Math.round(FS*dpr); var bg=bl.getContext("2d");
       bg.setTransform(dpr,0,0,dpr,0,0);
-      bg.filter="blur(13px) saturate(1.6) brightness(0.92)"; bg.drawImage(off,0,0,FS,FS);
+      bg.filter="blur("+Math.round(FS*0.0625)+"px) saturate(1.6) brightness(0.92)"; bg.drawImage(off,0,0,FS,FS);
       bg.filter="none"; bg.globalCompositeOperation="destination-in";
       bg.fillStyle="#000"; bg.beginPath(); bg.arc(FS/2,FS/2,FS*0.5,0,7); bg.fill();
       bg.globalCompositeOperation="source-over";
