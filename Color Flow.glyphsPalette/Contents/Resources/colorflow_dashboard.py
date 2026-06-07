@@ -1,4 +1,3 @@
-# encoding: utf-8
 """Color Font Dashboard — data model + entry point for Color Flow's report.
 
 Summarises, per master, how the font's glyphs are distributed across the Color
@@ -38,11 +37,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import quote
-import colornames
+
 import colorflow_assets
+import colorflow_recipes
+import colornames
 import glyphsvg
 import labelcolors
-import colorflow_recipes
 
 try:
     from GlyphsApp import Glyphs, Message  # type: ignore[import]
@@ -560,7 +560,7 @@ def _outline_cache_store(font, cache: dict) -> None:
         pass
 
 
-def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free: bool) -> dict:
+def _outline_paths(font, glyph_names: list) -> dict:
     """Per-master ``{glyph_name: {"d", "vb"}}`` of glyph outlines for the heatmap
     cells (every glyph in font order, so any shown cell can draw its letter), each
     entry sharing the master's em box.
@@ -569,8 +569,7 @@ def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free:
     ``lastChange`` — their own or a component they draw — is newer than the cache
     are re-extracted, so regenerating the report after a few edits is near-instant
     instead of re-walking every layer. Bounded by a TOTAL outline budget so very
-    large fonts keep the report a sane size. ``current``/``order``/``is_free`` are
-    kept for signature stability."""
+    large fonts keep the report a sane size."""
     budget = 100000   # global ceiling on emitted outlines, generous so every glyph draws
     ems = _em_boxes(font)
     master_ids = list(ems.keys())
@@ -593,9 +592,13 @@ def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free:
         stamp = _effective_stamp(font, glyph, master_ids)
         cached = entries.get(name)
         by_master: dict | None = None
+        # A cache hit is: same stamp AND the same master set was EXAMINED last time.
+        # The master set is already pinned by the signature, so an empty ``m`` (an
+        # inkless or partial-master glyph that produced no outline anywhere) is a
+        # valid hit — otherwise such glyphs would be re-extracted every run.
         if (isinstance(cached, dict) and stamp is not None and cached.get("t") == stamp
                 and isinstance(cached.get("m"), dict)
-                and all(mid in cached["m"] for mid in master_ids)):
+                and cached.get("masters") == master_ids):
             by_master = cached["m"]
         if by_master is None:
             by_master = {}
@@ -607,7 +610,7 @@ def _outline_paths(font, current: dict, glyph_names: list, order: list, is_free:
                 outline = glyphsvg.layer_outline_em(layer, ems[master_id]) if layer is not None else {}
                 if outline:
                     by_master[master_id] = outline
-            entries[name] = {"t": stamp, "m": by_master}
+            entries[name] = {"t": stamp, "masters": master_ids, "m": by_master}
             dirty = True
         for master_id, outline in by_master.items():
             if produced >= budget:
@@ -666,8 +669,10 @@ def _family_logo(font) -> dict:
     """The family name set in the font's own glyphs (via :func:`_logo_master`) as a
     single ``{"d", "vb"}`` outline, so the report header shows the typeface in
     itself. ``{}`` when it can't be drawn (no master / name / matching glyphs)."""
+    if font is None:
+        return {}
     master = _logo_master(font)
-    name = (font.familyName or "") if font is not None else ""
+    name = font.familyName or ""
     if master is None or not name:
         return {}
     upm = float(getattr(font, "upm", None) or 1000.0)
@@ -893,9 +898,15 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
             "preview": previews.get(master.id, {}),
         })
 
-    paths = _outline_paths(font, current, glyph_names, order, is_free)
+    paths = _outline_paths(font, glyph_names)
 
-    history = load_history(font)
+    # Fold today's live snapshot into the loaded history under today's date BEFORE
+    # deriving trend/forecast/journeys/streak, so the first run already shows a
+    # trend point for today and later runs reflect today's data rather than the
+    # previous capture (record_history persists the same snapshot afterwards, and
+    # its same-day-overwrite keeps re-running the same day idempotent).
+    today = now.strftime("%Y-%m-%d")
+    history = {**load_history(font), today: current}
     series = history_series(history, order, is_free)
     dates = [point["date"] for point in series]
     trend = {
@@ -903,7 +914,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "forecast": {master.id: forecast_master(series, master.id, glyph_total, now, is_free)
                      for master in font.masters},
         "dates": dates,
-        "today": now.strftime("%Y-%m-%d"),
+        "today": today,
         "streak": progress_streak(history, order, is_free),
     }
     journeys = _glyph_journeys(history, dates, current, glyph_names, order, is_free)

@@ -9,19 +9,19 @@ only thing left to manual testing is the real ``from GlyphsApp import ...`` line
 from __future__ import annotations
 
 from datetime import datetime
+from typing import SupportsIndex, overload
 
-import colornames as cc
 import colorflow_dashboard as db
-
+import colornames as cc
 
 # --------------------------------------------------------------------------- #
 # Fakes
 # --------------------------------------------------------------------------- #
 
-class _FakeLayers(dict):
+class _FakeLayers(dict[str, "_FakeLayerColor | None"]):
     """Glyphs returns ``None`` for a master with no layer, not KeyError."""
 
-    def __getitem__(self, key) -> object:
+    def __getitem__(self, key: str) -> _FakeLayerColor | None:
         return self.get(key)
 
 
@@ -29,6 +29,13 @@ class _FakeGlyph:
     def __init__(self, name: str, layers: dict) -> None:
         self.name = name
         self.layers = _FakeLayers(layers)
+        # Dynamic GSGlyph fields the dashboard reads; tests set them as needed.
+        self.lastChange: object | None = None
+        self.script: str | None = None
+        self.category: str | None = None
+        self.subCategory: str | None = None
+        self.case: str | None = None
+        self.unicode: str | None = None
 
 
 class _FakeMaster:
@@ -37,11 +44,18 @@ class _FakeMaster:
         self.name = name
 
 
-class _FakeGlyphs(list):
+class _FakeGlyphs(list["_FakeGlyph"]):
     """Mirrors ``GSFont.glyphs``: int indexing + iteration like a list, plus
     name indexing (``font.glyphs["A"]``) that returns ``None`` when absent."""
 
-    def __getitem__(self, key) -> object:
+    @overload
+    def __getitem__(self, key: SupportsIndex) -> _FakeGlyph: ...
+    @overload
+    def __getitem__(self, key: slice) -> list[_FakeGlyph]: ...
+    @overload
+    def __getitem__(self, key: str) -> _FakeGlyph | None: ...
+
+    def __getitem__(self, key: SupportsIndex | slice | str) -> _FakeGlyph | list[_FakeGlyph] | None:
         if isinstance(key, str):
             return next((glyph for glyph in self if glyph.name == key), None)
         return super().__getitem__(key)
@@ -57,6 +71,9 @@ class _FakeFont:
         self.glyphs = _FakeGlyphs(glyphs if glyphs is not None else [])
         self.filepath = filepath
         self.familyName = family
+        # The per-session outline cache lives here (a JSON string per key); tests
+        # that exercise the cache assign a plain dict.
+        self.tempData: dict[str, object] = {}
 
 
 class _Defaults(dict):
@@ -492,6 +509,9 @@ class _FakeLayerColor:
     def __init__(self, color: int | None, width: float = 500.0) -> None:
         self.color = color
         self.width = width
+        # Dynamic GSLayer fields the outline/cache paths read; set by tests.
+        self.drawBezierPath: object | None = None
+        self.components: list[_FakeComponent] = []
 
 
 # --------------------------------------------------------------------------- #
@@ -611,7 +631,7 @@ class _BezPath:
     def elementCount(self) -> int:
         return len(self._elements)
 
-    def elementAtIndex_associatedPoints_(self, index: int):
+    def elementAtIndex_associatedPoints_(self, index: int) -> tuple[int, list[_BezPoint]]:
         element_type, points = self._elements[index]
         return element_type, [_BezPoint(x, y) for x, y in points]
 
@@ -640,17 +660,18 @@ def _cache_font(glyph: _FakeGlyph) -> _FakeFont:
 
 
 def test_outline_cache_reuses_unchanged_glyph_and_invalidates_on_lastchange() -> None:
-    glyph = _FakeGlyph("A", {"m1": _outline_with(400, 700)})
+    layer = _outline_with(400, 700)
+    glyph = _FakeGlyph("A", {"m1": layer})
     glyph.lastChange = _FakeNSDate(100.0)
     font = _cache_font(glyph)
-    first = db._outline_paths(font, {}, ["A"], ["0"], True)["m1"]["A"]["d"]
+    first = db._outline_paths(font, ["A"])["m1"]["A"]["d"]
     # change the outline but keep lastChange -> the cache must serve the OLD outline
-    glyph.layers["m1"].drawBezierPath = _BezPath([(0, [(0, 0)]), (1, [(999, 0)]), (1, [(999, 9)]), (3, [])])
-    reused = db._outline_paths(font, {}, ["A"], ["0"], True)["m1"]["A"]["d"]
+    layer.drawBezierPath = _BezPath([(0, [(0, 0)]), (1, [(999, 0)]), (1, [(999, 9)]), (3, [])])
+    reused = db._outline_paths(font, ["A"])["m1"]["A"]["d"]
     assert reused == first
     # bump lastChange -> re-extract, picking up the new outline
     glyph.lastChange = _FakeNSDate(200.0)
-    fresh = db._outline_paths(font, {}, ["A"], ["0"], True)["m1"]["A"]["d"]
+    fresh = db._outline_paths(font, ["A"])["m1"]["A"]["d"]
     assert fresh != first
 
 
@@ -663,28 +684,32 @@ def test_outline_cache_invalidates_composite_when_a_base_changes() -> None:
     acute.lastChange = _FakeNSDate(100.0)
     font = _FakeFont([_FakeMaster("m1", "R")], [base, acute])
     font.tempData = {}
-    first = db._outline_paths(font, {}, ["A", "Aacute"], ["0"], True)["m1"]["Aacute"]["d"]
+    first = db._outline_paths(font, ["A", "Aacute"])["m1"]["Aacute"]["d"]
     # the composite's OWN lastChange is unchanged, but the base it draws changed
-    acute.layers["m1"].drawBezierPath = _BezPath([(0, [(0, 0)]), (1, [(800, 0)]), (1, [(800, 8)]), (3, [])])
+    composite_layer.drawBezierPath = _BezPath([(0, [(0, 0)]), (1, [(800, 0)]), (1, [(800, 8)]), (3, [])])
     base.lastChange = _FakeNSDate(300.0)
-    second = db._outline_paths(font, {}, ["A", "Aacute"], ["0"], True)["m1"]["Aacute"]["d"]
+    second = db._outline_paths(font, ["A", "Aacute"])["m1"]["Aacute"]["d"]
     assert second != first   # component dependency forced a re-extract
 
 
 def test_outline_cache_never_reuses_glyph_without_lastchange() -> None:
-    glyph = _FakeGlyph("A", {"m1": _outline_with(400, 700)})   # foundry-disabled lastChange
+    layer = _outline_with(400, 700)
+    glyph = _FakeGlyph("A", {"m1": layer})   # foundry-disabled lastChange
     font = _cache_font(glyph)
-    first = db._outline_paths(font, {}, ["A"], ["0"], True)["m1"]["A"]["d"]
-    glyph.layers["m1"].drawBezierPath = _BezPath([(0, [(0, 0)]), (1, [(700, 0)]), (1, [(700, 7)]), (3, [])])
-    second = db._outline_paths(font, {}, ["A"], ["0"], True)["m1"]["A"]["d"]
+    first = db._outline_paths(font, ["A"])["m1"]["A"]["d"]
+    layer.drawBezierPath = _BezPath([(0, [(0, 0)]), (1, [(700, 0)]), (1, [(700, 7)]), (3, [])])
+    second = db._outline_paths(font, ["A"])["m1"]["A"]["d"]
     assert second != first   # no stamp -> can't prove unchanged -> always re-extract
 
 
 def test_logo_master_prefers_regular_then_bold_then_first() -> None:
     thin, bold, reg = _FakeMaster("t", "Thin"), _FakeMaster("b", "Bold"), _FakeMaster("r", "Regular")
-    assert db._logo_master(_FakeFont([thin, bold, reg], [])).id == "r"
-    assert db._logo_master(_FakeFont([thin, bold], [])).id == "b"
-    assert db._logo_master(_FakeFont([thin], [])).id == "t"
+    regular = db._logo_master(_FakeFont([thin, bold, reg], []))
+    boldest = db._logo_master(_FakeFont([thin, bold], []))
+    only = db._logo_master(_FakeFont([thin], []))
+    assert regular is not None and regular.id == "r"
+    assert boldest is not None and boldest.id == "b"
+    assert only is not None and only.id == "t"
     assert db._logo_master(_FakeFont([], [])) is None
 
 
@@ -741,3 +766,122 @@ def test_build_model_preview_empty_without_outlines(tmp_path) -> None:
     current = db.build_master_glyph_colors(font)
     model = db.build_model(font, datetime(2026, 6, 5), current, current)
     assert model["masters"][0]["preview"] == {}
+
+
+# --------------------------------------------------------------------------- #
+# Outline cache — inkless / partial-master glyphs must be cache HITS (not
+# re-extracted forever). Probe: count real outline extractions per run.
+# --------------------------------------------------------------------------- #
+
+def _counting_extractor(monkeypatch) -> list[int]:
+    """Patch ``glyphsvg.layer_outline_em`` to count calls; returns a 1-elem list
+    used as a mutable counter (calls[0])."""
+    real = db.glyphsvg.layer_outline_em
+    calls = [0]
+
+    def counted(layer: object, em_height: float) -> dict:
+        calls[0] += 1
+        return real(layer, em_height)
+
+    monkeypatch.setattr(db.glyphsvg, "layer_outline_em", counted)
+    return calls
+
+
+def test_outline_cache_hits_inkless_glyph_on_second_run(monkeypatch) -> None:
+    # A glyph whose layer produces NO ink (no drawBezierPath) but carries a stamp:
+    # its cached ``m`` is empty, yet the second run with an unchanged stamp must be
+    # a HIT, never re-extracting (the old all()-in-cache guard never matched).
+    glyph = _FakeGlyph("space", {"m1": _FakeLayerColor(None)})   # layer present, no outline
+    glyph.lastChange = _FakeNSDate(100.0)
+    font = _cache_font(glyph)
+    calls = _counting_extractor(monkeypatch)
+    assert db._outline_paths(font, ["space"]) == {"m1": {}}      # no ink anywhere
+    assert calls[0] == 1                                         # examined once on run 1
+    calls[0] = 0
+    assert db._outline_paths(font, ["space"]) == {"m1": {}}
+    assert calls[0] == 0                                         # run 2 is a cache hit
+
+
+def test_outline_cache_hits_partial_master_glyph_on_second_run(monkeypatch) -> None:
+    # Ink in m1 only, none in m2 (a partial-master glyph). The cached ``m`` omits
+    # m2, but the master set was fully EXAMINED, so the second run is a HIT.
+    glyph = _FakeGlyph("A", {"m1": _outline_with(400, 700), "m2": _FakeLayerColor(0)})
+    glyph.lastChange = _FakeNSDate(100.0)
+    font = _FakeFont([_FakeMaster("m1", "R"), _FakeMaster("m2", "B")], [glyph])
+    font.tempData = {}
+    calls = _counting_extractor(monkeypatch)
+    first = db._outline_paths(font, ["A"])
+    assert "A" in first["m1"] and "A" not in first["m2"]         # only m1 has ink
+    assert calls[0] == 2                                         # both masters examined run 1
+    calls[0] = 0
+    second = db._outline_paths(font, ["A"])
+    assert second == first
+    assert calls[0] == 0                                         # run 2 re-extracts nothing
+
+
+def test_component_deps_handles_cyclic_reference(monkeypatch) -> None:
+    # a -> b -> a: a self-referential component cycle must terminate (the ``seen``
+    # set breaks it) rather than recursing forever, and still report both bases.
+    layer_a = _outline_with(100, 100)
+    layer_a.components = [_FakeComponent("b")]
+    layer_b = _outline_with(100, 100)
+    layer_b.components = [_FakeComponent("a")]
+    glyph_a = _FakeGlyph("a", {"m1": layer_a})
+    glyph_b = _FakeGlyph("b", {"m1": layer_b})
+    font = _FakeFont([_FakeMaster("m1", "R")], [glyph_a, glyph_b])
+    deps = db._component_deps(font, glyph_a, ["m1"], set())
+    assert deps == {"a", "b"}                                    # both reached, no infinite loop
+    # the cycle must not crash the cache walk either
+    font.tempData = {}
+    paths = db._outline_paths(font, ["a", "b"])
+    assert "a" in paths["m1"] and "b" in paths["m1"]
+
+
+def test_build_model_folds_today_into_trend_on_first_run(monkeypatch, tmp_path) -> None:
+    # First run with EMPTY persisted history must still yield a trend point for
+    # today (build_model folds the live snapshot in before deriving the series).
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    (tmp_path / "colorNames.txt").write_text("purple=A\nyellow=Done\n", encoding="utf-8")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(3)}),   # at final step
+              _FakeGlyph("B", {"m1": _FakeLayerColor(8)})]   # started, not final
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs, filepath=str(tmp_path / "F.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    assert db.load_history(font) == {}                         # nothing persisted yet
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    series = model["trend"]["series"]
+    assert [point["date"] for point in series] == ["2026-06-05"]   # today present
+    assert series[-1]["masters"]["m1"]["final"] == 1               # A reached the final step
+
+
+def test_build_model_latest_series_point_is_todays_data_not_prior_capture(
+        monkeypatch, tmp_path) -> None:
+    # Persisted history already holds an EARLIER capture for today; the run's
+    # latest series point must reflect today's live ``current``, not that capture.
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    (tmp_path / "colorNames.txt").write_text("purple=A\nyellow=Done\n", encoding="utf-8")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(3)}),
+              _FakeGlyph("B", {"m1": _FakeLayerColor(3)})]    # both at final step now
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs, filepath=str(tmp_path / "F.glyphs"))
+    now = datetime(2026, 6, 5)
+    # an earlier capture of the SAME day, with both glyphs still uncoloured
+    db.record_history(font, {"m1": {"A": cc.NO_COLOR, "B": cc.NO_COLOR}}, now)
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, now, current, current)
+    series = model["trend"]["series"]
+    assert series[-1]["date"] == "2026-06-05"
+    assert series[-1]["masters"]["m1"]["final"] == 2          # live data (both final), not 0
+
+
+def test_build_model_empty_font_does_not_crash(monkeypatch, tmp_path) -> None:
+    # No glyphs and no masters: build_model must produce a sane, empty-ish model
+    # rather than raise (glyphTotal == 0, no masters to index).
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    (tmp_path / "colorNames.txt").write_text("red=R\n", encoding="utf-8")
+    font = _FakeFont([], [], filepath=str(tmp_path / "Empty.glyphs"))
+    current = db.build_master_glyph_colors(font)            # {} -> no masters
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["glyphTotal"] == 0
+    assert model["glyphNames"] == [] and model["masters"] == []
+    assert model["paths"] == {} and model["coverage"]["byScript"] == {}
+    assert model["trend"]["forecast"] == {}                # no masters -> no forecasts
+    assert model["trend"]["series"][-1]["date"] == "2026-06-05"   # today still folded in
