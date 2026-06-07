@@ -100,6 +100,26 @@ def test_visible_labels_excludes_empty_labels() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# final_visible_step
+# --------------------------------------------------------------------------- #
+
+def test_final_visible_step_returns_last_visible_key() -> None:
+    meaning = cc.parse_color_names("red=Rough\nyellow=Refine\norange=Done\n")
+    assert cc.final_visible_step(meaning) == "1"   # orange = index 1
+
+
+def test_final_visible_step_ignores_trailing_hidden_steps() -> None:
+    # purple has an empty label -> hidden; the final step is the last *labelled* one
+    meaning = cc.parse_color_names("red=Start\ndarkGreen=Done\npurple=\n")
+    assert cc.final_visible_step(meaning) == "5"   # darkGreen = index 5
+
+
+def test_final_visible_step_returns_none_when_no_visible_steps() -> None:
+    assert cc.final_visible_step({}) is None
+    assert cc.final_visible_step(cc.parse_color_names("red=\norange=\n")) is None
+
+
+# --------------------------------------------------------------------------- #
 # key-file resolution
 # --------------------------------------------------------------------------- #
 

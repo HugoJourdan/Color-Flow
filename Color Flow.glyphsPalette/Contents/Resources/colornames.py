@@ -135,6 +135,19 @@ def visible_labels(meaning: dict[str, str]) -> dict[str, str]:
     return {index: label for index, label in meaning.items() if label}
 
 
+def final_visible_step(meaning: dict[str, str]) -> str | None:
+    """The index string of the last visible workflow step, or ``None``.
+
+    "Final" is the highest-ranked visible step in workflow order — the last
+    non-empty-labelled line of ``colorNames.txt``. Shared by the palette and the
+    jump shortcut so "finished" means the same thing in both halves.
+    """
+    visible = visible_labels(meaning)
+    if not visible:
+        return None
+    return list(visible.keys())[-1]
+
+
 def default_state(order: list[str]) -> dict[str, bool]:
     """A fresh per-layer Color Flow state: every step unchecked, in order."""
     return {index: False for index in order}
