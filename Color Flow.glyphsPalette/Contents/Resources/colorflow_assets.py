@@ -410,7 +410,13 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-scrub-bar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .tl-scrub-play{flex:0 0 auto}
 .tl-scrub-play[disabled]{opacity:.5;cursor:not-allowed}
-.tl-scrub{flex:1 1 auto;min-width:0;accent-color:var(--accent);color-scheme:dark light}
+.tl-scrub-wrap{flex:1 1 auto;min-width:0;position:relative}
+.tl-scrub-wrap .tl-scrub{width:100%;display:block}
+.tl-scrub{accent-color:var(--accent);color-scheme:dark light}
+.tl-scrub-ticks{position:relative;height:20px;margin:1px 7px 0;pointer-events:none}
+.tl-tick{position:absolute;top:0;width:1px;height:5px;background:var(--border-2);transform:translateX(-50%)}
+.tl-tick-lab{height:7px;background:var(--muted-2)}
+.tl-tick-d{position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:9px;line-height:1;color:var(--muted-2);white-space:nowrap;font-variant-numeric:tabular-nums}
 .tl-scrub-date{flex:0 0 auto;font-size:var(--fs-xs);color:var(--text);font-variant-numeric:tabular-nums;min-width:54px;text-align:right}
 .tl-scrub-diff{flex:0 0 auto;font-size:var(--fs-xs);font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
 .tl-scrub-diff .du{color:var(--ok)}
@@ -1883,12 +1889,27 @@ DASHBOARD_JS = r"""
         + ' title="'+esc(name)+'" aria-hidden="true">'+inner+'</span>';
     }).join("");
     var canPlay = dates.length >= 3;            // autoplay needs >=3 snapshots
+    // One tick per snapshot, aligned to the thumb travel; date labels thinned to ~6 so
+    // they don't overlap. The ticks are purely visual (the live date is the chip at right).
+    var n = dates.length, lastI = n - 1;
+    var labelStep = Math.max(1, Math.ceil(lastI / 5));   // aim for <=6 dated ticks
+    var ticks = "";
+    for (var ti=0; ti<n; ti++){
+      var leftPct = lastI > 0 ? (ti / lastI * 100) : 0;
+      var labeled = (ti % labelStep === 0) || (ti === lastI && lastI % labelStep !== 0);
+      ticks += '<span class="tl-tick'+(labeled?" tl-tick-lab":"")+'" style="left:'+leftPct.toFixed(2)+'%">'
+        + (labeled ? '<span class="tl-tick-d">'+esc(dateLabel(dates[ti]))+'</span>' : '')
+        + '</span>';
+    }
     var controls = '<div class="tl-scrub-bar">'
       + '<button type="button" class="chip tl-scrub-play" aria-pressed="false"'
       + (canPlay ? "" : ' disabled aria-disabled="true" title="Needs at least 3 snapshots"')
       + '>▶ Play</button>'
-      + '<input type="range" class="tl-scrub" min="0" max="'+(dates.length-1)+'" step="1" value="'+idx+'"'
+      + '<div class="tl-scrub-wrap">'
+      + '<input type="range" class="tl-scrub" min="0" max="'+lastI+'" step="1" value="'+idx+'"'
       + ' aria-label="Scrub through snapshot history" aria-valuetext="'+esc(dateLabel(dates[idx]))+'"/>'
+      + '<div class="tl-scrub-ticks" aria-hidden="true">'+ticks+'</div>'
+      + '</div>'
       + '<span class="tl-scrub-date" aria-live="polite">'+esc(dateLabel(dates[idx]))+'</span>'
       // #12: live "+A, -R today" chip near the slider; filled by scrubRecolour.
       + '<span class="tl-scrub-diff" aria-live="polite"></span>'

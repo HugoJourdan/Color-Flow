@@ -1086,6 +1086,17 @@ def test_dashboard_css_styles_scrub_diff_flash() -> None:
     assert ".tl-machine-grid .cell{transition:none}" in rm_block
 
 
+def test_dashboard_scrub_slider_has_dated_ticks() -> None:
+    js = assets.DASHBOARD_JS
+    machine = js.split("function timeMachine(")[1].split("\n  function ")[0]
+    assert 'class="tl-scrub-wrap"' in machine          # slider wrapped for tick alignment
+    assert 'class="tl-scrub-ticks"' in machine         # tick row under the slider
+    assert "tl-tick-d" in machine                       # dated tick labels
+    assert "dateLabel(dates[ti])" in machine            # labels reuse the shared formatter
+    css = assets.DASHBOARD_CSS
+    assert ".tl-scrub-ticks{" in css and ".tl-tick{" in css and ".tl-tick-d{" in css
+
+
 def test_dashboard_js_has_seed_state_builder() -> None:
     """#20: the bland "not enough history" line is replaced by a seed-state builder.
     timelineView routes to it whenever hasTrend() is false (<2 snapshots) AND for the
