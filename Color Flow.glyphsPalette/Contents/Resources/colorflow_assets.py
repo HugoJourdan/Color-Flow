@@ -953,9 +953,7 @@ DASHBOARD_JS = r"""
       }
       vt = Math.max(0, Math.min(maxTop, vt));
       if (focusAmt.length!==M){ focusAmt=[]; for (var z=0;z<M;z++) focusAmt[z]=(z===sel?0:1); }
-      for (var i=0;i<M;i++){ var target=(sel<0 || i===sel)?0:1;
-        if (target>focusAmt[i]) focusAmt[i]=target;                       // off: instant
-        else { focusAmt[i]+=(target-focusAmt[i])*0.07; if (focusAmt[i]-target<0.003) focusAmt[i]=target; } }
+      for (var i=0;i<M;i++){ focusAmt[i] = (sel<0 || i===sel) ? 0 : 1; }   // instant switch, no fade
       var rx=Math.min(92, W*0.42), ry=rx*tilt;
       var topY=ry+16, botPad=ry+12;
       var dz=VISIBLE>1?Math.min(60,(Hc-topY-botPad)/(VISIBLE-1)):0, cx=W/2;
