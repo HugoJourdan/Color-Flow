@@ -1113,8 +1113,23 @@ DASHBOARD_JS = r"""
       bg.globalCompositeOperation="source-over";
       return bl;
     }
-    var FIELDS = H.masters.map(function(m){ return buildField(countsOf(m), m.uncolored||0); });
-    var EMPTY = H.masters.map(function(m){ var c=countsOf(m),s=0,i; for(i=0;i<12;i++)s+=c[i]; return (s+(m.uncolored||0))===0; });
+    // When a colour is focused (clicked in a progress bar), each disc shows only
+    // that colour's share; everything else folds into the uncoloured grey. fk<0
+    // or null restores the full label distribution.
+    function focusedCounts(m, fk){
+      var c = countsOf(m);
+      if (fk==null) return { counts:c, uncolored:(m.uncolored||0) };                          // no focus -> full distribution
+      if (fk<0 || fk>11) return { counts:[0,0,0,0,0,0,0,0,0,0,0,0], uncolored:(m.uncolored||0) };  // None focused -> grey share only
+      var only=[0,0,0,0,0,0,0,0,0,0,0,0]; only[fk]=c[fk];
+      return { counts:only, uncolored:(H.glyphTotal||0)-c[fk] };                               // one colour -> its wedge + grey rest
+    }
+    var FIELDS, EMPTY;
+    function buildFields(fk){
+      FIELDS = H.masters.map(function(m){ var d=focusedCounts(m,fk); return buildField(d.counts, d.uncolored); });
+      EMPTY = H.masters.map(function(m){ var d=focusedCounts(m,fk), s=0, i; for(i=0;i<12;i++) s+=d.counts[i]; return (s+d.uncolored)===0; });
+    }
+    var curFocus = (state.focus==null?null:state.focus);
+    buildFields(curFocus);
     var FROST = (function(){
       var c=document.createElement("canvas"); c.width=c.height=FS; var g=c.getContext("2d");
       for (var k=0;k<1600;k++){ var x=Math.random()*FS,y=Math.random()*FS,r=Math.random()*1.6+0.3;
@@ -1234,7 +1249,11 @@ DASHBOARD_JS = r"""
     }
     fit();
     window.addEventListener("resize", fit);
-    function loop(){ rot+=0.008; render(); requestAnimationFrame(loop); }
+    function loop(){
+      var fk = (state.focus==null?null:state.focus);
+      if (fk!==curFocus){ curFocus=fk; buildFields(curFocus); }   // colour focus changed -> refilter discs
+      rot+=0.008; render(); requestAnimationFrame(loop);
+    }
     cv.addEventListener("wheel", function(e){ e.preventDefault();
       vt += e.deltaY*0.02; vt=Math.max(0, Math.min(Math.max(0,H.masters.length-VISIBLE), vt));
     }, {passive:false});
