@@ -1484,18 +1484,16 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			pass
 
-	def headerTick_(self, sender):
-		self._sync_header()
-
 	# Inject a colour bar into the palette SECTION HEADER (#23). Done deferred so
 	# the palette is docked first, then the whole window is searched for the title.
+	# The header is kept in sync by update() -> _sync_header on every
+	# UPDATEINTERFACE; we deliberately avoid a repeating NSTimer here because a
+	# scheduled timer with target=self retains the instance, which would prevent
+	# __del__ from ever running and leak every callback/observer on reload.
 	def deferredHeaderSetup_(self, sender):
 		try:
 			self._inject_title_bar()
 			self._update_title_bar()
-			if getattr(self, "_headerTimer", None) is None:
-				from Foundation import NSTimer
-				self._headerTimer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(0.5, self, "headerTick:", None, True)
 		except Exception:
 			import traceback
 			print("Color Flow [header setup] error:\n" + traceback.format_exc())
@@ -1873,11 +1871,6 @@ class ColorFlow(PalettePlugin):
 	def __del__(self):
 		# Delete callbacks when Glyphs quits, otherwise it'll crash :(
 		Glyphs.removeCallback(self.update)
-		try:
-			if getattr(self, "_headerTimer", None) is not None:
-				self._headerTimer.invalidate()
-		except Exception:
-			pass
 		# Remove the Rainbow Font View menu item this instance added.
 		self._teardown_rainbow_menu()
 		self._teardown_settings_menu()
