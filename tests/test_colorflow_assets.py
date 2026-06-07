@@ -389,8 +389,9 @@ def test_dashboard_js_has_streamgraph_builder() -> None:
     """#5: a Line/Flow toggle (default Line) swaps the per-master line chart for a
     stacked-area colour streamgraph. The streamgraph builder tallies per-step counts
     per date by calling stateAt over H.trend.dates, stacks bands bottom->top by
-    H.order, fills each band with its step var, and hatches the uncoloured bucket on
-    top. Reuses the calendar X axis (#7) and a snapping crosshair read-out."""
+    H.order, fills each band with its step var, and draws a disc-inspired "dreamy"
+    look: smooth curved band edges softened by a blur/saturate filter, with the
+    uncoloured bucket drawn solid (no hatch). Reuses the calendar X axis (#7)."""
     js = assets.DASHBOARD_JS
     # the named streamgraph builder
     assert "function streamParts(" in js
@@ -406,8 +407,11 @@ def test_dashboard_js_has_streamgraph_builder() -> None:
     # bands stack by palette order and fill with the per-step var
     assert "H.order" in js
     assert "varFor(" in js
-    # the uncoloured ("none") bucket is hatched on top via an SVG pattern
-    assert "stream-hatch" in js or "tl-stream-none" in js
+    # disc-inspired dreamy bands: smooth curves + a blur/saturate filter
+    assert "function curveSegs(" in js                      # Catmull-Rom band edges
+    assert 'filter id="tl-flow-soft"' in js and "feGaussianBlur" in js
+    assert 'fill="url(#tl-stream-hatch)"' not in js         # None is no longer hatched
+    assert 'class="tl-band tl-stream-none"' in js and 'fill="var(--c-none-b)"' in js  # None solid
     # reuses the calendar X axis day-offset math from #7
     assert "dayOff(" in js
     # reduced-motion: no draw-in animation via the shared gate

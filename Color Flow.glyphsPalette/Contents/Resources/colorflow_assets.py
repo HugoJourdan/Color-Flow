@@ -289,9 +289,9 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-chartbar .tl-legend{margin-bottom:0;flex:1 1 auto}
 .tl-mode{display:inline-flex;gap:4px;flex:0 0 auto}
 .tl-mode .tl-mode-btn[aria-pressed=true]{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
-.tl-band{stroke:var(--surface);stroke-width:.5;fill-opacity:.92}
-.tl-stream-none{fill-opacity:.85}
-.tl-lg-hatch{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline);background:var(--c-none)}
+.tl-band{stroke:none;fill-opacity:.95}
+.tl-stream-none{fill-opacity:.8}
+.tl-lg-hatch{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline);background:var(--c-none-b)}
 .ov-ring{display:block}
 .ov-ring .ov-ring-track{stroke:var(--track)}
 .ov-ring .ov-ring-arc{stroke:var(--accent)}
@@ -1198,6 +1198,19 @@ DASHBOARD_JS = r"""
       return { date:d, byKey:byKey, none:none };
     });
   }
+  // Catmull-Rom -> cubic-bezier segments through pts ([[x,y],...]); no leading
+  // moveto (the caller emits M/L). Gives the Flow streamgraph its soft, flowing
+  // (less flat) band edges.
+  function curveSegs(pts){
+    var s = "", t = 0.16;
+    for (var i = 0; i < pts.length - 1; i++){
+      var p0 = pts[i-1] || pts[i], p1 = pts[i], p2 = pts[i+1], p3 = pts[i+2] || p2;
+      s += "C"+(p1[0]+(p2[0]-p0[0])*t).toFixed(1)+","+(p1[1]+(p2[1]-p0[1])*t).toFixed(1)
+         + " "+(p2[0]-(p3[0]-p1[0])*t).toFixed(1)+","+(p2[1]-(p3[1]-p1[1])*t).toFixed(1)
+         + " "+p2[0].toFixed(1)+","+p2[1].toFixed(1);
+    }
+    return s;
+  }
   function streamParts(W, Ht){
     var ax = calendarAxis(W, Ht);
     var pl = ax.pl, ptop = ax.ptop, ih = ax.ih, iw = ax.iw;
@@ -1215,15 +1228,22 @@ DASHBOARD_JS = r"""
       return '<line class="tl-grid" x1="'+pl+'" y1="'+y+'" x2="'+(W-ax.pr)+'" y2="'+y+'"/>'
         + '<text class="tl-axis" x="'+(pl-5)+'" y="'+(parseFloat(y)+3).toFixed(1)+'" text-anchor="end">'+g+'</text>';
     }).join("");
-    // an SVG diagonal hatch pattern for the uncoloured band (mirrors the --c-none
-    // repeating-gradient look; theme-safe via the muted-2 stroke).
-    var defs = '<pattern id="tl-stream-hatch" class="stream-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
-      + '<rect width="6" height="6" fill="var(--track)"/>'
-      + '<line x1="0" y1="0" x2="0" y2="6" stroke="var(--muted-2)" stroke-width="2"/></pattern>';
+    // Disc-inspired "dreamy" look: bands are saturated + softly blurred (filter),
+    // their edges flow as smooth curves, and the uncoloured band is a flat solid
+    // (no hatch). Axes/grid stay outside the filter so they read crisp.
+    var defs = '<filter id="tl-flow-soft" x="-3%" y="-12%" width="106%" height="130%">'
+      + '<feColorMatrix type="saturate" values="1.18"/>'
+      + '<feGaussianBlur stdDeviation="1.1"/></filter>';
     // build a stacked Y for every date: running cumulative % from the baseline up.
-    // bands stack bottom->top by H.order; the none band sits on top, hatched.
+    // bands stack bottom->top by H.order; the none band sits on top, solid.
     var nPts = tally.length;
     function pctOf(c){ return c / denom * 100; }
+    function bandPath(lowerVals, upperVals){
+      var up = tally.map(function(t, i){ return [X(dayOff(t.date)), Y(upperVals[i])]; });
+      var lo = tally.map(function(t, i){ return [X(dayOff(t.date)), Y(lowerVals[i])]; }).reverse();
+      return "M"+up[0][0].toFixed(1)+","+up[0][1].toFixed(1)+curveSegs(up)
+           + "L"+lo[0][0].toFixed(1)+","+lo[0][1].toFixed(1)+curveSegs(lo)+"Z";
+    }
     var bandKeys = order.slice();                          // bottom -> top by palette order
     var bands = "";
     // cumulative top of the stack at each date, seeded at 0 (baseline = Y(0)).
@@ -1235,19 +1255,15 @@ DASHBOARD_JS = r"""
       // skip an all-zero band so empty steps add no markup on sparse history.
       var any = upper.some(function(v, i){ return v - lower[i] > 0.0001; });
       if (!any){ return; }
-      var topPts = tally.map(function(t, i){ return X(dayOff(t.date)).toFixed(1)+","+Y(upper[i]).toFixed(1); });
-      var botPts = tally.map(function(t, i){ return X(dayOff(t.date)).toFixed(1)+","+Y(lower[i]).toFixed(1); }).reverse();
-      var poly = topPts.concat(botPts).join(" ");
-      bands += '<polygon class="tl-band" points="'+poly+'" fill="var('+varFor(k)+')"><title>'+esc(labelFor(k))+'</title></polygon>';
+      bands += '<path class="tl-band" d="'+bandPath(lower, upper)+'" fill="var('+varFor(k)+')"><title>'+esc(labelFor(k))+'</title></path>';
     });
-    // the uncoloured bucket, hatched, stacked last (on top of the coloured bands).
+    // the uncoloured bucket, solid (no hatch), stacked last on top of the colours.
     var noneLower = cum.slice();
     var noneUpper = tally.map(function(t, i){ return cum[i] + pctOf(t.none); });
     if (noneUpper.some(function(v, i){ return v - noneLower[i] > 0.0001; })){
-      var nTop = tally.map(function(t, i){ return X(dayOff(t.date)).toFixed(1)+","+Y(noneUpper[i]).toFixed(1); });
-      var nBot = tally.map(function(t, i){ return X(dayOff(t.date)).toFixed(1)+","+Y(noneLower[i]).toFixed(1); }).reverse();
-      bands += '<polygon class="tl-band tl-stream-none" points="'+nTop.concat(nBot).join(" ")+'" fill="url(#tl-stream-hatch)"><title>'+esc(H.noneLabel)+'</title></polygon>';
+      bands += '<path class="tl-band tl-stream-none" d="'+bandPath(noneLower, noneUpper)+'" fill="var(--c-none-b)"><title>'+esc(H.noneLabel)+'</title></path>';
     }
+    var bandGroup = '<g filter="url(#tl-flow-soft)">'+bands+'</g>';
     // crosshair overlay shares the #7 data-snaps + the per-date counts so the
     // read-out (streamReadout) can show each step's count at the snapped date.
     var snaps = ax.snaps;
@@ -1258,7 +1274,7 @@ DASHBOARD_JS = r"""
     var deadline = deadlineRule(ax);                         // #19: shared rule, Flow mode too
     var chart = '<svg class="tl-chart tl-flow" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData
       + ' aria-label="Stacked colour completion over time. Hover or use the left and right arrow keys to read each snapshot.">'
-      + '<defs>'+defs+'</defs>'+ax.weekBands+grid+bands+ax.xticks+ax.todayRule+deadline+crossLayer+'</svg>';
+      + '<defs>'+defs+'</defs>'+ax.weekBands+grid+bandGroup+ax.xticks+ax.todayRule+deadline+crossLayer+'</svg>';
     // legend: one swatch per step (+ uncoloured), mirroring the band fills.
     var legend = order.map(function(k){
       return '<span class="tl-lg"><i style="background:var('+varFor(k)+')"></i>'+esc(labelFor(k))+'</span>';
