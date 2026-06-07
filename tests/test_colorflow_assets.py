@@ -149,6 +149,17 @@ def test_build_html_has_tower_master_navigator() -> None:
     assert '"wheel"' in html                          # scroll reveals the rest
 
 
+def test_dashboard_js_tower_is_hidpi_aware() -> None:
+    js = assets.DASHBOARD_JS
+    assert "devicePixelRatio" in js                       # supersample by the display's DPR
+    assert "Math.min(window.devicePixelRatio || 1, 3)" in js  # capped at 3x
+    assert "setTransform(dpr,0,0,dpr,0,0)" in js          # draw in CSS units at physical resolution
+    assert "cv.width=Math.round(availW*dpr)" in js        # #cfd-tower-cv backing store scaled to physical px
+    assert "cv.height=Math.round(availH*dpr)" in js
+    assert 'cv.style.width=availW+"px"' in js             # CSS size stays logical (hit-test unaffected)
+    assert "buf.width=Math.round(W*dpr)" in js            # composite buffer scaled too
+
+
 def test_build_html_has_script_coverage_grid() -> None:
     html = assets.build_html(_model())
     assert "function scriptGrid(" in html              # grid builder

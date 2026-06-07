@@ -1388,6 +1388,10 @@ DASHBOARD_JS = r"""
     if (!ctx) return;                       // headless / no-canvas env: skip
     var EMPTYFILL = (getComputedStyle(document.documentElement).getPropertyValue("--track")||"").trim() || "#15171c";   // empty disc ~ page bg
     var W = cv.width, Hc = cv.height, FS = 320;
+    // HiDPI: supersample every backing store by devicePixelRatio (capped at 3) while
+    // keeping all geometry in CSS-pixel units. fit() recomputes dpr on resize; the
+    // offscreen builders below read this same closure var. dpr=1 reproduces 1x exactly.
+    var dpr = Math.min(window.devicePixelRatio || 1, 3);
     var DISC_ALPHA = 0.95, tilt = 0.5, trimVal = 0.5, opacityVal = 0.32;
     var rot = -0.5, focusAmt = [];
     var VISIBLE = Math.min(16, H.masters.length);   // discs shown at once
@@ -1406,8 +1410,9 @@ DASHBOARD_JS = r"""
     }
     var UNCOL = "hsl(225,8%,4%)";   // dark neutral grey for the uncoloured share
     function buildField(counts, uncolored){
-      var off=document.createElement("canvas"); off.width=off.height=FS;
-      var g=off.getContext("2d"), cx=FS/2, cy=FS/2, R=FS*0.46, sum=0, i;
+      var off=document.createElement("canvas"); off.width=off.height=Math.round(FS*dpr);
+      var g=off.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+      var cx=FS/2, cy=FS/2, R=FS*0.46, sum=0, i;
       for (i=0;i<12;i++) sum+=counts[i];
       var total=sum+uncolored;
       if (total){
@@ -1432,8 +1437,9 @@ DASHBOARD_JS = r"""
         dk.addColorStop(0,"rgba(0,0,0,0.58)"); dk.addColorStop(0.5,"rgba(0,0,0,0.26)"); dk.addColorStop(1,"rgba(0,0,0,0)");
         g.fillStyle=dk; g.beginPath(); g.arc(cx,cy,R*0.72,0,7); g.fill();
       }
-      var bl=document.createElement("canvas"); bl.width=bl.height=FS; var bg=bl.getContext("2d");
-      bg.filter="blur(13px) saturate(1.6) brightness(0.92)"; bg.drawImage(off,0,0);
+      var bl=document.createElement("canvas"); bl.width=bl.height=Math.round(FS*dpr); var bg=bl.getContext("2d");
+      bg.setTransform(dpr,0,0,dpr,0,0);
+      bg.filter="blur(13px) saturate(1.6) brightness(0.92)"; bg.drawImage(off,0,0,FS,FS);
       bg.filter="none"; bg.globalCompositeOperation="destination-in";
       bg.fillStyle="#000"; bg.beginPath(); bg.arc(FS/2,FS/2,FS*0.5,0,7); bg.fill();
       bg.globalCompositeOperation="source-over";
@@ -1457,13 +1463,16 @@ DASHBOARD_JS = r"""
     var curFocus = (state.focus==null?null:state.focus);
     buildFields(curFocus);
     var FROST = (function(){
-      var c=document.createElement("canvas"); c.width=c.height=FS; var g=c.getContext("2d");
+      var c=document.createElement("canvas"); c.width=c.height=Math.round(FS*dpr); var g=c.getContext("2d");
+      g.setTransform(dpr,0,0,dpr,0,0);
       for (var k=0;k<1600;k++){ var x=Math.random()*FS,y=Math.random()*FS,r=Math.random()*1.6+0.3;
         g.fillStyle="rgba(255,255,255,"+(Math.random()*0.07)+")"; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); }
-      var o=document.createElement("canvas"); o.width=o.height=FS; var og=o.getContext("2d");
-      og.filter="blur(0.6px)"; og.drawImage(c,0,0); return o;
+      var o=document.createElement("canvas"); o.width=o.height=Math.round(FS*dpr); var og=o.getContext("2d");
+      og.setTransform(dpr,0,0,dpr,0,0);
+      og.filter="blur(0.6px)"; og.drawImage(c,0,0,FS,FS); return o;
     })();
-    var buf=document.createElement("canvas"); buf.width=W; buf.height=Hc; var bctx=buf.getContext("2d");
+    var buf=document.createElement("canvas"); buf.width=Math.round(W*dpr); buf.height=Math.round(Hc*dpr); var bctx=buf.getContext("2d");
+    bctx.setTransform(dpr,0,0,dpr,0,0);
 
     function paintDisc(g,fA,cx,cy,rx,ry,holeFrac,glow,empty){
       if (glow===undefined) glow=1;
@@ -1510,6 +1519,7 @@ DASHBOARD_JS = r"""
     function selIndex(){ if (state.master==null) return -1; for (var i=0;i<H.masters.length;i++){ if (H.masters[i].id===state.master) return i; } return -1; }
     var prevSel=-1;
     function render(){
+      ctx.setTransform(dpr,0,0,dpr,0,0);   // HiDPI: paint in CSS units at physical resolution (re-asserted each frame; save/restore below are balanced)
       ctx.clearRect(0,0,W,Hc);
       var M=H.masters.length; if (!M) return;
       var sel=selIndex(), maxTop=Math.max(0, M-VISIBLE);
@@ -1544,13 +1554,13 @@ DASHBOARD_JS = r"""
         for (var k=0;k<idxs.length;k++){ var ii=idxs[k], cyy=cyOf(ii); if(!EMPTY[ii]) shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,0,EMPTY[ii]); }
         bctx.save(); bctx.globalCompositeOperation="source-atop"; bctx.fillStyle="rgba(0,0,0,"+trimVal+")"; bctx.fillRect(0,0,W,Hc); bctx.restore();
         edgeFade(bctx);
-        ctx.save(); ctx.globalAlpha=opacityVal; ctx.drawImage(buf,0,0); ctx.restore();
+        ctx.save(); ctx.globalAlpha=opacityVal; ctx.drawImage(buf,0,0,W,Hc); ctx.restore();
       }
       function focusDisc(ii){ var amt=focusAmt[ii], cyy=cyOf(ii);
         bctx.clearRect(0,0,W,Hc); if(!EMPTY[ii]) shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,1-amt,EMPTY[ii]);
         var trim=amt*trimVal; if (trim>0){ bctx.save(); bctx.globalCompositeOperation="source-atop"; bctx.fillStyle="rgba(0,0,0,"+trim+")"; bctx.fillRect(0,0,W,Hc); bctx.restore(); }
         edgeFade(bctx);
-        ctx.save(); ctx.globalAlpha=1-amt*(1-opacityVal); ctx.drawImage(buf,0,0); ctx.restore();
+        ctx.save(); ctx.globalAlpha=1-amt*(1-opacityVal); ctx.drawImage(buf,0,0,W,Hc); ctx.restore();
       }
       if (sel<0){
         for (var n=M-1;n>=0;n--){ if (vis(n)) focusDisc(n); }   // no selection: every disc full
@@ -1566,9 +1576,11 @@ DASHBOARD_JS = r"""
       var main=document.getElementById("cfd-main"), host=cv.parentNode;
       var availW=(host&&host.clientWidth)||240, availH=(main&&main.clientHeight)||0;
       if (availH<240) availH=560;                      // stacked/mobile or pre-layout -> fallback
-      cv.style.width=availW+"px"; cv.style.height=availH+"px";
-      cv.width=availW; cv.height=availH; W=cv.width; Hc=cv.height;
-      buf.width=W; buf.height=Hc;
+      dpr=Math.min(window.devicePixelRatio || 1, 3);   // HiDPI: recompute on resize (display may move screens)
+      cv.style.width=availW+"px"; cv.style.height=availH+"px";   // CSS size stays in logical px (hit-test/layout unchanged)
+      cv.width=Math.round(availW*dpr); cv.height=Math.round(availH*dpr);   // backing store = physical px
+      W=availW; Hc=availH;                                       // logical drawing units (CSS px)
+      buf.width=Math.round(W*dpr); buf.height=Math.round(Hc*dpr); bctx.setTransform(dpr,0,0,dpr,0,0);
       var rx=Math.min(92,W*0.42), ry=rx*tilt, topY=ry+16, botPad=ry+12;   // mirror render() geometry
       VISIBLE=Math.max(4, Math.min(H.masters.length, Math.floor((Hc-topY-botPad)/34)+1));
       vt=Math.max(0, Math.min(Math.max(0,H.masters.length-VISIBLE), vt));
