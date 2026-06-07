@@ -197,16 +197,6 @@ def test_dashboard_js_has_journey_helpers() -> None:
     assert "<=" in js  # stateAt: last event at or before the date
 
 
-def test_dashboard_js_has_forecast_card() -> None:
-    js = assets.DASHBOARD_JS
-    assert "function forecastCard(" in js
-    assert 'ovCard("forecast"' in js
-    assert "H.trend.forecast" in js
-    assert "etaIso" in js
-    assert "confidence" in js
-    assert "Not enough history yet" in js   # the none/<2-points empty state
-
-
 def test_dashboard_js_has_regression_card() -> None:
     js = assets.DASHBOARD_JS
     assert "function regressionCard(" in js
@@ -325,7 +315,7 @@ def test_build_html_wires_all_report_insight_features() -> None:
     the generated document, and the self-contained/no-network invariant holds."""
     html = assets.build_html(_model())
     # render units
-    for marker in ("function forecastCard(", "function regressionCard(",
+    for marker in ("function regressionCard(",
                    "function recentCard(", "function dateDiffPanel(",
                    "function openJourney(", "function helpPanel(",
                    "function journeyOf(", "function stateAt("):

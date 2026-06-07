@@ -718,30 +718,9 @@ DASHBOARD_JS = r"""
     }).join("");
     return ovCard("recent", "Recent activity", rows, feed.length > 12);
   }
-  function forecastCard(){
-    var fc = H.trend && H.trend.forecast;
-    if (!fc) return "";
-    var key = state.master || "__all__";
-    var f = fc[key] || fc["__all__"];
-    if (!f) return "";
-    var body;
-    if (f.confidence === "none" || f.points < 2){
-      body = '<p class="ov-empty">Not enough history yet.</p>';
-    } else if (f.confidence === "done"){
-      body = '<p class="fc-line"><b>Done.</b> All '+f.total+' complete.</p>';
-    } else if (!f.etaIso){
-      body = '<p class="ov-empty">No recent progress — no estimate.</p>';
-    } else {
-      body = '<p class="fc-line"><b>~'+esc(f.etaIso)+'</b>'
-        + (f.bandDays!=null ? ' ±'+f.bandDays+'d' : '')
-        + ' · '+esc(f.confidence)+' confidence · '+f.remaining+' left'
-        + ' · ~'+f.velocityPerWeek+'/week</p>';
-    }
-    return ovCard("forecast", "Forecast", body, false);
-  }
   function overviewExtras(){
     if (!H.masters.length) return "";
-    return '<div class="ov-extra">'+forecastCard()+regressionCard()+recentCard()+leaderboard()+histogram()+timelineCard()+'</div>';
+    return '<div class="ov-extra">'+regressionCard()+recentCard()+leaderboard()+histogram()+timelineCard()+'</div>';
   }
   function tabsView(){
     if (state.master==null) return overall()+overviewExtras();   // no master selected -> global view + extras
