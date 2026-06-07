@@ -184,7 +184,9 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .cmp caption{text-align:left;color:var(--muted-2);font-size:var(--fs-xs);padding-bottom:8px}
 .cmp th,.cmp td{border:1px solid var(--border);padding:4px 10px;text-align:left}
 .cmp thead th:first-child,.cmp tbody th[scope="row"]{width:1%;white-space:nowrap}
-.cmp thead th{color:var(--muted);font-weight:600;text-align:center}
+.cmp thead th{color:var(--muted);font-weight:600;text-align:center;background:color-mix(in srgb,var(--text) 7%,transparent)}
+.cmp thead th:first-child{text-align:left}
+.cmp tbody tr:nth-child(even):not(.cmp-sel) td,.cmp tbody tr:nth-child(even):not(.cmp-sel) th{background:color-mix(in srgb,var(--text) 4%,transparent)}
 .cmp thead th .dot{margin:0}
 .cmp tbody th{font-weight:500}
 .cmp th .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
