@@ -252,7 +252,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
   .psec{page-break-before:always}
   .ptab{page-break-inside:avoid}
 }
-.ft{margin-top:24px;padding:12px 0 18px;border-top:1px solid var(--border);font-size:10px;color:var(--muted-2);line-height:1.4}
+.ft{margin-top:24px;padding:12px 0 18px;border-top:1px solid var(--border);font-size:10px;color:var(--muted-2);line-height:1.4;text-align:right}
 .cfd-tip{position:fixed;z-index:20;display:none;background:var(--surface);border:1px solid var(--border-2);border-radius:8px;padding:8px 10px;box-shadow:0 6px 24px rgba(0,0,0,.32);pointer-events:none}
 .cfd-tip .tip-h{font-size:var(--fs-2xs);color:var(--muted);margin-bottom:5px;white-space:nowrap}
 .cfd-tip .spark{display:block}
