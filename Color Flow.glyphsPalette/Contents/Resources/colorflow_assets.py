@@ -889,9 +889,9 @@ DASHBOARD_JS = r"""
 
     function paintDisc(g,fA,cx,cy,rx,ry,holeFrac,glow,empty){
       if (glow===undefined) glow=1;
-      if (empty){   // no colours: a solid disc in a near-background tone (not white, not transparent)
+      if (empty){   // no colours: a near-background tone at lower opacity (mixes with the bg)
         g.save(); g.translate(cx,cy); g.scale(1,ry/rx);
-        g.fillStyle=EMPTYFILL; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
+        g.globalAlpha=0.6; g.fillStyle=EMPTYFILL; g.beginPath(); g.arc(0,0,rx,0,7); g.fill(); g.globalAlpha=1;
         g.restore();
         return;
       }
