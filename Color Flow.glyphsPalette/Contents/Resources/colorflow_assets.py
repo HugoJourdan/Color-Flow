@@ -243,7 +243,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
   .psec{page-break-before:always}
   .ptab{page-break-inside:avoid}
 }
-.ft{margin-top:30px;padding-top:16px;border-top:1px solid var(--border);font-size:var(--fs-2xs);color:var(--muted-2);line-height:1.6}
+.ft{margin-top:24px;padding-top:12px;border-top:1px solid var(--border);font-size:10px;color:var(--muted-2);line-height:1.4}
 .cfd-tip{position:fixed;z-index:20;display:none;background:var(--surface);border:1px solid var(--border-2);border-radius:8px;padding:8px 10px;box-shadow:0 6px 24px rgba(0,0,0,.32);pointer-events:none}
 .cfd-tip .tip-h{font-size:var(--fs-2xs);color:var(--muted);margin-bottom:5px;white-space:nowrap}
 .cfd-tip .spark{display:block}
@@ -1024,7 +1024,7 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-app").innerHTML =
       header() + toolbar()
       + '<div id="cfd-main"><aside id="cfd-tower" aria-label="Masters"><canvas id="cfd-tower-cv" width="240" height="560"></canvas></aside><div id="cfd-body"></div></div>'
-      + '<footer class="ft">Color Font Dashboard · Color Flow — Hugo Jourdan<br>'+esc(H.generated)+'</footer>';
+      + '<footer class="ft">ColorFlow Report — '+esc(H.generated)+'</footer>';
     bind(); update(); initTower();
     window.__cfdExport = { csv: exportCSV, json: exportJSON, rows: exportRows, printHTML: buildPrintReport };
     // After the first paint the bars have run their fill animation once; stop
