@@ -119,6 +119,8 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .ov-main{flex:1}
 .ov-head{font-size:var(--fs-sm);color:var(--muted);margin-bottom:8px}
 .ov-head b{color:var(--text)}
+.ov-name{color:var(--text);font-weight:600;margin-right:9px}
+.ov-name::after{content:"·";color:var(--muted-2);margin-left:9px}
 .seg{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--track)}
 .seg>span{display:block;height:100%;transform-origin:left center;transition:opacity .2s ease}
 .seg .seg-none{background:var(--c-none)}
@@ -418,9 +420,10 @@ DASHBOARD_JS = r"""
     var legend = stepsSorted(m).map(function(s){
       return '<span class="lg" title="'+esc(s.label)+'"><i style="background:var('+varFor(s.key)+')"></i>'+pct(countFor(m,s.key)||0,total)+'%</span>';
     }).join("");
-    var head = (H.mode==="free" || !lastOrder)
+    var head = '<span class="ov-name">'+esc(m.name)+'</span>'
+      + ((H.mode==="free" || !lastOrder)
       ? '<b>'+started+'/'+total+'</b>'
-      : '<b>'+completion+'/'+total+'</b> complete · '+started+'/'+total+' started ('+startP+'%)';
+      : '<b>'+completion+'/'+total+'</b> complete · '+started+'/'+total+' started ('+startP+'%)');
     var recipeLine = "";
     if (H.recipes && H.recipes.length){
       var rc = ((H.recipeCompletion||{})[m.id])||{};
