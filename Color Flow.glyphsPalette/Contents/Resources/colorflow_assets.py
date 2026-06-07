@@ -769,20 +769,59 @@ DASHBOARD_JS = r"""
     paintScriptCards();
   }
 
-  // Set the focused colour and crossfade the heatmap: fade the current grid out,
-  // re-render to the recomposed (packed) set, fade it back in. Skips the animation
-  // when there's no heatmap, for reduced-motion users, or under the test hook.
+  // Re-organise the heatmap when the focused colour changes (a FLIP animation):
+  // snapshot every cell's box, swap the DOM to the recomposed grid, then play each
+  // surviving cell from its old box to its new one — so the focused colour's cells
+  // slide up and pack to the top while the rest slide out. Skips when there's no
+  // heatmap, for reduced-motion users, or under the test hook. Only cells near the
+  // viewport animate (off-screen ones just snap) to keep big grids smooth.
   function setFocus(fk){
     var heat = document.querySelector(".heat");
     var instant = !heat || window.__cfdNoAnim ||
       (window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
     if (instant){ state.focus = fk; update(); return; }
-    heat.classList.add("fading");
-    setTimeout(function(){
-      state.focus = fk; update();
-      var nh = document.querySelector(".heat");
-      if (nh){ nh.classList.add("fading"); requestAnimationFrame(function(){ nh.classList.remove("fading"); }); }
-    }, 200);
+    var vh = window.innerHeight || 800, margin = 40;
+    function near(r){ return r && r.bottom > -margin && r.top < vh + margin; }
+    var first = {}, prevList = Array.prototype.slice.call(heat.querySelectorAll(".cell"));
+    prevList.forEach(function(c){ first[c.getAttribute("data-glyph")] = c.getBoundingClientRect(); });
+
+    state.focus = fk; update();
+
+    var nh = document.querySelector(".heat");
+    if (!nh) return;
+    var seen = {}, play = [];
+    Array.prototype.forEach.call(nh.querySelectorAll(".cell"), function(c){
+      var key = c.getAttribute("data-glyph"); seen[key] = 1;
+      var fr = first[key], lr = c.getBoundingClientRect();
+      if (fr){                                              // survivor: slide old box -> new box
+        var dx = fr.left - lr.left, dy = fr.top - lr.top;
+        if ((dx || dy) && (near(fr) || near(lr))){ c.style.transition = "none"; c.style.transform = "translate("+dx+"px,"+dy+"px)"; play.push(c); }
+      } else if (near(lr)){                                 // newly shown (e.g. on clear): scale in
+        c.style.transition = "none"; c.style.opacity = "0"; c.style.transform = "scale(.55)"; play.push(c);
+      }
+    });
+
+    var layer = null;                                       // removed cells -> clones that slide out
+    var exiting = prevList.filter(function(c){ var k = c.getAttribute("data-glyph"); return !seen[k] && near(first[k]); });
+    if (exiting.length){
+      layer = document.createElement("div");
+      layer.style.cssText = "position:fixed;inset:0;z-index:30;pointer-events:none";
+      exiting.forEach(function(c){
+        var r = first[c.getAttribute("data-glyph")], cl = c.cloneNode(true);
+        cl.style.position = "fixed"; cl.style.margin = "0"; cl.style.pointerEvents = "none";
+        cl.style.left = r.left+"px"; cl.style.top = r.top+"px"; cl.style.width = r.width+"px"; cl.style.height = r.height+"px";
+        layer.appendChild(cl);
+      });
+      document.body.appendChild(layer);
+    }
+
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){
+      for (var i=0;i<play.length;i++){ var c = play[i];
+        c.style.transition = "transform .44s cubic-bezier(.2,.7,.2,1),opacity .34s ease"; c.style.transform = ""; c.style.opacity = ""; }
+      if (layer) Array.prototype.forEach.call(layer.children, function(cl){
+        cl.style.transition = "transform .42s ease,opacity .42s ease"; cl.style.transform = "translateY(16px) scale(.5)"; cl.style.opacity = "0"; });
+    }); });
+    if (layer) setTimeout(function(){ if (layer.parentNode) layer.parentNode.removeChild(layer); }, 480);
   }
 
   var toastTimer;
