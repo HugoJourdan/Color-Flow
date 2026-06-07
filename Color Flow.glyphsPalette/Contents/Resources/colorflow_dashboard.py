@@ -996,6 +996,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
     meta = glyph_meta(font)
     metas = [meta.get(name, {}) for name in glyph_names]
     categories = [(entry.get("category") or "Other") for entry in metas]
+    scripts = [(entry.get("script") or "Other") for entry in metas]
     recipe_completion = {}
     for master in font.masters:
         per_glyph = current.get(master.id, {})
@@ -1016,6 +1017,7 @@ def build_model(font, now: datetime, current: dict, previous: dict) -> dict:
         "noneLabel": none_text,
         "glyphNames": glyph_names,
         "categories": categories,
+        "scripts": scripts,
         "masters": masters,
         "colors": {str(index): labelcolors.hex_for(rgba)
                    for index, rgba in enumerate(labelcolors.read_label_colors())},

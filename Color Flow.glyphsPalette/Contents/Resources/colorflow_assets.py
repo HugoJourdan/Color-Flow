@@ -1471,6 +1471,78 @@ DASHBOARD_JS = r"""
     return '<div class="tl-lanes"><div class="tl-lanes-h">By category'
       + (sparse ? ' · current %' : ' · over time')+'</div>'+rows+'</div>';
   }
+  // ----- #18 per-script progress lanes over time -----------------------------
+  // Mirror of categoryLanes (#17) but grouped by the per-glyph H.scripts array
+  // (writing systems: Latin, Cyrillic, Greek, ...) instead of H.categories.
+  function scriptLanes(){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (dates.length < 1) return "";
+    // Map each glyph to its script from the parallel H.glyphNames / H.scripts
+    // arrays, grouping the glyph names by script (empty scripts never appear).
+    var allNames = H.glyphNames || [], allScripts = H.scripts || [], groups = {};
+    for (var gi = 0; gi < allNames.length; gi++){
+      var gscript = allScripts[gi] || "Other";
+      (groups[gscript] || (groups[gscript] = [])).push(allNames[gi]);
+    }
+    var scripts = Object.keys(groups);
+    if (!scripts.length) return "";
+    var mid = reglogMaster();
+    if (!mid) return "";
+    var sparse = dates.length < 3;                 // 1-2 snapshots: bar, no over-time line
+    var weight = stepWeights().weight;             // shared palette-order step weights
+    // Graded completion % for one script at one snapshot date: sum the step weights
+    // over that script's glyphs (reconstructed via stateAt) over the script's glyph
+    // count, on the same 0-100 graded scale as the master/overall cards.
+    var laneStatePct = function(names, iso){
+      var st = stateAt(mid, iso), sum = 0;
+      for (var i = 0; i < names.length; i++){
+        var w = weight[st[names[i]]]; if (w) sum += w;
+      }
+      return names.length ? Math.round(sum / names.length * 100) : 0;
+    };
+    // Tiny completion-over-time polyline (reuses the chart's Y-flip idiom, scaled to a
+    // mini box); only drawn when there are >=2 snapshots to connect.
+    var laneSpark = function(values){
+      var n = values.length, w = 64, h = 16, pad = 1.5, iw = w - pad*2, ih = h - pad*2;
+      if (n < 2) return "";
+      var pts = values.map(function(v, i){
+        var x = pad + i/(n-1)*iw;
+        var y = pad + ih - Math.max(0, Math.min(100, v))/100*ih;
+        return x.toFixed(1)+","+y.toFixed(1);
+      }).join(" ");
+      return '<svg class="tl-lane-spark" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true">'
+        + '<polyline points="'+pts+'" fill="none"/></svg>';
+    };
+    // ~a week before the latest snapshot, snapped onto a real snapshot date.
+    var today = (H.trend && H.trend.today) || dates[dates.length-1];
+    var weekAgo = snapDate(dates, isoMinusDays(today, 7));
+    var lanes = scripts.map(function(script){
+      var names = groups[script];
+      var values = dates.map(function(d){ return laneStatePct(names, d); });
+      var cur = values[values.length-1];
+      var prevPct = laneStatePct(names, weekAgo);
+      var delta = cur - prevPct;
+      return { script:script, count:names.length, values:values, cur:cur, delta:delta };
+    });
+    // laggard-first: lowest current % on top (name as a stable tie-breaker).
+    lanes.sort(function(a, b){ return (a.cur - b.cur) || (a.script < b.script ? -1 : 1); });
+    var rows = lanes.map(function(ln){
+      var arrow = ln.delta > 0 ? "▲" : (ln.delta < 0 ? "▼" : "▬");
+      var arrowCls = ln.delta > 0 ? "tl-d-up" : (ln.delta < 0 ? "tl-d-down" : "tl-d-flat");
+      var deltaTxt = (ln.delta>0?"+":"")+ln.delta+"% vs "+esc(dateLabel(weekAgo));
+      var mid2 = sparse
+        ? '<span class="tl-lane-bar"><span style="width:'+ln.cur+'%"></span></span>'
+        : laneSpark(ln.values);
+      return '<div class="tl-lane">'
+        + '<span class="tl-lane-n" title="'+esc(ln.script)+'">'+esc(ln.script)+' <small>('+ln.count+')</small></span>'
+        + '<span class="tl-lane-mid">'+mid2+'</span>'
+        + '<span class="tl-lane-pct">'+ln.cur+'%</span>'
+        + '<span class="tl-lane-d '+arrowCls+'" title="'+deltaTxt+'" aria-label="'+deltaTxt+'">'+arrow+'</span>'
+        + '</div>';
+    }).join("");
+    return '<div class="tl-lanes"><div class="tl-lanes-h">By script'
+      + (sparse ? ' · current %' : ' · over time')+'</div>'+rows+'</div>';
+  }
   function timelineView(){
     if (!hasTrend()){
       return '<section class="tl-empty"><p class="empty">Not enough history yet. Color Flow saves a snapshot each time you save the font; this timeline fills in as days of history accumulate.</p></section>';
@@ -1480,7 +1552,7 @@ DASHBOARD_JS = r"""
     // #14: This-week digest tops the tab (above the chart), per D1.
     return '<section class="timeline">'+weekDigest()+'<div class="tl-chartbar">'+tlModeToggle()
       + '<div class="tl-legend">'+parts.legend+'</div></div>'
-      + parts.chart+parts.foot+dateDiffPanel()+categoryLanes()+regressionLog()+'</section>';
+      + parts.chart+parts.foot+dateDiffPanel()+categoryLanes()+scriptLanes()+regressionLog()+'</section>';
   }
   function compareView(){
     // columns = steps (+None); rows = masters, labelled by the master name.

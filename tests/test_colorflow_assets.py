@@ -645,6 +645,37 @@ def test_dashboard_css_styles_category_lane_class() -> None:
     assert "var(--" in lane_block
 
 
+def test_dashboard_js_has_script_progress_lanes() -> None:
+    """#18: per-script progress lanes over time mirror the per-category lanes (#17),
+    but group by the per-glyph H.scripts array (writing systems) instead of
+    H.categories. A scriptLanes builder maps each glyph to its script from the
+    parallel H.glyphNames / H.scripts arrays, then — per script, per snapshot date —
+    sums graded step weights over that script's glyphs via stateAt to draw a tiny
+    completion sparkline. Each row carries the script name, its sparkline, the
+    current %, and a delta arrow vs ~a week ago; rows sort laggard-first. It reuses
+    the .tl-lane styling and is wired into the timeline view."""
+    js = assets.DASHBOARD_JS
+    # the named builder, wired into the timeline view (D1: lanes section)
+    assert "function scriptLanes(" in js
+    timeline = js.split("function timelineView(")[1].split("function ")[0]
+    assert "scriptLanes()" in timeline
+    lanes = js.split("function scriptLanes(")[1].split("\n  function ")[0]
+    # builds the glyphName -> script map from the two parallel arrays (the new field)
+    assert "H.scripts" in lanes
+    assert "H.glyphNames" in lanes
+    # graded completion per date via stateAt + the shared step weights (not reinvented)
+    assert "stateAt(" in lanes
+    assert "stepWeights(" in lanes
+    # walks the real snapshot dates for the over-time sparkline
+    assert "H.trend.dates" in lanes or "H.trend && H.trend.dates" in lanes
+    # one .tl-lane row per script, with a delta arrow vs ~a week ago
+    assert "tl-lane" in lanes
+    # laggard-first ordering (lowest current % on top)
+    assert "sort(" in lanes
+    # degrades to a current-% bar at 1-2 snapshots (no sparkline to draw)
+    assert "tl-lane-bar" in lanes
+
+
 def test_dashboard_js_has_journey_modal() -> None:
     js = assets.DASHBOARD_JS
     assert "function openJourney(" in js

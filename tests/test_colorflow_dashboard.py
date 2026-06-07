@@ -654,6 +654,35 @@ def test_build_model_shape_and_compact_glyph_names(tmp_path) -> None:
     assert model["changes"] == {"m1": {}}
 
 
+def test_build_model_emits_scripts_parallel_to_glyph_names(tmp_path) -> None:
+    # #18: a per-glyph `scripts` list, parallel to glyphNames, drives the
+    # per-script progress lanes. A blank/missing script falls back to "Other".
+    (tmp_path / "colorNames.txt").write_text("red=R\nNone=Nothing\n", encoding="utf-8")
+    master = _FakeMaster("m1", "Regular")
+    letter_a = _FakeGlyph("A", {"m1": _FakeLayerColor(0)})
+    alef = _FakeGlyph("alef-ar", {"m1": _FakeLayerColor(0)})
+    comma = _FakeGlyph("comma", {"m1": _FakeLayerColor(0)})   # no script -> "Other"
+    letter_a.script, alef.script = "latin", "arabic"
+    font = _FakeFont([master], [letter_a, alef, comma], filepath=str(tmp_path / "Font.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+
+    assert "scripts" in model
+    assert len(model["scripts"]) == len(model["glyphNames"])   # parallel to glyphNames
+    by_name = dict(zip(model["glyphNames"], model["scripts"]))
+    assert by_name == {"A": "latin", "alef-ar": "arabic", "comma": "Other"}
+
+
+def test_build_model_empty_font_has_empty_scripts(monkeypatch, tmp_path) -> None:
+    # #18: the empty-font invariant — no glyphs means scripts is [].
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    (tmp_path / "colorNames.txt").write_text("red=R\n", encoding="utf-8")
+    font = _FakeFont([], [], filepath=str(tmp_path / "Empty.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["scripts"] == [] and model["glyphNames"] == []
+
+
 def test_build_model_emits_journey_index_field(tmp_path) -> None:
     (tmp_path / "colorNames.txt").write_text(
         "purple=Outline\nyellow=Ready\nNone=Nothing\n", encoding="utf-8")
