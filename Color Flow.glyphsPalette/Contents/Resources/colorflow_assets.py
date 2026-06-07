@@ -846,26 +846,30 @@ DASHBOARD_JS = r"""
       for (var i=0;i<keys.length;i++){ var k=keys[i]; if (k>=0 && k<12) c[k]++; }
       return c;
     }
-    function buildField(counts){
+    var UNCOL = "hsl(225,8%,42%)";   // neutral grey for the uncoloured share
+    function buildField(counts, uncolored){
       var off=document.createElement("canvas"); off.width=off.height=FS;
       var g=off.getContext("2d"), cx=FS/2, cy=FS/2, R=FS*0.46, sum=0, i;
       for (i=0;i<12;i++) sum+=counts[i];
-      if (!sum){ /* no colours -> leave the field transparent (disc shows the page bg) */ }
-      else {
+      var total=sum+uncolored;
+      if (total){
+        // one wedge per present colour (hue) + the uncoloured share (grey), all
+        // proportional to the master's glyph total so uncoloured glyphs show too
+        var segs=[];
+        for (i=0;i<12;i++){ if(counts[i]>0) segs.push([counts[i]/total, hueHsl(i)]); }
+        if (uncolored>0) segs.push([uncolored/total, UNCOL]);
         var acc=0, stops=[];
-        for (i=0;i<12;i++){ if(!counts[i]) continue; stops.push([acc+(counts[i]/sum)/2,i]); acc+=counts[i]/sum; }
+        for (i=0;i<segs.length;i++){ stops.push([acc+segs[i][0]/2, segs[i][1]]); acc+=segs[i][0]; }
         var filled=false;
         try {
           var base=g.createConicGradient(-Math.PI/2,cx,cy);
-          for (i=0;i<stops.length;i++) base.addColorStop(stops[i][0],hueHsl(stops[i][1]));
-          base.addColorStop(1,hueHsl(stops[0][1]));
+          for (i=0;i<stops.length;i++) base.addColorStop(stops[i][0],stops[i][1]);
+          base.addColorStop(1,stops[0][1]);
           g.fillStyle=base; g.fillRect(0,0,FS,FS); filled=true;
         } catch(e){ filled=false; }
         if (!filled){ var a=-Math.PI/2;
-          for (i=0;i<12;i++){ if(!counts[i]) continue; var a1=a+(counts[i]/sum)*Math.PI*2;
-            g.fillStyle=hueHsl(i); g.beginPath(); g.moveTo(cx,cy); g.arc(cx,cy,R*1.25,a,a1); g.closePath(); g.fill(); a=a1; } }
-      }
-      if (sum){   // centre-darken only coloured discs; leave an empty disc evenly translucent
+          for (i=0;i<segs.length;i++){ var a1=a+segs[i][0]*Math.PI*2;
+            g.fillStyle=segs[i][1]; g.beginPath(); g.moveTo(cx,cy); g.arc(cx,cy,R*1.25,a,a1); g.closePath(); g.fill(); a=a1; } }
         var dk=g.createRadialGradient(cx,cy,0,cx,cy,R*0.72);
         dk.addColorStop(0,"rgba(0,0,0,0.58)"); dk.addColorStop(0.5,"rgba(0,0,0,0.26)"); dk.addColorStop(1,"rgba(0,0,0,0)");
         g.fillStyle=dk; g.beginPath(); g.arc(cx,cy,R*0.72,0,7); g.fill();
@@ -877,8 +881,8 @@ DASHBOARD_JS = r"""
       bg.globalCompositeOperation="source-over";
       return bl;
     }
-    var FIELDS = H.masters.map(function(m){ return buildField(countsOf(m)); });
-    var EMPTY = H.masters.map(function(m){ var c=countsOf(m),s=0,i; for(i=0;i<12;i++)s+=c[i]; return s===0; });
+    var FIELDS = H.masters.map(function(m){ return buildField(countsOf(m), m.uncolored||0); });
+    var EMPTY = H.masters.map(function(m){ var c=countsOf(m),s=0,i; for(i=0;i<12;i++)s+=c[i]; return (s+(m.uncolored||0))===0; });
     var FROST = (function(){
       var c=document.createElement("canvas"); c.width=c.height=FS; var g=c.getContext("2d");
       for (var k=0;k<1600;k++){ var x=Math.random()*FS,y=Math.random()*FS,r=Math.random()*1.6+0.3;
