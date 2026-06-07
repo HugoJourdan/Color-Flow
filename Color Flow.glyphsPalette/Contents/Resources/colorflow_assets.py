@@ -104,7 +104,7 @@ html,body{margin:0}
 body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains Mono",monospace;
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
-@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro>span{animation:none}.heat,.heat.fading{transition:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro{animation:none}.heat,.heat.fading{transition:none;opacity:1}}
 #cfd-app{max-width:1180px;margin:0 auto;padding:0 20px}
 #cfd-main{display:flex;gap:24px;align-items:flex-start}
 #cfd-tower{position:sticky;top:0;flex:0 0 240px;width:240px}
@@ -148,7 +148,7 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .seg>span.off{opacity:.28}
 .seg>span.on{filter:saturate(1.18)}
 @keyframes segGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-.seg.intro>span{animation:segGrow .4s ease backwards;animation-delay:calc(var(--i,0)*45ms)}
+.seg.intro{transform-origin:left center;animation:segGrow .5s ease backwards}
 .ov-recipe{margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
 .ov-recipe b{color:var(--text)}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
@@ -1421,13 +1421,17 @@ DASHBOARD_JS = r"""
         var segs=[];
         for (i=0;i<12;i++){ if(counts[i]>0) segs.push([counts[i]/total, slotColor(i)]); }
         if (uncolored>0) segs.push([uncolored/total, UNCOL]);
-        var acc=0, stops=[];
-        for (i=0;i<segs.length;i++){ stops.push([acc+segs[i][0]/2, segs[i][1]]); acc+=segs[i][0]; }
         var filled=false;
         try {
-          var base=g.createConicGradient(-Math.PI/2,cx,cy);
-          for (i=0;i<stops.length;i++) base.addColorStop(stops[i][0],stops[i][1]);
-          base.addColorStop(1,stops[0][1]);
+          // true proportional wedges (hard edges): each colour spans exactly its
+          // share. Two stops per wedge (start + end, same colour) give a crisp
+          // boundary; the later blur softens it without distorting the proportion.
+          var base=g.createConicGradient(-Math.PI/2,cx,cy), acc=0;
+          for (i=0;i<segs.length;i++){
+            base.addColorStop(Math.min(acc,1), segs[i][1]);
+            acc+=segs[i][0];
+            base.addColorStop(Math.min(acc,1), segs[i][1]);
+          }
           g.fillStyle=base; g.fillRect(0,0,FS,FS); filled=true;
         } catch(e){ filled=false; }
         if (!filled){ var a=-Math.PI/2;
@@ -1590,7 +1594,7 @@ DASHBOARD_JS = r"""
     function loop(){
       var fk = (state.focus==null?null:state.focus);
       if (fk!==curFocus){ curFocus=fk; buildFields(curFocus); }   // colour focus changed -> refilter discs
-      rot+=0.008; render(); requestAnimationFrame(loop);
+      rot+=0.0096; render(); requestAnimationFrame(loop);
     }
     cv.addEventListener("wheel", function(e){ e.preventDefault();
       vt += e.deltaY*0.02; vt=Math.max(0, Math.min(Math.max(0,H.masters.length-VISIBLE), vt));

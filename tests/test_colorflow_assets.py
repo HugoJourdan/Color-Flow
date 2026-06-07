@@ -131,7 +131,8 @@ def test_build_html_embeds_favicon_and_glyph_ink_token() -> None:
 def test_dashboard_css_has_fill_on_load_and_focus_styles() -> None:
     css = assets.DASHBOARD_CSS
     assert "@keyframes segGrow" in css                          # bars fill on load
-    assert ".seg.intro>span" in css
+    assert ".seg.intro{" in css                                 # whole bar grows as one block
+    assert "animation-delay:calc(var(--i" not in css            # NOT per-segment staggered
     assert ".seg>span.off" in css                               # dim the OTHER segments
     assert "box-shadow:inset 0 0 0 2px var(--text)" not in css  # white border removed
     assert ".cell.dim" not in css                               # glyph dim removed
