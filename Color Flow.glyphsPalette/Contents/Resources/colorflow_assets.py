@@ -495,8 +495,7 @@ DASHBOARD_JS = r"""
     var focusInfo = state.focus!==null
       ? '<button type="button" class="chip focus-clear" data-fclear="1" title="Clear colour focus">Focus: '+esc(labelFor(state.focus))+' ✕</button>'
       : '';
-    return '<section class="heat"><div class="heat-h"><span>Per-glyph · '+items.length
-      + ' <span class="hint">hover for name · click to open</span></span>'+sortCtl+focusInfo+toggle+'</div>'
+    return '<section class="heat"><div class="heat-h">'+sortCtl+focusInfo+toggle+'</div>'
       + (sections||empty)+'</section>';
   }
   function changes(m){
