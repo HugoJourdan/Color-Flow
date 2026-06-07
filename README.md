@@ -1,42 +1,40 @@
-# ABOUT
+# Color Flow
 
-**Color Flow** is a Palette Plugin to help organize and gamify your workflow by tracking progress through visual feedback. It works by assigning meaning to Layer Color Labels which are sorted into a series of customizable catogories and made directly accessable through the sidebar. Checkboxes and color-coded progress bars help to easily identify and update which step you are on in a workflow. 
+**Color Flow** is a Glyphs 3 palette plugin that turns the twelve native **Layer Color Labels** into a customizable, gamified workflow. Assign a meaning to each colour, tick the steps off in the sidebar, and watch colour-coded progress bars fill as your font moves from *outline* to *done*. A built‑in, offline **progress report** gives you a font‑wide picture — coverage, a per‑glyph heatmap, a burndown timeline with forecasts, and a day‑by‑day Time Machine.
 
+<img src="img/report-overview.png" width="900" alt="Color Flow report — overview">
 
-<img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/ColorFlow_thumbnail.jpg?raw=true" width="900">
+> The wide screenshots above and below come from the plugin's **HTML report**. Screenshots of the palette UI itself are coming soon.
 
-<br>
+---
 
-_________________
-# GLYPH COLOR 🆚 LAYER COLOR
+# Glyph Color 🆚 Layer Color
 
-In Glyphs App, color labels can be defined on two levels, Glyph and Layer, and applied in one of twelve predefined colors.
+In Glyphs, color labels can be defined on two levels — **Glyph** and **Layer** — in one of twelve predefined colors.
 
-* Set Glyph Color is accessed by control-click or right-click on a glyph. 
-* Set Layer Color is accessed by right-click on a glyph and holding the Option key.
+* **Set Glyph Color** — control‑click / right‑click a glyph.
+* **Set Layer Color** — right‑click a glyph while holding Option.
 
-Glyph Color spans across the entire glyph cell. Layer Color is drawn on the right half of the cell if a Glyph Color is set, or across the entire cell with a cut-out in the top left if no glyph
-color is set.
+Glyph Color spans the whole glyph cell. Layer Color is drawn on the right half of the cell when a Glyph Color is also set, or across the whole cell with a cut‑out in the top‑left when no glyph color is set.
 
-| Glyph Color | Layer Color | Glyph+Layer Color |
+| Glyph Color | Layer Color | Glyph + Layer Color |
 | :---: | :---: | :---: |
-| <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/Glyph-Color-Label.png" width="100"> | <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/Layer-Color-Label.png" width="100"> | <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/Glyph+Layer-Color-Label.png" width="100"> |
- 
-Convenient use of Layer Color Label is to indicate progress status of a layer, as the following example.
+| <img src="img/Glyph-Color-Label.png" width="100"> | <img src="img/Layer-Color-Label.png" width="100"> | <img src="img/Glyph+Layer-Color-Label.png" width="100"> |
+
+Color Flow reads the **Layer Color** to track the progress of each layer, for example:
 
 * 🟣 → Outline corrected
 * 🟢 → Anchors placed
 * 🔵 → Spacing set
-* 🟡 → Ready to Export
-<br>
+* 🟡 → Ready to export
 
-_________________
-# REQUIREMENTS
+---
 
-Color Flow requires a `colorNames.txt` file stored in either `~/Library/Application Support/Glyphs 3/info` or the same directory as the current Glyphs source file. Preference is given to the latter allowing for the sharing of the `colorNames.txt` file with glyphs source files to retain labelling information between project collaborators. 
+# Requirements
 
-The `colorNames.txt` file requires the formatting `colorName=meaning`, with each key on a newline and with no space surrounding the '='.  
-An example, with the defined colorNames is given below. 
+Color Flow needs a `colorNames.txt` file in **either** `~/Library/Application Support/Glyphs 3/info` **or** the same folder as the current Glyphs source. The latter wins, so the labelling can travel with the `.glyphs` file and stay in sync between collaborators.
+
+The file uses `colorName=meaning`, one per line, no spaces around the `=`:
 
 ```
 red=Step 1
@@ -45,7 +43,7 @@ brown=Step 3
 yellow=Step 4
 lightGreen=Step 5
 darkGreen=Step 6
-lightBlue=Step7
+lightBlue=Step 7
 darkBlue=Step 8
 purple=Step 9
 magenta=Step 10
@@ -53,13 +51,11 @@ lightGray=Step 11
 charcoal=Step 12
 ```
 
-<br>
+---
 
-_________________
-# CUSTOMIZE
+# Customize
 
-The whole point of Color Flow is that meaning and order of colors can be customized, so that each designer can build their own workflow.  
-Color order can be modified by changing line order and color can be hidden by removing it's meaning. An example, with a customize `colorNames.txt` is given below. 
+The point of Color Flow is that the **meaning and order** of colours are yours. Reorder by moving lines; hide a colour by leaving its meaning blank:
 
 ```
 red=
@@ -76,94 +72,124 @@ lightGray=
 charcoal=
 ```
 
-Display in Color Flow UI:
+Resulting workflow in the palette:
+
 * 🟣 → Outline corrected
 * 🟢 → Anchors placed
 * 🔵 → Spacing set
 * 🟡 → Ready to Export
 
+---
 
-<br>
+# How it works
 
-_________________
-# HOW IT WORK
+Each layer carries its own Color Flow state, shown in the panel. Layer Color Labels are set automatically from the **order** of the checked steps: the colour applied is the one **preceding the first unchecked step**.
 
-Each layer has is own Color Flow data, shown in the panel. Layers Color Labels are set automaticaly depending on the status and order of each category checkbox. The Color set is the precedent color of the first uncheck checkbox. 
+In the example below the Layer Color is `Orange` — even though `Light Green` and `Yellow` are ✅, `Brown` is unchecked, so the colour falls back to the step before it.
 
-In the following example Layer Color is set to `Orange` because even if `Light Green` and `Yellow` are ✅ , `Brown` is uncheck, so the color set is the color that precedes it.
+<img src="img/howcolorsetup1.jpg" width="450">   <img src="img/howcolorsetup2.jpg" width="450">
 
-<img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup1.jpg" width="450">   <img src="https://github.com/HugoJourdan/Color-Flow/blob/main/img/howcolorsetup2.jpg" width="450"> 
+> **Palette UI screenshots coming soon** — drag‑to‑reorder colours, double‑click‑to‑rename labels, focus mode, and the starter‑profile picker.
 
-Shortcuts can be used to toggle checkboxes. To assign shortcuts, follow these steps:
+### Shortcuts
 
-1. Download "Color Flow Shortcut" from Window > Plugin Manager.
-2. Reload script folder by pressing [ Option + MAJ + Command + Y ].
-3. In Glyph Preferences > Shortcuts, search "Color Flow" and assign a shortcut for each item. (I personnaly use Control+Number as shortcuts)
+Keyboard shortcuts can toggle each step:
 
+1. Install **"Color Flow Shortcut"** from *Window → Plugin Manager*.
+2. Reload the scripts folder with `⌥ ⇧ ⌘ Y`.
+3. In *Glyphs → Settings → Shortcuts*, search "Color Flow" and assign a shortcut per item (Control + number works well).
 
-_________________
-# EXTRA FEATURES
+There is also a **Jump to Next Unfinished** shortcut that selects the next glyph that still needs work.
 
-Some extra features are accessible from the Action Button.
+---
 
-* **Setup Color Flow based on Color Layers** : Set for all layer, Color Flow data based on its Layer Color (useful when you open for the first time a .glyph file with Layer Color already set)
-* **Reset Color Flow** : Reset for all layers, Color Flow data and Layer Color.
-* **Generate Color Flow Smart Filters** : Generate in the Filters UI section, a "Color Flow" folder containing filters to sort which layer has or has not a specific step checked.
-* **Copy Color Flow to Master** : Copy Color Flow data from a master to another.
-* **Toggle Rainbow Font View** : Group the Font View into colour-labelled sections (see below).
-* **Rainbow Source: Layer / Glyph Color** : Choose whether grouping reads the layer colour (of the selected master) or the glyph colour.
-* **Open Color Font Dashboard** : Open an HTML progress report for the current font (see below).
+# The progress report
 
-<br>
+A contemporary, **fully offline** report for the whole font, opened from the palette's **Action Button (⋯) → Open Color Font Dashboard**. It is a single self‑contained HTML file — no internet, no install — that you can keep or share. When it finishes building you get **Open** and **Save** buttons.
 
-_________________
-# COLOR FONT DASHBOARD
+Everything it shows matches the palette exactly: same glyphs, same Layer Color source, same step / free mode.
 
-A contemporary, interactive progress report for the whole font, opened in your
-browser from the palette's **Action Button (⋯) → Open Color Font Dashboard**. It is
-a single self-contained HTML file — no internet, no install — that you can keep or share.
+### Progress at a glance
 
-* **Search & filter** — find glyphs by name (press `/`), show only unfinished glyphs.
-* **Master tabs + Compare** — focus one master, or switch to a steps × masters matrix
-  to see which master lags on which step.
-* **Sort** — order steps by your workflow (`colorNames.txt`) or by progress.
-* **Per-glyph heatmap** — hover a cell for the glyph name + colour; click to copy the name.
-* **Light & dark** — follows your system, with a one-click toggle that remembers your choice.
-* **Matches the palette** — counts are exactly what the sidebar shows (same glyphs, same
-  Layer Color source, same step/free mode). Overall shows **completion** and **started**.
-* **Changed since last run** — lists glyphs whose colour changed since the previous open;
-  the snapshot lives in Glyphs' preferences, not in your `.glyphs` file.
+A stacked, colour‑coded completion bar (per font and per master) with a completion ring and a glowing colour‑dot legend.
 
-<br>
+<img src="img/report-progress.png" width="820" alt="Stacked progress bar with completion ring and legend">
 
-_________________
-# RAINBOW FONT VIEW
+### Coverage
 
-Color Flow can reorder the **Font View** into labelled colour sections, using the
-same `colorNames.txt` labels and order. Toggle it from **File > Color Flow: Rainbow
-Font View** (a checkmark shows the state) or the palette’s Action Button.
+How your colours are spread **by category** and **by writing system / script**, each script shown as a sample‑glyph card.
 
-It is **non-destructive**: your original glyph order is backed up when you enable it
-and restored when you disable it. Sections follow the order of `colorNames.txt`, and
-the "None" bucket (glyphs with no colour) is always placed last.
+<img src="img/report-coverage.png" width="820" alt="Coverage by category and by script">
 
-> This feature merges the former **Rainbow FontView** plugin into Color Flow. If you
-> still have the standalone *Rainbow FontView* plugin installed, **disable or remove
-> it** — otherwise both will fight over the Font View order. Color Flow warns you once
-> if it detects the old plugin.
+### Per‑glyph heatmap
 
-<br>
+Every glyph drawn as its own letterform, tinted by the step it's currently on. Hover a glyph for its step journey; click to open it in Glyphs.
 
-_________________
-# RENAME LABELS INLINE
+<img src="img/report-heatmap.png" width="820" alt="Per-glyph heatmap for one master">
 
-**Double-click a label** in the palette to edit it in place; press Return to save.
-Single-click still toggles the step. The new name is written straight to
-`colorNames.txt`, so the palette, the keyboard shortcuts, and the Rainbow Font View
-sections all relabel immediately.
+### Timeline & forecast
 
-<br>
+A burndown of completion over time with **Line** and **Flow** (colour streamgraph) modes, a this‑week digest, per‑category and per‑script lanes, a regression log, and a per‑master **finish‑date forecast** (velocity + ETA + confidence).
 
-*Thanks to Gor Jihanian (@gorjious) for his contribution.*
+<img src="img/report-trend.png" width="820" alt="Completion over time">
 
+The activity calendar and the completion chart sit side by side on the Overview:
 
+<img src="img/report-calendar.png" width="820" alt="Activity calendar beside completion over time">
+
+### Time Machine
+
+Replay your font's colouring **day by day**. Drag the scrubber — it has a tick per day, labelled by date — and the glyph grid fades back to the colour state on that date.
+
+<img src="img/report-scrubber.png" width="820" alt="Day-by-day Time Machine scrubber with dated ticks">
+
+> **Backfill from Git** — normally the timeline fills in one day at a time, as you run the report. If your `.glyphs` / `.glyphspackage` lives in a **git repository**, Color Flow reconstructs the history straight from your past commits (one snapshot per day) — so the timeline is populated immediately instead of having to wait days. It runs automatically for git‑tracked fonts and is incremental, so only the first run does the heavy lifting.
+
+### Compare
+
+A steps × masters matrix to see which master lags on which step. A fully‑complete cell shows ✅.
+
+<img src="img/report-compare.png" width="820" alt="Step completion compared across masters">
+
+### Also
+
+* **Light & dark** — follows your system, with a one‑click toggle that remembers your choice.
+* **Export** — the report data as **CSV / JSON / PDF**.
+* **Changed since last run** — glyphs whose colour changed since the previous report; the snapshot lives in Glyphs' preferences, never in your `.glyphs` file.
+
+---
+
+# Rainbow Font View
+
+Color Flow can reorder the **Font View** into labelled colour sections, using the same `colorNames.txt` labels and order. Toggle it from **File → Color Flow: Rainbow Font View** (a checkmark shows the state) or the palette's Action Button.
+
+It is **non‑destructive**: your original glyph order is backed up when you enable it and restored when you disable it. The "None" bucket (glyphs with no colour) is always placed last.
+
+> This feature merges the former **Rainbow FontView** plugin into Color Flow. If you still have the standalone *Rainbow FontView* plugin installed, **disable or remove it** — otherwise both will fight over the Font View order. Color Flow warns you once if it detects the old plugin.
+
+---
+
+# Rename labels inline
+
+**Double‑click a label** in the palette to edit it in place; press Return to save. Single‑click still toggles the step. The new name is written straight to `colorNames.txt`, so the palette, the keyboard shortcuts, and the Rainbow Font View sections all relabel immediately.
+
+---
+
+# Extra features (Action Button ⋯)
+
+* **Setup Color Flow based on Color Layers** — derive each layer's Color Flow state from its existing Layer Color (handy the first time you open a `.glyphs` file that already has colours).
+* **Generate Color Flow Smart Filters** — add a "Color Flow" folder of filters that sort layers by which step is / isn't set.
+* **Copy Color Flow to Master** — copy state from one master to another.
+* **Toggle Rainbow Font View** — group the Font View into colour sections.
+* **Rainbow Source: Layer / Glyph Color** — choose which colour the grouping reads.
+* **Open Color Font Dashboard** — build the progress report described above.
+
+---
+
+# Install
+
+Install **Color Flow** (and **Color Flow Shortcut** for keyboard shortcuts) from **Window → Plugin Manager**, then restart Glyphs. Make sure a `colorNames.txt` is in place (see *Requirements*).
+
+---
+
+*Thanks to Gor Jihanian ([@gorjious](https://github.com/gorjious)) for his contribution.*
