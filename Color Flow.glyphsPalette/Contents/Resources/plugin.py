@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import webbrowser
 from datetime import datetime
@@ -87,73 +88,23 @@ def _pump_runloop() -> None:
 
 
 class _ColorFlowLoaderBar(AppKit.NSView):
-	# A self-contained "rainbow fill" loading bar for the report-generation sheet:
-	# the workflow colours fill a rounded track 0->100% with a live percentage.
-	# Progress is REAL: the build calls set_progress() at each phase (and every few
-	# glyphs of the heavy outline pass) while _pump_runloop() keeps this view
-	# repainting through the otherwise-blocking main-thread build, so the bar tracks
-	# actual work instead of racing ahead on a timer. The 30 Hz NSTimer (added to the
-	# common run-loop modes) eases the displayed value toward the latest milestone so
-	# motion stays smooth between callbacks.
-	_SPECTRUM = (0, 1, 3, 4, 5, 6, 8, 9)   # red->green->blue->purple->pink (skip browns/greys)
+	# A "ghost-preview fill" ring loader for the report-generation sheet: a faint, spinning
+	# rainbow ghost ring fades out as a crisp rainbow ring fills clockwise to the real
+	# progress, leaving the favicon-style ring (open hole + live %) at 100%.
+	# Progress is REAL: the build calls set_progress() at each phase (and every few glyphs
+	# of the heavy outline pass) while _pump_runloop() keeps this view repainting through
+	# the otherwise-blocking main-thread build, so the ring tracks actual work instead of
+	# racing ahead on a timer. The 30 Hz NSTimer (added to the common run-loop modes) eases
+	# the displayed value toward the latest milestone + advances the spin between callbacks.
 
 	@objc.python_method
 	def configure(self, rgba_colors: list) -> None:
-		raw = [rgba_colors[i] for i in self._SPECTRUM if i < len(rgba_colors)]
-		if not raw:
-			raw = list(rgba_colors)
-		self._colors = [self._saturate(rgba, 1.6) for rgba in raw]   # vivid, punchy hues
+		# The ring is a full smooth-hue rainbow (HSB) like the favicon, so the palette
+		# colours aren't needed; the arg is kept for call-site compatibility.
 		self._value = 0.0    # displayed fraction (eased toward _target)
 		self._target = 0.0   # latest real-progress milestone (monotonic, never decreases)
-		self._fillImage = None   # cached blurred gradient fill (rebuilt on size change)
-		self._fillKey = None
+		self._phase = 0.0    # ghost-ring spin phase, in revolutions
 		self.start()
-
-	@objc.python_method
-	def _saturate(self, rgba: tuple, factor: float) -> tuple:
-		import colorsys
-		hue, sat, val = colorsys.rgb_to_hsv(rgba[0], rgba[1], rgba[2])
-		red, green, blue = colorsys.hsv_to_rgb(hue, min(1.0, sat * factor), val)
-		return (red, green, blue, rgba[3] if len(rgba) > 3 else 1.0)
-
-	@objc.python_method
-	def _blurred_fill(self, gradient: Any, width: float, bar_h: float, radius: float) -> Any:
-		# Render the full-width gradient offscreen and Gaussian-blur it so the colours
-		# read soft/dreamy like the favicon. Returns an NSImage sized to the bar, or
-		# None when Core Image is unavailable (caller falls back to the crisp gradient).
-		try:
-			import Quartz
-			source = AppKit.NSImage.alloc().initWithSize_(AppKit.NSMakeSize(width, bar_h))
-			source.lockFocus()
-			gradient.drawInRect_angle_(AppKit.NSMakeRect(0.0, 0.0, width, bar_h), 0.0)
-			source.unlockFocus()
-			image = Quartz.CIImage.alloc().initWithData_(source.TIFFRepresentation())
-			blur = Quartz.CIFilter.filterWithName_("CIGaussianBlur")
-			if image is None or blur is None:
-				return None
-			blur.setValue_forKey_(image, "inputImage")
-			blur.setValue_forKey_(radius, "inputRadius")
-			output = blur.valueForKey_("outputImage")
-			if output is None:
-				return None
-			# Push saturation back up — the blur averages neighbouring hues and dulls them,
-			# so re-boost so the bar reads vivid/colourful even while soft.
-			controls = Quartz.CIFilter.filterWithName_("CIColorControls")
-			if controls is not None:
-				controls.setValue_forKey_(output, "inputImage")
-				controls.setValue_forKey_(1.5, "inputSaturation")
-				boosted = controls.valueForKey_("outputImage")
-				if boosted is not None:
-					output = boosted
-			output = output.imageByCroppingToRect_(image.extent())   # blur expands extent; crop back
-			rep = AppKit.NSCIImageRep.alloc().initWithCIImage_(output)
-			if rep is None:
-				return None
-			result = AppKit.NSImage.alloc().initWithSize_(AppKit.NSMakeSize(width, bar_h))
-			result.addRepresentation_(rep)
-			return result
-		except Exception:
-			return None
 
 	@objc.python_method
 	def start(self) -> None:
@@ -173,6 +124,7 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 		self._timer = None
 
 	def tick_(self, timer: Any) -> None:
+		self._phase = (getattr(self, "_phase", 0.0) + 0.011) % 1.0   # advance the ghost spin
 		self.setNeedsDisplay_(True)
 
 	def viewDidMoveToWindow(self) -> None:
@@ -201,77 +153,78 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 		return value
 
 	def drawRect_(self, dirtyRect: Any) -> None:
-		colors = getattr(self, "_colors", None) or []
+		# "Ghost-preview fill": a faint, smeared, spinning rainbow ring is shown the whole
+		# time and fades out as the crisp ring fills clockwise to the real progress; at
+		# 100% only the crisp rainbow ring remains. Open hole in the middle (the sheet
+		# shows through), with the live % in the centre.
 		prog = self._progress()
+		phase = getattr(self, "_phase", 0.0)
 		bounds = self.bounds()
 		width = bounds.size.width
 		height = bounds.size.height
-		bar_h = 16.0 / 1.5   # thinner bar
-		bar_y = height - bar_h
-		radius = bar_h / 2.0
-		bar_rect = AppKit.NSMakeRect(0.0, bar_y, width, bar_h)
-		filled = prog * width
-		# Build (and cache once per size) the soft, saturated, Gaussian-blurred rainbow
-		# fill — both the glow and the bar itself draw from it.
-		nscolors = [
-			AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(rgba[0], rgba[1], rgba[2], 1.0)
-			for rgba in colors
-		]
-		blend = AppKit.NSGradient.alloc().initWithColors_(nscolors) if len(nscolors) >= 2 else None
-		key = (int(round(width)), int(round(bar_h)))
-		if blend is not None and getattr(self, "_fillKey", None) != key:
-			self._fillImage = self._blurred_fill(blend, width, bar_h, bar_h * 1.2)
-			self._fillKey = key
-		fill_image = getattr(self, "_fillImage", None)
-		# Coloured glow: the blurred fill drawn a little larger + faint BEHIND the track,
-		# CLIPPED to a rounded pill so it reads as a soft halo hugging the bar — not a
-		# rectangular ghost peeking out behind the rounded track (the "second bar").
-		if colors and prog > 0.0 and fill_image is not None:
-			grow = bar_h * 0.4
-			glow_rect = AppKit.NSMakeRect(-grow, bar_y - grow, filled + grow * 2.0, bar_h + grow * 2.0)
-			src_rect = AppKit.NSMakeRect(0.0, 0.0, max(filled, 1.0), bar_h)
-			glow_radius = (bar_h + grow * 2.0) / 2.0
-			context = AppKit.NSGraphicsContext.currentContext()
-			context.saveGraphicsState()
-			AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
-				glow_rect, glow_radius, glow_radius).addClip()
-			fill_image.drawInRect_fromRect_operation_fraction_(
-				glow_rect, src_rect, AppKit.NSCompositingOperationSourceOver, 0.5)
-			context.restoreGraphicsState()
-		track = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(bar_rect, radius, radius)
-		AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(0.137, 0.149, 0.180, 1.0).set()
-		track.fill()
-		if colors and prog > 0.0:
-			context = AppKit.NSGraphicsContext.currentContext()
-			context.saveGraphicsState()
-			track.addClip()
-			# reveal the fill only up to the filled fraction (colours stay anchored)
-			AppKit.NSBezierPath.bezierPathWithRect_(
-				AppKit.NSMakeRect(0.0, bar_y, filled, bar_h)).addClip()
-			if fill_image is not None:
-				fill_image.drawInRect_fromRect_operation_fraction_(
-					bar_rect, AppKit.NSZeroRect, AppKit.NSCompositingOperationSourceOver, 1.0)
-			elif blend is not None:
-				blend.drawInRect_angle_(bar_rect, 0.0)
-			elif nscolors:
-				nscolors[0].set()
-				AppKit.NSRectFill(AppKit.NSMakeRect(0.0, bar_y, filled, bar_h))
-			top = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(1.0, 1.0, 1.0, 0.22)
-			bottom = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(0.0, 0.0, 0.0, 0.16)
-			sheen = AppKit.NSGradient.alloc().initWithStartingColor_endingColor_(top, bottom)
-			if sheen is not None:
-				sheen.drawInRect_angle_(bar_rect, -90.0)
-			context.restoreGraphicsState()
+		cx = width / 2.0
+		cy = height / 2.0
+		r_out = min(width, height) / 2.0 - 2.0
+		if r_out <= 4.0:
+			return
+		r_in = r_out * 0.46
+		ease = 1.0 - (1.0 - prog) ** 3
+		ghost_alpha = 0.5 * (1.0 - ease)
+		if ghost_alpha > 0.02:
+			copies = 5
+			spread = 0.10            # revolutions of angular smear across the ghost copies
+			for k in range(copies):
+				offset = (k - (copies - 1) / 2.0) / copies * spread
+				self._draw_ring(cx, cy, r_in, r_out, 0.0, 1.0, phase + offset, ghost_alpha / copies * 1.7, 0.6, 40)
+		if prog > 0.0:
+			self._draw_ring(cx, cy, r_in, r_out, 0.0, prog, 0.0, 1.0, 0.95, max(6, int(prog * 72)))
+		self._draw_pct(cx, cy, r_in, prog)
+
+	@objc.python_method
+	def _draw_ring(self, cx: float, cy: float, r_in: float, r_out: float,
+				   f1: float, f2: float, hue_phase: float, alpha: float,
+				   brightness: float, segments: int) -> None:
+		# A rainbow annular sector from fraction f1..f2 of the circle (0 = 12 o'clock,
+		# clockwise). Hue follows the angle (+hue_phase for the spinning ghost). Drawn as
+		# `segments` filled NSBezierPath wedges; the centre is left empty (the hole).
+		if f2 <= f1 or alpha <= 0.0:
+			return
+		count = max(1, int(segments))
+		step = (f2 - f1) / count
+		edge = 3
+		f = f1
+		for _i in range(count):
+			g = f + step
+			hue = ((f + g) / 2.0 + hue_phase) % 1.0
+			AppKit.NSColor.colorWithHue_saturation_brightness_alpha_(hue, 0.88, brightness, alpha).set()
+			path = AppKit.NSBezierPath.bezierPath()
+			for s in range(edge + 1):
+				ang = math.pi / 2.0 - (f + (g - f) * s / edge) * 2.0 * math.pi
+				point = (cx + r_out * math.cos(ang), cy + r_out * math.sin(ang))
+				if s == 0:
+					path.moveToPoint_(point)
+				else:
+					path.lineToPoint_(point)
+			for s in range(edge + 1):
+				ang = math.pi / 2.0 - (g - (g - f) * s / edge) * 2.0 * math.pi
+				path.lineToPoint_((cx + r_in * math.cos(ang), cy + r_in * math.sin(ang)))
+			path.closePath()
+			path.fill()
+			f = g
+
+	@objc.python_method
+	def _draw_pct(self, cx: float, cy: float, r_in: float, prog: float) -> None:
 		paragraph = AppKit.NSMutableParagraphStyle.alloc().init()
 		paragraph.setAlignment_(AppKit.NSTextAlignmentCenter)
 		attributes = {
-			AppKit.NSForegroundColorAttributeName: AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(0.60, 0.63, 0.67, 1.0),
-			AppKit.NSFontAttributeName: AppKit.NSFont.systemFontOfSize_(11.0),
+			AppKit.NSForegroundColorAttributeName: AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(0.66, 0.69, 0.74, 1.0),
+			AppKit.NSFontAttributeName: AppKit.NSFont.systemFontOfSize_(max(8.0, r_in * 0.72)),
 			AppKit.NSParagraphStyleAttributeName: paragraph,
 		}
 		label = AppKit.NSAttributedString.alloc().initWithString_attributes_(
 			f"{int(round(prog * 100))}%", attributes)
-		label.drawInRect_(AppKit.NSMakeRect(0.0, 0.0, width, bar_y - 2.0))
+		text_height = label.size().height
+		label.drawInRect_(AppKit.NSMakeRect(cx - r_in, cy - text_height / 2.0, r_in * 2.0, text_height))
 
 
 class ColorFlow(PalettePlugin):
@@ -873,15 +826,15 @@ class ColorFlow(PalettePlugin):
 			if parent is None:
 				self.Open_Color_Font_Dashboard(None)
 				return
-			rect = AppKit.NSMakeRect(0, 0, 256, 84)
+			rect = AppKit.NSMakeRect(0, 0, 256, 120)
 			panel = AppKit.NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
 				rect, AppKit.NSWindowStyleMaskTitled, AppKit.NSBackingStoreBuffered, False)
 			panel.setTitle_("Color Flow")
 			content = panel.contentView()
 			label = AppKit.NSTextField.labelWithString_("Generating Color Flow report\u2026")
-			label.setFrame_(AppKit.NSMakeRect(16, 52, 224, 16))
+			label.setFrame_(AppKit.NSMakeRect(16, 94, 224, 16))
 			content.addSubview_(label)
-			loader = _ColorFlowLoaderBar.alloc().initWithFrame_(AppKit.NSMakeRect(16, 16, 224, 30))
+			loader = _ColorFlowLoaderBar.alloc().initWithFrame_(AppKit.NSMakeRect(100, 30, 56, 56))
 			loader.configure(labelcolors.read_label_colors())
 			content.addSubview_(loader)
 			# View here / Open / Save buttons, hidden until the build finishes — they
