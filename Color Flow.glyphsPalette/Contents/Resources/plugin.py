@@ -1013,22 +1013,21 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _present_report_webview(self, path) -> None:
-		# Embed the self-contained report in a WKWebView inside a standalone resizable
-		# window (the docked palette is too narrow to host a full-size sheet). glyphsapp://
-		# glyph links route back to Glyphs via the navigation delegate below; the file://
-		# report loads in place. Falls back to the browser on any failure.
+		# Embed the self-contained report in a WKWebView and present it as a sheet on the
+		# document window (the docked palette is too narrow to host it). glyphsapp:// glyph
+		# links route to Glyphs via a block-free JS message handler; the file:// report
+		# loads in place. Falls back to a floating window with no doc window; browser on error.
 		try:
 			import WebKit
 			style = (AppKit.NSWindowStyleMaskTitled | AppKit.NSWindowStyleMaskClosable
 				| AppKit.NSWindowStyleMaskResizable | AppKit.NSWindowStyleMaskMiniaturizable)
 			window = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
-				AppKit.NSMakeRect(0, 0, 1180, 780), style, AppKit.NSBackingStoreBuffered, False)
+				AppKit.NSMakeRect(0, 0, 1040, 740), style, AppKit.NSBackingStoreBuffered, False)
 			window.setTitle_("Color Flow — " + path.name)
 			window.setReleasedWhenClosed_(False)
 			window.setDelegate_(self)
-			window.center()
 			content = window.contentView()
-			bar_h = 36
+			bar_h = 40
 			size = content.bounds().size
 			config = WebKit.WKWebViewConfiguration.alloc().init()
 			# Route clicks on glyphsapp:// glyph links to Glyphs through a JS message
@@ -1054,20 +1053,42 @@ class ColorFlow(PalettePlugin):
 				AppKit.NSURL.fileURLWithPath_(str(path.parent)))
 			content.addSubview_(web)
 			save_btn = AppKit.NSButton.buttonWithTitle_target_action_("Save…", self, "saveReportFile:")
-			save_btn.setFrame_(AppKit.NSMakeRect(size.width - 230, 6, 104, 24))
+			save_btn.setFrame_(AppKit.NSMakeRect(12, 8, 90, 24))
 			save_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
-			save_btn.setAutoresizingMask_(AppKit.NSViewMinXMargin)
+			save_btn.setAutoresizingMask_(AppKit.NSViewMaxXMargin)
 			content.addSubview_(save_btn)
 			browser_btn = AppKit.NSButton.buttonWithTitle_target_action_("Open in Browser", self, "openReportBrowser:")
-			browser_btn.setFrame_(AppKit.NSMakeRect(size.width - 122, 6, 110, 24))
+			browser_btn.setFrame_(AppKit.NSMakeRect(108, 8, 130, 24))
 			browser_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
-			browser_btn.setAutoresizingMask_(AppKit.NSViewMinXMargin)
+			browser_btn.setAutoresizingMask_(AppKit.NSViewMaxXMargin)
 			content.addSubview_(browser_btn)
+			done_btn = AppKit.NSButton.buttonWithTitle_target_action_("Done", self, "dismissReportWindow:")
+			done_btn.setFrame_(AppKit.NSMakeRect(size.width - 92, 8, 80, 24))
+			done_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
+			done_btn.setKeyEquivalent_("\r")
+			done_btn.setAutoresizingMask_(AppKit.NSViewMinXMargin)
+			content.addSubview_(done_btn)
 			self._reportWindow = window
 			self._reportWeb = web
 			self._reportController = controller
 			self._reportWebPath = path
-			window.makeKeyAndOrderFront_(None)
+			parent = None
+			try:
+				doc = Glyphs.font.parent if (Glyphs.font is not None) else None
+				wc = doc.windowController() if doc is not None else None
+				parent = wc.window() if wc is not None else None
+			except Exception:
+				parent = None
+			if parent is None:
+				try:
+					parent = AppKit.NSApp.mainWindow() or AppKit.NSApp.keyWindow()
+				except Exception:
+					parent = None
+			if parent is not None:
+				parent.beginSheet_completionHandler_(window, None)
+			else:
+				window.center()
+				window.makeKeyAndOrderFront_(None)
 		except Exception:
 			import traceback
 			print("Color Flow [inline report] error:\n" + traceback.format_exc())
@@ -1086,6 +1107,33 @@ class ColorFlow(PalettePlugin):
 				webbrowser.open(path.as_uri())
 			except Exception:
 				pass
+
+	def dismissReportWindow_(self, sender) -> None:
+		self._dismiss_report_window()
+
+	@objc.python_method
+	def _dismiss_report_window(self) -> None:
+		# End the report sheet (or close the floating fallback window) and drop refs,
+		# removing the script-message handler to break the controller -> self cycle.
+		window = getattr(self, "_reportWindow", None)
+		controller = getattr(self, "_reportController", None)
+		if controller is not None:
+			try:
+				controller.removeScriptMessageHandlerForName_("cfGlyph")
+			except Exception:
+				pass
+		if window is not None:
+			try:
+				parent = window.sheetParent()
+				if parent is not None:
+					parent.endSheet_(window)
+				window.orderOut_(None)
+			except Exception:
+				pass
+		self._reportController = None
+		self._reportWeb = None
+		self._reportWindow = None
+		self._reportWebPath = None
 
 	def userContentController_didReceiveScriptMessage_(self, controller, message) -> None:
 		# A glyphsapp:// glyph link was clicked in the embedded report — hand the URL to
