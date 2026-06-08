@@ -1030,11 +1030,25 @@ class ColorFlow(PalettePlugin):
 			content = window.contentView()
 			bar_h = 36
 			size = content.bounds().size
+			config = WebKit.WKWebViewConfiguration.alloc().init()
+			# Route clicks on glyphsapp:// glyph links to Glyphs through a JS message
+			# handler — block-free, unlike a navigation-policy completion handler (whose
+			# block crashes PyObjC). The file:// report itself just loads normally.
+			controller = config.userContentController()
+			controller.addScriptMessageHandler_name_(self, "cfGlyph")
+			click_js = (
+				"document.addEventListener('click',function(e){"
+				"var a=e.target.closest&&e.target.closest('a[href^=\"glyphsapp:\"]');"
+				"if(a){e.preventDefault();try{"
+				"window.webkit.messageHandlers.cfGlyph.postMessage(a.getAttribute('href'));"
+				"}catch(err){}}},true);"
+			)
+			controller.addUserScript_(
+				WebKit.WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
+					click_js, WebKit.WKUserScriptInjectionTimeAtDocumentEnd, True))
 			web = WebKit.WKWebView.alloc().initWithFrame_configuration_(
-				AppKit.NSMakeRect(0, bar_h, size.width, size.height - bar_h),
-				WebKit.WKWebViewConfiguration.alloc().init())
+				AppKit.NSMakeRect(0, bar_h, size.width, size.height - bar_h), config)
 			web.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
-			web.setNavigationDelegate_(self)
 			web.loadFileURL_allowingReadAccessToURL_(
 				AppKit.NSURL.fileURLWithPath_(str(path)),
 				AppKit.NSURL.fileURLWithPath_(str(path.parent)))
@@ -1051,6 +1065,7 @@ class ColorFlow(PalettePlugin):
 			content.addSubview_(browser_btn)
 			self._reportWindow = window
 			self._reportWeb = web
+			self._reportController = controller
 			self._reportWebPath = path
 			window.makeKeyAndOrderFront_(None)
 		except Exception:
@@ -1072,26 +1087,16 @@ class ColorFlow(PalettePlugin):
 			except Exception:
 				pass
 
-	def webView_decidePolicyForNavigationAction_decisionHandler_(self, web_view, action, decision_handler) -> None:
-		# Keep the file:// report (and its in-page #anchors) loading in place; send
-		# glyphsapp:// (open a glyph in Glyphs) and external http/https/mailto links out
-		# to the system instead of navigating the embedded view away from the report.
-		import WebKit
-		url = None
-		scheme = ""
+	def userContentController_didReceiveScriptMessage_(self, controller, message) -> None:
+		# A glyphsapp:// glyph link was clicked in the embedded report — hand the URL to
+		# the system so Glyphs opens the glyph, instead of navigating the web view.
 		try:
-			url = action.request().URL()
-			scheme = (url.scheme() or "").lower() if url is not None else ""
+			href = message.body()
+			url = AppKit.NSURL.URLWithString_(str(href)) if href else None
+			if url is not None:
+				AppKit.NSWorkspace.sharedWorkspace().openURL_(url)
 		except Exception:
 			pass
-		if url is not None and scheme in ("glyphsapp", "http", "https", "mailto"):
-			try:
-				AppKit.NSWorkspace.sharedWorkspace().openURL_(url)
-			except Exception:
-				pass
-			decision_handler(WebKit.WKNavigationActionPolicyCancel)
-		else:
-			decision_handler(WebKit.WKNavigationActionPolicyAllow)
 
 	def windowWillClose_(self, notification) -> None:
 		# Drop our strong refs when the inline report window closes (avoids a leak; the
@@ -1101,6 +1106,13 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			closing = None
 		if closing is not None and closing == getattr(self, "_reportWindow", None):
+			controller = getattr(self, "_reportController", None)
+			if controller is not None:
+				try:
+					controller.removeScriptMessageHandlerForName_("cfGlyph")
+				except Exception:
+					pass
+			self._reportController = None
 			self._reportWeb = None
 			self._reportWindow = None
 			self._reportWebPath = None
