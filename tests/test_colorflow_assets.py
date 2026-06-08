@@ -238,6 +238,14 @@ def test_dashboard_calendar_is_month_grid_only() -> None:
     assert ".tl-cal-wk" not in css and ".tl-cal-key" not in css  # heatmap styles removed
 
 
+def test_dashboard_canvas_blur_has_webkit_fallback() -> None:
+    js = assets.DASHBOARD_JS
+    assert "CTX_FILTER_OK" in js                          # one-time canvas ctx.filter probe
+    assert "function cssSafeBlur(" in js                  # downscale->upscale fallback blur
+    assert "if (CTX_FILTER_OK)" in js                     # the disc field blur is gated
+    assert "cssSafeBlur(off, bg, FS" in js                # ...fallback on the else path (WebKit)
+
+
 def test_progress_bar_and_dots_glow_softened() -> None:
     js = assets.DASHBOARD_JS
     html = assets.build_html(_model())

@@ -513,6 +513,31 @@ DASHBOARD_JS = r"""
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
     return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
   function pct(n,t){ return t ? Math.round(n/t*100) : 0; }
+  // WebKit (and therefore the plugin's embedded WKWebView) does not support canvas 2D
+  // ctx.filter, so the disc/script-card blur silently no-ops there (hard wedges). Probe
+  // once; the browser path (filter works) is untouched, and the canvas blurs below fall
+  // back to a downscale->upscale approximation when it's missing.
+  var CTX_FILTER_OK = (function(){
+    try {
+      var c = document.createElement("canvas"); c.width = c.height = 9;
+      var g = c.getContext("2d");
+      g.fillStyle = "#fff"; g.fillRect(0, 0, 9, 9);
+      g.filter = "blur(2px)"; g.fillStyle = "#000"; g.fillRect(0, 0, 4, 9); g.filter = "none";
+      var p = g.getImageData(4, 4, 1, 1).data;
+      return p[0] > 20 && p[0] < 235;            // boundary pixel is mid-grey only if blurred
+    } catch(e){ return false; }
+  })();
+  // Cheap, WebKit-safe blur: shrink the source then draw it back up with smoothing.
+  function cssSafeBlur(src, dst, side, radius){
+    var step = Math.max(2, Math.round(radius));
+    var small = Math.max(1, Math.round(side / step));
+    var t = document.createElement("canvas"); t.width = t.height = small;
+    var tg = t.getContext("2d");
+    tg.imageSmoothingEnabled = true; tg.imageSmoothingQuality = "high";
+    tg.drawImage(src, 0, 0, small, small);
+    dst.imageSmoothingEnabled = true; dst.imageSmoothingQuality = "high";
+    dst.drawImage(t, 0, 0, side, side);
+  }
   function varFor(k){ return k===-1 ? "--c-none" : "--c"+k; }
   // A legend swatch dot that glows in its own colour (matches the progress-bar glow).
   function legendDot(key){
@@ -1008,7 +1033,9 @@ DASHBOARD_JS = r"""
       if (!filled){ var a=-Math.PI/2;
         for (i=0;i<segs.length;i++){ var a1=a+segs[i][0]/sum*Math.PI*2;
           g.fillStyle=segs[i][1]; g.beginPath(); g.moveTo(cx,cy); g.arc(cx,cy,R,a,a1); g.closePath(); g.fill(); a=a1; } }
-      ctx.filter="blur("+Math.round(Math.max(W,Ht)*0.085)+"px) saturate(1.2)"; ctx.drawImage(off,0,0); ctx.filter="none";
+      if (CTX_FILTER_OK){
+        ctx.filter="blur("+Math.round(Math.max(W,Ht)*0.085)+"px) saturate(1.2)"; ctx.drawImage(off,0,0); ctx.filter="none";
+      } else { cssSafeBlur(off, ctx, Math.max(W,Ht), Math.round(Math.max(W,Ht)*0.085)); }
     }
   }
   function paintScriptCards(){
@@ -2796,8 +2823,10 @@ DASHBOARD_JS = r"""
       }
       var bl=document.createElement("canvas"); bl.width=bl.height=Math.round(FS*dpr); var bg=bl.getContext("2d");
       bg.setTransform(dpr,0,0,dpr,0,0);
-      bg.filter="blur("+Math.round(FS*0.125)+"px) saturate(1.6) brightness(0.92)"; bg.drawImage(off,0,0,FS,FS);
-      bg.filter="none"; bg.globalCompositeOperation="destination-in";
+      if (CTX_FILTER_OK){
+        bg.filter="blur("+Math.round(FS*0.125)+"px) saturate(1.6) brightness(0.92)"; bg.drawImage(off,0,0,FS,FS); bg.filter="none";
+      } else { cssSafeBlur(off, bg, FS, Math.round(FS*0.125)); }
+      bg.globalCompositeOperation="destination-in";
       bg.fillStyle="#000"; bg.beginPath(); bg.arc(FS/2,FS/2,FS*0.5,0,7); bg.fill();
       bg.globalCompositeOperation="source-over";
       return bl;
@@ -2826,7 +2855,9 @@ DASHBOARD_JS = r"""
         g.fillStyle="rgba(255,255,255,"+(Math.random()*0.07)+")"; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); }
       var o=document.createElement("canvas"); o.width=o.height=Math.round(FS*dpr); var og=o.getContext("2d");
       og.setTransform(dpr,0,0,dpr,0,0);
-      og.filter="blur(0.6px)"; og.drawImage(c,0,0,FS,FS); return o;
+      if (CTX_FILTER_OK){ og.filter="blur(0.6px)"; og.drawImage(c,0,0,FS,FS); og.filter="none"; }
+      else { og.drawImage(c,0,0,FS,FS); }
+      return o;
     })();
     var buf=document.createElement("canvas"); buf.width=Math.round(W*dpr); buf.height=Math.round(Hc*dpr); var bctx=buf.getContext("2d");
     bctx.setTransform(dpr,0,0,dpr,0,0);
@@ -2843,12 +2874,15 @@ DASHBOARD_JS = r"""
       // dreamy/shiny finish at HALF the original strength (all highlight alphas
       // halved) layered over the now-blurrier colour field.
       g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.rotate(rot);
-      var halo=[[1.006,3,0.11],[1.025,6,0.07],[1.06,12,0.04]];
-      for (var h=0;h<halo.length;h++){ g.globalAlpha=halo[h][2]*glow; g.filter="blur("+halo[h][1]+"px)"; var hh=rx*halo[h][0]; g.drawImage(fA,-hh,-hh,hh*2,hh*2); }
-      g.filter="none"; g.globalAlpha=1; g.restore();
+      if (CTX_FILTER_OK){   // the halo is pure blur — skip it (not a sharp ghost) on WebKit
+        var halo=[[1.006,3,0.11],[1.025,6,0.07],[1.06,12,0.04]];
+        for (var h=0;h<halo.length;h++){ g.globalAlpha=halo[h][2]*glow; g.filter="blur("+halo[h][1]+"px)"; var hh=rx*halo[h][0]; g.drawImage(fA,-hh,-hh,hh*2,hh*2); }
+        g.filter="none"; g.globalAlpha=1;
+      }
+      g.restore();
       g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.rotate(rot);
       g.beginPath(); g.arc(0,0,rx,0,7); g.clip();
-      if (glow>1) g.filter="brightness("+(1+(glow-1)*0.7)+")";
+      if (CTX_FILTER_OK && glow>1) g.filter="brightness("+(1+(glow-1)*0.7)+")";
       g.globalAlpha=DISC_ALPHA; g.drawImage(fA,-o,-o,o*2,o*2);
       g.filter="none"; g.globalAlpha=1; g.restore();
       g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.beginPath(); g.arc(0,0,rx,0,7); g.clip();
