@@ -2,8 +2,8 @@
 
 A ``.colorflow`` file is a small JSON bundle of everything that defines a Color
 Flow workflow: the ``colorNames.txt`` text (colour order, labels, visibility,
-None label), step-vs-free mode, the Rainbow Font View source, and the 12 Glyphs
-label colours (RGBA). Sharing one lets a team standardise their workflow.
+None label), the Rainbow Font View source, and the 12 Glyphs label colours
+(RGBA). Sharing one lets a team standardise their workflow.
 
 This module is pure (no GlyphsApp): it builds, (de)serialises and *diffs*
 profiles. The plugin gathers the live values, calls :func:`build_profile`, and on
@@ -22,7 +22,7 @@ RAINBOW_SOURCES = ("Layer", "Glyph")
 _COLOR_EPSILON = 1e-3
 
 
-def build_profile(color_names: str, free_mode: bool, rainbow_source: str,
+def build_profile(color_names: str, rainbow_source: str,
                   label_colors: list, name: str = "") -> dict:
     """Assemble a portable profile dict from the live Color Flow config values."""
     source = rainbow_source if rainbow_source in RAINBOW_SOURCES else "Layer"
@@ -30,7 +30,6 @@ def build_profile(color_names: str, free_mode: bool, rainbow_source: str,
         "version": PROFILE_VERSION,
         "name": name or "Color Flow profile",
         "colorNames": color_names or "",
-        "freeMode": bool(free_mode),
         "rainbowSource": source,
         "labelColors": [list(rgba) for rgba in label_colors],
     }
@@ -68,17 +67,14 @@ def parse(text: str) -> dict:
         raise ValueError("Not a valid .colorflow file: expected a JSON object.")
     if raw.get("version") != PROFILE_VERSION:
         raise ValueError(f"Unsupported .colorflow version: {raw.get('version')!r}")
+    # Tolerant parsing: unknown keys in the raw JSON (e.g. retired fields
+    # written by older plugin versions) are simply ignored.
     return build_profile(
         color_names=str(raw.get("colorNames") or ""),
-        free_mode=bool(raw.get("freeMode")),
         rainbow_source=str(raw.get("rainbowSource") or "Layer"),
         label_colors=_coerce_label_colors(raw.get("labelColors") or []),
         name=str(raw.get("name") or ""),
     )
-
-
-def _mode(profile: dict) -> str:
-    return "free" if profile.get("freeMode") else "step"
 
 
 def _label_color_changes(current: list, incoming: list) -> int:
@@ -120,8 +116,6 @@ def diff_profile(current: dict, incoming: dict) -> list[dict]:
     an incoming one — surfaced to the user before applying an import so a shared
     profile never silently overwrites local choices. Empty when identical."""
     diffs: list[dict] = []
-    if bool(current.get("freeMode")) != bool(incoming.get("freeMode")):
-        diffs.append({"field": "Mode", "detail": f"{_mode(current)} -> {_mode(incoming)}"})
     if current.get("rainbowSource") != incoming.get("rainbowSource"):
         diffs.append({"field": "Rainbow source",
                       "detail": f"{current.get('rainbowSource')} -> {incoming.get('rainbowSource')}"})

@@ -212,15 +212,12 @@ def checked_state_for_color(color, order: list[str]) -> dict[str, bool]:
     return state
 
 
-def exclusive_state_for_color(color, order: list[str]) -> dict[str, bool]:
-    """Free-mode (single-select) checkbox state: only the step matching the
-    native ``layer.color`` is checked. Fully derived from the colour, so free
-    mode (like step mode) saves nothing in the .glyphs file."""
-    return {index: (color is not None and int(index) == color) for index in order}
-
-
 def single_counts_from_colors(colors: list, order: list[str]) -> dict[str, int]:
-    """Free-mode per-step counts: how many layers have *exactly* each colour."""
+    """Exact per-step census: how many layers have *exactly* each colour.
+
+    Unlike :func:`counts_from_colors` (cumulative), this is the exclusive
+    distribution — used for the palette's count badges, row bars and
+    title-bar colour segments, and the report's per-group ``dist`` data."""
     counts = {index: 0 for index in order}
     for color in colors:
         if color is None:
@@ -231,26 +228,13 @@ def single_counts_from_colors(colors: list, order: list[str]) -> dict[str, int]:
     return counts
 
 
-def highest_checked(state: dict[str, bool], order: list[str]) -> int | None:
-    """Highest checked step index, or ``None`` if none are checked.
-
-    Used in free mode to set ``layer.color`` (so a glyph still gets a native
-    colour for the Font-View grouping) when the checkboxes are independent and
-    no longer form a contiguous run."""
-    result: int | None = None
-    for index in order:
-        if index in state and state[index]:
-            result = int(index)
-    return result
-
-
 def non_exporting_names(glyphs: Iterable[Any]) -> set[str]:
     """Names of the glyphs marked non-exporting (``GSGlyph.export == False``).
 
     Pure: ``glyphs`` is any iterable of objects with a ``name`` and an optional
     ``export`` flag — a missing flag counts as exporting, matching Glyphs'
-    default. This is the exclusion set the opt-in "count exporting glyphs only"
-    mode threads through the palette's and the report's counting."""
+    default. This is the exclusion set ALWAYS threaded through the palette's
+    and the report's counting: non-exporting glyphs never count."""
     return {str(glyph.name) for glyph in glyphs if not getattr(glyph, "export", True)}
 
 
@@ -258,19 +242,19 @@ def exclude_named_colors(named_colors: Iterable[tuple[str, Any]],
                          excluded: set[str]) -> list:
     """Drop the colours of excluded glyphs from ``(glyph_name, color)`` pairs,
     returning the plain colour list the counting functions consume. An empty
-    exclusion set keeps every colour (the honest default — everything counts)."""
+    exclusion set keeps every colour (nothing to exclude — everything counts)."""
     if not excluded:
         return [color for _name, color in named_colors]
     return [color for name, color in named_colors if name not in excluded]
 
 
 def counts_from_colors(colors: list, order: list[str]) -> dict[str, int]:
-    """Per-step checked counts derived purely from native layer colors.
+    """Cumulative per-step counts: layers that reached each step OR BEYOND.
 
     Each colour is expanded to its checkbox state via :func:`checked_state_for_color`
-    (the contiguous "steps up to this colour" model), then summed. This lets the
-    whole Color Flow data model be derived from ``layer.color`` (already saved by
-    Glyphs) instead of stored in userData."""
+    (the contiguous "steps up to this colour" model), then summed. Used by the
+    report's ``masters[].counts`` ("reached step k or beyond" views); the palette's
+    displayed counts are the exact census (:func:`single_counts_from_colors`)."""
     states = [checked_state_for_color(color, order) for color in colors]
     return count_states(states, order)
 

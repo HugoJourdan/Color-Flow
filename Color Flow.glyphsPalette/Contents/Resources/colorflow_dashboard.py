@@ -5,12 +5,12 @@ Flow colour labels, and which glyphs changed colour since the last run. This
 module builds the data model and writes the report; the interactive HTML/CSS/JS
 that renders it lives in ``colorflow_assets`` (one self-contained, offline file).
 
-The numbers match the palette sidebar exactly: the same glyph set (ALL glyphs,
-the layer's own ``layer.color`` only), the same shared ``colornames`` counting
-(cumulative ``counts_from_colors`` in step mode, exact ``single_counts_from_colors``
-in free mode), and the same active mode — read from the one global pref both
-sides share, ``Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"]``. The
-uncoloured "None" row is a dashboard-only extra, tallied separately.
+The numbers come from the same shared ``colornames`` counting as the palette
+sidebar (same glyph set: ALL glyphs, the layer's own ``layer.color`` only).
+The per-group ``dist`` data is the exact census (``single_counts_from_colors``)
+— the same semantics as the palette's count badges; ``masters[].counts`` is the
+report-only cumulative "reached step k or beyond" view (``counts_from_colors``).
+The uncoloured "None" row is a dashboard-only extra, tallied separately.
 
 Design notes:
   * colours, order, labels and visibility come from the shared ``colornames``
@@ -22,8 +22,8 @@ Design notes:
     as JSON and the inline JS app renders it (search/filter/sort, tabs + compare,
     per-glyph heatmap, light/dark) with no network and no dependencies.
 
-The data layer imports nothing from Glyphs so it stays unit-testable; only
-``free_mode``, the snapshot helpers and ``main`` touch the running app.
+The data layer imports nothing from Glyphs so it stays unit-testable; only the
+snapshot helpers and ``main`` touch the running app.
 """
 
 from __future__ import annotations
@@ -42,7 +42,6 @@ import colorflow_assets
 import colorflow_git
 import colorflow_history_store
 import colorflow_outline_diff
-import colorflow_recipes
 import colornames
 import glyphsvg
 import labelcolors
@@ -58,22 +57,6 @@ except Exception:  # pragma: no cover - only importable inside Glyphs
 
 # Where the cross-session diff snapshot is stored (app prefs, not the font file).
 DEFAULTS_KEY = "com.hugojourdan.ColorFlow-DashboardSnapshot"
-
-# The single global pref the palette uses to decide step vs free mode
-# (settings_panel.py writes it, plugin.py:_free_mode reads it). Reading the same
-# key here guarantees the dashboard and palette can never disagree on the model.
-FREE_KEY = "com.hugojourdan.ColorFlow-FreeMode"
-
-# Opt-in workflow recipes (#5) live here as JSON; absent/empty = recipes off,
-# in which case the recipe-adjusted completion equals standard completion.
-RECIPES_KEY = "com.hugojourdan.ColorFlow-Recipes"
-
-# Opt-in "count exporting glyphs only" mode — the same global pref the palette's
-# action-popover checkbox toggles (plugin.py:_EXPORTING_ONLY_KEY). Parity rule:
-# the embedded per-master counts/keys always ship ALL glyphs (raw truth); when
-# the pref is ON the report recomputes its DISPLAYED percentages client-side
-# without the non-exporting glyphs, matching the palette's displayed counts.
-EXPORTING_ONLY_KEY = "com.hugojourdan.ColorFlow-ExportingOnly"
 
 # Hidden power-user pref: when truthy, the per-glyph outline SVGs are omitted from
 # the report. The embedded glyph paths are by far the heaviest part of the file, so
@@ -108,21 +91,21 @@ def snapshot_to_colors(per_glyph: dict[str, int]) -> list[int | None]:
     return [None if key == colornames.NO_COLOR else int(key) for key in per_glyph.values()]
 
 
-def master_counts(colors: list[int | None], order: list[str], is_free: bool) -> dict[str, int]:
-    """Per-step counts for one master, matching the palette exactly. ``order`` is
-    the str-keyed workflow order from ``load_meaning`` (file order, INCLUDING
-    hidden/empty-label slots — required so cumulative crediting matches). Free
-    mode is exact per-colour, step mode is cumulative."""
-    if is_free:
-        return colornames.single_counts_from_colors(colors, order)
+def master_counts(colors: list[int | None], order: list[str]) -> dict[str, int]:
+    """Cumulative per-step counts for one master ("reached step k or beyond").
+
+    Report-only semantics: the palette's count badges show the exact census
+    (``single_counts_from_colors``), like the report's ``dist``. ``order`` is the
+    str-keyed workflow order from ``load_meaning`` (file order, INCLUDING
+    hidden/empty-label slots — required so cumulative crediting matches)."""
     return colornames.counts_from_colors(colors, order)
 
 
 def uncolored_count(colors: list[int | None], order: list[str]) -> int:
     """How many layers fall outside the counted steps — the exact complement of
     "credited to a step": ``None`` or a colour whose ``str`` is not in ``order``
-    (hidden / unknown). One predicate serves both modes (the ``colornames``
-    counters never emit a None bucket, so the dashboard tallies it itself)."""
+    (hidden / unknown). The ``colornames`` counters never emit a None bucket, so
+    the dashboard tallies it itself."""
     order_set = set(order)
     return sum(1 for color in colors if color is None or str(color) not in order_set)
 
@@ -158,14 +141,6 @@ def display_from_meaning(meaning: dict[str, str], none_label: str) -> list[tuple
 # GlyphsApp-touching helpers
 # --------------------------------------------------------------------------- #
 
-def free_mode() -> bool:
-    """Active mode, read from the SAME global pref the palette reads, so the two
-    always agree. ``False`` (step mode) when Glyphs is absent or the pref unset."""
-    if Glyphs is None:
-        return False
-    return bool(Glyphs.defaults[FREE_KEY])
-
-
 def no_glyph_svg() -> bool:
     """Hidden pref: skip embedding per-glyph outline SVGs to make the report much
     lighter. ``False`` (embed the outlines) when Glyphs is absent or the key unset."""
@@ -174,38 +149,19 @@ def no_glyph_svg() -> bool:
     return bool(Glyphs.defaults[NO_GLYPH_SVG_KEY])
 
 
-def exporting_only() -> bool:
-    """Opt-in "count exporting glyphs only" pref, read from the SAME key the
-    palette toggles so the two can never disagree. ``False`` (everything counts)
-    when Glyphs is absent or the key unset."""
-    if Glyphs is None:
-        return False
-    return bool(Glyphs.defaults[EXPORTING_ONLY_KEY])
-
-
 def non_exporting_names(font) -> list[str]:
     """Sorted names of this font's non-exporting glyphs (``glyph.export`` is
-    falsy). Cheap (one ``font.glyphs`` pass) and shipped in the model
-    unconditionally, so the report's toggle can offer the mode whenever there is
-    anything to exclude — empty list when every glyph exports."""
+    falsy). Cheap (one ``font.glyphs`` pass) and shipped in the model so the
+    report can ALWAYS exclude these glyphs from every displayed percentage —
+    empty list when every glyph exports (nothing to exclude)."""
     return sorted(colornames.non_exporting_names(font.glyphs))
 
 
-def load_recipes() -> list:
-    """Opt-in workflow recipes from ``Glyphs.defaults`` (JSON). ``[]`` when Glyphs
-    is absent or no recipes are set — the recipe-adjusted metric then equals the
-    standard one."""
-    if Glyphs is None:
-        return []
-    return colorflow_recipes.parse_recipes(Glyphs.defaults[RECIPES_KEY])
-
-
 def glyph_meta(font) -> dict:
-    """``{glyph_name: {category, script, subCategory, case}}`` for recipe matching."""
+    """``{glyph_name: {category, script}}`` feeding the per-glyph ``categories`` /
+    ``scripts`` model lists (heatmap lanes + coverage grouping)."""
     return {glyph.name: {"category": str(getattr(glyph, "category", None) or ""),
-                         "script": str(getattr(glyph, "script", None) or ""),
-                         "subCategory": str(getattr(glyph, "subCategory", None) or ""),
-                         "case": str(getattr(glyph, "case", None) or "")}
+                         "script": str(getattr(glyph, "script", None) or "")}
             for glyph in font.glyphs}
 
 
@@ -633,8 +589,8 @@ def git_day_history(font) -> dict[str, dict[str, dict[str, int]]]:
 
 # --------------------------------------------------------------------------- #
 # Burndown / velocity — pure functions over the dated history.
-# "final" is the completion metric: in step mode the cumulative count at the
-# last workflow step; in free mode (no cumulative final) it equals "started".
+# "final" is the completion metric: the cumulative count at the last workflow
+# step.
 # --------------------------------------------------------------------------- #
 
 def _parse_iso(date: str) -> datetime:
@@ -642,36 +598,36 @@ def _parse_iso(date: str) -> datetime:
     return datetime.strptime(date, "%Y-%m-%d")
 
 
-def _master_point(per_glyph: dict, order: list[str], is_free: bool) -> dict[str, int]:
+def _master_point(per_glyph: dict, order: list[str]) -> dict[str, int]:
     """One master's ``{final, started, total}`` for a single dated snapshot."""
     colors = snapshot_to_colors(per_glyph)
-    counts = master_counts(colors, order, is_free)
+    counts = master_counts(colors, order)
     total = len(per_glyph)
     started = total - uncolored_count(colors, order)
     last = order[-1] if order else None
-    final = started if (is_free or last is None) else counts.get(last, 0)
+    final = started if last is None else counts.get(last, 0)
     return {"final": final, "started": started, "total": total}
 
 
-def history_series(history: dict, order: list[str], is_free: bool) -> list[dict]:
+def history_series(history: dict, order: list[str]) -> list[dict]:
     """The dated history reduced to a per-master count time series, oldest-first:
     ``[{"date": iso, "masters": {master_id: {final, started, total}}}]``."""
     series = []
     for date in sorted(history):
-        masters = {master_id: _master_point(per_glyph, order, is_free)
+        masters = {master_id: _master_point(per_glyph, order)
                    for master_id, per_glyph in history[date].items()}
         series.append({"date": date, "masters": masters})
     return series
 
 
-def progress_streak(history: dict, order: list[str], is_free: bool) -> dict:
+def progress_streak(history: dict, order: list[str]) -> dict:
     """A motivation streak (#17): how many consecutive *recorded days* ended with
     more labelled glyphs than the day before. Same-day captures already collapse
     to one entry per date, so each history entry is one work-day; calendar gaps
     (days you never opened the font) don't break the streak, regressions do.
     Returns ``{current, best, days}``."""
     dates = sorted(history)
-    totals = [sum(_master_point(per_glyph, order, is_free)["started"]
+    totals = [sum(_master_point(per_glyph, order)["started"]
                   for per_glyph in history[date].values()) for date in dates]
     progressed = [False] + [totals[i] > totals[i - 1] for i in range(1, len(totals))]
     current = 0
@@ -1018,12 +974,12 @@ def _glyph_groups(font, attr: str) -> dict[str, list[str]]:
     return groups
 
 
-def _coverage_for(current: dict, groups: dict[str, list[str]], order: list[str],
-                  is_free: bool) -> dict[str, list[dict]]:
+def _coverage_for(current: dict, groups: dict[str, list[str]],
+                  order: list[str]) -> dict[str, list[dict]]:
     """Per-master coverage rows for one grouping: each row is a group's
-    ``{key, total, final, started, uncolored, counts}`` using the SAME mode-aware
-    counting as the palette/dashboard, restricted to that group's glyphs. Rows are
-    sorted largest group first."""
+    ``{key, total, final, started, uncolored, counts}`` using the SAME counting
+    as the palette/dashboard, restricted to that group's glyphs. Rows are sorted
+    largest group first."""
     last = order[-1] if order else None
     result: dict[str, list[dict]] = {}
     for master_id, per_glyph in current.items():
@@ -1031,10 +987,10 @@ def _coverage_for(current: dict, groups: dict[str, list[str]], order: list[str],
         for group, names in groups.items():
             colors = snapshot_to_colors({name: per_glyph.get(name, colornames.NO_COLOR)
                                          for name in names})
-            counts = master_counts(colors, order, is_free)
+            counts = master_counts(colors, order)
             total = len(names)
             started = total - uncolored_count(colors, order)
-            final = started if (is_free or last is None) else counts.get(last, 0)
+            final = started if last is None else counts.get(last, 0)
             rows.append({"key": group, "total": total, "final": final, "started": started,
                          "uncolored": total - started, "counts": counts,
                          "dist": colornames.single_counts_from_colors(colors, order)})
@@ -1093,19 +1049,19 @@ def _script_meta(font) -> dict[str, dict]:
             for key, names in _glyph_groups(font, "script").items()}
 
 
-def build_coverage(font, current: dict, order: list[str], is_free: bool) -> dict:
+def build_coverage(font, current: dict, order: list[str]) -> dict:
     """Completion broken down by Unicode script and by glyph category, per master
     — the data behind the dashboard's Coverage view (#13). ``scriptMeta`` adds a
     display name + representative glyph per script for the script grid."""
     return {
-        "byScript": _coverage_for(current, _glyph_groups(font, "script"), order, is_free),
-        "byCategory": _coverage_for(current, _glyph_groups(font, "category"), order, is_free),
+        "byScript": _coverage_for(current, _glyph_groups(font, "script"), order),
+        "byCategory": _coverage_for(current, _glyph_groups(font, "category"), order),
         "scriptMeta": _script_meta(font),
     }
 
 
 def _glyph_journeys(history: dict, dates: list, current: dict, glyph_names: list,
-                    order: list, is_free: bool, cap: int = 400) -> dict:
+                    order: list, cap: int = 400) -> dict:
     """Per-master ``{glyph_name: [key_per_date]}`` for the heatmap drill-down
     sparkline — only *unfinished* glyphs whose step actually *changed* over the
     recorded dates (a flat journey has nothing to show), capped for big fonts.
@@ -1113,7 +1069,6 @@ def _glyph_journeys(history: dict, dates: list, current: dict, glyph_names: list
     uncoloured."""
     if not dates:
         return {}
-    order_set = set(order)
     last = order[-1] if order else None
     journeys: dict = {}
     for master_id, per_glyph in current.items():
@@ -1123,7 +1078,7 @@ def _glyph_journeys(history: dict, dates: list, current: dict, glyph_names: list
             if produced >= cap:
                 break
             key = per_glyph.get(name)
-            finished = (str(key) in order_set) if is_free else (str(key) == last)
+            finished = str(key) == last
             if finished:
                 continue
             journey = [history.get(date, {}).get(master_id, {}).get(name, colornames.NO_COLOR)
@@ -1206,7 +1161,6 @@ def build_model(font, now: datetime, current: dict, previous: dict, progress=Non
     ``progress`` (optional ``Callable[[float], None]``) receives a 0->1 fraction
     so a caller can drive a determinate loader; the outline phase dominates the
     cost, so it gets most of the band."""
-    is_free = free_mode()
     meaning, none_label = _meaning_and_none(font)
     order = list(meaning.keys())
     display = display_from_meaning(meaning, none_label)
@@ -1228,7 +1182,7 @@ def build_model(font, now: datetime, current: dict, previous: dict, progress=Non
             "id": master.id,
             "name": master.name,
             "keys": [per_glyph.get(name, colornames.NO_COLOR) for name in glyph_names],
-            "counts": master_counts(colors, order, is_free),
+            "counts": master_counts(colors, order),
             "uncolored": uncolored_count(colors, order),
             "preview": previews.get(master.id, {}),
         })
@@ -1258,15 +1212,15 @@ def build_model(font, now: datetime, current: dict, previous: dict, progress=Non
     if git_days:
         day_history = colorflow_git.merge_history(day_history, git_days)
     history = {**day_history, today: current}
-    series = history_series(history, order, is_free)
+    series = history_series(history, order)
     dates = [point["date"] for point in series]
     trend = {
         "series": series,
         "dates": dates,
         "today": today,
-        "streak": progress_streak(history, order, is_free),
+        "streak": progress_streak(history, order),
     }
-    journeys = _glyph_journeys(history, dates, current, glyph_names, order, is_free)
+    journeys = _glyph_journeys(history, dates, current, glyph_names, order)
     journey_index = build_journey_index(history, dates)
 
     # Fine-grain timeline: every checkpoint is its own point, finer than the per-day
@@ -1286,30 +1240,22 @@ def build_model(font, now: datetime, current: dict, previous: dict, progress=Non
             fine_kind = "save"
     if fine_history:
         fine_history = {**fine_history, now.strftime("%Y-%m-%dT%H:%M:%S"): current}
-        commit_series = history_series(fine_history, order, is_free)
+        commit_series = history_series(fine_history, order)
         commit_dates = [point["date"] for point in commit_series]
         commit_trend = {
             "series": commit_series,
             "dates": commit_dates,
             "today": commit_dates[-1] if commit_dates else None,
-            "streak": progress_streak(fine_history, order, is_free),
+            "streak": progress_streak(fine_history, order),
         }
         commit_journeys = _glyph_journeys(
-            fine_history, commit_dates, current, glyph_names, order, is_free)
+            fine_history, commit_dates, current, glyph_names, order)
         commit_journey_index = build_journey_index(fine_history, commit_dates)
 
-    recipes = load_recipes()
     meta = glyph_meta(font)
     metas = [meta.get(name, {}) for name in glyph_names]
     categories = [(entry.get("category") or "Other") for entry in metas]
     scripts = [(entry.get("script") or "Other") for entry in metas]
-    recipe_completion = {}
-    for master in font.masters:
-        per_glyph = current.get(master.id, {})
-        colors = [None if per_glyph.get(name, colornames.NO_COLOR) == colornames.NO_COLOR
-                  else int(per_glyph.get(name)) for name in glyph_names]
-        recipe_completion[master.id] = colorflow_recipes.recipe_completion(
-            metas, colors, recipes, order, is_free)
 
     if progress is not None:
         try:
@@ -1322,7 +1268,6 @@ def build_model(font, now: datetime, current: dict, previous: dict, progress=Non
         "fileName": Path(font.filepath).name if font.filepath else (font.familyName or "Untitled"),
         "version": f"{font.versionMajor}.{font.versionMinor:03d}",
         "generated": now.strftime("%Y-%m-%d"),
-        "mode": "free" if is_free else "step",
         "glyphTotal": glyph_total,
         "order": order,
         "steps": steps,
@@ -1330,10 +1275,10 @@ def build_model(font, now: datetime, current: dict, previous: dict, progress=Non
         "glyphNames": glyph_names,
         "categories": categories,
         "scripts": scripts,
-        # Exporting-only mode (parity invariant): masters[].counts/keys above ship
-        # ALL glyphs (raw truth); the report applies this exclusion client-side.
+        # Parity invariant: masters[].counts/keys above ship ALL glyphs (raw
+        # truth — the heatmap needs them to render the dimmed cells); the report
+        # ALWAYS applies this exclusion client-side to every percentage.
         "nonExporting": non_exporting_names(font),
-        "exportingOnly": exporting_only(),
         "masters": masters,
         "colors": {str(index): labelcolors.hex_for(rgba)
                    for index, rgba in enumerate(labelcolors.read_label_colors())},
@@ -1351,9 +1296,7 @@ def build_model(font, now: datetime, current: dict, previous: dict, progress=Non
         "hasCommits": bool(commit_trend and len(commit_trend["series"]) >= 2),
         "fineKind": fine_kind,                        # "commit" | "save" | None (labels the toggle)
         "lastEdit": glyph_last_edit(font, now),
-        "recipes": recipes,
-        "recipeCompletion": recipe_completion,
-        "coverage": build_coverage(font, current, order, is_free),
+        "coverage": build_coverage(font, current, order),
         "changes": compute_changes(current, previous),
         "crossMaster": cross_master_summary(
             current, [master.id for master in font.masters], glyph_names, order),

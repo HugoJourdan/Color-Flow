@@ -66,7 +66,7 @@ i.e. `target = "layer" if (option_pressed ^ swap_enabled) else "glyph"`.
 
 ### 3. Popover toggle
 
-In `Open_Action_Popover`, add one `CheckBox` to the existing Settings section (alongside `freeMode` / `storeInFont` / `exportingOnly`):
+In `Open_Action_Popover`, add one `CheckBox` to the existing Settings section (alongside `freeMode` / `storeInFont`):
 
 - Label: **"Swap Option color routing (plain → layer)"**
 - State initialised from `Glyphs.defaults[SWAP_KEY]`.

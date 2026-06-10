@@ -23,12 +23,11 @@ except Exception:  # pragma: no cover - only importable inside Glyphs
         pass
 
 MODE_KEY = "hugojourdan.RainbowFontView.labelUsed"
-FREE_KEY = "com.hugojourdan.ColorFlow-FreeMode"
 MODES = ("Layer", "Glyph")
 
 MARGIN = 15
 ROW_HEIGHT = 26
-TOP = 110  # first colour row sits below the source radio, free-mode + store-in-font + separator
+TOP = 84  # first colour row sits below the source radio, store-in-font + separator
 
 
 class ColorFlowSettings:
@@ -75,10 +74,6 @@ class ColorFlowSettings:
         )
         self.w.source.set(MODES.index(current))
         y += 28
-        free = bool(Glyphs.defaults[FREE_KEY]) if Glyphs is not None else False
-        self.w.freeMode = CheckBox((MARGIN, y, -MARGIN, 20),
-                                   "Free mode (independent steps)", value=free)
-        y += 26
         # Store the labels inside the .glyphs file (userData) so they travel when the
         # font is shared; otherwise they live only in the local colorNames.txt sidecar.
         self.w.storeInFont = CheckBox((MARGIN, y, -MARGIN, 20),
@@ -173,8 +168,6 @@ class ColorFlowSettings:
                 self.font.userData[colornames.FONT_LABELS_KEY] = text
             elif self.font.userData[colornames.FONT_LABELS_KEY] is not None:
                 del self.font.userData[colornames.FONT_LABELS_KEY]
-        if Glyphs is not None:
-            Glyphs.defaults[FREE_KEY] = bool(self.w.freeMode.get())
         self.w.close()
         try:
             self.plugin.reload_after_settings()

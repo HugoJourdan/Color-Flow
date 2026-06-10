@@ -1,7 +1,7 @@
-"""Render sample dashboards (step + free) to HTML for in-browser checks.
+"""Render a sample dashboard to HTML for in-browser checks.
 
 Usage: uv run python tools/dashboard_sample.py [out_dir]
-Writes dashboard_step.html and dashboard_free.html. No Glyphs required.
+Writes dashboard_step.html. No Glyphs required.
 """
 
 from __future__ import annotations
@@ -78,24 +78,20 @@ def _journey_index(masters: list[dict]) -> dict:
     return index
 
 
-def _counts(keys: list[int], is_free: bool) -> dict[str, int]:
+def _counts(keys: list[int]) -> dict[str, int]:
     counts = {o: 0 for o in ORDER}
     for key in keys:
         if key == -1:
             continue
         target = str(key)
-        if is_free:
-            if target in counts:
-                counts[target] += 1
-        else:
-            for step in ORDER:
-                counts[step] += 1
-                if step == target:
-                    break
+        for step in ORDER:
+            counts[step] += 1
+            if step == target:
+                break
     return counts
 
 
-def _model(is_free: bool) -> dict:
+def _model() -> dict:
     preview = {"d": "M40 -700L300 -700L300 -100L40 -100ZM360 -640L600 -640L600 -100L360 -100Z",
                "vb": "0 -740 640 680"}
     masters = []
@@ -103,7 +99,7 @@ def _model(is_free: bool) -> dict:
         keys = [SEQ[(i + offset) % len(SEQ)] for i in range(len(SEQ))]
         uncolored = sum(1 for k in keys if k == -1)
         masters.append({"id": name.lower(), "name": name, "keys": keys,
-                        "counts": _counts(keys, is_free), "uncolored": uncolored,
+                        "counts": _counts(keys), "uncolored": uncolored,
                         "preview": preview})
     outline = {"d": "M120 -700L520 -700L520 -100L120 -100Z", "vb": "80 -740 480 680"}
     paths = {master["id"]: {name: outline for name, key in zip(NAMES, master["keys"])
@@ -111,7 +107,7 @@ def _model(is_free: bool) -> dict:
     return {
         "family": "Acme Sans", "fileName": "Acme.glyphs", "version": "2.5",
         "generated": datetime(2026, 6, 5).strftime("%Y-%m-%d"),
-        "mode": "free" if is_free else "step", "glyphTotal": len(SEQ),
+        "glyphTotal": len(SEQ),
         "order": ORDER, "steps": STEPS, "noneLabel": "🫥 None",
         "glyphNames": NAMES,
         "categories": [("Letter" if i < 14 else "Number" if i < 18 else "Punctuation")
@@ -126,9 +122,6 @@ def _model(is_free: bool) -> dict:
         "journeyIndex": _journey_index(masters),
         "journeys": {"regular": {"A": [-1, 4, 8], "C": [-1, -1, 4]}, "bold": {}},
         "lastEdit": {"A": 2, "C": 30, "E": 1},
-        "recipes": [{"match": {"category": "Mark"}, "steps": ["6", "3"]}],
-        "recipeCompletion": {"regular": {"complete": 14, "total": len(SEQ)},
-                             "bold": {"complete": 11, "total": len(SEQ)}},
         "coverage": _coverage(),
         "changes": {"regular": {"A": [4, 8], "H": [6, 3]}},
     }
@@ -177,10 +170,9 @@ def _trend() -> dict:
 
 def main() -> None:
     out_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
-    for is_free in (False, True):
-        path = out_dir / f"dashboard_{'free' if is_free else 'step'}.html"
-        path.write_text(assets.build_html(_model(is_free)), encoding="utf-8")
-        print(path)
+    path = out_dir / "dashboard_step.html"
+    path.write_text(assets.build_html(_model()), encoding="utf-8")
+    print(path)
 
 
 if __name__ == "__main__":

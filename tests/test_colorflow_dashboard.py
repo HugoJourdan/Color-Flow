@@ -33,8 +33,6 @@ class _FakeGlyph:
         self.lastChange: object | None = None
         self.script: str | None = None
         self.category: str | None = None
-        self.subCategory: str | None = None
-        self.case: str | None = None
         self.unicode: str | None = None
         self.export: bool = True            # GSGlyph default: glyphs export
 
@@ -133,23 +131,24 @@ def _order_from(text: str) -> list[str]:
     return list(cc.parse_color_names(text).keys())
 
 
-def test_master_counts_matches_palette_step_mode() -> None:
+def test_master_counts_is_the_shared_cumulative_counting() -> None:
+    # Report-only semantics: masters[].counts stay cumulative ("reached step k
+    # or beyond"); the palette's count badges show the exact census, matching
+    # the report's per-group dist (single_counts_from_colors).
     order = _order_from(_HIDDEN_REORDERED)  # ["8", "4", "0", "3"]
     colors = [8, 4, None, 3, 0, 8]
-    assert db.master_counts(colors, order, is_free=False) == cc.counts_from_colors(colors, order)
-
-
-def test_master_counts_matches_palette_free_mode() -> None:
-    order = _order_from(_HIDDEN_REORDERED)
-    colors = [8, 4, None, 3, 0, 8]
-    assert db.master_counts(colors, order, is_free=True) == cc.single_counts_from_colors(colors, order)
+    assert db.master_counts(colors, order) == cc.counts_from_colors(colors, order)
 
 
 def test_step_counts_are_cumulative_over_file_order() -> None:
     order = _order_from(_HIDDEN_REORDERED)  # ["8", "4", "0", "3"]
     # one glyph at yellow (the final step) credits every earlier step in order
-    counts = db.master_counts([3], order, is_free=False)
+    counts = db.master_counts([3], order)
     assert counts == {"8": 1, "4": 1, "0": 1, "3": 1}
+    # ...unlike the palette's census, which credits ONLY the exact step
+    assert cc.single_counts_from_colors([3], order) == {
+        "8": 0, "4": 0, "0": 0, "3": 1
+    }
 
 
 def test_uncolored_count_counts_none_and_out_of_order_colours() -> None:
@@ -378,20 +377,6 @@ def test_main_open_when_done_false_returns_path_without_opening(tmp_path, monkey
     assert not opened                                        # NOT auto-opened
     assert result is not None and result.exists()            # path returned for Open/Save
     assert result.suffix == ".html"
-
-
-def test_free_mode_reads_global_pref(monkeypatch) -> None:
-    fake = _FakeGlyphsApp()
-    fake.defaults[db.FREE_KEY] = True
-    monkeypatch.setattr(db, "Glyphs", fake)
-    assert db.free_mode() is True
-    fake.defaults[db.FREE_KEY] = False
-    assert db.free_mode() is False
-
-
-def test_free_mode_defaults_to_step_without_glyphs(monkeypatch) -> None:
-    monkeypatch.setattr(db, "Glyphs", None)
-    assert db.free_mode() is False
 
 
 def test_no_glyph_svg_reads_hidden_pref(monkeypatch) -> None:
@@ -648,15 +633,19 @@ def _history(pairs: list) -> dict:
 
 def test_history_series_reduces_to_per_master_counts() -> None:
     history = _history([("2026-06-01", 2), ("2026-06-08", 4)])
-    series = db.history_series(history, _FC_ORDER, is_free=False)
+    series = db.history_series(history, _FC_ORDER)
     assert [point["date"] for point in series] == ["2026-06-01", "2026-06-08"]
     assert series[1]["masters"]["m1"] == {"final": 4, "started": 4, "total": 10}
 
 
-def test_master_point_free_mode_final_equals_started() -> None:
-    per_glyph = {"A": 0, "B": 1, "C": cc.NO_COLOR}    # free: exact labelled, no cumulative final
-    point = db._master_point(per_glyph, _FC_ORDER, is_free=True)
-    assert point["final"] == point["started"] == 2 and point["total"] == 3
+def test_master_point_counts_final_started_total() -> None:
+    # "final" is the cumulative count at the last step; "started" excludes the
+    # uncoloured glyphs; with no order at all, "final" falls back to "started".
+    per_glyph = {"A": 0, "B": 2, "C": cc.NO_COLOR}
+    point = db._master_point(per_glyph, _FC_ORDER)
+    assert point == {"final": 1, "started": 2, "total": 3}
+    empty = db._master_point(per_glyph, [])
+    assert empty["final"] == empty["started"]
 
 
 # --------------------------------------------------------------------------- #
@@ -742,11 +731,11 @@ def test_glyph_journeys_only_changed_unfinished_aligned_to_dates() -> None:
         "2026-06-02": {"m1": {"A": 1, "B": 1, "C": 2}},
     }
     current = {"m1": {"A": 1, "B": 1, "C": 2}}   # C is at the final step (2) -> finished
-    journeys = db._glyph_journeys(history, dates, current, ["A", "B", "C"], _FC_ORDER, is_free=False)
+    journeys = db._glyph_journeys(history, dates, current, ["A", "B", "C"], _FC_ORDER)
     assert journeys["m1"]["A"] == [cc.NO_COLOR, 1]   # changed + unfinished -> included, date-aligned
     assert "B" not in journeys["m1"]                 # flat journey -> nothing to show
     assert "C" not in journeys["m1"]                 # finished -> excluded
-    assert db._glyph_journeys(history, [], current, ["A"], _FC_ORDER, is_free=False) == {}
+    assert db._glyph_journeys(history, [], current, ["A"], _FC_ORDER) == {}
 
 
 def test_build_journey_index_emits_sparse_change_events_only() -> None:
@@ -810,7 +799,7 @@ def test_progress_streak_counts_trailing_improving_days() -> None:
     # started rises 2->4->5 (3 improving days), dips, then rises again for 2
     history = _history([("2026-06-01", 2), ("2026-06-02", 4), ("2026-06-03", 5),
                         ("2026-06-04", 3), ("2026-06-05", 6), ("2026-06-06", 7)])
-    streak = db.progress_streak(history, _FC_ORDER, is_free=False)
+    streak = db.progress_streak(history, _FC_ORDER)
     assert streak["current"] == 2     # last two days both improved (3->6->7)
     assert streak["best"] == 2        # two runs of length 2 (06-02..03 and 06-05..06)
     assert streak["days"] == 6
@@ -818,7 +807,7 @@ def test_progress_streak_counts_trailing_improving_days() -> None:
 
 def test_progress_streak_zero_when_last_day_regresses() -> None:
     history = _history([("2026-06-01", 5), ("2026-06-02", 8), ("2026-06-03", 6)])
-    assert db.progress_streak(history, _FC_ORDER, is_free=False)["current"] == 0
+    assert db.progress_streak(history, _FC_ORDER)["current"] == 0
 
 
 def test_coverage_groups_by_attribute_and_counts_per_group() -> None:
@@ -832,7 +821,7 @@ def test_coverage_groups_by_attribute_and_counts_per_group() -> None:
     current = db.build_master_glyph_colors(font)
 
     assert db._glyph_groups(font, "script") == {"latin": ["A", "B"], "Other": ["comma"]}
-    cov = db.build_coverage(font, current, _FC_ORDER, is_free=False)
+    cov = db.build_coverage(font, current, _FC_ORDER)
     by_script = {row["key"]: row for row in cov["byScript"]["m1"]}
     assert cov["byScript"]["m1"][0]["key"] == "latin"          # largest group first
     assert by_script["latin"]["total"] == 2 and by_script["latin"]["final"] == 1  # only A reached step 2
@@ -851,7 +840,7 @@ def test_build_coverage_emits_script_meta_with_representative_glyph() -> None:
     font = _FakeFont([_FakeMaster("m1", "R")], [letter_a, letter_b, comma])
     current = db.build_master_glyph_colors(font)
 
-    meta = db.build_coverage(font, current, _FC_ORDER, is_free=False)["scriptMeta"]
+    meta = db.build_coverage(font, current, _FC_ORDER)["scriptMeta"]
     assert meta["latin"] == {"name": "Latin", "glyph": "A"}     # Letter, lowest codepoint wins
     assert meta["Other"] == {"name": "Other", "glyph": "comma"}  # non-letter group falls to min cp
 
@@ -886,7 +875,6 @@ def test_build_model_shape_and_compact_glyph_names(tmp_path) -> None:
     assert model["fileName"] == "Font.glyphs"
     assert model["version"] == "2.005"   # Glyphs-style zero-padded minor (versionMinor=5)
     assert model["generated"] == "2026-06-05"
-    assert model["mode"] == "step"
     assert model["glyphTotal"] == 3
     assert model["order"] == ["8", "4", "3"]
     assert model["steps"] == [{"key": 8, "label": "Outline"},
@@ -1077,7 +1065,9 @@ def test_build_model_emits_cross_master_summary(tmp_path) -> None:
     assert cross["differGlyphs"] == ["B"]
 
 
-def test_build_model_counts_match_palette_step_and_free(tmp_path) -> None:
+def test_build_model_counts_are_cumulative_dist_matches_palette(tmp_path) -> None:
+    # masters[].counts keep the report-only cumulative semantics; the exact
+    # census (dist) is what the palette's count badges now show.
     (tmp_path / "colorNames.txt").write_text(_HIDDEN_REORDERED, encoding="utf-8")
     glyphs = [
         _FakeGlyph("A", {"m1": _FakeLayerColor(8)}),
@@ -1090,24 +1080,10 @@ def test_build_model_counts_match_palette_step_and_free(tmp_path) -> None:
     order = list(cc.parse_color_names(_HIDDEN_REORDERED).keys())
     colors = [8, 4, 3, None]
 
-    step = db.build_model(font, datetime(2026, 6, 5), current, current)
-    assert step["mode"] == "step"
-    assert step["masters"][0]["counts"] == cc.counts_from_colors(colors, order)
-    assert step["masters"][0]["uncolored"] == db.uncolored_count(colors, order)
-
-
-def test_build_model_free_mode(monkeypatch, tmp_path) -> None:
-    fake = _FakeGlyphsApp()
-    fake.defaults[db.FREE_KEY] = True
-    monkeypatch.setattr(db, "Glyphs", fake)
-    (tmp_path / "colorNames.txt").write_text(_HIDDEN_REORDERED, encoding="utf-8")
-    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)}), _FakeGlyph("B", {"m1": _FakeLayerColor(4)})]
-    font = _FakeFont([_FakeMaster("m1", "R")], glyphs, filepath=str(tmp_path / "F.glyphs"))
-    current = db.build_master_glyph_colors(font)
-    order = list(cc.parse_color_names(_HIDDEN_REORDERED).keys())
     model = db.build_model(font, datetime(2026, 6, 5), current, current)
-    assert model["mode"] == "free"
-    assert model["masters"][0]["counts"] == cc.single_counts_from_colors([8, 4], order)
+    assert "mode" not in model                       # single (sequential) workflow
+    assert model["masters"][0]["counts"] == cc.counts_from_colors(colors, order)
+    assert model["masters"][0]["uncolored"] == db.uncolored_count(colors, order)
 
 
 def test_build_model_multi_master_keys_align_to_glyph_names(tmp_path) -> None:
@@ -1255,22 +1231,6 @@ def test_family_logo_renders_family_with_chosen_master() -> None:
 def test_family_logo_empty_without_matching_glyphs() -> None:
     font = _FakeFont([_FakeMaster("m1", "Regular")], [], family="Zz")
     assert db._family_logo(font) == {}
-
-
-def test_build_model_recipe_completion_parity_without_recipes(tmp_path) -> None:
-    # No recipes (Glyphs absent) -> recipeCompletion.complete must equal the
-    # count of glyphs at the global final step, i.e. standard completion.
-    (tmp_path / "colorNames.txt").write_text("purple=A\nyellow=Done\n", encoding="utf-8")
-    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(3)}),   # 3 = yellow = final step
-              _FakeGlyph("B", {"m1": _FakeLayerColor(3)}),
-              _FakeGlyph("C", {"m1": _FakeLayerColor(8)})]   # 8 = purple = not final
-    font = _FakeFont([_FakeMaster("m1", "R")], glyphs, filepath=str(tmp_path / "F.glyphs"))
-    current = db.build_master_glyph_colors(font)
-    model = db.build_model(font, datetime(2026, 6, 5), current, current)
-    assert model["recipes"] == []
-    last = model["order"][-1]
-    standard_final = model["masters"][0]["counts"][last]
-    assert model["recipeCompletion"]["m1"]["complete"] == standard_final == 2
 
 
 def test_build_model_master_preview_and_favicon(tmp_path) -> None:
@@ -1421,22 +1381,8 @@ def test_build_model_empty_font_does_not_crash(monkeypatch, tmp_path) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Exporting-only mode (count exporting glyphs only)
+# Non-exporting glyphs are ALWAYS excluded from every count and percentage
 # --------------------------------------------------------------------------- #
-
-def test_exporting_only_reads_pref(monkeypatch) -> None:
-    fake = _FakeGlyphsApp()
-    fake.defaults[db.EXPORTING_ONLY_KEY] = True
-    monkeypatch.setattr(db, "Glyphs", fake)
-    assert db.exporting_only() is True
-    fake.defaults[db.EXPORTING_ONLY_KEY] = False
-    assert db.exporting_only() is False
-
-
-def test_exporting_only_defaults_off_without_glyphs(monkeypatch) -> None:
-    monkeypatch.setattr(db, "Glyphs", None)
-    assert db.exporting_only() is False
-
 
 def test_non_exporting_names_sorted_from_font() -> None:
     glyphs = [_FakeGlyph("zeta", {}), _FakeGlyph("A", {}), _FakeGlyph("comma", {})]
@@ -1446,7 +1392,7 @@ def test_non_exporting_names_sorted_from_font() -> None:
     assert db.non_exporting_names(font) == ["comma", "zeta"]    # sorted
 
 
-def test_build_model_ships_non_exporting_and_pref_keys(tmp_path) -> None:
+def test_build_model_ships_non_exporting_names_only(tmp_path) -> None:
     (tmp_path / "colorNames.txt").write_text("red=R\nNone=Nothing\n", encoding="utf-8")
     master = _FakeMaster("m1", "Regular")
     letter_a = _FakeGlyph("A", {"m1": _FakeLayerColor(0)})
@@ -1456,7 +1402,8 @@ def test_build_model_ships_non_exporting_and_pref_keys(tmp_path) -> None:
     current = db.build_master_glyph_colors(font)
     model = db.build_model(font, datetime(2026, 6, 5), current, current)
     assert model["nonExporting"] == ["ornament"]
-    assert model["exportingOnly"] is False                      # honest default: OFF
+    # the exclusion is always on — no pref/toggle key ships with the model
+    assert all(not key.startswith("exporting") for key in model)
 
 
 def test_build_model_non_exporting_empty_when_all_export(tmp_path) -> None:
@@ -1469,13 +1416,12 @@ def test_build_model_non_exporting_empty_when_all_export(tmp_path) -> None:
     assert model["nonExporting"] == []
 
 
-def test_build_model_counts_stay_raw_when_exporting_only_on(tmp_path, monkeypatch) -> None:
-    # PARITY INVARIANT: with the pref ON the embedded per-master counts/keys still
-    # ship ALL glyphs (raw truth) — the report applies the exclusion client-side,
-    # so its displayed numbers match the palette's displayed (excluded) counts.
-    fake = _FakeGlyphsApp()
-    fake.defaults[db.EXPORTING_ONLY_KEY] = True
-    monkeypatch.setattr(db, "Glyphs", fake)
+def test_build_model_counts_stay_raw_with_non_exporting_glyphs(tmp_path) -> None:
+    # PARITY INVARIANT: the embedded per-master counts/keys ship ALL glyphs (raw
+    # truth — the heatmap needs every key to render the dimmed cells); the report
+    # ALWAYS applies the exclusion client-side, so it counts the same glyph set
+    # as the palette (its census/dist numbers match the palette's badges; its
+    # cumulative views keep the report-only "reached step k or beyond" sums).
     (tmp_path / "colorNames.txt").write_text("red=R\nNone=Nothing\n", encoding="utf-8")
     master = _FakeMaster("m1", "Regular")
     letter_a = _FakeGlyph("A", {"m1": _FakeLayerColor(0)})
@@ -1484,7 +1430,6 @@ def test_build_model_counts_stay_raw_when_exporting_only_on(tmp_path, monkeypatc
     font = _FakeFont([master], [letter_a, ornament], filepath=str(tmp_path / "Font.glyphs"))
     current = db.build_master_glyph_colors(font)
     model = db.build_model(font, datetime(2026, 6, 5), current, current)
-    assert model["exportingOnly"] is True
     assert model["nonExporting"] == ["ornament"]
     assert model["glyphTotal"] == 2                             # raw total
     assert model["masters"][0]["counts"] == {"0": 2}            # raw: both glyphs counted

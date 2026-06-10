@@ -6,23 +6,33 @@ import colorflow_profile as profile
 import pytest
 
 
-def _profile(color_names: str = "red=Outline\norange=Spacing\n", free_mode: bool = False,
+def _profile(color_names: str = "red=Outline\norange=Spacing\n",
              rainbow_source: str = "Layer", label_colors: list | None = None) -> dict:
     return profile.build_profile(
-        color_names=color_names, free_mode=free_mode, rainbow_source=rainbow_source,
+        color_names=color_names, rainbow_source=rainbow_source,
         label_colors=label_colors if label_colors is not None else [[1, 0, 0, 1], [0, 1, 0, 1]],
         name="House style")
 
 
 def test_build_profile_normalises_unknown_source() -> None:
-    built = profile.build_profile("red=A\n", False, "Nonsense", [])
+    built = profile.build_profile("red=A\n", "Nonsense", [])
     assert built["rainbowSource"] == "Layer"      # unknown source -> default
     assert built["version"] == profile.PROFILE_VERSION
 
 
 def test_serialize_parse_round_trips() -> None:
-    original = _profile(free_mode=True, rainbow_source="Glyph")
+    original = _profile(rainbow_source="Glyph")
     assert profile.parse(profile.serialize(original)) == original
+
+
+def test_parse_ignores_unknown_keys_from_older_profiles() -> None:
+    # Tolerant import: keys written by older plugin versions (e.g. the retired
+    # mode flag) are dropped, and never re-exported.
+    parsed = profile.parse(
+        '{"version": 1, "colorNames": "red=A\\n", "freeMode": true,'
+        ' "rainbowSource": "Layer", "labelColors": []}')
+    assert "freeMode" not in parsed
+    assert "freeMode" not in profile.serialize(parsed)
 
 
 def test_parse_rejects_bad_json_and_wrong_version() -> None:
@@ -47,11 +57,10 @@ def test_diff_identical_profiles_is_empty() -> None:
     assert profile.diff_profile(_profile(), _profile()) == []
 
 
-def test_diff_reports_mode_and_source() -> None:
-    diffs = profile.diff_profile(_profile(free_mode=False, rainbow_source="Layer"),
-                                 _profile(free_mode=True, rainbow_source="Glyph"))
+def test_diff_reports_source() -> None:
+    diffs = profile.diff_profile(_profile(rainbow_source="Layer"),
+                                 _profile(rainbow_source="Glyph"))
     fields = {d["field"]: d["detail"] for d in diffs}
-    assert fields["Mode"] == "step -> free"
     assert fields["Rainbow source"] == "Layer -> Glyph"
 
 

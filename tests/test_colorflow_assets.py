@@ -12,7 +12,7 @@ import colorflow_assets as assets
 def _model() -> dict:
     return {
         "family": "Acme", "fileName": "Acme.glyphs", "version": "1.0",
-        "generated": "2026-06-05", "mode": "step", "glyphTotal": 2,
+        "generated": "2026-06-05", "glyphTotal": 2,
         "order": ["0"], "steps": [{"key": 0, "label": "Red"}], "noneLabel": "None",
         "glyphNames": ["A", "B"],
         "masters": [{"id": "m1", "name": "Regular", "keys": [0, -1],
@@ -331,7 +331,7 @@ def test_dashboard_has_colour_spread_radar_in_master_view() -> None:
 def test_cumulative_progress_shown_as_workflow_funnel() -> None:
     js = assets.DASHBOARD_JS
     # countFor is the cumulative metric (reached step k or beyond) — the model's counts
-    # (raw passthrough; the exporting-only branch reroutes through countedStats).
+    # (raw passthrough; with non-exporting glyphs present it reroutes through countedStats).
     countfor = js.split("function countFor(", 1)[1].split("\n  function ", 1)[0]
     assert "m.counts[String(k)]" in countfor
     # the flat text legend is gone; a workflow funnel renders the cumulative reach as
@@ -1471,135 +1471,41 @@ def test_leaderboard_chip_css_is_compact_and_theme_safe() -> None:
     assert "lb-chip" not in css.split("@media (prefers-reduced-motion:reduce)", 1)[1].split("\n", 1)[0]
 
 
-def test_dashboard_js_recipe_card_replaces_overall_text_line() -> None:
-    """Recipes no longer render as a muted one-line footnote inside the global
-    overall() section — they get a proper Overview card (ovCard pattern) gated on
-    H.recipes, wired into the overviewExtras grid AND appended to the printed
-    Overview section so the PDF keeps the recipe data. The focused-master view
-    keeps its own per-master recipe-adjusted footnote."""
-    js = assets.DASHBOARD_JS
-    overall = js.split("function overall(", 1)[1].split("\n  function ", 1)[0]
-    assert "Recipe-adjusted" not in overall          # old inline line removed
-    assert "recipeLine" not in overall
-    assert "function recipeCard(" in js
-    card = js.split("function recipeCard(", 1)[1].split("\n  function ", 1)[0]
-    assert "H.recipes && H.recipes.length" in card   # gate: no recipes -> no card
-    assert 'return ""' in card
-    assert 'ovCard("recipes"' in card
-    extras = js.split("function overviewExtras(", 1)[1].split("}", 1)[0]
-    assert "recipeCard()" in extras
-    # print: the Overview section keeps the recipe data (card appended to overall())
-    assert 'add("psec-overview", "Overview", overall()+recipeCard());' in js
-    master = js.split("function masterOverall(", 1)[1].split("\n  function ", 1)[0]
-    assert "Recipe-adjusted" in master               # focused-master footnote stays
-
-
-def test_dashboard_js_recipe_card_lists_recipes_and_master_bars() -> None:
-    """Card body: a one-line global summary on top (X/Y + % + recipe count), then
-    one row per recipe (display name with a fallback for nameless configs, the
-    human match-rule summary, kept-step count) and a compact recipe-adjusted
-    progress bar per master reusing the existing .lb-bar track/fill styles with
-    X/Y counts; a single-master file gets one anonymous bar (no master name)."""
-    js = assets.DASHBOARD_JS
-    card = js.split("function recipeCard(", 1)[1].split("\n  function ", 1)[0]
-    assert 'class="rcp-sum"' in card and "Recipe-adjusted" in card
-    assert "H.recipes.length===1" in card            # "recipe" vs "recipes" plural
-    assert "H.recipeCompletion" in card              # render-only: Python computes it
-    assert 'class="rcp-name"' in card and "recipeMatchLabel(r.match)" in card
-    assert '"Recipe "+(i+1)' in card                 # nameless recipes get a fallback
-    assert 'class="rcp-rule"' in card and 'class="rcp-steps"' in card
-    assert 'class="lb-bar"' in card                  # existing progress-bar styles
-    assert 'class="rcp-m-c"' in card                 # the X/Y count per master bar
-    assert "H.masters.length === 1" in card          # single master -> one bare bar
-    assert 'class="rcp-m-n"' in card                 # master name on multi-master rows
-
-
-def test_dashboard_js_recipe_match_label_humanises_rules() -> None:
-    """recipeMatchLabel turns a recipe's match dict into editor-vocabulary prose
-    (Category/Script/Subcategory/Case, joined with a middle dot); the stringified
-    GS case enum maps back to its human name; empty/absent criteria are skipped."""
-    js = assets.DASHBOARD_JS
-    assert "function recipeMatchLabel(" in js
-    helper = js.split("function recipeMatchLabel(", 1)[1].split("\n  function ", 1)[0]
-    assert "RECIPE_FIELDS" in helper and "RECIPE_CASES" in helper
-    for label in ('"category","Category"', '"script","Script"',
-                  '"subCategory","Subcategory"', '"case","Case"'):
-        assert label in js
-    for case_pair in ('"1":"Uppercase"', '"2":"Lowercase"',
-                      '"3":"Smallcaps"', '"4":"Minor"'):
-        assert case_pair in js
-    assert 'parts.join(" · ")' in helper
-    assert 'value == null || value === ""' in helper  # absent criteria skipped
-
-
-def test_dashboard_css_styles_recipe_card() -> None:
-    """Recipe-card CSS: every class is token-driven (--text/--muted/--track…) so
-    both themes and print stay right; the rule summary ellipsises instead of
-    wrapping; no animation rides in (nothing for the reduced-motion gate). The
-    old .ov-recipe footnote class survives for the focused-master view."""
-    css = assets.DASHBOARD_CSS
-    for selector in (".rcp-sum{", ".rcp-row{", ".rcp-name{", ".rcp-rule{",
-                     ".rcp-steps{", ".rcp-masters{", ".rcp-m{", ".rcp-m-n{",
-                     ".rcp-m-c{"):
-        assert selector in css
-        block = css.split(selector, 1)[1].split("}", 1)[0]
-        assert "animation" not in block and "transition" not in block
-    rule = css.split(".rcp-rule{", 1)[1].split("}", 1)[0]
-    assert "ellipsis" in rule and "var(--muted)" in rule
-    assert "var(--muted)" in css.split(".rcp-sum{", 1)[1].split("}", 1)[0]
-    assert ".rcp-sum b{color:var(--text)}" in css
-    assert ".rcp-m-c b{color:var(--text)}" in css
-    assert "var(--track)" in css.split(".rcp-masters{", 1)[1].split("}", 1)[0]
-    # nothing new behind the reduced-motion gate
-    gate = css.split("@media (prefers-reduced-motion:reduce)", 1)[1].split("\n", 1)[0]
-    assert "rcp-" not in gate
-    assert ".ov-recipe{" in css                       # master footnote still styled
-
-
 # --------------------------------------------------------------------------- #
-# Exporting-only mode: count exporting glyphs only (opt-in, default OFF)
+# Non-exporting glyphs: ALWAYS excluded from every count and percentage
 # --------------------------------------------------------------------------- #
 
 def test_dashboard_js_has_centralised_counted_set_helper() -> None:
-    """One countedSet() helper centralises the exclusion: null when everything
-    counts (toggle off / nothing to exclude), else a {name:1} lookup of counted
-    glyphs. isCounted/countedTotal wrap it; memos drop when the toggle flips."""
+    """One countedSet() helper centralises the always-on exclusion: null when
+    everything counts (no non-exporting glyphs), else a {name:1} lookup of
+    counted glyphs. isCounted/countedTotal wrap it."""
     js = assets.DASHBOARD_JS
     assert "function countedSet(" in js
     assert "function isCounted(" in js
     assert "function countedTotal(" in js
     counted = js.split("function countedSet(")[1].split("\n  function ")[0]
-    # off / nothing-to-exclude -> null (everything counts, zero overhead)
-    assert "if (!state.exportingOnly || !(H.nonExporting||[]).length) return null;" in counted
-    # the toggle flip clears every exclusion-dependent memo before re-rendering
-    toggle = js.split("function setExportingOnly(")[1].split("\n  function ")[0]
-    assert "COUNTED = null" in toggle
-    assert "CSTATS = {}" in toggle and "EXCL = {}" in toggle
-    assert "NAVCACHE = null" in toggle
-    assert "update();" in toggle
+    # nothing-to-exclude -> null (everything counts, zero overhead); otherwise
+    # the exclusion applies UNCONDITIONALLY — no state/toggle gate.
+    assert "if (!(H.nonExporting||[]).length) return null;" in counted
+    assert "state." not in counted
 
 
-def test_dashboard_js_exporting_only_toggle_in_toolbar() -> None:
-    """The toolbar offers the toggle only when the font has non-exporting glyphs;
-    its initial state is seeded from the palette pref (H.exportingOnly)."""
+def test_dashboard_js_has_no_exporting_only_toggle() -> None:
+    """The exclusion is always on: no toolbar toggle, no setter, no state field,
+    no pref seeding — the toolbar keeps only Overview / Timeline / Export."""
     js = assets.DASHBOARD_JS
+    assert "cfd-exo" not in js                               # old toggle id (cfd-export survives)
+    assert "setExporting" not in js
+    assert "state.exporting" not in js
+    assert "H.exporting" not in js
+    assert "Exporting only" not in js
     toolbar = js.split("function toolbar(")[1].split("\n  function ")[0]
-    assert 'id="cfd-exonly"' in toolbar
-    assert "(H.nonExporting||[]).length" in toolbar          # gated on having anything to exclude
-    assert "state.exportingOnly" in toolbar                  # aria-pressed reflects the state
-    # seeded from the embedded pref once the model is decompressed
-    assert "state.exportingOnly = !!H.exportingOnly;" in js
-    # wired: clicking flips the centralised toggle; update() keeps aria-pressed in sync
-    bind = js.split("function bind(")[1].split("\n  function init(")[0]
-    assert 'getElementById("cfd-exonly")' in bind
-    assert "setExportingOnly(!state.exportingOnly)" in bind
-    update = js.split("function update(")[1].split("\n  function ")[0]
-    assert 'getElementById("cfd-exonly")' in update
+    assert toolbar.count("<button") == 3
 
 
 def test_dashboard_js_percentage_helpers_use_counted_denominators() -> None:
-    """Every completion percentage excludes non-exporting glyphs when the toggle is
-    ON: the ring/donut (gradedOverallPct/aggExclusive), the leaderboard
+    """Every completion percentage always excludes non-exporting glyphs: the
+    ring/donut (gradedOverallPct/aggExclusive), the leaderboard
     (gradedMasterPct), the graded line (gradedPctAt), the stream + navigator
     denominators, and the lanes (laneGradedPctOne)."""
     js = assets.DASHBOARD_JS
@@ -1616,7 +1522,6 @@ def test_dashboard_js_percentage_helpers_use_counted_denominators() -> None:
     assert "countedTotal()" in stream and "isCounted(name)" in stream
     nav = js.split("function navOverallSeries(")[1].split("\n  function ")[0]
     assert "countedTotal()" in nav and "isCounted(name)" in nav
-    assert "state.exportingOnly" in nav                      # cache key includes the toggle
 
 
 def test_dashboard_js_coverage_rows_recomputed_under_exclusion() -> None:
@@ -1643,13 +1548,14 @@ def test_dashboard_js_heatmap_dims_excluded_cells_instead_of_hiding() -> None:
 
 def test_dashboard_js_counted_stats_mirror_raw_counts_shape() -> None:
     """countedStats(m) recomputes the m.counts / m.uncolored equivalents from the
-    raw keys: free mode = exclusive distribution, step mode = suffix-sum
-    cumulative ('reached k or beyond'); countFor/uncoloredFor route through it
-    only while the exclusion is active (raw passthrough when OFF)."""
+    raw keys as the suffix-sum cumulative ('reached k or beyond') of the exclusive
+    distribution; countFor/uncoloredFor route through it whenever the font has
+    non-exporting glyphs (raw passthrough otherwise)."""
     js = assets.DASHBOARD_JS
     stats = js.split("function countedStats(")[1].split("\n  function ")[0]
-    assert 'H.mode === "free"' in stats
+    assert "run += dist[key]||0; counts[key] = run;" in stats   # suffix-sum cumulative
+    assert "H.mode" not in js                                   # no mode switch anywhere
     count_for = js.split("function countFor(")[1].split("\n  function ")[0]
     assert "countedSet()" in count_for and "countedStats(m)" in count_for
-    assert "m.counts[String(k)]" in count_for                # raw truth when OFF
+    assert "m.counts[String(k)]" in count_for                # raw truth when nothing to exclude
     assert "function uncoloredFor(" in js

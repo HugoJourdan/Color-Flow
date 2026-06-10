@@ -93,13 +93,9 @@ In the example below the Layer Color is `Orange` — even though `Light Green` a
 
 ### Shortcuts
 
-Keyboard shortcuts can toggle each step:
+The palette registers a native **Jump to next color glyph** command that opens the next glyph that still needs work. Assign it a key in *Glyphs → Settings → Shortcuts* (search "Color Flow") — no extra install needed.
 
-1. Install **"Color Flow Shortcut"** from *Window → Plugin Manager*.
-2. Reload the scripts folder with `⌥ ⇧ ⌘ Y`.
-3. In *Glyphs → Settings → Shortcuts*, search "Color Flow" and assign a shortcut per item (Control + number works well).
-
-There is also a **Jump to Next Unfinished** shortcut that selects the next glyph that still needs work.
+The same jump is also available as a script: install **"Color Flow Shortcut"** from *Window → Plugin Manager* and reload the scripts folder with `⌥ ⇧ ⌘ Y`.
 
 ---
 
@@ -107,7 +103,7 @@ There is also a **Jump to Next Unfinished** shortcut that selects the next glyph
 
 A contemporary, **fully offline** report for the whole font, opened from the palette's **Action Button (⋯) → Open Color Font Dashboard**. It is a single self‑contained HTML file — no internet, no install — that you can keep or share. When it finishes building you get **Open** and **Save** buttons.
 
-Everything it shows matches the palette exactly: same glyphs, same Layer Color source, same step / free mode.
+Everything it shows matches the palette exactly: same glyphs, same Layer Color source, same counting.
 
 ### Progress at a glance
 
@@ -188,7 +184,7 @@ It is **non‑destructive**: your original glyph order is backed up when you ena
 
 # Install
 
-Install **Color Flow** (and **Color Flow Shortcut** for keyboard shortcuts) from **Window → Plugin Manager**, then restart Glyphs. Make sure a `colorNames.txt` is in place (see *Requirements*).
+Install **Color Flow** (and optionally **Color Flow Shortcut** for the script version of the jump shortcut) from **Window → Plugin Manager**, then restart Glyphs. Make sure a `colorNames.txt` is in place (see *Requirements*).
 
 ---
 

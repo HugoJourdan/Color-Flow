@@ -6,8 +6,8 @@
 #
 # Opens the next glyph whose current-master layer.color is not the final visible
 # workflow step (see colorNames.txt). Scans the font in order from the active
-# glyph, wraps around, and opens the result in the Edit view. Recipes are ignored
-# in v1 — it uses the single global final step.
+# glyph, wraps around, and opens the result in the Edit view. It uses the single
+# global final step.
 #
 # v1 always opens a new tab; reusing an already-open Edit tab (moving the cursor
 # to the target glyph within it) is deferred.
@@ -31,7 +31,8 @@ Keeping that here means the two can never drift again.
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from typing import Any
 
 # Canonical color order — index 0..11 matches Glyphs' native layer color labels.
 COLOR_ORDER = [
@@ -54,6 +55,12 @@ NONE_TOKEN = "None"
 
 # File the plugin and shortcuts both read. (The README documents this name too.)
 KEY_FILE_NAME = "colorNames.txt"
+
+# Optional in-font storage for the colour labels (the same text as colorNames.txt).
+# When present in ``font.userData`` it travels inside the .glyphs file, so a shared
+# font shows the same labels without the sidecar file. Takes precedence over the
+# external key file (see :func:`pick_settings_text`).
+FONT_LABELS_KEY = "com.hugojourdan.ColorFlow.colorNames"
 
 
 def _user_home() -> str:
@@ -220,15 +227,12 @@ def checked_state_for_color(color, order: list[str]) -> dict[str, bool]:
     return state
 
 
-def exclusive_state_for_color(color, order: list[str]) -> dict[str, bool]:
-    """Free-mode (single-select) checkbox state: only the step matching the
-    native ``layer.color`` is checked. Fully derived from the colour, so free
-    mode (like step mode) saves nothing in the .glyphs file."""
-    return {index: (color is not None and int(index) == color) for index in order}
-
-
 def single_counts_from_colors(colors: list, order: list[str]) -> dict[str, int]:
-    """Free-mode per-step counts: how many layers have *exactly* each colour."""
+    """Exact per-step census: how many layers have *exactly* each colour.
+
+    Unlike :func:`counts_from_colors` (cumulative), this is the exclusive
+    distribution — used for the palette's count badges, row bars and
+    title-bar colour segments, and the report's per-group ``dist`` data."""
     counts = {index: 0 for index in order}
     for color in colors:
         if color is None:
@@ -239,26 +243,33 @@ def single_counts_from_colors(colors: list, order: list[str]) -> dict[str, int]:
     return counts
 
 
-def highest_checked(state: dict[str, bool], order: list[str]) -> int | None:
-    """Highest checked step index, or ``None`` if none are checked.
+def non_exporting_names(glyphs: Iterable[Any]) -> set[str]:
+    """Names of the glyphs marked non-exporting (``GSGlyph.export == False``).
 
-    Used in free mode to set ``layer.color`` (so a glyph still gets a native
-    colour for the Font-View grouping) when the checkboxes are independent and
-    no longer form a contiguous run."""
-    result: int | None = None
-    for index in order:
-        if index in state and state[index]:
-            result = int(index)
-    return result
+    Pure: ``glyphs`` is any iterable of objects with a ``name`` and an optional
+    ``export`` flag — a missing flag counts as exporting, matching Glyphs'
+    default. This is the exclusion set ALWAYS threaded through the palette's
+    and the report's counting: non-exporting glyphs never count."""
+    return {str(glyph.name) for glyph in glyphs if not getattr(glyph, "export", True)}
+
+
+def exclude_named_colors(named_colors: Iterable[tuple[str, Any]],
+                         excluded: set[str]) -> list:
+    """Drop the colours of excluded glyphs from ``(glyph_name, color)`` pairs,
+    returning the plain colour list the counting functions consume. An empty
+    exclusion set keeps every colour (nothing to exclude — everything counts)."""
+    if not excluded:
+        return [color for _name, color in named_colors]
+    return [color for name, color in named_colors if name not in excluded]
 
 
 def counts_from_colors(colors: list, order: list[str]) -> dict[str, int]:
-    """Per-step checked counts derived purely from native layer colors.
+    """Cumulative per-step counts: layers that reached each step OR BEYOND.
 
     Each colour is expanded to its checkbox state via :func:`checked_state_for_color`
-    (the contiguous "steps up to this colour" model), then summed. This lets the
-    whole Color Flow data model be derived from ``layer.color`` (already saved by
-    Glyphs) instead of stored in userData."""
+    (the contiguous "steps up to this colour" model), then summed. Used by the
+    report's ``masters[].counts`` ("reached step k or beyond" views); the palette's
+    displayed counts are the exact census (:func:`single_counts_from_colors`)."""
     states = [checked_state_for_color(color, order) for color in colors]
     return count_states(states, order)
 
@@ -283,6 +294,33 @@ def layer_color_for_state(state: dict[str, bool], order: list[str]) -> int | Non
         else:
             break
     return color
+
+
+def font_labels_text(font: Any) -> str | None:
+    """Colour-label text stored inside ``font.userData[FONT_LABELS_KEY]``, or ``None``.
+
+    Reads the optional in-font label storage. Returns ``None`` when the font is
+    ``None``, the key is unset, or the value is blank/not a string — so callers can
+    treat ``None`` as "fall back to the external key file". Never raises."""
+    if font is None:
+        return None
+    try:
+        value = font.userData[FONT_LABELS_KEY]
+    except Exception:
+        return None
+    if isinstance(value, str) and value.strip():
+        return value
+    return None
+
+
+def pick_settings_text(userdata_text: str | None, file_text: str | None) -> str:
+    """Resolve the colour-label settings text by precedence: the in-font value wins,
+    then the external key file, then the built-in default. Blank entries are skipped
+    so an empty file/userData never shadows a real source."""
+    for candidate in (userdata_text, file_text):
+        if candidate is not None and candidate.strip():
+            return candidate
+    return DEFAULT_COLOR_NAMES
 
 
 def resolve_key_file(

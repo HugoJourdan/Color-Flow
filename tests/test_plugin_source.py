@@ -84,44 +84,66 @@ def test_validate_menu_item_rainbow_disabled_without_font() -> None:
     assert "NSOnState if self.fontview.is_enabled(font) else NSOffState" in tail
 
 
-def test_row_click_focuses_without_opening_tab() -> None:
-    body = _method_body("rowClicked_")
-    # Row click is focus/dim only — no Edit-tab side-effect (tab spam fix).
-    assert "_open_step_tab" not in body
-    assert "_focusColor" in body
-    assert "Update_Plugin_UI" in body
+def test_single_click_row_focus_removed() -> None:
+    # Single-click row focus is gone: no handler, no gesture wiring.
+    assert "def rowClicked_(" not in PLUGIN_SOURCE
+    assert '"rowClicked:"' not in PLUGIN_SOURCE
 
 
-def test_row_click_keeps_drag_suppression_guard() -> None:
-    body = _method_body("rowClicked_")
-    # End-of-drag clicks must still be swallowed by the _lastDragTime guard.
+def test_double_click_row_opens_step_tab() -> None:
+    body = _method_body("rowDoubleClicked_")
+    # Double-click on a row opens exactly that step's glyphs in a new Edit tab.
+    assert "_open_step_tab" in body
+    assert "_color_for_recognizer" in body
+
+
+def test_double_click_wired_with_two_clicks_alongside_pan() -> None:
+    body = _method_body("_attach_row_overlay")
+    # The overlay carries BOTH recognizers: a two-click NSClickGestureRecognizer
+    # for open-tab and the pan recognizer for drag-reorder.
+    assert '"rowDoubleClicked:"' in body
+    assert "setNumberOfClicksRequired_(2)" in body
+    assert '"colorDragged:"' in body
+    assert "setNumberOfClicksRequired_(1)" not in body
+
+
+def test_double_click_keeps_drag_suppression_guard() -> None:
+    body = _method_body("rowDoubleClicked_")
+    # End-of-drag clicks must still be swallowed by the _lastDragTime guard
+    # BEFORE any tab opens.
     assert "_lastDragTime" in body
     guard = body.index("_lastDragTime")
-    focus_toggle = body.index("_focusColor")
-    assert guard < focus_toggle
+    open_tab = body.index("_open_step_tab")
+    assert guard < open_tab
 
 
-def test_count_click_opens_step_tab() -> None:
-    body = _method_body("countClicked_")
-    # The count badge keeps the Review Queue behaviour: focus + open the
-    # step's glyphs in a new Edit tab.
-    assert "_open_step_tab" in body
-    assert "_focusColor" in body
+def test_count_badge_is_passive() -> None:
+    # The count badge no longer opens tabs: handler, wiring and the badge
+    # registry that resolved a recognizer back to its colour are all gone.
+    assert "countClicked_" not in PLUGIN_SOURCE
+    assert '"countClicked:"' not in PLUGIN_SOURCE
+    assert "_color_for_count" not in PLUGIN_SOURCE
+    assert "_countBoxes" not in PLUGIN_SOURCE
 
 
-def test_escape_still_clears_focus() -> None:
-    body = _method_body("cancelOperation_")
-    assert "_clear_focus" in body
+def test_step_tab_membership_matches_exact_badge_count() -> None:
+    body = _method_body("_glyphs_for_step")
+    # The badge shows the exact census, so the tab it opens holds exactly those
+    # glyphs: layers with EXACTLY this colour, non-exporting glyphs excluded —
+    # not the cumulative "reached this step or beyond" set.
+    assert "self._excluded_glyph_names()" in body
+    assert "str(layerColor) == str(color)" in body
+    assert "_layer_state" not in body
 
 
-def test_action_popover_has_free_mode_checkbox() -> None:
-    body = _method_body("Open_Action_Popover")
-    # Free mode (previously only reachable via the never-imported
-    # settings_panel.py) is a checkbox in the action popover, seeded from the
-    # FreeMode default the palette already consumes.
-    assert "popover.freeMode = CheckBox" in body
-    assert "value=self._free_mode()" in body
-    assert "callback=self._popover_free_mode" in body
+def test_focus_mode_machinery_removed() -> None:
+    # With no setter left the focus/dim machinery is dead — state, Escape path
+    # and the Update_Plugin_UI dimming branch are all gone.
+    assert "_focusColor" not in PLUGIN_SOURCE
+    assert "_clear_focus" not in PLUGIN_SOURCE
+    assert "cancelOperation_" not in PLUGIN_SOURCE
+    assert "rowAlpha" not in PLUGIN_SOURCE
+    assert '"focus"' not in PLUGIN_SOURCE
 
 
 def test_action_popover_has_store_labels_checkbox() -> None:
@@ -136,23 +158,13 @@ def test_action_popover_has_store_labels_checkbox() -> None:
 
 def test_action_popover_height_fits_settings_rows() -> None:
     body = _method_body("Open_Action_Popover")
-    # 500 -> 540: two checkbox rows + separator appended below the legend.
-    # 540 -> 568: the "Workflow recipes…" button appended below the checkboxes.
-    # 568 -> 590: the "Count exporting glyphs only" checkbox row.
-    assert "Popover((220, 590)" in body
+    # 590 -> 518: the retired settings rows (two checkboxes + one button) below
+    # the legend were removed, leaving only the store-in-font checkbox.
+    assert "Popover((220, 518)" in body
+    assert "Popover((220, 546)" not in body
     assert "Popover((220, 568)" not in body
-    assert "Popover((220, 540)" not in body
+    assert "Popover((220, 590)" not in body
     assert "Popover((220, 500)" not in body
-
-
-def test_free_mode_handler_persists_default_and_invalidates_counts() -> None:
-    body = _method_body("_popover_free_mode")
-    assert 'Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"]' in body
-    # Free vs step changes the derived counts, so the per-master cache must be
-    # dropped BEFORE the redraw or the bars repaint from stale data.
-    invalidate = body.index("_invalidate_counts")
-    redraw = body.index("Update_Plugin_UI")
-    assert invalidate < redraw
 
 
 def test_store_labels_handler_mirrors_settings_panel_save() -> None:
@@ -217,66 +229,35 @@ def test_register_uses_gscallbackhandler_api_unassigned() -> None:
     assert "_SHORTCUT_HANDLER = target" in body
 
 
-def test_register_covers_all_13_commands_in_one_group() -> None:
+def test_register_covers_only_jump_command_in_one_group() -> None:
     body = _module_function_body("_register_native_shortcuts")
     assert '_SHORTCUT_GROUP = "Color Flow"' in PLUGIN_SOURCE
     assert '_SHORTCUT_ID_PREFIX = "com.hugojourdan.ColorFlow."' in PLUGIN_SOURCE
-    # 12 toggles driven by the display-name table + the explicit jump command.
-    assert "for index, display in _SHORTCUT_DISPLAY_NAMES:" in body
-    assert 'f"{_SHORTCUT_ID_PREFIX}toggleStep{index}"' in body
-    assert 'f"toggleStepShortcut{index}:"' in body
+    # Exactly one command: the jump (Hugo's wording), no step toggles.
+    assert '"Jump to next color glyph"' in body
     assert '_SHORTCUT_ID_PREFIX + "jumpNext"' in body
     assert '"jumpNextShortcut:"' in body
-    # The display table covers exactly steps 0..11 with the script spellings.
-    table_start = PLUGIN_SOURCE.index("_SHORTCUT_DISPLAY_NAMES = (")
-    table = PLUGIN_SOURCE[table_start : PLUGIN_SOURCE.index(")\n", table_start)]
-    for index, display in enumerate(
-        [
-            "Red", "Orange", "Brown", "Yellow", "Green", "DarkGreen",
-            "Blue", "DarkBlue", "Purple", "Magenta", "Grey", "Charcoal",
-        ]
-    ):
-        assert f'({index}, "{display}")' in table
+    assert "toggleStepShortcut" not in PLUGIN_SOURCE
+    assert "_SHORTCUT_DISPLAY_NAMES" not in PLUGIN_SOURCE
+    assert "_toggle_step_for_selection" not in PLUGIN_SOURCE
 
 
-def test_shortcut_handler_has_distinct_selectors_and_validate() -> None:
-    # One ObjC selector per command on a long-lived NSObject target.
+def test_shortcut_handler_has_jump_selector_and_validate() -> None:
+    # One ObjC selector for the jump command on a long-lived NSObject target.
     assert "class ColorFlowShortcutHandler(NSObject):" in PLUGIN_SOURCE
-    for index in range(12):
-        assert f"def toggleStepShortcut{index}_(self, sender) -> None:" in PLUGIN_SOURCE
-        assert f"self._toggle({index})" in PLUGIN_SOURCE
     assert "def jumpNextShortcut_(self, sender) -> None:" in PLUGIN_SOURCE
     # GSShortcutCommandProtocol conformance, typed as returning an ObjC BOOL.
     assert "def validateShortcutCommand_editViewController_(" in PLUGIN_SOURCE
     validate = PLUGIN_SOURCE.index("def validateShortcutCommand_editViewController_(")
     decorator = PLUGIN_SOURCE.rindex("@objc.typedSelector(objc._C_NSBOOL", 0, validate)
     assert decorator < validate
-    # Both action paths are guarded — a shortcut can never raise into Glyphs.
-    toggle_body = PLUGIN_SOURCE[
-        PLUGIN_SOURCE.index("def _toggle(self, index: int)") : PLUGIN_SOURCE.index(
-            "def jumpNextShortcut_"
-        )
-    ]
-    assert "except Exception:" in toggle_body
+    # The action path is guarded — the shortcut can never raise into Glyphs.
     jump_body = PLUGIN_SOURCE[
         PLUGIN_SOURCE.index("def jumpNextShortcut_") : PLUGIN_SOURCE.index(
-            "def toggleStepShortcut0_"
+            "def _register_native_shortcuts"
         )
     ]
     assert "except Exception:" in jump_body
-
-
-def test_shortcut_toggle_mirrors_generated_script() -> None:
-    body = _module_function_body("_toggle_step_for_selection")
-    # Same semantics as the generated TOGGLE_TAIL in tools/generate_shortcuts.py.
-    assert "if key not in meaning:" in body  # hidden colour -> no-op
-    assert 'bool(Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"])' in body
-    assert "None if layer.color == index else index" in body  # free mode
-    assert "colornames.checked_state_for_color(layer.color, order)" in body
-    assert "colornames.layer_color_for_state(state, order)" in body
-    # Invalidates the palette's cached per-master counts, same tempData key.
-    assert '_SHORTCUT_COUNTS_KEY = "com.hugojourdan.ColorFlow-counts-"' in PLUGIN_SOURCE
-    assert "font.tempData[_SHORTCUT_COUNTS_KEY + master.id] = None" in body
 
 
 def test_shortcut_jump_mirrors_generated_script() -> None:
@@ -291,30 +272,18 @@ def test_shortcut_jump_mirrors_generated_script() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Exporting-only mode (count exporting glyphs only)
+# Non-exporting glyphs are ALWAYS excluded from every count and percentage
 # --------------------------------------------------------------------------- #
 
 
-def test_action_popover_has_exporting_only_checkbox() -> None:
+def test_action_popover_has_no_exporting_only_checkbox() -> None:
+    # The exclusion is always on — no opt-in checkbox, no pref key anywhere.
     body = _method_body("Open_Action_Popover")
-    # Opt-in pref (default OFF), seeded from the same key the dashboard reads.
-    assert "popover.exportingOnly = CheckBox" in body
-    assert '"Count exporting glyphs only"' in body
-    assert "value=self._exporting_only()" in body
-    assert "callback=self._popover_exporting_only" in body
-    assert (
-        '_EXPORTING_ONLY_KEY = "com.hugojourdan.ColorFlow-ExportingOnly"' in PLUGIN_SOURCE
-    )
-
-
-def test_exporting_only_handler_persists_pref_and_invalidates_counts() -> None:
-    body = _method_body("_popover_exporting_only")
-    assert "Glyphs.defaults[_EXPORTING_ONLY_KEY]" in body
-    # The stale cache for the newly selected mode must be dropped BEFORE the
-    # redraw, same discipline as the free-mode handler.
-    invalidate = body.index("_invalidate_counts")
-    redraw = body.index("Update_Plugin_UI")
-    assert invalidate < redraw
+    assert "Count exporting glyphs only" not in body
+    assert "popover.exporting" not in body
+    assert "ColorFlow-Exporting" not in PLUGIN_SOURCE
+    assert "_popover_exporting" not in PLUGIN_SOURCE
+    assert "def _exporting" not in PLUGIN_SOURCE
 
 
 def test_derive_counts_threads_exclusion_set_through_colornames() -> None:
@@ -323,29 +292,36 @@ def test_derive_counts_threads_exclusion_set_through_colornames() -> None:
     # pure helper — palette and report counting can never disagree.
     assert "colornames.exclude_named_colors(named_colors, self._excluded_glyph_names())" in body
     excluded = _method_body("_excluded_glyph_names")
+    # UNCONDITIONAL: the exclusion set is always the non-exporting names.
     assert "colornames.non_exporting_names(self.font.glyphs)" in excluded
-    assert "if not self._exporting_only():" in excluded     # OFF -> empty set, all count
+    assert "return set()" in excluded                       # only the exception fallback
+    assert "Glyphs.defaults" not in excluded
 
 
-def test_counts_cache_key_includes_exporting_only_pref() -> None:
-    # Toggling the pref must invalidate: the cache signature embeds the mode, and
-    # the invalidator drops BOTH variants.
-    key_body = _method_body("_counts_cache_key")
-    assert '"-exporting" if self._exporting_only() else ""' in key_body
+def test_derive_counts_is_exact_census_not_cumulative() -> None:
+    # Each count badge = layers with EXACTLY that colour (raw census), NOT the
+    # cumulative "reached this step or beyond" suffix-sum. 358 glyphs all on
+    # the final step -> final row 358, every other row 0.
+    body = _method_body("_derive_counts")
+    assert "return colornames.single_counts_from_colors(colors, order)" in body
+    assert "colornames.counts_from_colors(" not in PLUGIN_SOURCE
+
+
+def test_counts_cache_single_variant() -> None:
+    # Always-on exclusion -> one cache variant again; no mode suffix anywhere.
+    assert '"-exporting"' not in PLUGIN_SOURCE
+    assert '_SHORTCUT_COUNTS_KEY = "com.hugojourdan.ColorFlow-counts-"' in PLUGIN_SOURCE
     counts_body = _method_body("_counts")
-    assert "self._counts_cache_key(masterId)" in counts_body
+    assert "key = _SHORTCUT_COUNTS_KEY + masterId" in counts_body
     invalidate = _method_body("_invalidate_counts")
     assert "_SHORTCUT_COUNTS_KEY + masterId] = None" in invalidate
-    assert '_SHORTCUT_COUNTS_KEY + masterId + "-exporting"] = None' in invalidate
-    # the module-level shortcut toggle clears both variants too
-    toggle = _module_function_body("_toggle_step_for_selection")
-    assert 'font.tempData[_SHORTCUT_COUNTS_KEY + master.id + "-exporting"] = None' in toggle
 
 
 def test_palette_bar_denominator_excludes_non_exporting() -> None:
     body = _method_body("Update_Plugin_UI")
     # Counts AND the bar denominator shrink together, so a fully finished
-    # exporting set reads as a full bar.
+    # exporting set reads as a full bar on the final step (counts are the
+    # exact census, so the other rows stay empty).
     assert "len(self.font.glyphs) - len(self._excluded_glyph_names())" in body
     title = _method_body("_update_title_bar")
     assert "self._excluded_glyph_names()" in title

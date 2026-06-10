@@ -24,11 +24,10 @@ from typing import Any
 import AppKit
 import colorflow_filters
 import colorflow_profile
-import colorflow_recipes
 
-# Shared, GlyphsApp-free colorNames logic (also embedded into the shortcut
-# scripts by tools/generate_shortcuts.py). Glyphs puts this bundle's Resources/
-# dir on sys.path, so a plain absolute import works.
+# Shared, GlyphsApp-free colorNames logic (also embedded into the jump
+# shortcut script by tools/generate_shortcuts.py). Glyphs puts this bundle's
+# Resources/ dir on sys.path, so a plain absolute import works.
 import colornames
 
 # Shared "jump to next unfinished" navigation (also embedded into the jump
@@ -286,22 +285,12 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 #																									   #
 ########################################################################################################
 
-# Display spellings match tools/generate_shortcuts.py (Green/Blue/Grey rather than
-# lightGreen/lightBlue/lightGray) so the native command titles line up with the
-# external shortcut-script names users already know.
-_SHORTCUT_DISPLAY_NAMES = (
-	(0, "Red"), (1, "Orange"), (2, "Brown"), (3, "Yellow"),
-	(4, "Green"), (5, "DarkGreen"), (6, "Blue"), (7, "DarkBlue"),
-	(8, "Purple"), (9, "Magenta"), (10, "Grey"), (11, "Charcoal"),
-)
 _SHORTCUT_GROUP = "Color Flow"
 _SHORTCUT_ID_PREFIX = "com.hugojourdan.ColorFlow."
 _SHORTCUT_COUNTS_KEY = "com.hugojourdan.ColorFlow-counts-"
-# Opt-in "count exporting glyphs only" mode (default OFF): when set, glyphs
-# marked non-exporting in Glyphs drop out of every completion percentage —
-# palette counts/bars here, and the report's displayed percentages (the same
-# pref is read by colorflow_dashboard.exporting_only()).
-_EXPORTING_ONLY_KEY = "com.hugojourdan.ColorFlow-ExportingOnly"
+# Glyphs marked non-exporting in Glyphs are ALWAYS excluded from every
+# completion percentage — palette counts/bars here, and the report's displayed
+# percentages (colorflow_dashboard ships the same exclusion set client-side).
 
 # Strong module-level reference to the registered target. GSShortcutItem holds its
 # target WEAK and Glyphs builds one palette instance per document window, so the
@@ -312,43 +301,6 @@ _SHORTCUT_HANDLER = None
 
 def _shortcut_font_dir(font) -> str | None:
 	return os.path.dirname(font.filepath) if font.filepath else None
-
-
-def _toggle_step_for_selection(index: int) -> None:
-	"""Toggle workflow step ``index`` on the selected layers.
-
-	Mirrors the generated "Toggle <Color> CheckBox (Color Flow)" scripts
-	(tools/generate_shortcuts.py, TOGGLE_TAIL) so the native shortcut and the
-	external script can never disagree: free mode toggles the colour exclusively,
-	step mode flips the checkbox within the contiguous run, and the palette's
-	cached per-master counts are invalidated.
-	"""
-	font = Glyphs.font
-	if font is None:
-		return
-	master = font.selectedFontMaster
-	layers = font.selectedLayers
-	if master is None or not layers:
-		return
-	meaning = colornames.load_meaning(_shortcut_font_dir(font))
-	order = list(meaning.keys())
-	key = str(index)
-	if key not in meaning:
-		return  # this color is hidden in the current colorNames.txt
-	free = bool(Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"])
-	for layer in layers:
-		if free:
-			# single-select: toggle this colour exclusively (clear if re-pressed)
-			layer.color = None if layer.color == index else index
-		else:
-			# contiguous steps: derive from layer.color, nothing saved in the file
-			state = colornames.checked_state_for_color(layer.color, order)
-			state[key] = not state.get(key, False)
-			layer.color = colornames.layer_color_for_state(state, order)
-	# Invalidate the palette's cached counts (volatile tempData) — both the plain
-	# variant and the exporting-only one (see ColorFlow._counts_cache_key).
-	font.tempData[_SHORTCUT_COUNTS_KEY + master.id] = None
-	font.tempData[_SHORTCUT_COUNTS_KEY + master.id + "-exporting"] = None
 
 
 def _jump_to_next_unfinished() -> None:
@@ -392,7 +344,7 @@ def _jump_to_next_unfinished() -> None:
 
 
 class ColorFlowShortcutHandler(NSObject):
-	"""Long-lived target for the native shortcut commands (one per session)."""
+	"""Long-lived target for the native shortcut command (one per session)."""
 
 	# GSShortcutCommandProtocol: Glyphs asks right before performing the action.
 	# Typed selector because the protocol method returns an ObjC BOOL, which
@@ -401,14 +353,6 @@ class ColorFlowShortcutHandler(NSObject):
 	def validateShortcutCommand_editViewController_(self, action, editViewController) -> bool:
 		return True
 
-	@objc.python_method
-	def _toggle(self, index: int) -> None:
-		try:
-			_toggle_step_for_selection(index)
-		except Exception:
-			import traceback
-			print("Color Flow [toggle shortcut] error:\n" + traceback.format_exc())
-
 	def jumpNextShortcut_(self, sender) -> None:
 		try:
 			_jump_to_next_unfinished()
@@ -416,53 +360,16 @@ class ColorFlowShortcutHandler(NSObject):
 			import traceback
 			print("Color Flow [jump shortcut] error:\n" + traceback.format_exc())
 
-	# One tiny selector per step so each command is individually remappable in
-	# Glyphs > Settings > Shortcuts.
-	def toggleStepShortcut0_(self, sender) -> None:
-		self._toggle(0)
-
-	def toggleStepShortcut1_(self, sender) -> None:
-		self._toggle(1)
-
-	def toggleStepShortcut2_(self, sender) -> None:
-		self._toggle(2)
-
-	def toggleStepShortcut3_(self, sender) -> None:
-		self._toggle(3)
-
-	def toggleStepShortcut4_(self, sender) -> None:
-		self._toggle(4)
-
-	def toggleStepShortcut5_(self, sender) -> None:
-		self._toggle(5)
-
-	def toggleStepShortcut6_(self, sender) -> None:
-		self._toggle(6)
-
-	def toggleStepShortcut7_(self, sender) -> None:
-		self._toggle(7)
-
-	def toggleStepShortcut8_(self, sender) -> None:
-		self._toggle(8)
-
-	def toggleStepShortcut9_(self, sender) -> None:
-		self._toggle(9)
-
-	def toggleStepShortcut10_(self, sender) -> None:
-		self._toggle(10)
-
-	def toggleStepShortcut11_(self, sender) -> None:
-		self._toggle(11)
-
 
 def _register_native_shortcuts() -> None:
-	"""Register the 12 step toggles + jump in Glyphs > Settings > Shortcuts.
+	"""Register the jump command in Glyphs > Settings > Shortcuts.
 
 	Uses GSCallbackHandler +registerShortcutCommand:group:identifier:action:
 	target:character:modifierFlags: (GlyphsCore.framework, GSCallbackHandler.h).
-	Commands ship UNASSIGNED (character "") so users map their own keys natively
-	— no Scripts-folder copying. Registers once per session: Glyphs builds one
-	palette instance per document window, so later windows must not re-register.
+	The command ships UNASSIGNED (character "") so users map their own key
+	natively — no Scripts-folder copying. Registers once per session: Glyphs
+	builds one palette instance per document window, so later windows must not
+	re-register.
 	"""
 	global _SHORTCUT_HANDLER
 	if _SHORTCUT_HANDLER is not None:
@@ -470,26 +377,16 @@ def _register_native_shortcuts() -> None:
 	callback_handler = objc.lookUpClass("GSCallbackHandler")
 	register = callback_handler.registerShortcutCommand_group_identifier_action_target_character_modifierFlags_
 	target = ColorFlowShortcutHandler.alloc().init()
-	# Mark registered BEFORE the calls: a partial failure must not re-register
-	# the earlier commands when the next window opens (it would only fail again).
+	# Mark registered BEFORE the call: a partial failure must not re-register
+	# when the next window opens (it would only fail again).
 	_SHORTCUT_HANDLER = target
-	for index, display in _SHORTCUT_DISPLAY_NAMES:
-		register(
-			f"Toggle {display} Checkbox",
-			_SHORTCUT_GROUP,
-			f"{_SHORTCUT_ID_PREFIX}toggleStep{index}",
-			f"toggleStepShortcut{index}:",
-			target,
-			"",  # unassigned — the user picks a key in Settings > Shortcuts
-			0,
-		)
 	register(
-		"Jump to Next Unfinished",
+		"Jump to next color glyph",
 		_SHORTCUT_GROUP,
 		_SHORTCUT_ID_PREFIX + "jumpNext",
 		"jumpNextShortcut:",
 		target,
-		"",
+		"",  # unassigned — the user picks a key in Settings > Shortcuts
 		0,
 	)
 
@@ -559,8 +456,6 @@ class ColorFlow(PalettePlugin):
 		# Per-row widgets (label / bar / count) are built by Update_Plugin_UI.
 		self._rowChecks = {}
 		self._rowOverlays = {}
-		self._focusColor = None
-		self._countBoxes = {}
 		self._build_static_rows()
 
 		# # Select a master if none is selected
@@ -606,7 +501,7 @@ class ColorFlow(PalettePlugin):
 	def reload_after_settings(self) -> None:
 		self.meaning = self.Load_Meaning()
 		for i in range(12):
-			for suffix in ("line", "colorTag", "", "box", "count", "hl", "focus", "click", "eye", "eyeTag", "eyeLine"):
+			for suffix in ("line", "colorTag", "", "box", "count", "hl", "click", "eye", "eyeTag", "eyeLine"):
 				attr = str(i) + suffix
 				if hasattr(self.paletteView.frame, attr):
 					delattr(self.paletteView.frame, attr)
@@ -659,7 +554,7 @@ class ColorFlow(PalettePlugin):
 			import traceback
 			print("Color Flow [Rainbow setup] error:\n" + traceback.format_exc())
 
-		# Native shortcut commands in Glyphs > Settings > Shortcuts (remappable,
+		# Native shortcut command in Glyphs > Settings > Shortcuts (remappable,
 		# no Scripts-folder copying). Guarded like the Rainbow setup: a missing
 		# GSCallbackHandler symbol on an older Glyphs, or any registration
 		# failure, only prints to the Macro panel and never breaks plugin load.
@@ -709,7 +604,7 @@ class ColorFlow(PalettePlugin):
 				# bail gracefully instead of letting NSPopover throw.
 				print("Color Flow: no visible view to anchor the settings popover to.")
 				return
-			self._popover = Popover((220, 590), parentView=button,
+			self._popover = Popover((220, 518), parentView=button,
 				preferredEdge='left', behavior='semitransient')
 			popover = self._popover
 			popover.fgoLabel = TextBox((12, 12, -12, 16), "Font Glyph Order",
@@ -771,30 +666,17 @@ class ColorFlow(PalettePlugin):
 			legendY = reportY + 8 + 22 + 8
 			popover.legend = Button((12, legendY, 20, 22), "?",
 				callback=self._open_legend, sizeStyle='small')
-			# Settings ported from the never-reachable settings_panel.py: the app-wide
-			# free mode (independent steps) and storing the labels inside this .glyphs
-			# file (userData) so they travel when the font is shared.
+			# Settings ported from the never-reachable settings_panel.py: storing the
+			# labels inside this .glyphs file (userData) so they travel when the font
+			# is shared.
 			settingsY = legendY + 22 + 8
 			popover.settingsSep = HorizontalLine((12, settingsY, -12, 1))
-			popover.freeMode = CheckBox((12, settingsY + 8, -12, 18),
-				"Free mode (independent steps)", value=self._free_mode(),
-				callback=self._popover_free_mode, sizeStyle='small')
-			popover.storeInFont = CheckBox((12, settingsY + 30, -12, 18),
+			popover.storeInFont = CheckBox((12, settingsY + 8, -12, 18),
 				"Store labels in this font",
 				value=colornames.font_labels_text(Glyphs.font) is not None,
 				callback=self._popover_store_in_font, sizeStyle='small')
 			if Glyphs.font is None:
 				popover.storeInFont.enable(False)
-			# Opt-in: drop the glyphs marked non-exporting in Glyphs from every
-			# completion percentage (palette counts/bars + the report's displayed
-			# percentages). Honest default OFF — everything counts.
-			popover.exportingOnly = CheckBox((12, settingsY + 52, -12, 18),
-				"Count exporting glyphs only", value=self._exporting_only(),
-				callback=self._popover_exporting_only, sizeStyle='small')
-			# Workflow recipes (#5): a small editor for the per-category/per-script
-			# step recipes — previously only settable as raw JSON in the Macro panel.
-			popover.recipes = Button((12, settingsY + 76, -12, 22), "Workflow recipes…",
-				callback=self._open_recipes_editor, sizeStyle='small')
 			# The button has no background or border of its own; the animated GIF
 			# (which bakes in its own button shape) provides the entire visual. The
 			# native bezel is removed and an NSImageView the exact size of the button
@@ -978,7 +860,7 @@ class ColorFlow(PalettePlugin):
 		color_names = colornames.read_color_names(colornames.get_key_file(font_dir))
 		source = self.fontview.mode(font) if font is not None else "Layer"
 		return colorflow_profile.build_profile(
-			color_names=color_names, free_mode=self._free_mode(), rainbow_source=source,
+			color_names=color_names, rainbow_source=source,
 			label_colors=labelcolors.read_label_colors(), name=name)
 
 	@objc.python_method
@@ -1048,7 +930,6 @@ class ColorFlow(PalettePlugin):
 		incoming_names = incoming.get("colorNames", "")
 		if incoming_names.strip():
 			colornames.write_color_names(colornames.get_key_file(font_dir), incoming_names)
-		Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"] = bool(incoming.get("freeMode"))
 		if font is not None:
 			self.fontview.set_mode(font, incoming.get("rainbowSource", "Layer"))
 		colors = [tuple(rgba) for rgba in incoming.get("labelColors", [])]
@@ -1065,11 +946,7 @@ class ColorFlow(PalettePlugin):
 		try:
 			meaning = getattr(self, "meaning", {}) or {}
 			visible = colornames.visible_labels(meaning)
-			free = bool(Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"])
-			mode_line = ("Free mode: each colour is independent."
-				if free else
-				"Step mode: a colour means every step up to it is done.")
-			lines = [mode_line, ""]
+			lines = ["A colour means every step up to it is done.", ""]
 			for position, (color, label) in enumerate(visible.items(), start=1):
 				name = colornames.COLOR_NAMES.get(int(color), str(color))
 				lines.append(f"{position}. {label}  ({name})")
@@ -1077,46 +954,6 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [legend] error:\n" + traceback.format_exc())
-
-	# Free-mode checkbox in the action popover (ported from the unreachable
-	# settings_panel.py): persist the app-wide default, then redraw. Free vs step
-	# changes both the derived per-step counts and the row checkbox states, so the
-	# cached per-master counts must be dropped first — a plain redraw would repaint
-	# from the stale cache until the next interface update.
-	@objc.python_method
-	def _popover_free_mode(self, sender) -> None:
-		try:
-			Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"] = bool(sender.get())
-			try:
-				if self.font is not None:
-					self._invalidate_counts(self.font.selectedFontMaster.id)
-			except Exception:
-				pass
-			self._lastSignature = None
-			self.Update_Plugin_UI()
-		except Exception:
-			import traceback
-			print("Color Flow [free mode] error:\n" + traceback.format_exc())
-
-	# Exporting-only checkbox in the action popover: persist the app-wide pref,
-	# then redraw. The counts cache key includes the pref (_counts_cache_key) so
-	# the two modes can never read each other's cache, but the freshly selected
-	# mode's entry may itself be stale from an earlier toggle — drop it before
-	# the redraw, same discipline as the free-mode handler.
-	@objc.python_method
-	def _popover_exporting_only(self, sender) -> None:
-		try:
-			Glyphs.defaults[_EXPORTING_ONLY_KEY] = bool(sender.get())
-			try:
-				if self.font is not None:
-					self._invalidate_counts(self.font.selectedFontMaster.id)
-			except Exception:
-				pass
-			self._lastSignature = None
-			self.Update_Plugin_UI()
-		except Exception:
-			import traceback
-			print("Color Flow [exporting only] error:\n" + traceback.format_exc())
 
 	# Store-labels checkbox (ported from settings_panel._save): ticking mirrors the
 	# current effective label text into font.userData[FONT_LABELS_KEY] so the
@@ -1156,213 +993,6 @@ class ColorFlow(PalettePlugin):
 				field.set(labels.get(index, ""))
 		except Exception:
 			pass
-
-	# ------------------------------------------------------------------ workflow recipes editor
-	# A vanilla FloatingWindow editing the opt-in workflow recipes (#5) that the
-	# report's recipe-adjusted completion reads from Glyphs.defaults — previously
-	# only definable by hand-typing JSON in the Macro panel. All parsing /
-	# validation / persistence goes through the pure colorflow_recipes helpers so
-	# the logic stays unit-tested; this layer is only widgets.
-
-	# The visible workflow steps (key -> label) in workflow order, one checkbox
-	# per step in every editor row. Reloaded each open so label renames show up.
-	@objc.python_method
-	def _recipe_steps(self) -> list:
-		meaning = getattr(self, "meaning", None) or self.Load_Meaning()
-		return list(colornames.visible_labels(meaning).items())
-
-	# Match-field values actually present in the open font, stringified exactly
-	# like the report's glyph_meta stringifies them so popup values and recipe
-	# matching compare equal. Empty lists with no font: match_options then falls
-	# back to its static vocabulary.
-	@objc.python_method
-	def _recipe_field_values(self) -> dict:
-		values: dict = {field: [] for field, _label in colorflow_recipes.MATCH_FIELDS}
-		font = Glyphs.font
-		if font is not None:
-			try:
-				for glyph in font.glyphs:
-					for field in values:
-						value = getattr(glyph, field, None)
-						if value:
-							values[field].append(str(value))
-			except Exception:
-				pass
-		return values
-
-	@objc.python_method
-	def _open_recipes_editor(self, sender) -> None:
-		try:
-			self._close_popover()
-			import colorflow_dashboard
-			draft = colorflow_recipes.parse_recipes(
-				Glyphs.defaults[colorflow_dashboard.RECIPES_KEY])
-			self._build_recipes_window(draft)
-		except Exception:
-			import traceback
-			print("Color Flow [recipes editor] error:\n" + traceback.format_exc())
-
-	# (Re)build the whole editor window from a draft list — add/remove rebuild the
-	# window instead of reflowing it, which keeps the vanilla layout trivial. Note:
-	# steps a recipe lists beyond the currently visible workflow are dropped on
-	# save (the editor edits THIS workflow; serialize_recipes normalises anyway).
-	@objc.python_method
-	def _build_recipes_window(self, draft: list, position: tuple | None = None) -> None:
-		self._close_recipes_editor()
-		steps = self._recipe_steps()
-		field_values = self._recipe_field_values()
-		step_lines = -(-len(steps) // 4) if steps else 0
-		row_height = 28 + step_lines * 22 + 12
-		rows_top = 36
-		body_height = len(draft) * row_height if draft else 24
-		window = FloatingWindow((660, rows_top + body_height + 46),
-			"Color Flow — Workflow Recipes")
-		self._recipesWindow = window
-		self._recipesRows = []
-		for text, x, width in (("Name", 12, 188), ("Category", 208, 106),
-				("Script", 318, 106), ("Subcategory", 428, 110), ("Case", 542, 106)):
-			setattr(window, f"head{text}", TextBox((x, 14, width, 14), text, sizeStyle='mini'))
-		if not draft:
-			window.empty = TextBox((12, rows_top + 4, -12, 16),
-				"No recipes yet — click + to add one.", sizeStyle='small')
-		for row_index, recipe in enumerate(draft):
-			self._build_recipe_row(window, row_index, recipe,
-				rows_top + row_index * row_height, steps, field_values)
-		window.addRecipe = Button((12, -34, 32, 22), "+",
-			callback=self._recipes_add, sizeStyle='small')
-		window.removeRecipe = Button((50, -34, 32, 22), "−",
-			callback=self._recipes_remove, sizeStyle='small')
-		window.cancel = Button((-188, -34, 80, 22), "Cancel",
-			callback=self._recipes_cancel, sizeStyle='small')
-		window.save = Button((-100, -34, 88, 22), "Save",
-			callback=self._recipes_save, sizeStyle='small')
-		window.setDefaultButton(window.save)
-		if position is not None:
-			try:
-				_x, _y, current_w, current_h = window.getPosSize()
-				window.setPosSize((position[0], position[1], current_w, current_h))
-			except Exception:
-				pass
-		window.open()
-
-	# One editor row: name field, an "Any"-defaulting popup per match criterion
-	# (so multi-criteria recipes round-trip without loss), one checkbox per
-	# visible workflow step, and a separator.
-	@objc.python_method
-	def _build_recipe_row(self, window, row_index: int, recipe: dict, top: int,
-			steps: list, field_values: dict) -> None:
-		match = recipe.get("match", {})
-		row: dict = {"popups": {}, "options": {}, "steps": {}}
-		row["name"] = EditText((12, top, 188, 22), recipe.get("name", ""),
-			continuous=False, sizeStyle='small')
-		setattr(window, f"recipeName{row_index}", row["name"])
-		layout = {"category": (208, 106), "script": (318, 106),
-			"subCategory": (428, 110), "case": (542, 106)}
-		for field, _label in colorflow_recipes.MATCH_FIELDS:
-			x, width = layout[field]
-			selected = match.get(field) or None
-			options = colorflow_recipes.match_options(field, field_values.get(field), selected)
-			values = [""] + [value for value, _optionLabel in options]
-			popup = PopUpButton((x, top, width, 22),
-				["Any"] + [optionLabel for _value, optionLabel in options], sizeStyle='small')
-			popup.set(values.index(selected) if selected in values else 0)
-			setattr(window, f"recipe{field.capitalize()}{row_index}", popup)
-			row["popups"][field] = popup
-			row["options"][field] = values
-		wanted = set(recipe.get("steps") or [])
-		for position, (key, label) in enumerate(steps):
-			checkbox = CheckBox(
-				(12 + (position % 4) * 160, top + 28 + (position // 4) * 22, 156, 18),
-				label, value=(key in wanted), sizeStyle='small')
-			setattr(window, f"recipeStep{row_index}_{key}", checkbox)
-			row["steps"][key] = checkbox
-		step_lines = -(-len(steps) // 4) if steps else 0
-		setattr(window, f"recipeSep{row_index}",
-			HorizontalLine((12, top + 28 + step_lines * 22 + 4, -12, 1)))
-		self._recipesRows.append(row)
-
-	# Read every editor row back into raw recipe dicts. serialize_recipes /
-	# parse_recipes do all the validation, so this stays dumb on purpose.
-	@objc.python_method
-	def _recipes_draft_from_ui(self) -> list:
-		draft = []
-		for row in getattr(self, "_recipesRows", []):
-			match = {}
-			for field, popup in row["popups"].items():
-				values = row["options"][field]
-				index = popup.get()
-				value = values[index] if 0 <= index < len(values) else ""
-				if value:
-					match[field] = value
-			checked = [key for key, checkbox in row["steps"].items() if checkbox.get()]
-			draft.append({"name": row["name"].get().strip(), "match": match, "steps": checked})
-		return draft
-
-	@objc.python_method
-	def _recipes_window_position(self) -> tuple | None:
-		window = getattr(self, "_recipesWindow", None)
-		if window is None:
-			return None
-		try:
-			x, y, _width, _height = window.getPosSize()
-			return (x, y)
-		except Exception:
-			return None
-
-	@objc.python_method
-	def _recipes_add(self, sender) -> None:
-		try:
-			position = self._recipes_window_position()
-			draft = self._recipes_draft_from_ui()
-			# a fresh recipe starts with every visible step checked (= full order,
-			# the engine's no-op), so saving it unedited changes nothing.
-			draft.append({"name": "", "match": {},
-				"steps": [key for key, _label in self._recipe_steps()]})
-			self._build_recipes_window(draft, position=position)
-		except Exception:
-			import traceback
-			print("Color Flow [recipes add] error:\n" + traceback.format_exc())
-
-	@objc.python_method
-	def _recipes_remove(self, sender) -> None:
-		try:
-			position = self._recipes_window_position()
-			draft = self._recipes_draft_from_ui()
-			if draft:
-				draft.pop()
-			self._build_recipes_window(draft, position=position)
-		except Exception:
-			import traceback
-			print("Color Flow [recipes remove] error:\n" + traceback.format_exc())
-
-	@objc.python_method
-	def _recipes_save(self, sender) -> None:
-		# Persist through the pure helpers: serialize_recipes normalises and
-		# validates the round-trip, so the report engine reads back exactly what
-		# the editor saved.
-		try:
-			import colorflow_dashboard
-			Glyphs.defaults[colorflow_dashboard.RECIPES_KEY] = (
-				colorflow_recipes.serialize_recipes(self._recipes_draft_from_ui()))
-			self._close_recipes_editor()
-		except Exception:
-			import traceback
-			print("Color Flow [recipes save] error:\n" + traceback.format_exc())
-
-	@objc.python_method
-	def _recipes_cancel(self, sender) -> None:
-		self._close_recipes_editor()
-
-	@objc.python_method
-	def _close_recipes_editor(self) -> None:
-		window = getattr(self, "_recipesWindow", None)
-		if window is not None:
-			try:
-				window.close()
-			except Exception:
-				pass
-		self._recipesWindow = None
-		self._recipesRows = []
 
 	@objc.python_method
 	def _generate_smart_filters(self, sender) -> None:
@@ -2303,41 +1933,26 @@ class ColorFlow(PalettePlugin):
 
 	# ------------------------------------------------------------------ derived data (tempData)
 
-	# --- mode: contiguous "step" (default, nothing saved in the file) vs "free"
-	# (independent checkboxes, stored per-layer in userData). ---
-	@objc.python_method
-	def _free_mode(self) -> bool:
-		return bool(Glyphs.defaults["com.hugojourdan.ColorFlow-FreeMode"])
-
-	# --- opt-in "count exporting glyphs only" (default OFF): non-exporting glyphs
-	# drop out of the per-master counts AND the bar denominators. ---
-	@objc.python_method
-	def _exporting_only(self) -> bool:
-		return bool(Glyphs.defaults[_EXPORTING_ONLY_KEY])
-
 	# The exclusion set the counting threads through colornames: the names of the
-	# font's non-exporting glyphs when the pref is ON, else empty (all count).
+	# font's non-exporting glyphs — ALWAYS excluded, they never count.
 	@objc.python_method
 	def _excluded_glyph_names(self) -> set:
-		if not self._exporting_only():
-			return set()
 		try:
 			return colornames.non_exporting_names(self.font.glyphs)
 		except Exception:
 			return set()
 
-	# A layer's checkbox state, derived from its colour. Free mode is single-
-	# select (only the matching colour); step mode is the contiguous run.
+	# A layer's checkbox state, derived from its colour: the contiguous run of
+	# steps up to and including the colour.
 	@objc.python_method
 	def _layer_state(self, layer, order) -> dict:
-		if self._free_mode():
-			return colornames.exclusive_state_for_color(layer.color, order)
 		return colornames.checked_state_for_color(layer.color, order)
 
-	# Per-step counts for a master, derived from native layer colours. Nothing
-	# Color Flow tracks is saved in the .glyphs file, in either mode. In
-	# exporting-only mode the non-exporting glyphs' colours are excluded before
-	# counting (the exclusion set is threaded through colornames).
+	# Exact per-step census for a master, derived from native layer colours: a
+	# layer counts ONLY for the colour it actually has (raw census, NOT the
+	# cumulative "reached this step or beyond" sum). Nothing Color Flow tracks
+	# is saved in the .glyphs file. The non-exporting glyphs' colours are always
+	# excluded before counting (the exclusion set is threaded through colornames).
 	@objc.python_method
 	def _derive_counts(self, masterId) -> dict:
 		order = list(self.meaning.keys())
@@ -2346,19 +1961,11 @@ class ColorFlow(PalettePlugin):
 			layer = glyph.layers[masterId]
 			named_colors.append((glyph.name, layer.color if layer is not None else None))
 		colors = colornames.exclude_named_colors(named_colors, self._excluded_glyph_names())
-		if self._free_mode():
-			return colornames.single_counts_from_colors(colors, order)
-		return colornames.counts_from_colors(colors, order)
-
-	# Cache signature: the key includes the exporting-only pref, so counts derived
-	# under one mode can never be repainted after toggling into the other.
-	@objc.python_method
-	def _counts_cache_key(self, masterId) -> str:
-		return _SHORTCUT_COUNTS_KEY + masterId + ("-exporting" if self._exporting_only() else "")
+		return colornames.single_counts_from_colors(colors, order)
 
 	@objc.python_method
 	def _counts(self, masterId) -> dict:
-		key = self._counts_cache_key(masterId)
+		key = _SHORTCUT_COUNTS_KEY + masterId
 		counts = self.font.tempData[key]
 		if not hasattr(counts, "keys"):
 			counts = self._derive_counts(masterId)
@@ -2367,12 +1974,10 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _invalidate_counts(self, masterId) -> None:
-		# Drop BOTH variants (plain + exporting-only) — see _counts_cache_key.
 		self.font.tempData[_SHORTCUT_COUNTS_KEY + masterId] = None
-		self.font.tempData[_SHORTCUT_COUNTS_KEY + masterId + "-exporting"] = None
 
 	# Remember which colour a freshly built row checkbox belongs to (the widgets
-	# rebuild on each refresh). Row interaction (open-tab click + drag-reorder)
+	# rebuild on each refresh). Row interaction (open-tab double-click + drag-reorder)
 	# lives on a full-width transparent overlay added after the count, so the
 	# WHOLE row responds — see _attach_row_overlay.
 	@objc.python_method
@@ -2380,8 +1985,11 @@ class ColorFlow(PalettePlugin):
 		self._rowChecks[color] = checkbox
 
 	# A transparent, full-width overlay laid over each row (above the bar, label
-	# and count) so a click anywhere on the row toggles focus on that step and a
-	# drag reorders it. The label/count underneath stay visible.
+	# and count) so a DOUBLE-click anywhere on the row opens that step's glyphs
+	# in a new Edit tab and a drag reorders it. The label/count underneath stay
+	# visible. The two recognizers coexist: the pan only fires on movement, the
+	# click only on two stationary clicks, and the _lastDragTime guard swallows
+	# any end-of-drag click that slips through.
 	@objc.python_method
 	def _attach_row_overlay(self, color, yPos) -> None:
 		overlay = Group((0, yPos - self.shift - 1, self.width, 19))
@@ -2389,8 +1997,8 @@ class ColorFlow(PalettePlugin):
 		self._rowOverlays[color] = overlay
 		view = overlay._nsObject
 		try:
-			click = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "rowClicked:")
-			click.setNumberOfClicksRequired_(1)
+			click = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "rowDoubleClicked:")
+			click.setNumberOfClicksRequired_(2)
 			view.addGestureRecognizer_(click)
 		except Exception:
 			pass
@@ -2633,8 +2241,10 @@ class ColorFlow(PalettePlugin):
 			yPos = 13
 			masterId = self.font.selectedFontMaster.id
 			counts = self._counts(masterId)
-			# Exporting-only mode shrinks the bar denominator with the counts, so
-			# a fully-finished exporting set still reads as a full bar.
+			# Non-exporting glyphs never count: the bar denominator shrinks with
+			# the counts. Counts are the exact census, so each row's bar fills
+			# with the layers sitting EXACTLY on that step — a fully finished
+			# exporting set reads as a full bar on the final step, empty elsewhere.
 			glyphCount = len(self.font.glyphs) - len(self._excluded_glyph_names())
 			order = list(self.meaning.keys())
 
@@ -2643,11 +2253,7 @@ class ColorFlow(PalettePlugin):
 			firstColor = selectedLayers[0].color if selectedLayers else None
 
 			for color, meaning in self.meaning.items():
-				focusColor = getattr(self, "_focusColor", None)
-				focused = focusColor is not None
-				isFocusRow = focused and str(color) == str(focusColor)
-				rowAlpha = 1.0 if (not focused or isFocusRow) else 0.28
-				for suffix in ("", "box", "count", "hl", "focus", "click"):
+				for suffix in ("", "box", "count", "hl", "click"):
 					attr = str(color) + suffix
 					if hasattr(self.paletteView.frame, attr):
 						delattr(self.paletteView.frame, attr)
@@ -2669,51 +2275,20 @@ class ColorFlow(PalettePlugin):
 						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
 					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
-					try:
-						_tv = checkbox._nsObject
-						_tc = _tv.textColor() or AppKit.NSColor.labelColor()
-						_tv.setTextColor_(_tc.colorWithAlphaComponent_(rowAlpha))
-					except Exception:
-						pass
 					self._register_row_checkbox(checkbox, color)
 					self._make_count(color, count, yPos)
 					self._attach_row_overlay(color, yPos)
 					yPos += 19
 				else:
 					if barWidth:
-						_rgba = self.colorKeys[str(color)]
-						fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(_rgba[0], _rgba[1], _rgba[2], _rgba[3] * rowAlpha)
+						fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
 						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
 					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
-					try:
-						_tv = checkbox._nsObject
-						_tc = _tv.textColor() or AppKit.NSColor.labelColor()
-						_tv.setTextColor_(_tc.colorWithAlphaComponent_(rowAlpha))
-					except Exception:
-						pass
 					self._register_row_checkbox(checkbox, color)
 					self._make_count(color, count, yPos)
 					self._attach_row_overlay(color, yPos)
 					yPos += 19
-			self._countBoxes = {}
-			for reviewColor in list(self._rowChecks.keys()):
-				countBox = getattr(self.paletteView.frame, str(reviewColor)+"count", None)
-				if countBox is None:
-					continue
-				self._countBoxes[reviewColor] = countBox
-				try:
-					recognizer = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "countClicked:")
-					recognizer.setNumberOfClicksRequired_(1)
-					view = self._ns_button(countBox)
-					view.addGestureRecognizer_(recognizer)
-					area = AppKit.NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
-						view.bounds(),
-						AppKit.NSTrackingCursorUpdate | AppKit.NSTrackingActiveInKeyWindow | AppKit.NSTrackingMouseEnteredAndExited,
-						self, None)
-					view.addTrackingArea_(area)
-				except Exception:
-					pass
 			self._update_title_bar()
 		except Exception:
 			import traceback
@@ -2781,80 +2356,44 @@ class ColorFlow(PalettePlugin):
 			except Exception:
 				pass
 
-	# Review Queue + Focus (#10, #11): single-click a row to toggle focus on
-	# that step (row highlight / dimming) with no other side-effect; single-click
-	# the step's count badge to focus AND open exactly its glyphs in a new Edit
-	# tab to walk through them. Click again to clear focus.
-	# Pointing-hand cursor while hovering a clickable count badge (#10/#11).
+	# Review Queue: DOUBLE-click a row to open exactly that step's glyphs in a
+	# new Edit tab to walk through them. The count badge is a passive display.
+	# Pointing-hand cursor while hovering an openable row.
 	def cursorUpdate_(self, event) -> None:
 		try:
 			AppKit.NSCursor.pointingHandCursor().set()
 		except Exception:
 			pass
 
-	def rowClicked_(self, sender) -> None:
+	def rowDoubleClicked_(self, sender) -> None:
 		try:
+			# End-of-drag clicks must never read as an open request — same
+			# _lastDragTime suppression guard as the drag recognizer writes.
 			lastDrag = getattr(self, "_lastDragTime", None)
 			if lastDrag is not None and (datetime.now() - lastDrag).total_seconds() < 0.25:
 				return
 			color = self._color_for_recognizer(sender)
 			if color is None:
 				return
-			# Focus/dim toggle only — opening an Edit tab is the count badge's
-			# job (countClicked_), so casual row clicks don't spam new tabs.
-			self._focusColor = None if getattr(self, "_focusColor", None) == color else color
-			self.Update_Plugin_UI()
+			self._open_step_tab(color)
 		except Exception:
 			import traceback
-			print("Color Flow [row click] error:\n" + traceback.format_exc())
+			print("Color Flow [row double-click] error:\n" + traceback.format_exc())
 
-	def countClicked_(self, sender) -> None:
-		try:
-			color = self._color_for_count(sender)
-			if color is None:
-				return
-			self._focusColor = None if getattr(self, "_focusColor", None) == color else color
-			self.Update_Plugin_UI()
-			if self._focusColor is not None:
-				self._open_step_tab(color)
-		except Exception:
-			import traceback
-			print("Color Flow [review] error:\n" + traceback.format_exc())
-
+	# Exact census membership, matching the count badge: a glyph is "at" this
+	# step only when its layer colour IS this step (not beyond it), and the
+	# non-exporting glyphs are excluded — the opened tab holds exactly the
+	# badge's count of glyphs.
 	@objc.python_method
-	def _clear_focus(self) -> None:
-		# Escape (or a programmatic clear) drops focus mode and repaints. Safe to
-		# call when nothing is focused — it is then a no-op repaint.
-		if getattr(self, "_focusColor", None) is None:
-			return
-		self._focusColor = None
-		try:
-			self.Update_Plugin_UI()
-		except Exception:
-			pass
-
-	def cancelOperation_(self, sender) -> None:
-		# AppKit routes the Escape key to cancelOperation_ up the responder chain.
-		self._clear_focus()
-
-	@objc.python_method
-	def _color_for_count(self, recognizer) -> str | None:
-		view = recognizer.view()
-		for color, box in getattr(self, "_countBoxes", {}).items():
-			try:
-				if self._ns_button(box) == view:
-					return color
-			except Exception:
-				continue
-		return None
-
-	@objc.python_method
-	def _glyphs_for_step(self, color, masterId, order) -> list:
+	def _glyphs_for_step(self, color, masterId) -> list:
+		excluded = self._excluded_glyph_names()
 		names = []
 		for glyph in self.font.glyphs:
+			if glyph.name in excluded:
+				continue
 			layer = glyph.layers[masterId]
-			state = self._layer_state(layer, order) if layer is not None else {}
-			if state.get(color):
+			layerColor = layer.color if layer is not None else None
+			if layerColor is not None and str(layerColor) == str(color):
 				names.append(glyph.name)
 		return names
 
@@ -2867,8 +2406,7 @@ class ColorFlow(PalettePlugin):
 			masterId = font.selectedFontMaster.id
 		except Exception:
 			return
-		order = list(self.meaning.keys())
-		names = self._glyphs_for_step(color, masterId, order)
+		names = self._glyphs_for_step(color, masterId)
 		if not names:
 			Message(f"No glyphs at \u201c{self.meaning.get(color, str(color))}\u201d.", title="Color Flow")
 			return
@@ -3168,7 +2706,7 @@ class ColorFlow(PalettePlugin):
 
 	# Resolve colorNames.txt (per-font dir, else the shared info dir) and parse it
 	# into {"0".."11": label}. All parsing/key-file logic lives in the shared
-	# colornames module so the palette and the shortcut scripts can
+	# colornames module so the palette and the jump shortcut script can
 	# never diverge (see tools/generate_shortcuts.py).
 	@objc.python_method
 	def Load_Meaning(self) -> dict:

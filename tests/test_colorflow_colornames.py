@@ -473,7 +473,8 @@ def test_write_color_names_round_trips_a_label_edit(tmp_path) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# counts_from_colors (derive aggregate progress from native layer colors)
+# counts_from_colors (cumulative "reached step k or beyond" — report-only;
+# the palette's displayed counts are single_counts_from_colors)
 # --------------------------------------------------------------------------- #
 
 def test_counts_from_colors_counts_contiguous_prefixes() -> None:
@@ -530,38 +531,22 @@ def test_settings_round_trip() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# highest_checked (free mode -> native layer colour)
+# single_counts_from_colors (exact per-colour census — the palette's count
+# badges/row bars, the title-bar segments and the report's dist)
 # --------------------------------------------------------------------------- #
-
-def test_highest_checked_returns_top_checked_index() -> None:
-    assert cc.highest_checked({"0": True, "1": False, "3": True}, ["0", "1", "2", "3"]) == 3
-
-
-def test_highest_checked_none_when_empty() -> None:
-    assert cc.highest_checked({"0": False, "1": False}, ["0", "1"]) is None
-
-
-def test_highest_checked_ignores_keys_outside_order() -> None:
-    assert cc.highest_checked({"0": True, "9": True}, ["0", "1"]) == 0
-
-
-# --------------------------------------------------------------------------- #
-# Free mode = single-select (derived from layer.color, no userData)
-# --------------------------------------------------------------------------- #
-
-def test_exclusive_state_checks_only_the_matching_colour() -> None:
-    assert cc.exclusive_state_for_color(2, ["0", "1", "2", "3"]) == {
-        "0": False, "1": False, "2": True, "3": False
-    }
-
-
-def test_exclusive_state_all_false_for_none() -> None:
-    assert cc.exclusive_state_for_color(None, ["0", "1"]) == {"0": False, "1": False}
-
 
 def test_single_counts_count_exact_colour_matches() -> None:
     assert cc.single_counts_from_colors([0, 0, 2, None], ["0", "1", "2"]) == {
         "0": 2, "1": 0, "2": 1
+    }
+
+
+def test_single_counts_all_on_final_step_credit_only_that_step() -> None:
+    # Hugo's screenshot shape: every glyph Approved (final step) -> the final
+    # row shows the full total, every earlier row shows 0 (no suffix-sum).
+    order = ["0", "1", "2"]
+    assert cc.single_counts_from_colors([2, 2, 2], order) == {
+        "0": 0, "1": 0, "2": 3
     }
 
 
@@ -589,7 +574,7 @@ def test_pick_settings_text_precedence() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Exporting-only exclusion (count exporting glyphs only)
+# Non-exporting exclusion (non-exporting glyphs never count)
 # --------------------------------------------------------------------------- #
 
 class _G:
@@ -635,7 +620,9 @@ def test_exclude_named_colors_threads_into_step_counting() -> None:
     assert excluded == {"0": 2, "1": 1}
 
 
-def test_exclude_named_colors_threads_into_free_counting() -> None:
+def test_exclude_named_colors_threads_into_exact_counting() -> None:
+    # The exact census (palette count badges / title-bar segments / report
+    # dist) honours the same exclusion set as the cumulative counting.
     order = ["0", "1"]
     named = [("A", 1), ("nonexp", 0), ("B", 0)]
     excluded = cc.single_counts_from_colors(

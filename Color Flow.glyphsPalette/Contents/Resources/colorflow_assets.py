@@ -118,7 +118,6 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .hd .fam{font-weight:600}
 .hd .meta{font-size:var(--fs-sm);color:var(--muted-2)}
 .hd .sp{flex:1}
-.hd .mode{font-size:var(--fs-xs);color:var(--muted);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:4px 9px}
 .hd .streak{font-size:var(--fs-xs);color:var(--text);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:4px 9px}
 .icon{width:30px;height:28px;border:1px solid var(--border-2);border-radius:var(--r-sm);background:transparent;color:var(--muted);cursor:pointer}
 .icon:hover{color:var(--text)}
@@ -161,8 +160,6 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .fnl-pct{flex:0 0 auto;min-width:38px;text-align:right;font-size:var(--fs-xs);font-variant-numeric:tabular-nums;color:var(--text)}
 .fnl-empty{font-size:var(--fs-xs);color:var(--muted-2);padding:4px 5px}
 .funnel.intro .fnl-fill{animation:segGrow .5s ease backwards}
-.ov-recipe{margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
-.ov-recipe b{color:var(--text)}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
 .legend .lg{display:inline-flex;align-items:center;gap:5px}
 .ov-extra{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:14px;margin-top:16px}
@@ -203,20 +200,6 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .hg-bar{flex:1;height:9px;border-radius:4px;background:var(--track);overflow:hidden}
 .hg-bar>span{display:block;height:100%;background:var(--accent);border-radius:4px}
 .hg-n{flex:0 0 26px;text-align:right;font-size:var(--fs-2xs);color:var(--muted)}
-/* Recipes card: global summary line, one row per recipe, per-master X/Y bars
-   (the bars reuse .lb-bar). Token-driven only — both themes + print stay right. */
-.rcp-sum{margin:0 0 10px;font-size:var(--fs-xs);color:var(--muted)}
-.rcp-sum b{color:var(--text)}
-.rcp-row{display:flex;align-items:baseline;gap:8px;padding:3px 0;font-size:var(--fs-xs);min-width:0}
-.rcp-row+.rcp-row{border-top:1px solid var(--track)}
-.rcp-name{flex:0 0 auto;color:var(--text);font-weight:600}
-.rcp-rule{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
-.rcp-steps{flex:0 0 auto;font-size:var(--fs-2xs);color:var(--muted-2);white-space:nowrap}
-.rcp-masters{margin-top:10px;border-top:1px solid var(--track);padding-top:6px}
-.rcp-m{display:flex;align-items:center;gap:9px;padding:4px 0}
-.rcp-m-n{flex:0 0 96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-2xs);color:var(--muted)}
-.rcp-m-c{flex:0 0 auto;min-width:48px;text-align:right;font-size:var(--fs-2xs);color:var(--muted);font-variant-numeric:tabular-nums}
-.rcp-m-c b{color:var(--text)}
 .legend i{width:8px;height:8px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .tabs{display:flex;gap:18px;border-bottom:1px solid var(--border);margin-bottom:6px;overflow-x:auto}
 .tab{font:var(--fs-sm) inherit;background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted-2);padding:8px 0;cursor:pointer;white-space:nowrap}
@@ -553,7 +536,6 @@ DASHBOARD_JS = r"""
     viewLo: null, viewHi: null,            // Range-navigator zoom window (snapshot indices; null = full)
     tlSpan: null,                          // active duration preset ("1d".."1y"/"all"; null = custom/full)
     journeyGlyph: null, helpOpen: false,   // journey modal + help panel
-    exportingOnly: false,                  // seeded from H.exportingOnly in start()
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
   // Timeline datasets: the per-day set (always) and the fine-grain per-save/per-commit set
@@ -689,18 +671,18 @@ DASHBOARD_JS = r"""
       + '%;background:var('+varFor(key)+');--i:'+(idx||0)
       + ';box-shadow:0 0 9px color-mix(in srgb,var('+glow+') 22%,transparent),inset -6px 0 9px -3px rgba(0,0,0,.2)" title="'+esc(lab)+' — click to focus these glyphs"></span>';
   }
-  // ----- Exporting-only mode -------------------------------------------------
-  // Glyphs marked non-exporting in Glyphs (H.nonExporting) can be dropped from
-  // every completion percentage via the toolbar toggle (state.exportingOnly,
-  // seeded from the palette pref H.exportingOnly). PARITY: the embedded
-  // masters[].counts/keys always ship ALL glyphs (raw truth); the exclusion is
-  // applied HERE, client-side, so the displayed numbers match the palette's.
-  // countedSet() centralises the exclusion: null when everything counts (toggle
-  // off / nothing to exclude), else a {name:1} lookup of the glyphs that DO
-  // count. Heatmap cells of excluded glyphs dim (.ncnt) instead of vanishing.
-  var COUNTED = null, COUNTEDN = 0;            // memo; rebuilt when the toggle flips
+  // ----- Non-exporting exclusion ---------------------------------------------
+  // Glyphs marked non-exporting in Glyphs (H.nonExporting) are ALWAYS dropped
+  // from every completion percentage, matching the palette. PARITY: the
+  // embedded masters[].counts/keys always ship ALL glyphs (raw truth); the
+  // exclusion is applied HERE, client-side, so the displayed numbers match
+  // the palette's. countedSet() centralises the exclusion: null when nothing
+  // to exclude (every glyph exports), else a {name:1} lookup of the glyphs
+  // that DO count. Heatmap cells of excluded glyphs dim (.ncnt) instead of
+  // vanishing.
+  var COUNTED = null, COUNTEDN = 0;            // memo; the exclusion never changes after load
   function countedSet(){
-    if (!state.exportingOnly || !(H.nonExporting||[]).length) return null;
+    if (!(H.nonExporting||[]).length) return null;
     if (COUNTED) return COUNTED;
     var off = {}; (H.nonExporting||[]).forEach(function(n){ off[n]=1; });
     var set = {}, n = 0;
@@ -710,10 +692,10 @@ DASHBOARD_JS = r"""
   }
   function isCounted(name){ var set = countedSet(); return !set || !!set[name]; }
   function countedTotal(){ return countedSet() ? COUNTEDN : (H.glyphTotal||0); }
-  // Per-master tallies with the exclusion applied (memoised; only consulted while
-  // the toggle is ON): the m.counts / m.uncolored equivalents, recomputed from the
-  // raw m.keys. Step mode's cumulative "reached k or beyond" is the suffix sum of
-  // the exclusive distribution in workflow order; free mode is the distribution.
+  // Per-master tallies with the exclusion applied (memoised; consulted whenever
+  // the font has non-exporting glyphs): the m.counts / m.uncolored equivalents,
+  // recomputed from the raw m.keys. The cumulative "reached k or beyond" count
+  // is the suffix sum of the exclusive distribution in workflow order.
   var CSTATS = {};
   function countedStats(m){
     if (CSTATS[m.id]) return CSTATS[m.id];
@@ -727,18 +709,9 @@ DASHBOARD_JS = r"""
     var counts = {}, run = 0, order = H.order||[];
     for (var j=order.length-1;j>=0;j--){
       var key = order[j];
-      if (H.mode === "free"){ counts[key] = dist[key]||0; }
-      else { run += dist[key]||0; counts[key] = run; }
+      run += dist[key]||0; counts[key] = run;
     }
     return (CSTATS[m.id] = { dist:dist, counts:counts, uncolored:none });
-  }
-  // Flip the toggle: drop every exclusion-dependent memo, then re-render.
-  function setExportingOnly(on){
-    state.exportingOnly = !!on;
-    COUNTED = null; COUNTEDN = 0; CSTATS = {}; EXCL = {};
-    NAVCACHE = null; NAVCACHE_KEY = "";        // navigator series changes denominator
-    laneNumCache = {};                         // lane %s change scale — don't tween across
-    update();
   }
   // Exclusive current-colour tally for a master: how many glyphs sit at EACH colour
   // right now (memoised per master). m.counts is cumulative ("reached step k or
@@ -754,7 +727,7 @@ DASHBOARD_JS = r"""
   }
   // cumulative: glyphs that reached step k OR BEYOND (the model's m.counts). This is
   // the workflow-completion metric used by the legends, Compare grid and exports.
-  // While exporting-only is ON the counted recompute stands in for m.counts.
+  // With non-exporting glyphs present the counted recompute stands in for m.counts.
   function countFor(m,k){
     if (countedSet()){ var cs = countedStats(m); return k===-1 ? cs.uncolored : (cs.counts[String(k)]||0); }
     return k===-1 ? m.uncolored : (m.counts[String(k)]||0);
@@ -808,16 +781,9 @@ DASHBOARD_JS = r"""
       + '<button type="button" id="cfd-theme" class="icon" aria-label="Toggle light or dark theme">◐</button></header>';
   }
   function toolbar(){
-    // Exporting-only toggle: only offered when the font actually has non-exporting
-    // glyphs to exclude; seeded from the palette pref (state.exportingOnly <- H.exportingOnly).
-    var nx = (H.nonExporting||[]).length;
-    var exonly = nx
-      ? '<button type="button" id="cfd-exonly" class="chip" aria-pressed="'+(!!state.exportingOnly)+'" title="Count exporting glyphs only — drop the '+nx+' non-exporting glyph'+(nx===1?"":"s")+' from every percentage">⊘ Exporting only</button>'
-      : '';
     return '<div class="tb">'
       + '<button type="button" id="cfd-overview" class="chip" aria-pressed="true" title="Back to the overview">⌂ Overview</button>'
       + '<button type="button" id="cfd-timeline" class="chip" aria-pressed="false">📈 Timeline</button>'
-      + exonly
       + '<button type="button" id="cfd-export" class="chip" style="margin-left:auto" title="Export the report as PDF, CSV or JSON">⤓ Export Report</button></div>';
   }
   // ----- Graded step progress -----------------------------------------------
@@ -910,8 +876,6 @@ DASHBOARD_JS = r"""
     // same as the makeup bar did — not aggregate()'s cumulative "reached-or-beyond" sums.
     var ex = aggExclusive();
     var grand = a.grand || 1;
-    // Recipes no longer footnote this section — they have their own Overview card
-    // (recipeCard(), in overviewExtras) with per-recipe rows and per-master bars.
     // The Overview card is just the big donut ring: tiled with the exclusive colour shares,
     // each arc clickable to focus that colour's glyphs. No stacked bar, no step funnel.
     var ringSegs = H.steps.map(function(s){ return { key:s.key, label:s.label, frac:(ex.dist[String(s.key)]||0)/grand }; });
@@ -945,19 +909,13 @@ DASHBOARD_JS = r"""
     // the funnel toggle (click to show/hide progress by step).
     var head = '<span class="ov-name">'+esc(m.name)+'</span>'
       + '<button type="button" class="ov-pct" data-funnel="1" aria-expanded="'+(state.funnelOpen!==false)+'" title="'+started+'/'+total+' glyphs started ('+startP+'%) · click for progress by step">'+gradedMasterPct(m)+'% complete</button>';
-    var recipeLine = "";
-    if (H.recipes && H.recipes.length){
-      var rc = ((H.recipeCompletion||{})[m.id])||{};
-      // recipe completion is computed in Python over ALL glyphs — keep its raw denominator.
-      if (rc.complete != null) recipeLine = '<div class="ov-recipe">Recipe-adjusted: <b>'+rc.complete+'/'+H.glyphTotal+'</b> complete ('+pct(rc.complete,H.glyphTotal)+'%)</div>';
-    }
     var segParts = H.steps.map(function(s,i){
       return segSpan(s.key, pct(dist[String(s.key)]||0, total), s.label, i);
     }).join("") + segSpan(-1, pct(none, total), H.noneLabel, H.steps.length);
     return '<section class="overall master-overall" aria-label="'+esc(m.name+" totals")+'">'
       + '<div class="ov-main"><div class="ov-head">'+head+'</div>'
       + '<div class="seg'+(barsAnim?" intro":"")+'" role="img" aria-label="'+esc(m.name+" colour distribution")+'">'+segParts+'</div>'
-      + funnelHTML(function(k){ return countFor(m,k)||0; }, total)+recipeLine+'</div></section>';
+      + funnelHTML(function(k){ return countFor(m,k)||0; }, total)+'</div></section>';
   }
   function heatmap(m){
     var cats = H.categories || [];
@@ -991,7 +949,7 @@ DASHBOARD_JS = r"""
     var ch = (H.changes && H.changes[m.id]) || {};
     function cellHTML(it){
       var name = it[0], key = it[1], lab = labelFor(key);
-      // exporting-only: excluded glyphs stay visible but DIM (.ncnt) with a
+      // non-exporting: excluded glyphs stay visible but DIM (.ncnt) with a
       // "not counted" affordance — they never vanish from the grid.
       var dim = !isCounted(name);
       if (dim) lab += " — not counted";
@@ -1229,56 +1187,6 @@ DASHBOARD_JS = r"""
       : "";
     return ovCard("crossMaster", "Across masters", head + ident + differLine + steps, false);
   }
-  // ----- Workflow-recipe completion card (global Overview) -------------------
-  // Replaces the old one-line "Recipe-adjusted" footnote inside overall(): a proper
-  // Overview card listing every recipe (display name, a human-readable match rule,
-  // how many steps it keeps) plus the recipe-adjusted completion per master as
-  // compact X/Y progress bars (a single anonymous bar for one-master files).
-  // Render-only: the metric itself is computed in Python (H.recipes +
-  // H.recipeCompletion); no recipes -> no card, exactly like the old line.
-  var RECIPE_FIELDS = [["category","Category"],["script","Script"],["subCategory","Subcategory"],["case","Case"]];
-  var RECIPE_CASES = {"1":"Uppercase","2":"Lowercase","3":"Smallcaps","4":"Minor"};
-  function recipeMatchLabel(match){
-    // human summary of a recipe's match rule, e.g. "Category = Mark · Script = latin";
-    // glyph.case arrives as a stringified GS enum, so map it back to its human name.
-    var parts = [];
-    RECIPE_FIELDS.forEach(function(field){
-      var value = (match||{})[field[0]];
-      if (value == null || value === "") return;
-      if (field[0] === "case") value = RECIPE_CASES[String(value)] || value;
-      parts.push(field[1]+" = "+value);
-    });
-    return parts.join(" · ");
-  }
-  function recipeCard(){
-    if (!(H.recipes && H.recipes.length)) return "";
-    var perMaster = H.recipeCompletion || {};
-    var grand = H.glyphTotal * H.masters.length;
-    var done = 0;
-    H.masters.forEach(function(m){ done += ((perMaster[m.id])||{}).complete||0; });
-    var summary = '<p class="rcp-sum">Recipe-adjusted: <b>'+done+'/'+grand+'</b> complete ('
-      + pct(done,grand)+'%) · '+H.recipes.length+' recipe'+(H.recipes.length===1?"":"s")+'</p>';
-    var rows = H.recipes.map(function(r, i){
-      var name = r.name || ("Recipe "+(i+1));
-      var rule = recipeMatchLabel(r.match);
-      var kept = (r.steps||[]).length;
-      return '<div class="rcp-row" title="'+esc(name+(rule ? " — "+rule : ""))+'">'
-        + '<span class="rcp-name">'+esc(name)+'</span>'
-        + '<span class="rcp-rule">'+esc(rule)+'</span>'
-        + '<span class="rcp-steps">'+kept+' step'+(kept===1?"":"s")+'</span></div>';
-    }).join("");
-    var solo = H.masters.length === 1;
-    var bars = H.masters.map(function(m){
-      var rc = (perMaster[m.id])||{};
-      var complete = rc.complete||0;
-      var total = (rc.total != null) ? rc.total : H.glyphTotal;
-      return '<div class="rcp-m" title="'+esc(m.name+" — "+complete+"/"+total+" recipe-adjusted complete")+'">'
-        + (solo ? "" : '<span class="rcp-m-n">'+esc(m.name)+'</span>')
-        + '<span class="lb-bar"><span style="width:'+pct(complete,total)+'%"></span></span>'
-        + '<span class="rcp-m-c"><b>'+complete+'</b>/'+total+'</span></div>';
-    }).join("");
-    return ovCard("recipes", "Recipes", summary+rows+'<div class="rcp-masters">'+bars+'</div>', false);
-  }
   // The activity calendar (heatmap / standard month grid) lives on the Overview, as a
   // full-width card. Clicking a day still scrubs the Time Machine (jumping to the
   // Timeline tab if it isn't on screen — see the data-calday handler).
@@ -1321,7 +1229,7 @@ DASHBOARD_JS = r"""
   }
   function overviewExtras(){
     if (!H.masters.length) return "";
-    var cards = '<div class="ov-extra">'+crossMasterCard()+recipeCard()+leaderboard()+histogram()+'</div>';
+    var cards = '<div class="ov-extra">'+crossMasterCard()+leaderboard()+histogram()+'</div>';
     // The completion-over-time chart lives on the Timeline tab (its hero); the Overview
     // no longer duplicates it. Keep the activity calendar here as the time-context card.
     var cal = calendarCard();
@@ -1380,7 +1288,7 @@ DASHBOARD_JS = r"""
   // uncoloured summed across the family, so the bar reads across all master-glyph slots
   // instead of silently showing only the first master. `glyphs` keeps the real per-group
   // glyph count (same for every master) so the displayed count isn't multiplied.
-  // Coverage rows with the exporting-only exclusion applied: rebuilt client-side
+  // Coverage rows with the non-exporting exclusion applied: rebuilt client-side
   // from the raw m.keys + the parallel H.categories / H.scripts arrays (the
   // shipped H.coverage rows are the all-glyphs truth). Mirrors _coverage_for's
   // row shape ({key,total,uncolored,dist,glyphs}) and largest-group-first order.
@@ -1411,7 +1319,7 @@ DASHBOARD_JS = r"""
     return out;
   }
   function covRows(which){
-    if (countedSet()) return covRowsCounted(which);   // exporting-only: recompute without the excluded glyphs
+    if (countedSet()) return covRowsCounted(which);   // non-exporting glyphs present: recompute without them
     var by = (H.coverage && H.coverage[which]) || {};
     if (state.master != null) return by[state.master] || [];
     var merged = {}, orderKeys = [];
@@ -1724,7 +1632,7 @@ DASHBOARD_JS = r"""
     // colour's WEIGHTED contribution (step weight x count / total). So the stack TOP
     // traces the same graded % as the Line, and the empty space above (up to 100%) is
     // the work remaining. denom = the scope's whole total (the graded-% denominator,
-    // exporting-only-aware via countedTotal).
+    // exclusion-aware via countedTotal).
     var WT = stepWeights().weight;
     var denom = scopeIds.length * (countedTotal() || 1) || 1;
     var grid = [0,25,50,75,100].map(function(g){
@@ -1823,7 +1731,7 @@ DASHBOARD_JS = r"""
   var NAVCACHE = null, NAVCACHE_KEY = "";
   function navOverallSeries(){
     var s = fullSeries();
-    var key = state.tlGran + ":" + state.tlBucket + ":" + (state.exportingOnly ? 1 : 0)
+    var key = state.tlGran + ":" + state.tlBucket
       + ":" + s.length + ":" + (s.length ? s[s.length-1].date : "");
     if (NAVCACHE && NAVCACHE_KEY === key){ return NAVCACHE; }
     var W = stepWeights().weight, denom = (H.masters.length * (countedTotal() || 1)) || 1;
@@ -1970,7 +1878,7 @@ DASHBOARD_JS = r"""
       else unchanged++;
     }
     // net graded-% delta (spec #4): change in graded completion between A and B,
-    // over the whole-font denominator (exporting-only-aware), same scale as the % cards.
+    // over the whole-font denominator (exclusion-aware), same scale as the % cards.
     var denom = countedTotal() || Object.keys(names).length || 1;
     var deltaPct = Math.round((gradedStateSum(after) - gradedStateSum(before)) / denom * 100);
     return {advanced:advanced, regressed:regressed, unchanged:unchanged, deltaPct:deltaPct};
@@ -2170,7 +2078,7 @@ DASHBOARD_JS = r"""
     if (dates.length < 1) return "";
     // Map each glyph to its category from the parallel H.glyphNames / H.categories
     // arrays, grouping the glyph names by category (empty categories never appear).
-    // Exporting-only drops excluded glyphs here so the lane counts read counted sizes.
+    // Non-exporting glyphs are dropped here so the lane counts read counted sizes.
     var allNames = H.glyphNames || [], allCats = H.categories || [], groups = {};
     for (var gi = 0; gi < allNames.length; gi++){
       if (!isCounted(allNames[gi])) continue;
@@ -2221,7 +2129,7 @@ DASHBOARD_JS = r"""
     if (dates.length < 1) return "";
     // Map each glyph to its script from the parallel H.glyphNames / H.scripts
     // arrays, grouping the glyph names by script (empty scripts never appear).
-    // Exporting-only drops excluded glyphs here so the lane counts read counted sizes.
+    // Non-exporting glyphs are dropped here so the lane counts read counted sizes.
     var allNames = H.glyphNames || [], allScripts = H.scripts || [], groups = {};
     for (var gi = 0; gi < allNames.length; gi++){
       if (!isCounted(allNames[gi])) continue;
@@ -2635,7 +2543,6 @@ DASHBOARD_JS = r"""
     document.documentElement.setAttribute("data-theme", state.theme);
     var tl = document.getElementById("cfd-timeline"); if (tl) tl.setAttribute("aria-pressed", state.view==="timeline");
     var ov = document.getElementById("cfd-overview"); if (ov) ov.setAttribute("aria-pressed", state.view==="tabs");
-    var exo = document.getElementById("cfd-exonly"); if (exo) exo.setAttribute("aria-pressed", !!state.exportingOnly);
     var sb = document.getElementById("cfd-sort"); if (sb) sb.textContent = "↕ Sort: "+(state.sort==="progress"?"progress":"workflow");
     paintScriptCards();
     animateLaneNumbers();                        // count-up the lane %s when the picked moment / focus changes
@@ -2713,8 +2620,8 @@ DASHBOARD_JS = r"""
 
   // ----- Status export: CSV / JSON for stakeholders + trackers (#22) -----
   function exportRows(){
-    // Follows the exporting-only toggle (countFor / uncoloredFor / countedTotal are
-    // exclusion-aware), so an export always matches the percentages on screen.
+    // countFor / uncoloredFor / countedTotal always exclude non-exporting glyphs,
+    // so an export always matches the percentages on screen.
     var rows = [], total = countedTotal();
     H.masters.forEach(function(m){
       H.steps.forEach(function(s){
@@ -2731,7 +2638,7 @@ DASHBOARD_JS = r"""
     return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
   }
   function exportCSV(){
-    var lines = [["Family",H.family],["File",H.fileName],["Version",H.version],["Mode",H.mode],
+    var lines = [["Family",H.family],["File",H.fileName],["Version",H.version],
                  ["Generated",H.generated],["Glyphs",H.glyphTotal]]
       .map(function(r){ return csvCell(r[0])+","+csvCell(r[1]); });
     lines.push("", ["Master","Step","Label","Count","Total","Percent"].join(","));
@@ -2741,12 +2648,13 @@ DASHBOARD_JS = r"""
     return lines.join("\n");
   }
   function exportJSON(){
-    // countFor / uncoloredFor / countedTotal follow the exporting-only toggle, so
-    // the JSON matches the on-screen numbers (raw m.counts passthrough when off).
+    // countFor / uncoloredFor / countedTotal always exclude non-exporting glyphs,
+    // so the JSON matches the on-screen numbers (raw m.counts passthrough when
+    // the font has nothing to exclude).
     return JSON.stringify({
-      family:H.family, fileName:H.fileName, version:H.version, mode:H.mode,
+      family:H.family, fileName:H.fileName, version:H.version,
       generated:H.generated, glyphTotal:H.glyphTotal, steps:H.steps,
-      exportingOnly:!!(countedSet()),
+      nonExporting:H.nonExporting||[],
       masters:H.masters.map(function(m){
         var counts = {}; (H.order||[]).forEach(function(k){ counts[k] = countFor(m,k); });
         return { id:m.id, name:m.name, counts:counts, uncolored:uncoloredFor(m),
@@ -2786,7 +2694,7 @@ DASHBOARD_JS = r"""
       toc.push('<a class="ptab" href="#'+id+'">'+esc(title)+'</a>');
       secs += '<section class="psec" id="'+id+'"><h2 class="ph">'+esc(title)+'</h2>'+inner+'</section>';
     }
-    add("psec-overview", "Overview", overall()+recipeCard());
+    add("psec-overview", "Overview", overall());
     H.masters.forEach(function(m){ add("psec-m-"+m.id, m.name, masterOverall(m)+heatmap(m)); });
     add("psec-coverage", "Coverage by category", printCoverageRows());
     add("psec-timeline", "Progress over time", timelineView());
@@ -2899,10 +2807,6 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-timeline").addEventListener("click", function(){ toggleView("timeline"); });
     document.getElementById("cfd-export").addEventListener("click", openExport);
     document.getElementById("cfd-help").addEventListener("click", openHelp);
-    // Exporting-only toggle (only rendered when H.nonExporting has entries): flips
-    // the client-side exclusion; update() keeps its aria-pressed in sync.
-    var exonly = document.getElementById("cfd-exonly");
-    if (exonly) exonly.addEventListener("click", function(){ setExportingOnly(!state.exportingOnly); });
     document.addEventListener("keydown", function(e){
       if (e.key==="Escape"){ closeExport(); closeJourney(); closeHelp(); if (state.focus!==null){ setFocus(null); } }
     });
@@ -3377,9 +3281,6 @@ DASHBOARD_JS = r"""
   function start(){
     loadModel().then(function(model){
       H = model; normalizeHiddenKeys(); lastOrder = H.order.length ? H.order[H.order.length-1] : null;
-      // Seed the exporting-only toggle from the palette pref (only meaningful when
-      // there is anything to exclude; countedSet() no-ops otherwise).
-      state.exportingOnly = !!H.exportingOnly;
       // Stash both timeline granularities; the toggle swaps which drives H.trend etc.
       tlDay = { trend: H.trend, journeys: H.journeys, journeyIndex: H.journeyIndex };
       tlCommit = H.hasCommits
