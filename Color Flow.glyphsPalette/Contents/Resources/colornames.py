@@ -16,7 +16,8 @@ Keeping that here means the two can never drift again.
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from typing import Any
 
 # Canonical color order — index 0..11 matches Glyphs' native layer color labels.
 COLOR_ORDER = [
@@ -39,6 +40,12 @@ NONE_TOKEN = "None"
 
 # File the plugin and shortcuts both read. (The README documents this name too.)
 KEY_FILE_NAME = "colorNames.txt"
+
+# Optional in-font storage for the colour labels (the same text as colorNames.txt).
+# When present in ``font.userData`` it travels inside the .glyphs file, so a shared
+# font shows the same labels without the sidecar file. Takes precedence over the
+# external key file (see :func:`pick_settings_text`).
+FONT_LABELS_KEY = "com.hugojourdan.ColorFlow.colorNames"
 
 
 def _user_home() -> str:
@@ -237,6 +244,26 @@ def highest_checked(state: dict[str, bool], order: list[str]) -> int | None:
     return result
 
 
+def non_exporting_names(glyphs: Iterable[Any]) -> set[str]:
+    """Names of the glyphs marked non-exporting (``GSGlyph.export == False``).
+
+    Pure: ``glyphs`` is any iterable of objects with a ``name`` and an optional
+    ``export`` flag — a missing flag counts as exporting, matching Glyphs'
+    default. This is the exclusion set the opt-in "count exporting glyphs only"
+    mode threads through the palette's and the report's counting."""
+    return {str(glyph.name) for glyph in glyphs if not getattr(glyph, "export", True)}
+
+
+def exclude_named_colors(named_colors: Iterable[tuple[str, Any]],
+                         excluded: set[str]) -> list:
+    """Drop the colours of excluded glyphs from ``(glyph_name, color)`` pairs,
+    returning the plain colour list the counting functions consume. An empty
+    exclusion set keeps every colour (the honest default — everything counts)."""
+    if not excluded:
+        return [color for _name, color in named_colors]
+    return [color for name, color in named_colors if name not in excluded]
+
+
 def counts_from_colors(colors: list, order: list[str]) -> dict[str, int]:
     """Per-step checked counts derived purely from native layer colors.
 
@@ -268,6 +295,33 @@ def layer_color_for_state(state: dict[str, bool], order: list[str]) -> int | Non
         else:
             break
     return color
+
+
+def font_labels_text(font: Any) -> str | None:
+    """Colour-label text stored inside ``font.userData[FONT_LABELS_KEY]``, or ``None``.
+
+    Reads the optional in-font label storage. Returns ``None`` when the font is
+    ``None``, the key is unset, or the value is blank/not a string — so callers can
+    treat ``None`` as "fall back to the external key file". Never raises."""
+    if font is None:
+        return None
+    try:
+        value = font.userData[FONT_LABELS_KEY]
+    except Exception:
+        return None
+    if isinstance(value, str) and value.strip():
+        return value
+    return None
+
+
+def pick_settings_text(userdata_text: str | None, file_text: str | None) -> str:
+    """Resolve the colour-label settings text by precedence: the in-font value wins,
+    then the external key file, then the built-in default. Blank entries are skipped
+    so an empty file/userData never shadows a real source."""
+    for candidate in (userdata_text, file_text):
+        if candidate is not None and candidate.strip():
+            return candidate
+    return DEFAULT_COLOR_NAMES
 
 
 def resolve_key_file(

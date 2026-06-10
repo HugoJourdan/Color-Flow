@@ -563,3 +563,81 @@ def test_single_counts_count_exact_colour_matches() -> None:
     assert cc.single_counts_from_colors([0, 0, 2, None], ["0", "1", "2"]) == {
         "0": 2, "1": 0, "2": 1
     }
+
+
+# --------------------------------------------------------------------------- #
+# In-font label storage (shared via the .glyphs file)
+# --------------------------------------------------------------------------- #
+
+def test_font_labels_text_reads_userdata() -> None:
+    class _F:
+        def __init__(self, ud: dict) -> None:
+            self.userData = ud
+
+    assert cc.font_labels_text(_F({cc.FONT_LABELS_KEY: "red=Drawn\n"})) == "red=Drawn\n"
+    assert cc.font_labels_text(_F({})) is None              # key unset
+    assert cc.font_labels_text(_F({cc.FONT_LABELS_KEY: "   "})) is None  # blank skipped
+    assert cc.font_labels_text(None) is None
+
+
+def test_pick_settings_text_precedence() -> None:
+    assert cc.pick_settings_text("UD", "FILE") == "UD"      # in-font wins
+    assert cc.pick_settings_text(None, "FILE") == "FILE"    # fall back to key file
+    assert cc.pick_settings_text("   ", "FILE") == "FILE"   # blank userData skipped
+    assert cc.pick_settings_text(None, None) == cc.DEFAULT_COLOR_NAMES
+    assert cc.pick_settings_text("", "  ") == cc.DEFAULT_COLOR_NAMES
+
+
+# --------------------------------------------------------------------------- #
+# Exporting-only exclusion (count exporting glyphs only)
+# --------------------------------------------------------------------------- #
+
+class _G:
+    """Minimal glyph stand-in: a name + an optional GSGlyph-style export flag."""
+
+    def __init__(self, name: str, export: object = True) -> None:
+        self.name = name
+        if export is not True:
+            self.export = export
+
+
+def test_non_exporting_names_collects_only_falsy_export_flags() -> None:
+    glyphs = [_G("A"), _G("B", export=False), _G("C", export=True), _G("D", export=0)]
+    assert cc.non_exporting_names(glyphs) == {"B", "D"}
+
+
+def test_non_exporting_names_missing_export_attr_counts_as_exporting() -> None:
+    # Glyphs' default is export=True; a fake without the attribute must not be excluded.
+    assert cc.non_exporting_names([_G("A"), _G("B")]) == set()
+
+
+def test_non_exporting_names_empty_iterable() -> None:
+    assert cc.non_exporting_names([]) == set()
+
+
+def test_exclude_named_colors_drops_excluded_glyph_colours() -> None:
+    named = [("A", 0), ("B", 3), ("C", None)]
+    assert cc.exclude_named_colors(named, {"B"}) == [0, None]
+
+
+def test_exclude_named_colors_empty_exclusion_keeps_everything() -> None:
+    named = [("A", 0), ("B", 3), ("C", None)]
+    assert cc.exclude_named_colors(named, set()) == [0, 3, None]
+
+
+def test_exclude_named_colors_threads_into_step_counting() -> None:
+    # A non-exporting glyph at the final step must not credit any step once excluded.
+    order = ["0", "1"]
+    named = [("A", 1), ("nonexp", 1), ("B", 0)]
+    all_counts = cc.counts_from_colors(cc.exclude_named_colors(named, set()), order)
+    excluded = cc.counts_from_colors(cc.exclude_named_colors(named, {"nonexp"}), order)
+    assert all_counts == {"0": 3, "1": 2}
+    assert excluded == {"0": 2, "1": 1}
+
+
+def test_exclude_named_colors_threads_into_free_counting() -> None:
+    order = ["0", "1"]
+    named = [("A", 1), ("nonexp", 0), ("B", 0)]
+    excluded = cc.single_counts_from_colors(
+        cc.exclude_named_colors(named, {"nonexp"}), order)
+    assert excluded == {"0": 1, "1": 1}
