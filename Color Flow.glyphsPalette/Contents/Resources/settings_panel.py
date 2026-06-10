@@ -28,7 +28,7 @@ MODES = ("Layer", "Glyph")
 
 MARGIN = 15
 ROW_HEIGHT = 26
-TOP = 84  # first colour row sits below the source radio, free-mode box + separator
+TOP = 110  # first colour row sits below the source radio, free-mode + store-in-font + separator
 
 
 class ColorFlowSettings:
@@ -37,7 +37,9 @@ class ColorFlowSettings:
     def __init__(self, plugin: Any, font: Any) -> None:
         self.plugin = plugin
         self.font = font
-        rows, self.none_label = colornames.parse_settings(self._read_key_file())
+        # whether this font already carries its labels in-file (userData)
+        self.store_in_font = colornames.font_labels_text(font) is not None
+        rows, self.none_label = colornames.parse_settings(self._read_settings_text())
         # [index, label, visible], mutable so reorder/toggle callbacks can edit in place
         self.rows: list[list[Any]] = [list(row) for row in rows]
         self._checks: dict[int, CheckBox] = {}
@@ -45,12 +47,15 @@ class ColorFlowSettings:
         self._build()
 
     # ------------------------------------------------------------------ data
-    def _read_key_file(self) -> str:
+    def _read_settings_text(self) -> str:
+        """Label settings text by precedence: in-font userData, then the external key
+        file, then the built-in default — so a shared font's labels load first."""
         font_dir = None
         if self.font is not None and self.font.filepath:
             font_dir = os.path.dirname(self.font.filepath)
         path = colornames.resolve_key_file(font_dir)
-        return colornames.read_color_names(path) or colornames.DEFAULT_COLOR_NAMES
+        return colornames.pick_settings_text(
+            colornames.font_labels_text(self.font), colornames.read_color_names(path))
 
     def _row_text(self, index: int, label: str) -> str:
         return label or colornames.DEFAULT_LABELS.get(index, str(index))
@@ -73,6 +78,12 @@ class ColorFlowSettings:
         free = bool(Glyphs.defaults[FREE_KEY]) if Glyphs is not None else False
         self.w.freeMode = CheckBox((MARGIN, y, -MARGIN, 20),
                                    "Free mode (independent steps)", value=free)
+        y += 26
+        # Store the labels inside the .glyphs file (userData) so they travel when the
+        # font is shared; otherwise they live only in the local colorNames.txt sidecar.
+        self.w.storeInFont = CheckBox((MARGIN, y, -MARGIN, 20),
+                                      "Store labels in this font (shared with file)",
+                                      value=self.store_in_font)
         y += 26
         self.w.separator = HorizontalLine((MARGIN, y, -MARGIN, 1))
 
@@ -156,6 +167,12 @@ class ColorFlowSettings:
             return
         if self.font is not None:
             self.font.userData[MODE_KEY] = MODES[self.w.source.get()]
+            # store-in-font option: mirror the labels into the .glyphs file (so they
+            # travel when shared), or clear the key when the option is switched off.
+            if bool(self.w.storeInFont.get()):
+                self.font.userData[colornames.FONT_LABELS_KEY] = text
+            elif self.font.userData[colornames.FONT_LABELS_KEY] is not None:
+                del self.font.userData[colornames.FONT_LABELS_KEY]
         if Glyphs is not None:
             Glyphs.defaults[FREE_KEY] = bool(self.w.freeMode.get())
         self.w.close()
