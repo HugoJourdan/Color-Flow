@@ -104,7 +104,7 @@ html,body{margin:0}
 body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains Mono",monospace;
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
-@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro{animation:none}.heat,.heat.fading{transition:none;opacity:1}.tl-machine-grid .cell{transition:none}.tl-seed-shimmer .tl-seed-ghost{animation:none}}
+@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro{animation:none}.heat,.heat.fading{transition:none;opacity:1}.tl-seed-shimmer .tl-seed-ghost{animation:none}.ov-viz.intro .rdr-poly{animation:none}.funnel.intro .fnl-fill{animation:none}.tl-anim .tl-line{animation:none;stroke-dasharray:none;stroke-dashoffset:0}.tl-anim .tl-band,.tl-anim .tl-area,.tl-anim .tl-dot{animation:none;opacity:1}.cm-differ-panel{transition:none}}
 #cfd-app{max-width:1180px;margin:0 auto;padding:0 20px}
 #cfd-main{display:flex;gap:24px;align-items:flex-start}
 #cfd-tower{position:sticky;top:0;flex:0 0 240px;width:240px}
@@ -130,16 +130,17 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .chip{font-size:var(--fs-xs);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:6px 10px;background:var(--surface-2);color:var(--muted);cursor:pointer}
 .chip:hover{color:var(--text)}
 .chip[aria-pressed=true]{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
-.overall{display:flex;align-items:center;gap:22px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:16px 0}
+.overall{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin:16px 0}
 .master-overall{margin-top:8px}
-.ov-num{display:flex;align-items:center;justify-content:center}
+.ov-num{display:flex;align-items:center;justify-content:center;border:0;background:none;padding:0;cursor:pointer}
+.ov-num:hover{filter:brightness(1.1)}
 .ov-num .big{font-size:var(--fs-big);font-weight:650;letter-spacing:-.02em;line-height:1}
 .ov-num .big small{font-size:var(--fs-big-sm);color:var(--muted-2)}
 .ov-sub{font-size:var(--fs-xs);color:var(--muted-2);text-transform:uppercase;letter-spacing:.06em}
 .ov-main{flex:1}
 .ov-head{font-size:var(--fs-sm);color:var(--muted);margin-bottom:8px}
 .ov-head b{color:var(--text)}
-.ov-name{color:var(--text);font-weight:600;margin-right:9px}
+.ov-name{color:var(--text);font-weight:650;font-size:17px;letter-spacing:-.01em;margin-right:9px}
 .ov-name::after{content:"·";color:var(--muted-2);margin-left:9px}
 .seg{display:flex;height:10px;border-radius:5px;overflow:visible;background:var(--track)}
 .seg>span{display:block;height:100%;transform-origin:left center;transition:opacity .2s ease;filter:saturate(1.2) brightness(1.08)}
@@ -151,6 +152,15 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .seg>span.on{filter:saturate(1.18)}
 @keyframes segGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 .seg.intro{transform-origin:left center;animation:segGrow .5s ease backwards}
+.funnel{margin-top:12px;display:flex;flex-direction:column;gap:5px}
+.fnl-row{display:flex;align-items:center;gap:9px;width:100%;padding:1px 4px}
+.fnl-row>i{flex:0 0 auto}
+.fnl-lab{flex:0 0 auto;min-width:84px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-xs);color:var(--muted)}
+.fnl-track{flex:1;height:9px;border-radius:5px;background:var(--track);overflow:hidden}
+.fnl-fill{display:block;height:100%;border-radius:5px;transform-origin:left center;filter:saturate(1.2) brightness(1.08)}
+.fnl-pct{flex:0 0 auto;min-width:38px;text-align:right;font-size:var(--fs-xs);font-variant-numeric:tabular-nums;color:var(--text)}
+.fnl-empty{font-size:var(--fs-xs);color:var(--muted-2);padding:4px 5px}
+.funnel.intro .fnl-fill{animation:segGrow .5s ease backwards}
 .ov-recipe{margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
 .ov-recipe b{color:var(--text)}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
@@ -158,8 +168,18 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .ov-extra{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:14px;margin-top:16px}
 .ov-extra .ovc-timeline{grid-column:1/-1}
 .ov-cal-tl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:14px;margin-top:14px}
+.ov-cal-solo{margin-top:14px}
 .ovc-calendar .tl-cal-card{margin-top:0;border-top:0;padding-top:0}
 @media (max-width:720px){.ov-cal-tl{grid-template-columns:1fr}}
+.ov-viz{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:14px;margin-top:14px}
+.ovz-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+.ovz{display:block;width:100%;height:auto;max-width:320px}
+.rdr-grid{stroke:var(--track);fill:none}
+.rdr-spoke{stroke:var(--track)}
+.rdr-axt{fill:var(--muted-2);font-size:9px}
+.rdr-poly{fill-opacity:.2;stroke-width:2;stroke-linejoin:round;transform-box:fill-box;transform-origin:center}
+@keyframes ovzScaleIn{from{transform:scale(.55);opacity:0}to{transform:scale(1);opacity:1}}
+.ov-viz.intro .rdr-poly{animation:ovzScaleIn .5s ease backwards;animation-delay:calc(var(--i,0)*90ms)}
 .ov-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
 .ov-card.open{grid-column:1/-1}
 .ov-card-h{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin:0 0 10px;padding:0;background:none;border:0;font:inherit;font-size:var(--fs-2xs);font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:left}
@@ -169,6 +189,8 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .ov-card-body.scroll{max-height:300px;overflow-y:auto;padding-right:4px}
 .lb-row{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;padding:5px 0;cursor:pointer;color:var(--text);font:inherit;text-align:left}
 .lb-row+.lb-row{border-top:1px solid var(--track)}
+.lb-chip{flex:0 0 40px;height:28px;color:var(--text);opacity:.85}
+.lb-chip svg{display:block;width:100%;height:100%}
 .lb-n{flex:0 0 96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-xs)}
 .ov-card.open .lb-n{flex-basis:170px}
 .lb-bar{flex:1;height:7px;border-radius:4px;background:var(--track);overflow:hidden}
@@ -181,6 +203,20 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .hg-bar{flex:1;height:9px;border-radius:4px;background:var(--track);overflow:hidden}
 .hg-bar>span{display:block;height:100%;background:var(--accent);border-radius:4px}
 .hg-n{flex:0 0 26px;text-align:right;font-size:var(--fs-2xs);color:var(--muted)}
+/* Recipes card: global summary line, one row per recipe, per-master X/Y bars
+   (the bars reuse .lb-bar). Token-driven only — both themes + print stay right. */
+.rcp-sum{margin:0 0 10px;font-size:var(--fs-xs);color:var(--muted)}
+.rcp-sum b{color:var(--text)}
+.rcp-row{display:flex;align-items:baseline;gap:8px;padding:3px 0;font-size:var(--fs-xs);min-width:0}
+.rcp-row+.rcp-row{border-top:1px solid var(--track)}
+.rcp-name{flex:0 0 auto;color:var(--text);font-weight:600}
+.rcp-rule{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.rcp-steps{flex:0 0 auto;font-size:var(--fs-2xs);color:var(--muted-2);white-space:nowrap}
+.rcp-masters{margin-top:10px;border-top:1px solid var(--track);padding-top:6px}
+.rcp-m{display:flex;align-items:center;gap:9px;padding:4px 0}
+.rcp-m-n{flex:0 0 96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-2xs);color:var(--muted)}
+.rcp-m-c{flex:0 0 auto;min-width:48px;text-align:right;font-size:var(--fs-2xs);color:var(--muted);font-variant-numeric:tabular-nums}
+.rcp-m-c b{color:var(--text)}
 .legend i{width:8px;height:8px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .tabs{display:flex;gap:18px;border-bottom:1px solid var(--border);margin-bottom:6px;overflow-x:auto}
 .tab{font:var(--fs-sm) inherit;background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted-2);padding:8px 0;cursor:pointer;white-space:nowrap}
@@ -206,11 +242,14 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .heat-h .hsort{margin-left:auto;display:flex;gap:6px}
 .heat-h .chip{padding:4px 8px;font-size:var(--fs-2xs)}
 .focus-clear{border-color:var(--accent);color:var(--text)}
+.heat-pill{display:inline-flex;align-items:center;gap:8px;margin:0 0 10px;padding:5px 10px;font-size:var(--fs-xs);color:var(--muted);background:var(--surface-2);border:1px solid var(--border-2);border-radius:999px}
+.heat-pill .chip{padding:2px 8px;font-size:var(--fs-2xs)}
 .cat:first-child{margin-top:0}
 .cat-h{font-size:var(--fs-xs);color:var(--muted);margin:14px 0 6px;display:flex;align-items:center;gap:6px}
 .cat-n{color:var(--muted-2)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:3px}
 .cell{aspect-ratio:1;border:0;padding:0;border-radius:5px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease,opacity .2s ease}
+.cell.ncnt{opacity:.35}
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}
 .cell.copied{outline:2px solid var(--ok);outline-offset:1px}
 .cell svg{width:100%;height:100%;display:block;padding:3px;transform:scale(.9)}
@@ -224,26 +263,6 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .chg .cn{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chg .sw{width:11px;height:11px;border-radius:3px;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .chg .arr{color:var(--muted-2)}
-.cmp-wrap{overflow-x:auto;margin-top:8px}
-.cmp{border-collapse:collapse;width:100%;font-size:var(--fs-xs)}
-.cmprow{transition:opacity .2s ease;cursor:pointer}
-.cmp tr.cmp-dim{opacity:.3}
-.cmp tr.cmp-sel{opacity:1}
-.cmp tr.cmp-sel .cmp-m{color:var(--text);font-weight:600}
-.cmp tr.cmp-sel td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
-.cmp caption{text-align:left;color:var(--muted-2);font-size:var(--fs-xs);padding-bottom:8px}
-.cmp th,.cmp td{border:1px solid var(--border);padding:4px 10px;text-align:left}
-.cmp thead th:first-child,.cmp tbody th[scope="row"]{width:1%;white-space:nowrap}
-.cmp thead th{color:var(--muted);font-weight:600;text-align:center;background:color-mix(in srgb,var(--text) 7%,transparent)}
-.cmp thead th:first-child{text-align:left}
-.cmp tbody tr:nth-child(even):not(.cmp-sel) td,.cmp tbody tr:nth-child(even):not(.cmp-sel) th{background:color-mix(in srgb,var(--text) 4%,transparent)}
-.cmp thead th .dot{margin:0}
-.cmp tbody th{font-weight:500}
-.cmp th .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
-.cmp td{position:relative}
-.cmp .cmpbar{position:absolute;left:0;top:0;bottom:0;border-radius:0;opacity:.28}
-.cmp .cmpn{position:relative}
-.cmp td.cmp-done{text-align:center;color:var(--ok);font-size:var(--fs-sm)}
 .cov{margin-top:6px}
 .cov-h{display:flex;align-items:center;gap:12px;margin:10px 0 4px}
 .cov-title{font-size:var(--fs-sm);color:var(--muted)}
@@ -256,6 +275,10 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .cov-bar>span:last-child{border-radius:0 5px 5px 0}
 .cov-bar .cov-none{background:var(--c-none)}
 .cov-row .num{width:auto;min-width:48px;text-align:right;color:var(--muted)}
+.ov-catcov{margin:16px 0}
+.cov-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px}
+.cov-grid2 .cov-row:nth-child(1),.cov-grid2 .cov-row:nth-child(2){border-top:0}
+@media (max-width:680px){.cov-grid2{grid-template-columns:1fr}.cov-grid2 .cov-row:nth-child(2){border-top:1px solid var(--track)}}
 .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px;margin:12px 0 4px}
 .scard{position:relative;aspect-ratio:1;border-radius:16px;overflow:hidden;background:var(--track)}
 .scard-fill{position:absolute;inset:0;width:100%;height:100%;display:block}
@@ -269,9 +292,14 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-lg{display:inline-flex;align-items:center;gap:5px}
 .tl-lg i{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .tl-chart{width:100%;height:auto;display:block;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
-.tl-line{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;transition:opacity .2s ease}
+.tl-line{fill:none;stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round;transition:opacity .2s ease}
 .tl-line.tl-dim{opacity:.16}
 .tl-line.tl-sel{stroke-width:3}
+@keyframes tlDraw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes tlFade{from{opacity:0}to{opacity:1}}
+.tl-anim .tl-line{stroke-dasharray:1;stroke-dashoffset:1;animation:tlDraw 1s cubic-bezier(.4,0,.2,1) forwards}
+.tl-anim .tl-area,.tl-anim .tl-band{animation:tlFade .8s ease both}
+.tl-anim .tl-dot{animation:tlFade .5s ease both;animation-delay:.55s}
 .tl-area{stroke:none}
 .tl-dot{transition:opacity .2s ease}
 .tl-dot.tl-dim{opacity:.16}
@@ -280,31 +308,63 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-lg.tl-sel{font-weight:600}
 .tl-grid{stroke:var(--track);stroke-width:1}
 .tl-axis{fill:var(--muted-2);font-size:10px}
-.tl-weekband{fill:var(--text);opacity:.035}
 .tl-xtick{fill:var(--muted-2);font-size:9px}
-.tl-today{stroke:var(--accent);stroke-width:1.5;stroke-dasharray:3 3;opacity:.7}
-.tl-today-pill{fill:var(--accent)}
-.tl-today-pill-t{fill:#fff;font-size:8.5px;font-weight:600}
-.tl-cross{stroke:var(--muted-2);stroke-width:1;opacity:.85;pointer-events:none;display:none}
-.tl-cross-mark{fill:var(--muted-2);pointer-events:none;display:none}
-.tl-crossarea{fill:transparent;cursor:crosshair}
-.tl-brush{fill:var(--accent);opacity:.16;pointer-events:none;display:none}
-.tl-brush-h{fill:var(--accent);opacity:.9;cursor:ew-resize;display:none}
-.tl-brush-h:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.tl-crossarea{fill:transparent;cursor:pointer}
+.tl-chart{cursor:pointer}
 .tl-chart:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.tl-foot{display:flex;justify-content:space-between;font-size:var(--fs-2xs);color:var(--muted-2);margin-top:6px}
+.tl-nav-wrap{position:relative;margin:6px 0 2px;padding:0 5px}
+.tl-nav{display:block;width:100%;height:auto;cursor:crosshair;touch-action:none}
+.tl-nav-area{fill:var(--accent);opacity:.13}
+.tl-nav-line{fill:none;stroke:var(--accent);stroke-width:1.2;opacity:.6}
+.tl-nav-scrim{fill:var(--bg);opacity:.58}
+.tl-nav-win{fill:var(--accent);opacity:.1;cursor:grab}
+.tl-nav-win:active{cursor:grabbing}
+.tl-nav-h{cursor:ew-resize}
+.tl-nav-h-hit{fill:transparent}
+.tl-nav-h-bar{fill:var(--accent);opacity:.95}
+.tl-nav-grip{stroke:var(--bg);stroke-width:1;opacity:.85}
+.tl-nav-h:focus-visible{outline:none}
+.tl-nav-h:focus-visible .tl-nav-h-bar{outline:2px solid var(--text);outline-offset:1px}
+.tl-nav-reset{position:absolute;top:-1px;right:0;font:inherit;font-size:var(--fs-xs);color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:1px 7px;cursor:pointer}
+.tl-nav-reset:hover{color:var(--text)}
+.tl-lanes-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 28px}
+@media (max-width:680px){.tl-lanes-grid{grid-template-columns:1fr}}
 .tl-chartbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px}
 .tl-chartbar .tl-legend{margin-bottom:0;flex:1 1 auto}
+.tl-granbar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.tl-granlabel{font-size:var(--fs-xs);color:var(--muted-2);text-transform:uppercase;letter-spacing:.04em}
 .tl-mode{display:inline-flex;gap:4px;flex:0 0 auto}
+.tl-bucket{margin-left:2px;padding-left:8px;border-left:1px solid var(--border)}
 .tl-mode .tl-mode-btn[aria-pressed=true]{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.tl-switch{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:2px}
+.tl-sw-btn{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:var(--fs-xs);color:var(--muted);background:transparent;border:0;border-radius:5px;padding:3px 9px;cursor:pointer;line-height:1}
+.tl-sw-btn:hover{color:var(--text)}
+.tl-sw-btn[aria-pressed=true]{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--text)}
+.tl-sw-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.tl-ico{width:14px;height:14px;display:block;fill:currentColor}
+.tl-spanbar{margin-left:auto}
+.tl-span-btn{padding:3px 8px}
 .tl-band{stroke:none;fill-opacity:.6}
-.tl-stream-none{fill-opacity:.45}
 .tl-lg-hatch{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline);background:var(--c-none-b)}
 .ov-ring{display:block}
 .ov-ring .ov-ring-track{stroke:var(--track)}
 .ov-ring .ov-ring-arc{stroke:var(--accent)}
-.ov-ring-t{fill:var(--text);font-size:17px;font-weight:600}
-.cmp tbody th[scope="row"]{white-space:nowrap;font-weight:600;color:var(--text)}
+.ov-ring .ov-ring-seg{stroke-linecap:butt;transition:opacity .15s ease}
+.ov-ring-big .ov-ring-seg{cursor:pointer}
+.ov-ring-seg.off{opacity:.28}
+.ov-ring-seg.on,.ov-ring-big .ov-ring-seg:hover{opacity:1}
+.ov-ring-t{fill:var(--text);font-size:12.5px;font-weight:600}
+.ov-ring-big .ov-ring-t{font-size:26px;font-weight:650}
+.ov-ringonly{flex-direction:column;align-items:center;justify-content:center;gap:12px}
+.ov-ringbox{display:flex}
+.ov-ringrow{display:flex;align-items:center;gap:24px;flex-wrap:wrap;justify-content:center}
+.ov-legend{display:flex;flex-direction:column;gap:2px;min-width:150px}
+.ov-leg-item{display:flex;align-items:center;gap:8px;background:none;border:0;color:var(--text);cursor:pointer;font:inherit;font-size:var(--fs-xs);padding:3px 7px;border-radius:6px;text-align:left;transition:opacity .15s ease,background .15s ease}
+.ov-leg-item:hover,.ov-leg-item.on{background:var(--surface-2)}
+.ov-leg-item.off{opacity:.4}
+.ov-leg-sw{width:11px;height:11px;border-radius:3px;flex:none;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
+.ov-leg-lab{flex:1;white-space:nowrap}
+.ov-leg-pct{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
 .cfd-modal{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.5)}
 .cfd-modal-box{background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:18px 20px;box-shadow:0 18px 60px rgba(0,0,0,.45);max-width:440px;width:calc(100% - 40px)}
 .cfd-modal-h{font-size:var(--fs-base);font-weight:600;margin-bottom:14px}
@@ -319,9 +379,6 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .hp-row{display:flex;align-items:center;gap:9px;font-size:var(--fs-sm)}
 .hp-n{flex:1;color:var(--text)}
 .hp-pos{font-size:var(--fs-xs);color:var(--muted-2)}
-.hp-gloss{margin-top:6px;border-top:1px solid var(--border);padding-top:10px;font-size:var(--fs-xs);color:var(--muted)}
-.hp-gloss p{margin:0 0 6px}
-.hp-gloss b{color:var(--text)}
 .rg-row{display:flex;align-items:center;gap:7px;font-size:var(--fs-xs);padding:4px 0}
 .rg-row+.rg-row{border-top:1px solid var(--track)}
 .rg-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
@@ -335,16 +392,19 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .cm-note{color:var(--muted-2)}
 .cm-steps{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:4px;font-size:var(--fs-xs);color:var(--muted)}
 .cm-steps-l{color:var(--muted-2)}
-.cm-step{display:inline-flex;align-items:center;gap:5px}
+.cm-step{display:inline-flex;align-items:center;gap:5px;background:none;border:0;color:var(--muted);cursor:pointer;font:inherit;font-size:var(--fs-xs);padding:2px 6px;border-radius:6px;transition:opacity .15s ease,background .15s ease}
+.cm-step:hover,.cm-step.on{background:var(--surface-2)}
+.cm-step.off{opacity:.4}
 .cm-step-n{color:var(--text)}
-.tl-digest{margin-bottom:14px;border:1px solid var(--border-2);border-radius:var(--r);background:var(--surface-2);padding:12px 14px}
-.tl-digest-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.tl-digest-title{font-weight:600;color:var(--text)}
-.tl-digest-sub{font-size:var(--fs-xs);color:var(--muted)}
-.tl-digest-body{display:flex;align-items:center;gap:10px;margin-top:6px}
-.tl-digest-net{font-size:var(--fs-big-sm);font-weight:700;letter-spacing:-.01em;line-height:1}
-.tl-digest-arrow{font-size:1.1em}
-.tl-digest-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.cm-differ-h{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;cursor:pointer;font:inherit;font-size:var(--fs-xs);padding:0;text-align:left}
+.cm-chev{flex:0 0 auto;width:10px;color:var(--muted-2)}
+.cm-differ-panel{display:flex;flex-wrap:wrap;gap:4px;max-height:0;overflow:hidden;transition:max-height .25s ease}
+.cm-differ-panel.open{max-height:160px;overflow-y:auto;margin:0 0 8px;padding:2px 0}
+.cm-dg{background:var(--surface-2);border:1px solid var(--border-2);color:var(--text);cursor:pointer;font:inherit;font-size:var(--fs-xs);padding:2px 8px;border-radius:999px;transition:background .15s ease}
+.cm-dg:hover{background:var(--border)}
+.rg-m{margin-left:8px;font-size:var(--fs-xs);color:var(--muted-2)}
+.ov-pct{border:0;background:none;font:inherit;font-weight:700;color:var(--text);cursor:pointer;padding:0;vertical-align:baseline}
+.ov-pct:hover{text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
 .tl-d-up{color:var(--ok)}
 .tl-d-down{color:var(--c0)}
 .tl-d-flat{color:var(--muted-2)}
@@ -368,17 +428,31 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-histmeter-l{flex:0 0 auto;white-space:nowrap}
 .tl-histmeter-bar{flex:1;height:6px;border-radius:3px;background:var(--track);overflow:hidden}
 .tl-histmeter-bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
-.tl-diff{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
-.tl-diff-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
-.tl-diff-pick{display:flex;gap:14px;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--muted)}
-.tl-diff-pick select{background:var(--surface-2);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--text);font:inherit;font-size:var(--fs-xs);padding:3px 6px}
-.tl-diff-out{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
-.tl-reglog{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
-.tl-reglog-h{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
-.tl-reglog-all{flex:0 0 auto}
-.tl-reglog-rows .rg-row{cursor:pointer}
-.tl-reglog-rows .rg-row:hover{color:var(--text)}
-.tl-flag{stroke:var(--c0);stroke-width:2;stroke-linecap:round}
+/* #D Shape changes (git outline diffs) */
+.oc{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
+.oc-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
+.oc-day{margin-top:4px}
+.oc-day-h{display:flex;align-items:center;gap:8px;width:100%;padding:5px 6px;border:0;border-radius:7px;background:none;color:var(--text);font:inherit;cursor:pointer;text-align:left}
+.oc-day-h:hover{background:var(--surface-2)}
+.oc-chev{flex:0 0 auto;width:10px;color:var(--muted-2)}
+.oc-date{flex:1;font-weight:600}
+.oc-count{flex:0 0 auto;font-size:var(--fs-xs);color:var(--muted-2);font-variant-numeric:tabular-nums}
+.oc-grid{display:flex;flex-wrap:wrap;gap:10px;padding:8px 6px 2px}
+.oc-cell{display:flex;flex-direction:column;align-items:center;gap:3px;width:60px}
+.oc-cell svg{width:48px;height:48px;background:var(--track);border-radius:6px;border:1px solid var(--border)}
+.oc-old{fill:var(--muted-2);opacity:.32}
+.oc-new{fill:var(--text)}
+.tad{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
+.tad-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
+.tad-sub{color:var(--muted-2);font-weight:400}
+.tad-row{display:flex;align-items:center;gap:10px;width:100%;padding:5px 6px;border:0;border-radius:7px;background:none;color:var(--text);font:inherit;cursor:pointer;text-align:left}
+.tad-row:hover{background:var(--surface-2)}
+.tad-row svg{width:34px;height:34px;flex:none;background:var(--track);border-radius:6px;border:1px solid var(--border)}
+.tad-glyph{font-weight:600}
+.tad-master{color:var(--muted);font-size:var(--fs-xs)}
+.tad-when{margin-left:auto;color:var(--muted);font-size:var(--fs-xs);text-align:right}
+.tad-when b{color:var(--text);font-weight:600}
+.oc-glyph{font-size:var(--fs-2xs);color:var(--muted);max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tl-lanes{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
 .tl-lanes-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
 .tl-lane{display:flex;align-items:center;gap:10px;font-size:var(--fs-xs);color:var(--text);padding:4px 0}
@@ -389,43 +463,12 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-lane-spark polyline{stroke:var(--accent);stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
 .tl-lane-bar{display:block;width:100%;height:6px;background:var(--track);border-radius:3px;overflow:hidden}
 .tl-lane-bar>span{display:block;height:100%;background:var(--accent);border-radius:3px}
+.tl-lane.done .tl-lane-spark polyline{stroke:var(--ok)}
+.tl-lane.done .tl-lane-bar>span{background:var(--ok)}
 .tl-lane-pct{flex:0 0 auto;color:var(--text);font-variant-numeric:tabular-nums;text-align:right;min-width:34px}
 .tl-lane-d{flex:0 0 auto}
-.tl-deadline-rule{stroke:var(--c0);stroke-width:1.5;stroke-dasharray:4 3}
-.tl-deadline-pill{fill:var(--c0);opacity:.92}
-.tl-deadline-t{fill:#fff;font-size:9px;font-weight:600}
-.tl-verdicts{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
-.tl-deadline-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.tl-deadline-l{font-size:var(--fs-xs);color:var(--muted)}
-.tl-deadline-bar input{background:var(--surface-2);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--text);font:inherit;font-size:var(--fs-xs);padding:3px 6px;color-scheme:dark light}
-.tl-deadline-runway{display:inline-block;margin-top:8px;font-size:var(--fs-xs);color:var(--muted-2)}
-.tl-verdict-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.tl-verdict{display:inline-flex;flex-direction:column;gap:2px;font-size:var(--fs-xs);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:5px 9px;background:var(--surface-2)}
-.tl-v-name{color:var(--text);font-weight:600}
-.tl-v-note{color:var(--muted)}
-.tl-v-pace{color:var(--muted-2);font-variant-numeric:tabular-nums}
-.tl-v-ok{border-color:var(--ok)}.tl-v-ok .tl-v-name{color:var(--ok)}
-.tl-v-amber{border-color:var(--c1)}.tl-v-amber .tl-v-name{color:var(--c1)}
-.tl-v-late{border-color:var(--c0)}.tl-v-late .tl-v-name{color:var(--c0)}
-.tl-machine{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
-.tl-machine-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
-.tl-scrub-bar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.tl-scrub-wrap{flex:1 1 auto;min-width:0;position:relative}
-.tl-scrub-wrap .tl-scrub{width:100%;display:block}
-.tl-scrub{accent-color:var(--accent);color-scheme:dark light}
-.tl-scrub-ticks{position:relative;height:20px;margin:1px 7px 0;pointer-events:none}
-.tl-tick{position:absolute;top:0;width:1px;height:3px;background:var(--border);transform:translateX(-50%)}
-.tl-tick-snap{height:6px;background:var(--muted-2)}
-.tl-tick-lab{height:8px;background:var(--accent)}
-.tl-tick-d{position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:9px;line-height:1;color:var(--muted-2);white-space:nowrap;font-variant-numeric:tabular-nums}
-.tl-scrub-date{flex:0 0 auto;font-size:var(--fs-xs);color:var(--text);font-variant-numeric:tabular-nums;min-width:54px;text-align:right}
-.tl-scrub-diff{flex:0 0 auto;font-size:var(--fs-xs);font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
-.tl-scrub-diff .du{color:var(--ok)}
-.tl-scrub-diff .dd{color:var(--c0)}
-.tl-machine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(20px,1fr));gap:3px}
-.tl-machine-grid .cell{aspect-ratio:1;border-radius:4px;cursor:default;box-shadow:inset 0 0 0 1px var(--swatch-outline);transition:background .45s ease,filter .45s ease}
-.tl-machine-grid .cell.tl-flash{filter:brightness(1.1)}
-.tl-machine-grid .cell svg{padding:2px}
+.tl-scrubline{stroke:var(--accent);stroke-width:1.5;stroke-dasharray:3 3;opacity:.85;pointer-events:none}
+.tl-scrubdot{fill:var(--accent);pointer-events:none}
 .tl-cal-card{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
 .tl-cal-h{display:flex;align-items:center;gap:10px;font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
 .tl-cal-ttl{flex:none}
@@ -444,11 +487,6 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-mcal-snap.lv4{background:var(--accent);color:#fff}
 .tl-mcal-snap:hover{outline:1px solid var(--text);outline-offset:1px}
 .tl-mcal-n{pointer-events:none}
-.dz{font-size:var(--fs-xs);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:4px 9px;color:var(--muted)}
-.dz-up{border-color:var(--ok);color:var(--ok)}
-.dz-down{border-color:var(--c0);color:var(--c0)}
-.dz-flat{color:var(--muted-2)}
-.dz-net{color:var(--text);font-weight:600}
 .cfd-cards.jm-list{display:flex;flex-direction:column;gap:7px;text-align:left}
 .jm-row{display:flex;align-items:center;gap:9px;font-size:var(--fs-sm)}
 .jm-date{flex:0 0 92px;color:var(--muted-2);font-size:var(--fs-xs)}
@@ -476,12 +514,16 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .cfd-tip .tip-h{font-size:var(--fs-2xs);color:var(--muted);margin-bottom:5px;white-space:nowrap}
 .cfd-tip .spark{display:block}
 .cfd-tip .spark rect{box-shadow:inset 0 0 0 1px var(--swatch-outline)}
-.tl-cross-row{display:flex;align-items:center;gap:6px;font-size:var(--fs-2xs);color:var(--muted);white-space:nowrap;line-height:1.7}
-.tl-cross-row i{width:8px;height:8px;border-radius:50%;flex:0 0 auto;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
-.tl-cross-row b{margin-left:auto;color:var(--text)}
-.tl-cross-row.tl-sel{color:var(--text);font-weight:600}
 .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);background:var(--surface);border:1px solid var(--border-2);color:var(--text);border-radius:var(--r-sm);padding:8px 14px;font-size:var(--fs-sm);opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* Boot-failure card (start()'s catch). Pure CSS — it must render when the embedded
+   model is broken, so the rainbow brand mark is a hard-coded gradient, not --cN data.
+   Theme tokens (--surface/--border/--text/--muted) keep both themes right. */
+.err-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.err-card{max-width:460px;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:34px 32px}
+.err-mark{display:block;width:52px;height:10px;border-radius:5px;margin:0 auto 18px;background:linear-gradient(90deg,#f97e55,#ffbe68,#fff157,#6bab59,#64a5ef,#a962e7)}
+.err-title{margin:0 0 10px;font-size:var(--fs-base);font-weight:600;color:var(--text)}
+.err-msg{margin:0;font-size:var(--fs-xs);line-height:1.5;color:var(--muted);font-family:"JetBrains Mono",monospace;word-break:break-word}
 button:focus-visible,input:focus-visible,summary:focus-visible,.cell:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 """
 
@@ -497,18 +539,85 @@ DASHBOARD_JS = r"""
   var state = {
     master: null,                          // no master selected -> global overview
     view: "tabs", before: false, sort: "workflow",
-    glyphSort: "category", focus: null,
+    focus: null,
     ovExpand: {},                          // which Overview cards are expanded
-    tlMode: "line",                        // Timeline chart mode: "line" | "flow" (streamgraph)
+    cmDifferOpen: false,                   // cross-master "differ" drill-down disclosure
+    heatSort: "category",                  // focus-mode glyph grid: "category" | "color"
+    funnelOpen: false,                     // per-step funnel: collapsed by default, toggled by the % ring/number
+    tlCatOpen: {},                         // Timeline Time-Machine category blocks expanded? (closed by default)
+    ocOpen: {},                            // Timeline "Shape changes" day blocks expanded? (closed by default)
+    tlGran: "save",                        // Timeline mode: "save" (one point per save, the base graph) | "time"
+    tlBucket: "day",                       // Time-mode grouping: "hour" | "day" | "month"
     calY: null, calM: null,                // Activity-calendar displayed month (lazy: last snapshot)
-    tlScrub: null,                         // Time Machine scrubber index (null -> latest snapshot)
-    dateA: null, dateB: null,              // Timeline date A-vs-B diff selection
+    tlScrub: null,                         // picked-moment scrubber index (null -> latest snapshot)
+    viewLo: null, viewHi: null,            // Range-navigator zoom window (snapshot indices; null = full)
+    tlSpan: null,                          // active duration preset ("1d".."1y"/"all"; null = custom/full)
     journeyGlyph: null, helpOpen: false,   // journey modal + help panel
+    exportingOnly: false,                  // seeded from H.exportingOnly in start()
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
+  // Timeline datasets: the per-day set (always) and the fine-grain per-save/per-commit set
+  // (may be null). "Save" mode plots the raw fine set; "Time" mode buckets that fine set by
+  // hour/day/month (last save per bucket). applyGranularity() swaps which trend/journeys/
+  // journeyIndex H points at. H.fineKind ("commit"|"save") picks the user-facing wording.
+  var tlDay = null, tlCommit = null;
+  function fineUnits(){ return H.fineKind === "save" ? "saves" : "commits"; }
+  function fineNoun(){ return H.fineKind === "save" ? "save" : "commit"; }
+  // Bucket key for a datetime ISO string per the active Time unit (truncate the ISO).
+  function bucketKey(iso, unit){
+    var s = String(iso);
+    if (unit === "hour") return s.slice(0,13);     // YYYY-MM-DDTHH
+    if (unit === "month") return s.slice(0,7);      // YYYY-MM
+    return s.slice(0,10);                            // day: YYYY-MM-DD
+  }
+  // Group a fine (per-save) dataset into one snapshot per time bucket — the LAST save in
+  // each bucket wins (series is oldest-first). journeyIndex stays the full fine history so
+  // stateAt() still reconstructs colours at any bucket-end date.
+  function bucketedTrend(fine, unit){
+    var ser = (fine.trend && fine.trend.series) || [];
+    var lastByBucket = {};
+    ser.forEach(function(p){ lastByBucket[bucketKey(p.date, unit)] = p; });
+    var keys = Object.keys(lastByBucket).sort();
+    var series = keys.map(function(k){ return lastByBucket[k]; });
+    var dates = series.map(function(p){ return p.date; });
+    return { trend: { series: series, dates: dates,
+                      today: dates.length ? dates[dates.length-1] : null,
+                      streak: fine.trend && fine.trend.streak },
+             journeys: fine.journeys, journeyIndex: fine.journeyIndex };
+  }
+  function applyGranularity(){
+    var fine = tlCommit || tlDay;          // prefer the per-save fine set; fall back to per-day
+    if (!fine) return;
+    var src = (state.tlGran === "save") ? fine : bucketedTrend(fine, state.tlBucket);
+    H.trend = src.trend; H.journeys = src.journeys; H.journeyIndex = src.journeyIndex;
+  }
+  function resetTimelineWindow(){
+    state.tlScrub = null;                  // reset the picked moment to latest on switch
+    state.viewLo = null; state.viewHi = null;   // window indices are dataset-specific
+    state.tlSpan = null;
+  }
+  function setGranularity(gran){
+    if (gran === "save" && !tlCommit) return;
+    if (gran === state.tlGran) return;
+    state.tlGran = gran;
+    resetTimelineWindow();
+    applyGranularity();
+    update();
+  }
+  function setBucket(unit){
+    if (unit === state.tlBucket) return;
+    state.tlBucket = unit;
+    if (state.tlGran !== "time"){ state.tlGran = "time"; }   // picking a bucket implies Time mode
+    resetTimelineWindow();
+    applyGranularity();
+    update();
+  }
   // The colour bar runs its fill animation once, on the first paint only — not on
   // master switches or any later re-render.
   var barsAnim = false, introPlayed = false;
+  var tlChartShouldAnim = false;                // draw-in the timeline chart once when entering the Timeline
+  var laneNumCache = {};                        // last-shown lane % per lane key, for count-up tweening
+  var vizIntroPlayed = false;                   // colour-spread radar build-animates once
 
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
     return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
@@ -552,6 +661,18 @@ DASHBOARD_JS = r"""
     for (var i=0;i<H.steps.length;i++){ if (String(H.steps[i].key)===String(k)) return H.steps[i].label; }
     return "Color "+k;
   }
+  // A glyph painted with a HIDDEN colour (a label hidden in the plugin) is not a
+  // workflow step, so it must read as uncoloured EVERYWHERE — otherwise it shows as a
+  // phantom colour the ring/breakdown deny, paints a stray wedge on the disc, and lands
+  // in "None" while still tinted its real colour. Rewrite any per-master key that isn't
+  // in the visible order to -1, once, at load. (stateAt does the same for the timeline.)
+  function normalizeHiddenKeys(){
+    var inOrder = {}; (H.order||[]).forEach(function(k){ inOrder[String(k)] = 1; });
+    (H.masters||[]).forEach(function(m){
+      var ks = m.keys; if (!ks) return;
+      for (var i=0;i<ks.length;i++){ if (ks[i] !== -1 && !inOrder[String(ks[i])]) ks[i] = -1; }
+    });
+  }
   function masterById(id){
     for (var i=0;i<H.masters.length;i++){ if (H.masters[i].id===id) return H.masters[i]; }
     return H.masters[0];
@@ -568,8 +689,78 @@ DASHBOARD_JS = r"""
       + '%;background:var('+varFor(key)+');--i:'+(idx||0)
       + ';box-shadow:0 0 9px color-mix(in srgb,var('+glow+') 22%,transparent),inset -6px 0 9px -3px rgba(0,0,0,.2)" title="'+esc(lab)+' — click to focus these glyphs"></span>';
   }
-  function countFor(m,k){ return k===-1 ? m.uncolored : (m.counts[String(k)]||0); }
-  function startedOf(m){ return H.glyphTotal - m.uncolored; }
+  // ----- Exporting-only mode -------------------------------------------------
+  // Glyphs marked non-exporting in Glyphs (H.nonExporting) can be dropped from
+  // every completion percentage via the toolbar toggle (state.exportingOnly,
+  // seeded from the palette pref H.exportingOnly). PARITY: the embedded
+  // masters[].counts/keys always ship ALL glyphs (raw truth); the exclusion is
+  // applied HERE, client-side, so the displayed numbers match the palette's.
+  // countedSet() centralises the exclusion: null when everything counts (toggle
+  // off / nothing to exclude), else a {name:1} lookup of the glyphs that DO
+  // count. Heatmap cells of excluded glyphs dim (.ncnt) instead of vanishing.
+  var COUNTED = null, COUNTEDN = 0;            // memo; rebuilt when the toggle flips
+  function countedSet(){
+    if (!state.exportingOnly || !(H.nonExporting||[]).length) return null;
+    if (COUNTED) return COUNTED;
+    var off = {}; (H.nonExporting||[]).forEach(function(n){ off[n]=1; });
+    var set = {}, n = 0;
+    (H.glyphNames||[]).forEach(function(nm){ if (!off[nm]){ set[nm]=1; n++; } });
+    COUNTEDN = n;
+    return (COUNTED = set);
+  }
+  function isCounted(name){ var set = countedSet(); return !set || !!set[name]; }
+  function countedTotal(){ return countedSet() ? COUNTEDN : (H.glyphTotal||0); }
+  // Per-master tallies with the exclusion applied (memoised; only consulted while
+  // the toggle is ON): the m.counts / m.uncolored equivalents, recomputed from the
+  // raw m.keys. Step mode's cumulative "reached k or beyond" is the suffix sum of
+  // the exclusive distribution in workflow order; free mode is the distribution.
+  var CSTATS = {};
+  function countedStats(m){
+    if (CSTATS[m.id]) return CSTATS[m.id];
+    var set = countedSet(), ks = m.keys||[], names = H.glyphNames||[];
+    var dist = {}, none = 0;
+    for (var i=0;i<ks.length;i++){
+      if (set && !set[names[i]]) continue;
+      var k = ks[i], sk = String(k);
+      if (k===-1 || H.order.indexOf(sk)===-1) none++; else dist[sk]=(dist[sk]||0)+1;
+    }
+    var counts = {}, run = 0, order = H.order||[];
+    for (var j=order.length-1;j>=0;j--){
+      var key = order[j];
+      if (H.mode === "free"){ counts[key] = dist[key]||0; }
+      else { run += dist[key]||0; counts[key] = run; }
+    }
+    return (CSTATS[m.id] = { dist:dist, counts:counts, uncolored:none });
+  }
+  // Flip the toggle: drop every exclusion-dependent memo, then re-render.
+  function setExportingOnly(on){
+    state.exportingOnly = !!on;
+    COUNTED = null; COUNTEDN = 0; CSTATS = {}; EXCL = {};
+    NAVCACHE = null; NAVCACHE_KEY = "";        // navigator series changes denominator
+    laneNumCache = {};                         // lane %s change scale — don't tween across
+    update();
+  }
+  // Exclusive current-colour tally for a master: how many glyphs sit at EACH colour
+  // right now (memoised per master). m.counts is cumulative ("reached step k or
+  // beyond"), which made every earlier step inherit the most-advanced count — so the
+  // legend/compare/export must use this, not m.counts, to match the stacked bar.
+  var EXCL = {};
+  function exclusiveOf(m){
+    if (EXCL[m.id]) return EXCL[m.id];
+    var set = countedSet(), names = H.glyphNames||[];
+    var dist = {}, ks = m.keys || [];
+    for (var i=0;i<ks.length;i++){ if (set && !set[names[i]]) continue; var k=ks[i], sk=String(k); if (k!==-1 && H.order.indexOf(sk)!==-1) dist[sk]=(dist[sk]||0)+1; }
+    return (EXCL[m.id] = dist);
+  }
+  // cumulative: glyphs that reached step k OR BEYOND (the model's m.counts). This is
+  // the workflow-completion metric used by the legends, Compare grid and exports.
+  // While exporting-only is ON the counted recompute stands in for m.counts.
+  function countFor(m,k){
+    if (countedSet()){ var cs = countedStats(m); return k===-1 ? cs.uncolored : (cs.counts[String(k)]||0); }
+    return k===-1 ? m.uncolored : (m.counts[String(k)]||0);
+  }
+  function uncoloredFor(m){ return countedSet() ? countedStats(m).uncolored : m.uncolored; }
+  function startedOf(m){ return countedTotal() - uncoloredFor(m); }
   function stepsSorted(m){
     var s = H.steps.slice();
     if (state.sort==="progress"){ s.sort(function(a,b){ return countFor(m,b.key)-countFor(m,a.key); }); }
@@ -581,16 +772,18 @@ DASHBOARD_JS = r"""
   }
 
   function aggregate(){
-    var grand = H.glyphTotal * H.masters.length;
+    var grand = countedTotal() * H.masters.length;
     var agg = {}; H.order.forEach(function(o){ agg[o]=0; });
-    H.masters.forEach(function(m){ H.order.forEach(function(o){ agg[o]+=(m.counts[o]||0); }); });
+    H.masters.forEach(function(m){ H.order.forEach(function(o){ agg[o]+=countFor(m,o); }); });
     return { grand:grand, agg:agg };
   }
 
   function aggExclusive(){
     var dist = {}; H.order.forEach(function(o){ dist[o]=0; }); var none = 0;
+    var set = countedSet(), names = H.glyphNames||[];
     H.masters.forEach(function(m){
-      (m.keys||[]).forEach(function(k){
+      (m.keys||[]).forEach(function(k, i){
+        if (set && !set[names[i]]) return;
         var sk = String(k);
         if (k===-1 || H.order.indexOf(sk)===-1) none++; else dist[sk]++;
       });
@@ -615,11 +808,16 @@ DASHBOARD_JS = r"""
       + '<button type="button" id="cfd-theme" class="icon" aria-label="Toggle light or dark theme">◐</button></header>';
   }
   function toolbar(){
+    // Exporting-only toggle: only offered when the font actually has non-exporting
+    // glyphs to exclude; seeded from the palette pref (state.exportingOnly <- H.exportingOnly).
+    var nx = (H.nonExporting||[]).length;
+    var exonly = nx
+      ? '<button type="button" id="cfd-exonly" class="chip" aria-pressed="'+(!!state.exportingOnly)+'" title="Count exporting glyphs only — drop the '+nx+' non-exporting glyph'+(nx===1?"":"s")+' from every percentage">⊘ Exporting only</button>'
+      : '';
     return '<div class="tb">'
       + '<button type="button" id="cfd-overview" class="chip" aria-pressed="true" title="Back to the overview">⌂ Overview</button>'
-      + '<button type="button" id="cfd-coverage" class="chip" aria-pressed="false">🗂 Coverage</button>'
       + '<button type="button" id="cfd-timeline" class="chip" aria-pressed="false">📈 Timeline</button>'
-      + '<button type="button" id="cfd-compare" class="chip" aria-pressed="false">▤ Compare</button>'
+      + exonly
       + '<button type="button" id="cfd-export" class="chip" style="margin-left:auto" title="Export the report as PDF, CSV or JSON">⤓ Export Report</button></div>';
   }
   // ----- Graded step progress -----------------------------------------------
@@ -638,71 +836,148 @@ DASHBOARD_JS = r"""
     STEPW = { weight:weight, N:N, steps:steps };
     return STEPW;
   }
-  function gradedSum(m){ var W=stepWeights().weight, ks=m.keys||[], s=0; for (var i=0;i<ks.length;i++){ var w=W[ks[i]]; if (w) s+=w; } return s; }
-  function gradedMasterPct(m){ var n=H.glyphTotal||((m.keys||[]).length)||1; return Math.round(gradedSum(m)/n*100); }
-  function gradedOverallPct(){ var s=0, tot=0; H.masters.forEach(function(m){ s+=gradedSum(m); tot+=H.glyphTotal; }); return tot? Math.round(s/tot*100):0; }
-  function masterStarted(m){ return (m.uncolored||0) < H.glyphTotal; }   // any colour set at all
-  function ring(p){
-    var r=26, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(100,p))/100);
-    return '<svg class="ov-ring" width="66" height="66" viewBox="0 0 66 66" role="progressbar" aria-valuenow="'+p+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+p+'% complete">'
-      + '<circle class="ov-ring-track" cx="33" cy="33" r="'+r+'" fill="none" stroke-width="6"/>'
-      + '<circle class="ov-ring-arc" cx="33" cy="33" r="'+r+'" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 33 33)"/>'
-      + '<text class="ov-ring-t" x="33" y="34" text-anchor="middle" dominant-baseline="central">'+p+'%</text></svg>';
+  function gradedSum(m){ var W=stepWeights().weight, ks=m.keys||[], names=H.glyphNames||[], set=countedSet(), s=0; for (var i=0;i<ks.length;i++){ if (set && !set[names[i]]) continue; var w=W[ks[i]]; if (w) s+=w; } return s; }
+  function gradedMasterPct(m){ var n=countedTotal()||((m.keys||[]).length)||1; return Math.round(gradedSum(m)/n*100); }
+  // Graded completion % of one master AT a past snapshot date — partial credit per
+  // step (final step weight 1), the SAME metric the Overview ring / Compare / exports
+  // use. Reconstructs the state at the date (stateAt) and sums step weights, so the
+  // Line chart, the ring and Flow all tell one consistent story. (Was final-step-only,
+  // which sat at 0 until glyphs reached the last colour, then cliffed to 100.)
+  function gradedPctAt(masterId, date){
+    var W = stepWeights().weight, total = countedTotal() || 1, snap = stateAt(masterId, date), s = 0;
+    for (var name in snap){ if (!isCounted(name)) continue; var w = W[String(snap[name])]; if (w){ s += w; } }
+    return s / total * 100;
+  }
+  function gradedOverallPct(){ var s=0, tot=0; H.masters.forEach(function(m){ s+=gradedSum(m); tot+=countedTotal(); }); return tot? Math.round(s/tot*100):0; }
+  function masterStarted(m){ return (uncoloredFor(m)||0) < countedTotal(); }   // any counted colour set at all
+  // A donut. With `segs` ({key,frac,label} colour shares) it tiles the ring with the
+  // palette colours — each arc proportional to its share of the font, the uncoloured
+  // remainder showing as the faint track. opts.select makes each arc a colour selector
+  // (data-fkey; dims the others when one is focused). opts.big draws the large Overview
+  // hero ring. The centre always reads the completion %. No segs -> a single progress arc.
+  function ring(p, segs, opts){
+    opts = opts || {};
+    var big = !!opts.big, select = !!opts.select;
+    var sz = big ? 132 : 52, cc = sz/2, sw = big ? 14 : 5, r = cc - sw/2 - 2, c = 2*Math.PI*r;
+    var arcs = "";
+    if (segs && segs.length){
+      var acc = 0;
+      segs.forEach(function(sg){
+        var len = Math.max(0, Math.min(1, sg.frac||0)) * c;
+        if (len <= 0.01) return;
+        var on = select && state.focus === sg.key;
+        var off = select && state.focus !== null && !on;
+        var cls = "ov-ring-seg" + (on ? " on" : (off ? " off" : ""));
+        var sel = select ? ' data-fkey="'+sg.key+'" title="'+esc((sg.label||"")+" — click to focus these glyphs")+'"' : '';
+        arcs += '<circle class="'+cls+'"'+sel+' cx="'+cc+'" cy="'+cc+'" r="'+r+'" fill="none" stroke="var('+varFor(sg.key)+')" stroke-width="'+sw+'"'
+          + ' stroke-dasharray="'+len.toFixed(2)+' '+(c-len).toFixed(2)+'" stroke-dashoffset="'+(-acc).toFixed(2)+'" transform="rotate(-90 '+cc+' '+cc+')"/>';
+        acc += len;
+      });
+    } else {
+      var offp = c*(1-Math.max(0,Math.min(100,p))/100);
+      arcs = '<circle class="ov-ring-arc" cx="'+cc+'" cy="'+cc+'" r="'+r+'" fill="none" stroke-width="'+sw+'" stroke-linecap="round" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+offp.toFixed(1)+'" transform="rotate(-90 '+cc+' '+cc+')"/>';
+    }
+    return '<svg class="ov-ring'+(big?" ov-ring-big":"")+'" width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'" role="progressbar" aria-valuenow="'+p+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+p+'% complete">'
+      + '<circle class="ov-ring-track" cx="'+cc+'" cy="'+cc+'" r="'+r+'" fill="none" stroke-width="'+sw+'"/>'
+      + arcs
+      + '<text class="ov-ring-t" x="'+cc+'" y="'+(cc+0.5)+'" text-anchor="middle" dominant-baseline="central">'+p+'%</text></svg>';
+  }
+  // ----- Workflow funnel: cumulative "reached step k or beyond" as descending bars.
+  // Replaces the flat text legend with the SAME cumulative metric drawn so a nearly
+  // full makeup bar can't be misread as nearly complete — the funnel visibly narrows
+  // toward "done". Read-only on purpose: it counts reached-or-beyond, while focusing a
+  // colour means the glyphs sitting AT it (exclusive) — different sets, so the click-to-
+  // focus selector stays on the makeup bar above; the funnel is the progress reference.
+  function funnelHTML(cumFor, total){
+    // Collapsed by default; expanded by clicking the % ring (global) / % number (master).
+    // No caption or chevron — the percentage itself is the toggle (data-funnel on it).
+    if (state.funnelOpen === false) return "";
+    var rows = H.steps.map(function(s){
+      var p = pct(cumFor(s.key)||0, total);
+      if (p === 0) return "";                       // a step no glyph has reached yet
+      return '<div class="fnl-row" title="'+esc(s.label+" — "+p+"% reached this step or beyond")+'">'
+        + legendDot(s.key)
+        + '<span class="fnl-lab">'+esc(s.label)+'</span>'
+        + '<span class="fnl-track"><span class="fnl-fill" style="width:'+p+'%;background:var('+varFor(s.key)+')"></span></span>'
+        + '<span class="fnl-pct">'+p+'%</span></div>';
+    }).join("");
+    if (!rows) rows = '<div class="fnl-empty">Not started yet</div>';
+    return '<div class="funnel'+(barsAnim?" intro":"")+'" role="group" aria-label="Cumulative progress by step, reached or beyond">'+rows+'</div>';
   }
   function overall(){
     var a = aggregate(), compP = gradedOverallPct();
-    var legend = H.steps.map(function(s){
-      return '<span class="lg" title="'+esc(s.label)+'">'+legendDot(s.key)+pct(a.agg[String(s.key)]||0,a.grand)+'%</span>';
-    }).join("");
-    var recipeLine = "";
-    if (H.recipes && H.recipes.length){
-      var recipeComplete = 0;
-      H.masters.forEach(function(m){ recipeComplete += (((H.recipeCompletion||{})[m.id])||{}).complete||0; });
-      recipeLine = '<div class="ov-recipe">Recipe-adjusted: <b>'+recipeComplete+'/'+a.grand+'</b> complete ('
-        + pct(recipeComplete,a.grand)+'%) · '+H.recipes.length+' recipe'+(H.recipes.length===1?"":"s")+'</div>';
-    }
+    // exclusive current-colour totals (one colour per glyph) so the ring tiles read the
+    // same as the makeup bar did — not aggregate()'s cumulative "reached-or-beyond" sums.
     var ex = aggExclusive();
-    var segParts = H.steps.map(function(s,i){
-      return segSpan(s.key, pct(ex.dist[String(s.key)]||0, a.grand), s.label, i);
-    }).join("") + segSpan(-1, pct(ex.none, a.grand), H.noneLabel, H.steps.length);
-    return '<section class="overall" aria-label="Overall totals">'
-      + '<div class="ov-num">'+ring(compP)+'</div>'
-      + '<div class="ov-main">'
-      + '<div class="seg'+(barsAnim?" intro":"")+'" role="img" aria-label="Colour distribution across the font">'+segParts+'</div>'
-      + '<div class="legend">'+legend+'</div>'+recipeLine+'</div></section>';
+    var grand = a.grand || 1;
+    // Recipes no longer footnote this section — they have their own Overview card
+    // (recipeCard(), in overviewExtras) with per-recipe rows and per-master bars.
+    // The Overview card is just the big donut ring: tiled with the exclusive colour shares,
+    // each arc clickable to focus that colour's glyphs. No stacked bar, no step funnel.
+    var ringSegs = H.steps.map(function(s){ return { key:s.key, label:s.label, frac:(ex.dist[String(s.key)]||0)/grand }; });
+    // Colour labels beside the ring: one clickable swatch+label+% per step (+ None),
+    // matching the ring arcs (same data-fkey focus + on/off highlight).
+    function legItem(key, label, cnt){
+      var on = state.focus === key, off = state.focus !== null && !on, p = Math.round(cnt/grand*100);
+      return '<button type="button" class="ov-leg-item'+(on?" on":"")+(off?" off":"")+'" data-fkey="'+key+'" title="'+esc(label+" — "+cnt+" glyphs ("+p+"%)")+'">'
+        + '<i class="ov-leg-sw" style="background:var('+varFor(key)+')"></i>'
+        + '<span class="ov-leg-lab">'+esc(label)+'</span><span class="ov-leg-pct">'+p+'%</span></button>';
+    }
+    var legend = H.steps.map(function(s){ return legItem(s.key, s.label, ex.dist[String(s.key)]||0); }).join("")
+      + legItem(-1, H.noneLabel, ex.none||0);
+    return '<section class="overall ov-ringonly" aria-label="Overall completion — click a colour to focus its glyphs">'
+      + '<div class="ov-ringrow"><div class="ov-ringbox">'+ring(compP, ringSegs, {big:true, select:true})+'</div>'
+      + '<div class="ov-legend" role="group" aria-label="Colour labels">'+legend+'</div></div>'
+      + '</section>';
   }
 
   // The selected master rendered like the overall card (ring + stacked bar +
   // legend), but scoped to this one master instead of the whole font.
   function masterOverall(m){
-    var total = H.glyphTotal;
-    var started = total - m.uncolored;
+    var total = countedTotal();
+    var started = total - uncoloredFor(m);
     var startP = pct(started,total);
-    var legend = stepsSorted(m).map(function(s){
-      return '<span class="lg" title="'+esc(s.label)+'">'+legendDot(s.key)+pct(countFor(m,s.key)||0,total)+'%</span>';
-    }).join("");
+    // exclusive current-colour tally drives the makeup bar (exclusion-aware).
+    var set=countedSet(), names=H.glyphNames||[];
+    var dist={}, none=0;
+    (m.keys||[]).forEach(function(k, i){ if (set && !set[names[i]]) return; var sk=String(k); if (k===-1 || H.order.indexOf(sk)===-1) none++; else dist[sk]=(dist[sk]||0)+1; });
+    // one clear progress number; the started count is in the tooltip. The number is also
+    // the funnel toggle (click to show/hide progress by step).
     var head = '<span class="ov-name">'+esc(m.name)+'</span>'
-      + '<b>'+gradedMasterPct(m)+'% complete</b> · '+started+'/'+total+' started ('+startP+'%)';
+      + '<button type="button" class="ov-pct" data-funnel="1" aria-expanded="'+(state.funnelOpen!==false)+'" title="'+started+'/'+total+' glyphs started ('+startP+'%) · click for progress by step">'+gradedMasterPct(m)+'% complete</button>';
     var recipeLine = "";
     if (H.recipes && H.recipes.length){
       var rc = ((H.recipeCompletion||{})[m.id])||{};
-      if (rc.complete != null) recipeLine = '<div class="ov-recipe">Recipe-adjusted: <b>'+rc.complete+'/'+total+'</b> complete ('+pct(rc.complete,total)+'%)</div>';
+      // recipe completion is computed in Python over ALL glyphs — keep its raw denominator.
+      if (rc.complete != null) recipeLine = '<div class="ov-recipe">Recipe-adjusted: <b>'+rc.complete+'/'+H.glyphTotal+'</b> complete ('+pct(rc.complete,H.glyphTotal)+'%)</div>';
     }
-    var dist={}, none=0;
-    (m.keys||[]).forEach(function(k){ var sk=String(k); if (k===-1 || H.order.indexOf(sk)===-1) none++; else dist[sk]=(dist[sk]||0)+1; });
     var segParts = H.steps.map(function(s,i){
       return segSpan(s.key, pct(dist[String(s.key)]||0, total), s.label, i);
     }).join("") + segSpan(-1, pct(none, total), H.noneLabel, H.steps.length);
     return '<section class="overall master-overall" aria-label="'+esc(m.name+" totals")+'">'
       + '<div class="ov-main"><div class="ov-head">'+head+'</div>'
       + '<div class="seg'+(barsAnim?" intro":"")+'" role="img" aria-label="'+esc(m.name+" colour distribution")+'">'+segParts+'</div>'
-      + '<div class="legend">'+legend+'</div>'+recipeLine+'</div></section>';
+      + funnelHTML(function(k){ return countFor(m,k)||0; }, total)+recipeLine+'</div></section>';
   }
   function heatmap(m){
     var cats = H.categories || [];
+    // Time travel: when a moment is picked on the Timeline chart (state.tlScrub),
+    // every cell renders the HISTORICAL colour at that snapshot, reconstructed via
+    // stateAt() — the same source the tower discs and the category/script lanes
+    // read, so all the scrub-aware surfaces agree. stateAt already normalises
+    // hidden keys to -1; a glyph with no event by that date reads as uncoloured
+    // (exactly like the discs' countsOf).
+    var scrubISO = null, scrubSnap = null;
+    if (state.tlScrub != null){
+      var sdates = (H.trend && H.trend.dates) || [], sdate = sdates[scrubIndex()];
+      if (sdate != null){ scrubISO = sdate; scrubSnap = stateAt(m.id, sdate); }
+    }
     var items = [];
     for (var i=0;i<H.glyphNames.length;i++){
-      items.push([H.glyphNames[i], m.keys[i], i]);
+      // the historical key feeds the SAME items the cell colour, the focus filter
+      // and the by-colour grouping read, so they stay consistent while scrubbed.
+      var key0 = scrubSnap ? (scrubSnap[H.glyphNames[i]] != null ? scrubSnap[H.glyphNames[i]] : -1) : m.keys[i];
+      items.push([H.glyphNames[i], key0, i]);
     }
     function matchesFocus(it){
       var k = it[1];
@@ -716,7 +991,13 @@ DASHBOARD_JS = r"""
     var ch = (H.changes && H.changes[m.id]) || {};
     function cellHTML(it){
       var name = it[0], key = it[1], lab = labelFor(key);
-      var wasKey = (ch[name] != null) ? ch[name][0] : key;
+      // exporting-only: excluded glyphs stay visible but DIM (.ncnt) with a
+      // "not counted" affordance — they never vanish from the grid.
+      var dim = !isCounted(name);
+      if (dim) lab += " — not counted";
+      // while time-travelling the before/after pair collapses to the historical
+      // colour ("before last run" is meaningless at an arbitrary past moment).
+      var wasKey = (!scrubSnap && ch[name] != null) ? ch[name][0] : key;
       var nowVar = varFor(key), wasVar = varFor(wasKey);
       var showVar = state.before ? wasVar : nowVar;
       // Fully percent-encode the path (encodeURIComponent → slashes become %2F),
@@ -727,14 +1008,29 @@ DASHBOARD_JS = r"""
         + "&glyph=" + encodeURIComponent(name) + "&layer=" + encodeURIComponent(m.id);
       var p = paths[name];
       var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '"/></svg>' : '';
-      return '<a class="cell' + (p ? ' glyph' : '') + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:color-mix(in srgb,var(' + showVar + ') 35%,transparent)" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
+      return '<a class="cell' + (p ? ' glyph' : '') + (dim ? ' ncnt' : '') + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:color-mix(in srgb,var(' + showVar + ') 35%,transparent)" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
     }
     var sections;
-    if (state.glyphSort === "font"){
-      // pure font glyph order — one flat grid, no category headers
-      sections = '<div class="grid" aria-label="All glyphs in font order">'+shown.map(cellHTML).join("")+'</div>';
+    if (state.heatSort === "color"){
+      // group cells by their current colour, ordered by the workflow (order[]), the
+      // uncoloured bucket last; glyphs within a colour keep font order.
+      var byKey = {};
+      shown.forEach(function(it){
+        var k = it[1];
+        var kk = (k===-1 || H.order.indexOf(String(k))===-1) ? "none" : String(k);
+        if (!byKey[kk]){ byKey[kk] = []; }
+        byKey[kk].push(it);
+      });
+      var keyOrder = H.order.slice();
+      keyOrder.push("none");
+      sections = keyOrder.filter(function(kk){ return byKey[kk] && byKey[kk].length; }).map(function(kk){
+        var key = kk==="none" ? -1 : parseInt(kk,10);
+        var lab = labelFor(key);
+        return '<div class="cat"><div class="cat-h">'+swatchFor(kk==="none"?null:key)+' '+esc(lab)+' <span class="cat-n">'+byKey[kk].length+'</span></div>'
+          + '<div class="grid" aria-label="'+esc(lab)+'">'+byKey[kk].map(cellHTML).join("")+'</div></div>';
+      }).join("");
     } else {
-      // group cells by glyph category, Font-View style
+      // group cells by glyph category, Font-View style (the default layout).
       var groups = {}, seen = [];
       shown.forEach(function(it){ var c = cats[it[2]] || "Other"; if (!groups[c]){ groups[c]=[]; seen.push(c); } groups[c].push(it); });
       // order categories like the Glyphs Font View (Letter first); glyphs within a
@@ -747,14 +1043,21 @@ DASHBOARD_JS = r"""
       }).join("");
     }
     var empty = items.length===0 ? '<p class="empty">No glyphs.</p>' : "";
-    var toggle = Object.keys(ch).length ? '<button type="button" class="ba-toggle chip" aria-pressed="'+state.before+'" title="Toggle the cell colours between before and after the last run">'+(state.before?"Before":"After")+'</button>' : '';
-    var sortCtl = '<span class="hsort">'
-      + '<button type="button" class="chip" data-gsort="category" aria-pressed="'+(state.glyphSort==="category")+'" title="Group glyphs by category (Font View order)">Category</button>'
-      + '<button type="button" class="chip" data-gsort="font" aria-pressed="'+(state.glyphSort==="font")+'" title="Keep the plain font glyph order">Font order</button></span>';
+    var toggle = (!scrubSnap && Object.keys(ch).length) ? '<button type="button" class="ba-toggle chip" aria-pressed="'+state.before+'" title="Toggle the cell colours between before and after the last run">'+(state.before?"Before":"After")+'</button>' : '';
     var focusInfo = state.focus!==null
       ? '<button type="button" class="chip focus-clear" data-fclear="1" title="Clear colour focus">Focus: '+esc(labelFor(state.focus))+' ✕</button>'
       : '';
-    return '<section class="heat"><div class="heat-h">'+sortCtl+focusInfo+toggle+'</div>'
+    // sort control: order the grid by glyph category (default) or by colour.
+    var sortCtl = '<span class="hsort" role="group" aria-label="Sort glyphs">'
+      + '<button type="button" class="chip" data-hsort="category" aria-pressed="'+(state.heatSort!=="color")+'" title="Group glyphs by category">Category</button>'
+      + '<button type="button" class="chip" data-hsort="color" aria-pressed="'+(state.heatSort==="color")+'" title="Group glyphs by colour">By colour</button></span>';
+    // dismissible time-travel pill above the grid: which moment the cells show,
+    // plus a one-click return to the live (today) colours.
+    var pill = scrubISO
+      ? '<div class="heat-pill" role="status">Viewing '+esc(dateLabel(scrubISO))
+        + ' — <button type="button" class="chip" data-scrubclear="1" title="Clear the picked moment and show the current colours">back to today</button></div>'
+      : '';
+    return '<section class="heat"><div class="heat-h">'+focusInfo+toggle+sortCtl+'</div>'+pill
       + (sections||empty)+'</section>';
   }
   function changes(m){
@@ -792,8 +1095,17 @@ DASHBOARD_JS = r"""
     return '<div class="ov-card ovc-'+esc(key)+(open?" open":"")+'">'+head
       + '<div class="ov-card-body'+(open?" scroll":"")+'">'+bodyHtml+'</div></div>';
   }
+  // The master's own "Aa" outline (H.masters[].preview, {d, vb}) as a small chip,
+  // so a Thin row visibly looks thin and a Black row black. Masters whose A/a have
+  // no outline carry no preview ({}); their rows render exactly as before (no chip).
+  function lbChip(pv){
+    if (!pv || !pv.d) return "";
+    return '<span class="lb-chip" aria-hidden="true"><svg viewBox="'+esc(pv.vb)
+      + '" preserveAspectRatio="xMidYMid meet"><path d="'+esc(pv.d)+'" fill="currentColor"/></svg></span>';
+  }
   function lbRow(r){
     return '<button type="button" class="lb-row" data-m="'+esc(r.id)+'" title="Focus '+esc(r.name)+'">'
+      + lbChip(r.pv)
       + '<span class="lb-n">'+esc(r.name)+'</span>'
       + '<span class="lb-bar"><span style="width:'+r.p+'%"></span></span>'
       + '<span class="lb-p">'+r.p+'%</span></button>';
@@ -801,7 +1113,7 @@ DASHBOARD_JS = r"""
   // Ranked masters by graded step progress; click a row to focus that master.
   // Collapsed shows the top 6; expanded scrolls through every master.
   function leaderboard(){
-    var rows = H.masters.map(function(m){ return {id:m.id, name:m.name, p:masterPct(m), any:masterStarted(m)}; });
+    var rows = H.masters.map(function(m){ return {id:m.id, name:m.name, p:masterPct(m), any:masterStarted(m), pv:m.preview}; });
     rows.sort(function(a,b){ return b.p-a.p || (a.name<b.name?-1:1); });
     var started = rows.filter(function(r){ return r.any; });
     var open = !!state.ovExpand.leaderboard;
@@ -813,6 +1125,9 @@ DASHBOARD_JS = r"""
   }
   // How many masters fall in each completion band.
   function histogram(){
+    // a 6-band spread only carries signal for many masters; for a small family the
+    // "Furthest along" leaderboard already shows the spread, so skip it (#cut).
+    if (H.masters.length < 8) return "";
     var buckets=[{l:"0%",n:0},{l:"1–25%",n:0},{l:"26–50%",n:0},{l:"51–75%",n:0},{l:"76–99%",n:0},{l:"100%",n:0}];
     H.masters.forEach(function(m){ var p=masterPct(m);
       var b = !masterStarted(m)?0 : p>=100?5 : p<=25?1 : p<=50?2 : p<=75?3 : 4; buckets[b].n++; });
@@ -823,14 +1138,6 @@ DASHBOARD_JS = r"""
         + '<span class="hg-n">'+b.n+'</span></div>';
     }).join("");
     return ovCard("histogram", "Masters by completion", rows, false);
-  }
-  // Completion-over-time: chart + range foot, no static colour/name legend — the
-  // per-master name + % only appear on hover (the snapping crosshair / dot titles).
-  function timelineCard(){
-    if (!hasTrend()) return "";
-    var parts = trendParts(680, 190);
-    var body = parts.chart + parts.foot;
-    return ovCard("timeline", "Completion over time", body, false);
   }
   // rank within the workflow order; uncoloured/none and off-palette steps rank
   // below every real step so "-> none" reads as backward.
@@ -844,32 +1151,6 @@ DASHBOARD_JS = r"""
   function swatchFor(key){
     var v = (key==null) ? "--c-none" : varFor(key);
     return '<span class="rg-sw" style="background:var('+v+')"></span>';
-  }
-  function regressionCard(){
-    var changes = (H.changes && state.master) ? H.changes[state.master]
-      : mergedChanges();
-    var rows = "", count = 0;
-    for (var name in changes){
-      var pair = changes[name], was = pair[0], nw = pair[1];
-      if (rankOf(nw) < rankOf(was)){
-        rows += '<div class="rg-row" data-jglyph="'+esc(name)+'"><span class="rg-n">'+esc(name)+'</span>'
-          + swatchFor(was)+'<span class="rg-ar">→</span>'+swatchFor(nw)+'</div>';
-        count++;
-      }
-    }
-    if (!rows.length) return "";
-    return ovCard("regression", "Moved backward ("+count+")", rows, count>6);
-  }
-  // When no master is selected, merge every master's changes so the global card
-  // still flags regressions; per-glyph last-write wins (stable for review).
-  function mergedChanges(){
-    var all = {};
-    var byMaster = H.changes || {};
-    for (var mid in byMaster){
-      var ch = byMaster[mid];
-      for (var name in ch){ all[name] = ch[name]; }
-    }
-    return all;
   }
   function whenLabel(name){
     var days = (H.lastEdit && H.lastEdit[name] != null) ? H.lastEdit[name] : null;
@@ -907,23 +1188,96 @@ DASHBOARD_JS = r"""
     var cm = H.crossMaster;
     if (!cm) return "";
     // The done-everywhere progress bar + the identical/differ counts + by-step chips.
-    // No per-glyph list, no expand toggle.
     var donePct = pct(cm.doneEverywhere, cm.total);
     var head = '<p class="cm-headline"><b>'+cm.doneEverywhere+'</b> / '+cm.total+' done everywhere</p>'
       + '<div class="bar cm-bar"><span style="width:'+donePct+'%;background:var(--accent)"></span></div>';
     var ident = '<p class="cm-line">identical in all masters: <b>'+cm.identical+'</b></p>';
     var single = (cm.masterCount < 2) ? ' <span class="cm-note">(single master)</span>' : '';
-    var differLine = '<p class="cm-line">differ between masters: <b>'+cm.differ+'</b>'+single+'</p>';
+    // The differ count drills down: a chevron disclosure slides out the actual glyph
+    // names (H.crossMaster.differGlyphs) as chips; each chip opens the journey modal
+    // via the shared data-jglyph delegate. state.cmDifferOpen keeps it open across
+    // re-renders; the toggle itself mutates the DOM in place (see the data-cmdiffer
+    // branch) so the max-height transition can play.
+    var differGlyphs = cm.differGlyphs || [];
+    var differLine;
+    if (differGlyphs.length){
+      var open = !!state.cmDifferOpen;
+      var glyphChips = differGlyphs.map(function(n){
+        return '<button type="button" class="cm-dg" data-jglyph="'+esc(n)
+          + '" title="'+esc(n+" — differs between masters · click for its journey")+'">'+esc(n)+'</button>';
+      }).join("");
+      differLine = '<button type="button" class="cm-line cm-differ-h" data-cmdiffer="1" aria-expanded="'+open
+        + '" aria-controls="cm-differ-panel" title="Show the glyphs that differ between masters">'
+        + '<span class="cm-chev" aria-hidden="true">'+(open?"▾":"▸")+'</span>'
+        + '<span>differ between masters: <b>'+cm.differ+'</b>'+single+'</span></button>'
+        + '<div id="cm-differ-panel" class="cm-differ-panel'+(open?" open":"")+'">'+glyphChips+'</div>';
+    } else {
+      differLine = '<p class="cm-line">differ between masters: <b>'+cm.differ+'</b>'+single+'</p>';
+    }
     var byStep = cm.byStep || {};
     var chips = Object.keys(byStep).map(function(k){
       var key = parseInt(k, 10);
-      return '<span class="cm-step" title="'+esc(labelFor(key))+'">'+swatchFor(key)
-        + '<span class="cm-step-n">'+byStep[k]+'</span></span>';
+      // a real button carrying data-fkey, so the shared document-level delegate
+      // toggles colour focus exactly like the Overview ring legend items.
+      var on = state.focus === key, off = state.focus !== null && !on;
+      return '<button type="button" class="cm-step'+(on?" on":"")+(off?" off":"")
+        + '" data-fkey="'+key+'" title="'+esc(labelFor(key)+" — click to focus these glyphs")+'">'+swatchFor(key)
+        + '<span class="cm-step-n">'+byStep[k]+'</span></button>';
     }).join("");
     var steps = chips
       ? '<div class="cm-steps"><span class="cm-steps-l">by step:</span>'+chips+'</div>'
       : "";
     return ovCard("crossMaster", "Across masters", head + ident + differLine + steps, false);
+  }
+  // ----- Workflow-recipe completion card (global Overview) -------------------
+  // Replaces the old one-line "Recipe-adjusted" footnote inside overall(): a proper
+  // Overview card listing every recipe (display name, a human-readable match rule,
+  // how many steps it keeps) plus the recipe-adjusted completion per master as
+  // compact X/Y progress bars (a single anonymous bar for one-master files).
+  // Render-only: the metric itself is computed in Python (H.recipes +
+  // H.recipeCompletion); no recipes -> no card, exactly like the old line.
+  var RECIPE_FIELDS = [["category","Category"],["script","Script"],["subCategory","Subcategory"],["case","Case"]];
+  var RECIPE_CASES = {"1":"Uppercase","2":"Lowercase","3":"Smallcaps","4":"Minor"};
+  function recipeMatchLabel(match){
+    // human summary of a recipe's match rule, e.g. "Category = Mark · Script = latin";
+    // glyph.case arrives as a stringified GS enum, so map it back to its human name.
+    var parts = [];
+    RECIPE_FIELDS.forEach(function(field){
+      var value = (match||{})[field[0]];
+      if (value == null || value === "") return;
+      if (field[0] === "case") value = RECIPE_CASES[String(value)] || value;
+      parts.push(field[1]+" = "+value);
+    });
+    return parts.join(" · ");
+  }
+  function recipeCard(){
+    if (!(H.recipes && H.recipes.length)) return "";
+    var perMaster = H.recipeCompletion || {};
+    var grand = H.glyphTotal * H.masters.length;
+    var done = 0;
+    H.masters.forEach(function(m){ done += ((perMaster[m.id])||{}).complete||0; });
+    var summary = '<p class="rcp-sum">Recipe-adjusted: <b>'+done+'/'+grand+'</b> complete ('
+      + pct(done,grand)+'%) · '+H.recipes.length+' recipe'+(H.recipes.length===1?"":"s")+'</p>';
+    var rows = H.recipes.map(function(r, i){
+      var name = r.name || ("Recipe "+(i+1));
+      var rule = recipeMatchLabel(r.match);
+      var kept = (r.steps||[]).length;
+      return '<div class="rcp-row" title="'+esc(name+(rule ? " — "+rule : ""))+'">'
+        + '<span class="rcp-name">'+esc(name)+'</span>'
+        + '<span class="rcp-rule">'+esc(rule)+'</span>'
+        + '<span class="rcp-steps">'+kept+' step'+(kept===1?"":"s")+'</span></div>';
+    }).join("");
+    var solo = H.masters.length === 1;
+    var bars = H.masters.map(function(m){
+      var rc = (perMaster[m.id])||{};
+      var complete = rc.complete||0;
+      var total = (rc.total != null) ? rc.total : H.glyphTotal;
+      return '<div class="rcp-m" title="'+esc(m.name+" — "+complete+"/"+total+" recipe-adjusted complete")+'">'
+        + (solo ? "" : '<span class="rcp-m-n">'+esc(m.name)+'</span>')
+        + '<span class="lb-bar"><span style="width:'+pct(complete,total)+'%"></span></span>'
+        + '<span class="rcp-m-c"><b>'+complete+'</b>/'+total+'</span></div>';
+    }).join("");
+    return ovCard("recipes", "Recipes", summary+rows+'<div class="rcp-masters">'+bars+'</div>', false);
   }
   // The activity calendar (heatmap / standard month grid) lives on the Overview, as a
   // full-width card. Clicking a day still scrubs the Time Machine (jumping to the
@@ -932,26 +1286,66 @@ DASHBOARD_JS = r"""
     if (!hasTrend()) return "";
     return '<div class="ov-card ovc-calendar">'+activityCalendar()+'</div>';
   }
+  // ----- Colour-spread radar (shown in the focused-master panel) -------------
+  // The selected master's glyph spread across the colour-step axes, scaled to that
+  // master's busiest step so the shape fills the chart. Only the selected master.
+  var CFD_TAU = Math.PI * 2, CFD_TOP = -Math.PI / 2;
+  function polarXY(cx, cy, r, ang){ return [cx + r*Math.cos(ang), cy + r*Math.sin(ang)]; }
+  function shortLab(s){ s = ""+s; return s.length > 9 ? s.slice(0,8)+"…" : s; }
+  function radarCard(){
+    var steps = H.steps || [];
+    if (steps.length < 3 || H.masters.length < 1) return "";
+    // only the selected master (this card lives in its panel); fall back to the first.
+    var mi = 0; for (var x=0;x<H.masters.length;x++){ if (H.masters[x].id===state.master){ mi=x; break; } }
+    var m = H.masters[mi];
+    var cx=100, cy=100, R=64, N=steps.length, maxVal=1, g, k, a, p;
+    var exm = exclusiveOf(m);   // a spread = where glyphs ACTUALLY sit now (exclusive), not cumulative
+    steps.forEach(function(s){ var v=exm[String(s.key)]||0; if (v>maxVal) maxVal=v; });   // scale to this master
+    var grid="", spokes="", axt="";
+    for (g=1; g<=3; g++){
+      var pts=[]; for (k=0;k<N;k++){ a=CFD_TOP+k/N*CFD_TAU; p=polarXY(cx,cy,R*g/3,a); pts.push(p[0].toFixed(1)+","+p[1].toFixed(1)); }
+      grid += '<polygon class="rdr-grid" points="'+pts.join(" ")+'"/>';
+    }
+    for (k=0;k<N;k++){
+      a=CFD_TOP+k/N*CFD_TAU; var pe=polarXY(cx,cy,R,a), pa=polarXY(cx,cy,R+12,a);
+      spokes += '<line class="rdr-spoke" x1="'+cx+'" y1="'+cy+'" x2="'+pe[0].toFixed(1)+'" y2="'+pe[1].toFixed(1)+'"/>';
+      var anchor = Math.abs(pa[0]-cx)<4 ? "middle" : (pa[0]<cx ? "end" : "start");
+      axt += '<text class="rdr-axt" x="'+pa[0].toFixed(1)+'" y="'+(pa[1]+3).toFixed(1)+'" text-anchor="'+anchor+'">'+esc(shortLab(steps[k].label))+'</text>';
+    }
+    var pp=[]; for (var j=0;j<N;j++){ var an=CFD_TOP+j/N*CFD_TAU; var r=R*(exm[String(steps[j].key)]||0)/maxVal; var xy=polarXY(cx,cy,r,an); pp.push(xy[0].toFixed(1)+","+xy[1].toFixed(1)); }
+    var col="hsl("+masterHue(mi)+",70%,58%)";
+    var poly='<polygon class="rdr-poly" points="'+pp.join(" ")+'" style="fill:'+col+';stroke:'+col+'"><title>'+esc(m.name)+'</title></polygon>';
+    // viewBox padded horizontally so the axis labels at the left/right tips aren't clipped.
+    var svg = '<svg class="ovz" viewBox="-26 0 252 200" role="img" aria-label="'+esc(m.name+" colour spread")+'">'+grid+spokes+poly+axt+'</svg>';
+    return ovCard("radar", "Colour spread by master", '<div class="ovz-wrap">'+svg+'</div>', false);
+  }
   function overviewExtras(){
     if (!H.masters.length) return "";
-    var cards = '<div class="ov-extra">'+crossMasterCard()+leaderboard()+histogram()+'</div>';
-    // Completion-over-time sits in a 2-column-wide slot with the activity calendar
-    // pinned to its left (calendar first in source order).
-    var tl = timelineCard(), cal = calendarCard();
-    if (tl || cal){ cards += '<div class="ov-cal-tl">'+cal+tl+'</div>'; }
+    var cards = '<div class="ov-extra">'+crossMasterCard()+recipeCard()+leaderboard()+histogram()+'</div>';
+    // The completion-over-time chart lives on the Timeline tab (its hero); the Overview
+    // no longer duplicates it. Keep the activity calendar here as the time-context card.
+    var cal = calendarCard();
+    if (cal){ cards += '<div class="ov-cal-solo">'+cal+'</div>'; }
     return cards;
   }
-  // Regression + Recent are per-master change feeds, so they belong with the
-  // selected master, not the global Overview. Both already key off state.master
-  // (set here), so they render that master's regressions/recent activity.
+  // Recent activity is the per-master change feed (all moves, history-aware), so it
+  // belongs with the selected master, not the global Overview. The old last-save
+  // regression card is gone; backward moves are no longer surfaced on the chart.
+  // The colour-spread radar joins Recent — it reads against the focused master.
   function masterExtras(){
-    var cards = regressionCard()+recentCard();
-    return cards ? '<div class="ov-extra">'+cards+'</div>' : "";
+    var cards = recentCard();
+    var body = cards ? '<div class="ov-extra">'+cards+'</div>' : "";
+    var radar = radarCard();
+    if (radar){
+      var vizIntro = !vizIntroPlayed; vizIntroPlayed = true;   // animate once, not on every master switch
+      body += '<div class="ov-viz'+(vizIntro?" intro":"")+'">'+radar+'</div>';
+    }
+    return body;
   }
   function tabsView(){
     if (state.master==null) return overall()+overviewExtras();   // no master selected -> global view + extras
     var m = masterById(state.master);
-    return '<div class="panel" role="tabpanel">'+masterOverall(m)+heatmap(m)+masterExtras()+'</div>';
+    return '<div class="panel" role="tabpanel">'+masterOverall(m)+categoryCoverageCard()+scriptCoverageCard()+heatmap(m)+masterExtras()+'</div>';
   }
   function covStacked(r){
     // a left-aligned stacked bar of the colours actually set in this group; no inline
@@ -981,13 +1375,58 @@ DASHBOARD_JS = r"""
     return v || ("hsl("+Math.round((key*31)%360)+",65%,55%)");
   }
   function prettyScript(key){ return key==="Other" ? "Other" : key.charAt(0).toUpperCase()+key.slice(1); }
-  // Rows for the grid: the selected master's per-script coverage, defaulting to the
-  // first master when none is focused (same default the category rows use).
-  function scriptRows(){
-    var cov = (H.coverage && H.coverage.byScript) || {};
-    var mid = state.master != null ? state.master : ((H.masters[0]||{}).id);
-    return cov[mid] || [];
+  // Coverage rows for the active scope. Focused master -> that master's rows. Global
+  // (no master) -> every master MERGED into font-wide rows: per-colour dist / total /
+  // uncoloured summed across the family, so the bar reads across all master-glyph slots
+  // instead of silently showing only the first master. `glyphs` keeps the real per-group
+  // glyph count (same for every master) so the displayed count isn't multiplied.
+  // Coverage rows with the exporting-only exclusion applied: rebuilt client-side
+  // from the raw m.keys + the parallel H.categories / H.scripts arrays (the
+  // shipped H.coverage rows are the all-glyphs truth). Mirrors _coverage_for's
+  // row shape ({key,total,uncolored,dist,glyphs}) and largest-group-first order.
+  function covRowsCounted(which){
+    var attrs = which === "byScript" ? (H.scripts||[]) : (H.categories||[]);
+    var names = H.glyphNames||[], set = countedSet();
+    var masters = state.master != null ? [masterById(state.master)] : H.masters;
+    var groupIdx = {}, gkeys = [];
+    for (var i=0;i<names.length;i++){
+      if (set && !set[names[i]]) continue;
+      var g = attrs[i] || "Other";
+      if (!groupIdx[g]){ groupIdx[g] = []; gkeys.push(g); }
+      groupIdx[g].push(i);
+    }
+    var out = gkeys.map(function(gk){
+      var idxs = groupIdx[gk], total = 0, uncolored = 0, dist = {};
+      masters.forEach(function(m){
+        var ks = m.keys||[];
+        for (var j=0;j<idxs.length;j++){
+          var k = ks[idxs[j]], sk = String(k);
+          total++;
+          if (k===-1 || H.order.indexOf(sk)===-1) uncolored++; else dist[sk]=(dist[sk]||0)+1;
+        }
+      });
+      return { key:gk, total:total, uncolored:uncolored, glyphs:idxs.length, dist:dist };
+    });
+    out.sort(function(a,b){ return (b.glyphs - a.glyphs) || (a.key < b.key ? -1 : 1); });
+    return out;
   }
+  function covRows(which){
+    if (countedSet()) return covRowsCounted(which);   // exporting-only: recompute without the excluded glyphs
+    var by = (H.coverage && H.coverage[which]) || {};
+    if (state.master != null) return by[state.master] || [];
+    var merged = {}, orderKeys = [];
+    H.masters.forEach(function(m){
+      (by[m.id] || []).forEach(function(r){
+        var agg = merged[r.key];
+        if (!agg){ agg = merged[r.key] = {key:r.key, total:0, uncolored:0, glyphs:r.total||0, dist:{}}; orderKeys.push(r.key); }
+        agg.total += r.total||0; agg.uncolored += r.uncolored||0;
+        var dd = r.dist || {}; for (var k in dd){ agg.dist[k] = (agg.dist[k]||0) + dd[k]; }
+      });
+    });
+    return orderKeys.map(function(k){ return merged[k]; });
+  }
+  // Rows for the script grid: the active scope's per-script coverage (covRows).
+  function scriptRows(){ return covRows("byScript"); }
   function scriptGlyphSVG(meta){
     if (!meta || !meta.glyph) return "";
     var first = (H.masters[0]||{}).id, paths = H.paths || {};
@@ -1002,13 +1441,15 @@ DASHBOARD_JS = r"""
     if (!rows.length) return '<p class="empty">No glyphs.</p>';
     var meta = (H.coverage && H.coverage.scriptMeta) || {};
     var cards = rows.map(function(r){
-      var m = meta[r.key] || {}, name = m.name || prettyScript(r.key), dist = r.dist || {}, parts = [], k;
+      var m = meta[r.key] || {}, rawName = m.name || prettyScript(r.key), dist = r.dist || {}, parts = [], k;
+      var name = rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1) : rawName;   // always capitalise
+      var count = (r.glyphs != null ? r.glyphs : r.total);
       for (k in dist){ if (dist[k]) parts.push(k+":"+dist[k]); }
       return '<div class="scard" data-dist="'+esc(parts.join(","))+'" data-total="'+r.total
-        + '" data-uncol="'+(r.uncolored||0)+'" title="'+esc(name+" — "+r.total+" glyphs")+'">'
+        + '" data-uncol="'+(r.uncolored||0)+'" title="'+esc(name+" — "+count+" glyphs")+'">'
         + '<canvas class="scard-fill" width="320" height="320" aria-hidden="true"></canvas>'
         + '<div class="scard-in"><span class="scard-name">'+esc(name)+'</span>'
-        + scriptGlyphSVG(m) + '<span class="scard-ct">'+r.total+'</span></div></div>';
+        + scriptGlyphSVG(m) + '<span class="scard-ct">'+count+'</span></div></div>';
     }).join("");
     return '<div class="sgrid">'+cards+'</div>';
   }
@@ -1052,24 +1493,28 @@ DASHBOARD_JS = r"""
       paintBlend(ctx, cv.width, cv.height, segs, sum, grey);
     }
   }
-  function coverageView(){
-    // No toggle: categories always come first, with the per-script grid below it
-    // (only when the family actually has more than one script). Both default to the
-    // first master when none is focused.
-    var byCat = (H.coverage && H.coverage.byCategory) || {};
-    var covMaster = state.master==null ? ((H.masters[0]||{}).id) : state.master;
-    var catRows = byCat[covMaster] || [];
-    var catBody = catRows.length ? catRows.map(function(r){
+  // The "Colours set by category" rows for the active scope (shared by the Coverage tab
+  // and, when a master is focused, the Overview under its progress bar).
+  function categoryCoverageBody(){
+    var catRows = covRows("byCategory");
+    if (!catRows.length) return '<p class="empty">No glyphs.</p>';
+    return catRows.map(function(r){
+      var count = (r.glyphs != null ? r.glyphs : r.total);
       return '<div class="cov-row"><span class="cov-name" title="'+esc(r.key)+'">'+esc(r.key)+'</span>'
-        + covStacked(r) + '<span class="num">'+r.total+'</span></div>';
-    }).join("") : '<p class="empty">No glyphs.</p>';
-    var catPanel = '<div class="panel"><div class="cov-h"><span class="cov-title">Colours set by category</span></div>'
-      + '<div class="cov-rows">'+catBody+'</div></div>';
+        + covStacked(r) + '<span class="num">'+count+'</span></div>';
+    }).join("");
+  }
+  // Two-column version surfaced in the focused-master Overview, just under the bar.
+  function categoryCoverageCard(){
+    return '<div class="ov-catcov"><div class="cov-h"><span class="cov-title">Colours set by category</span></div>'
+      + '<div class="cov-rows cov-grid2">'+categoryCoverageBody()+'</div></div>';
+  }
+  // The "Colours set by script" grid for the focused master, surfaced in the Overview
+  // under the category card (only when the family has more than one script).
+  function scriptCoverageCard(){
     var scripts = scriptRows().filter(function(r){ return r.key !== "Other"; });
-    var scrPanel = scripts.length > 1
-      ? '<div class="panel"><div class="cov-h"><span class="cov-title">Colours set by script</span></div>'+scriptGrid()+'</div>'
-      : '';
-    return '<section class="cov">'+catPanel+scrPanel+'</section>';
+    if (scripts.length <= 1) return "";
+    return '<div class="ov-catcov"><div class="cov-h"><span class="cov-title">Colours set by script</span></div>'+scriptGrid()+'</div>';
   }
   // ----- Timeline: completion over time, one line per master -----
   function masterHue(i){ return Math.round((i*137.508) % 360); }
@@ -1077,35 +1522,76 @@ DASHBOARD_JS = r"""
   // so the day never drifts across the local timezone boundary.
   var CFD_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   function dateLabel(iso){
+    // commit-granularity keys carry a time (YYYY-MM-DDTHH:MM:SS[.n]) -> "5 Jun 14:30";
+    // per-day keys are date-only -> "5 Jun".
+    if (typeof iso === "string" && iso.indexOf("T") > 0){
+      var dt = new Date(iso.slice(0, 19) + "Z");
+      if (isNaN(dt.getTime())) return iso.slice(0, 16);
+      var hh = ("0" + dt.getUTCHours()).slice(-2), mm = ("0" + dt.getUTCMinutes()).slice(-2);
+      return dt.getUTCDate() + " " + CFD_MONTHS[dt.getUTCMonth()] + " " + hh + ":" + mm;
+    }
     var d = new Date(iso + "T00:00:00Z");
     if (isNaN(d.getTime())) return iso;
     return d.getUTCDate() + " " + CFD_MONTHS[d.getUTCMonth()];
+  }
+  // Axis tick label honouring the active Time bucket: Days -> "5 Jun", Months -> "Jun 26",
+  // Hours/Save -> the full "5 Jun 14:30". Keeps the axis legible per grouping.
+  function tickLabel(iso){
+    if (state.tlGran === "time"){
+      if (state.tlBucket === "month"){
+        var s = String(iso), year = +s.slice(0,4), mo = +s.slice(5,7) - 1;
+        if (mo >= 0 && mo < 12){ return CFD_MONTHS[mo] + (isNaN(year) ? "" : " " + String(year).slice(2)); }
+        return s.slice(0,7);
+      }
+      if (state.tlBucket === "day"){ return dateLabel(String(iso).slice(0,10)); }
+    }
+    return dateLabel(iso);
   }
   // ----- #7 shared calendar X axis -------------------------------------------
   // Builds the plot geometry + X scale and the calendar layers (zebra ISO-week
   // bands, thinned date tick labels, dashed "today" rule) that both the line chart
   // (trendParts) and the streamgraph (streamParts) draw, so the X axis stays
   // identical between the Line and Flow modes. Y(pct) maps a 0-100 % onto the plot.
+  // ----- Range navigator (CMC-style) -----------------------------------------
+  // A full-history mini-chart with a draggable window that ZOOMS the main trend chart
+  // to a focus date range. The window is two snapshot indices (state.viewLo/viewHi;
+  // null = full range). Only the Timeline tab's chart is windowed (the Overview card
+  // stays full-range), so trendSeries() gates on the active view.
+  function fullSeries(){ return (H.trend && H.trend.series) || []; }
+  function isZoomed(){ return state.viewLo != null || state.viewHi != null; }
+  function viewBounds(){
+    var n = fullSeries().length;
+    if (n === 0){ return [0, -1]; }
+    var lo = state.viewLo == null ? 0 : state.viewLo;
+    var hi = state.viewHi == null ? n - 1 : state.viewHi;
+    lo = Math.max(0, Math.min(lo, n - 1));
+    hi = Math.max(0, Math.min(hi, n - 1));
+    if (lo > hi){ var t = lo; lo = hi; hi = t; }
+    if (hi - lo < 1){                          // keep >=2 points so a line can draw
+      if (hi < n - 1){ hi = lo + 1; } else { lo = hi - 1; }
+    }
+    return [lo, hi];
+  }
+  function trendSeries(){
+    var s = fullSeries();
+    if (state.view !== "timeline" || !isZoomed()){ return s; }
+    var b = viewBounds(); return s.slice(b[0], b[1] + 1);
+  }
   function calendarAxis(W, Ht){
-    var series = (H.trend && H.trend.series) || [];
+    var series = trendSeries();
     var pl=30, pr=12, ptop=12, pb=16, iw=W-pl-pr, ih=Ht-ptop-pb;
+    // Both Time and Save modes space snapshots EVENLY (one equal slot each) so bunched-
+    // in-time saves don't cluster at the left. dayOff() returns the snapshot index.
+    var even = true;
     var t0 = new Date(series[0].date).getTime();
-    function dayOff(d){ return (new Date(d).getTime()-t0)/86400000; }
-    var lastOff = Math.max(1, dayOff(series[series.length-1].date));
+    var idxByDate = {}; series.forEach(function(p, i){ idxByDate[p.date] = i; });
+    function dayOff(d){ return even ? (idxByDate[d] != null ? idxByDate[d] : 0)
+                                    : (new Date(d).getTime() - t0)/86400000; }
+    var lastOff = even ? Math.max(1, series.length - 1) : dayOff(series[series.length-1].date);
+    if (!(lastOff > 0)){ lastOff = 1; }
     function X(o){ return pl + o/lastOff*iw; }
     function Y(p){ return ptop + ih - p/100*ih; }
-    // zebra ISO-week bands: align to the Monday opening the first snapshot's week.
-    var firstDate = new Date(series[0].date + "T00:00:00Z");
-    var firstDow = (firstDate.getUTCDay() + 6) % 7;          // 0 = Monday
-    var weekStart = -firstDow;                                // offset of that Monday
-    var weekBands = "";
-    for (var wOff = weekStart, band = 0; wOff < lastOff; wOff += 7, band++){
-      if (band % 2 === 0){ continue; }                       // tint every other week only
-      var bx0 = Math.max(pl, X(Math.max(0, wOff)));
-      var bx1 = Math.min(W - pr, X(Math.min(lastOff, wOff + 7)));
-      if (bx1 <= bx0){ continue; }
-      weekBands += '<rect class="tl-weekband" x="'+bx0.toFixed(1)+'" y="'+ptop+'" width="'+(bx1-bx0).toFixed(1)+'" height="'+ih+'"/>';
-    }
+    var weekBands = "";   // even spacing has no real time axis -> no calendar week bands
     // thin the tick labels so they never collide on long spans: aim for ~6 ticks,
     // stepping whole snapshots so every label sits on a real data X.
     var tickStep = Math.max(1, Math.ceil(series.length / 6));
@@ -1114,31 +1600,55 @@ DASHBOARD_JS = r"""
       if (idx % tickStep !== 0 && idx !== series.length - 1){ return; }
       var tx = X(dayOff(p.date));
       var anchor = idx === 0 ? "start" : (idx === series.length - 1 ? "end" : "middle");
-      xticks += '<text class="tl-xtick" x="'+tx.toFixed(1)+'" y="'+(ptop+ih+pb).toFixed(1)+'" text-anchor="'+anchor+'">'+esc(dateLabel(p.date))+'</text>';
+      xticks += '<text class="tl-xtick" x="'+tx.toFixed(1)+'" y="'+(ptop+ih+pb).toFixed(1)+'" text-anchor="'+anchor+'">'+esc(tickLabel(p.date))+'</text>';
     });
-    // dashed "today" rule + pill, only when today falls inside the plotted span.
-    var todayRule = "";
-    var today = H.trend && H.trend.today;
-    if (today){
-      var tOff = dayOff(today);
-      if (tOff >= 0 && tOff <= lastOff){
-        var trx = X(tOff);
-        var lab = dateLabel(today);
-        var pillW = lab.length * 5.5 + 12;
-        var pillX = Math.min(W - pr - pillW, Math.max(pl, trx - pillW/2));
-        todayRule = '<line class="tl-today" x1="'+trx.toFixed(1)+'" y1="'+ptop+'" x2="'+trx.toFixed(1)+'" y2="'+(ptop+ih).toFixed(1)+'"/>'
-          + '<rect class="tl-today-pill" x="'+pillX.toFixed(1)+'" y="'+(ptop-1)+'" width="'+pillW.toFixed(1)+'" height="13" rx="6"/>'
-          + '<text class="tl-today-pill-t" x="'+(pillX+pillW/2).toFixed(1)+'" y="'+(ptop+8.5)+'" text-anchor="middle">'+esc(lab)+'</text>';
-      }
-    }
+    var todayRule = "";   // the always-on "today" line + date bubble were removed
     // snapshot X anchors in SVG user-space — crosshair + brush snap to these.
     var snaps = series.map(function(p){ return { x:+X(dayOff(p.date)).toFixed(1), d:p.date }; });
+    // Persistent marker at the clicked/scrubbed snapshot (state.tlScrub is a FULL-series
+    // index; map it into the possibly-windowed series). Lets a click on the chart show
+    // which moment is selected (the colour disc reads the same index).
+    var scrubRule = "";
+    if (state.tlScrub != null){
+      var swi = state.tlScrub - viewBounds()[0];
+      if (swi >= 0 && swi < series.length && series[swi]){
+        var srx = X(dayOff(series[swi].date));
+        scrubRule = '<line class="tl-scrubline" x1="'+srx.toFixed(1)+'" y1="'+ptop+'" x2="'+srx.toFixed(1)+'" y2="'+(ptop+ih).toFixed(1)+'"/>'
+          + '<circle class="tl-scrubdot" cx="'+srx.toFixed(1)+'" cy="'+(ptop+ih).toFixed(1)+'" r="3.5"/>';
+      }
+    }
     return { series:series, pl:pl, pr:pr, ptop:ptop, pb:pb, iw:iw, ih:ih,
              dayOff:dayOff, lastOff:lastOff, X:X, Y:Y,
-             weekBands:weekBands, xticks:xticks, todayRule:todayRule, snaps:snaps };
+             weekBands:weekBands, xticks:xticks, todayRule:todayRule, snaps:snaps, scrubRule:scrubRule };
   }
   // Shared trend builder: returns the chart SVG, the per-master legend and the
   // date foot, so both the Timeline view and the Overview card draw the same.
+  // Gentle MONOTONE smoothing through pts ([{x,y},...]): a cubic path whose control-point
+  // tangents are clamped (zero at local extrema) so the curve never overshoots a real data
+  // value. Shared by every progress line (each master, the colour-mode top line, the
+  // navigator) so all graphs are smooth, not just the focused one.
+  function smoothPath(ps){
+    if (ps.length < 2){ return ps.length ? "M"+ps[0].x.toFixed(1)+" "+ps[0].y.toFixed(1) : ""; }
+    var slopes = [];
+    for (var s = 0; s < ps.length - 1; s++){
+      var dx = ps[s+1].x - ps[s].x;
+      slopes.push(dx ? (ps[s+1].y - ps[s].y) / dx : 0);
+    }
+    var tang = [slopes[0]];
+    for (var k = 1; k < ps.length - 1; k++){
+      var a = slopes[k-1], b = slopes[k];
+      tang.push(a*b <= 0 ? 0 : (a + b) / 2);                 // zero tangent at extrema -> no overshoot
+    }
+    tang.push(slopes[slopes.length-1]);
+    var d = "M"+ps[0].x.toFixed(1)+" "+ps[0].y.toFixed(1);
+    for (var j = 0; j < ps.length - 1; j++){
+      var hx = (ps[j+1].x - ps[j].x) / 3;                    // 1/3-span control handles
+      var c1x = ps[j].x + hx,   c1y = ps[j].y + tang[j]*hx;
+      var c2x = ps[j+1].x - hx, c2y = ps[j+1].y - tang[j+1]*hx;
+      d += " C"+c1x.toFixed(1)+" "+c1y.toFixed(1)+" "+c2x.toFixed(1)+" "+c2y.toFixed(1)+" "+ps[j+1].x.toFixed(1)+" "+ps[j+1].y.toFixed(1);
+    }
+    return d;
+  }
   function trendParts(W, Ht){
     var ax = calendarAxis(W, Ht);
     var series = ax.series, pl = ax.pl, pr = ax.pr, ptop = ax.ptop, ih = ax.ih, iw = ax.iw;
@@ -1150,43 +1660,20 @@ DASHBOARD_JS = r"""
     }).join("");
     // ----- #7 real calendar X axis: zebra ISO-week bands + date tick labels -----
     var weekBands = ax.weekBands, xticks = ax.xticks, todayRule = ax.todayRule;
-    // ----- #10 gentle monotone smoothing for the selected master's line/area.
-    // Cubic path whose control-point tangents are clamped so the curve stays
-    // monotone between real data points and never overshoots a tl-dot value.
-    function smoothPath(ps){
-      if (ps.length < 2){ return ps.length ? "M"+ps[0].x.toFixed(1)+" "+ps[0].y.toFixed(1) : ""; }
-      var slopes = [];                                       // secant slope of each segment
-      for (var s = 0; s < ps.length - 1; s++){
-        var dx = ps[s+1].x - ps[s].x;
-        slopes.push(dx ? (ps[s+1].y - ps[s].y) / dx : 0);
-      }
-      var tang = [slopes[0]];                                // tangent (dy/dx) at each point
-      for (var k = 1; k < ps.length - 1; k++){
-        var a = slopes[k-1], b = slopes[k];
-        tang.push(a*b <= 0 ? 0 : (a + b) / 2);               // zero tangent at local extrema -> no overshoot
-      }
-      tang.push(slopes[slopes.length-1]);
-      var d = "M"+ps[0].x.toFixed(1)+" "+ps[0].y.toFixed(1);
-      for (var j = 0; j < ps.length - 1; j++){
-        var hx = (ps[j+1].x - ps[j].x) / 3;                  // 1/3-span control handles
-        var c1x = ps[j].x + hx,   c1y = ps[j].y + tang[j]*hx;
-        var c2x = ps[j+1].x - hx, c2y = ps[j+1].y - tang[j+1]*hx;
-        d += " C"+c1x.toFixed(1)+" "+c1y.toFixed(1)+" "+c2x.toFixed(1)+" "+c2y.toFixed(1)+" "+ps[j+1].x.toFixed(1)+" "+ps[j+1].y.toFixed(1);
-      }
-      return d;
-    }
     var defs = "", lines = "", selLine = "", legend = "";
     H.masters.forEach(function(m, i){
-      var col = "hsl("+masterHue(i)+",70%,55%)";
+      // Colours OFF -> the line is neutral gray (turn Colours on for the per-colour
+      // breakdown). The focused master reads brighter; the rest sit at muted gray.
+      var col = (state.master != null && m.id === state.master) ? "var(--text)" : "var(--muted)";
       var pts = series.map(function(p){
         var mp = p.masters[m.id]; if (!mp) return null;
-        var c = mp.total ? mp.final/mp.total*100 : 0;
+        var c = gradedPctAt(m.id, p.date);          // graded completion (matches the ring), not final-step-only
         return { x:X(dayOff(p.date)), y:Y(c), pc:c, date:p.date };
       }).filter(Boolean);
       if (!pts.length) return;
       var dim = state.master!=null && m.id!==state.master;   // a master is selected, not this one
       var sel = state.master!=null && m.id===state.master;
-      var poly = pts.map(function(o){ return o.x.toFixed(1)+","+o.y.toFixed(1); }).join(" ");
+      var smooth = smoothPath(pts);                          // every line is smooth, not just the focused one
       var dots = pts.map(function(o){ return '<circle class="tl-dot'+(dim?" tl-dim":"")+'" cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="'+(sel?3:2.5)+'" fill="'+col+'"><title>'+esc(m.name+" · "+o.date+" · "+Math.round(o.pc)+"%")+'</title></circle>'; }).join("");
       if (sel){
         // #10 hero area: gentle smoothed line + a soft gradient fill that closes
@@ -1194,119 +1681,70 @@ DASHBOARD_JS = r"""
         var gradId = "tl-area-grad-"+i;
         var topY = ptop, botY = Y(0);
         defs += '<linearGradient id="'+gradId+'" x1="0" y1="'+topY+'" x2="0" y2="'+botY.toFixed(1)+'" gradientUnits="userSpaceOnUse">'
-          + '<stop offset="0" stop-color="hsl('+masterHue(i)+',70%,55%)" stop-opacity="0.22"/>'
-          + '<stop offset="1" stop-color="hsl('+masterHue(i)+',70%,55%)" stop-opacity="0"/>'
+          + '<stop offset="0" stop-color="var(--text)" stop-opacity="0.16"/>'
+          + '<stop offset="1" stop-color="var(--text)" stop-opacity="0"/>'
           + '</linearGradient>';
-        var top = smoothPath(pts);
-        var area = top + " L"+pts[pts.length-1].x.toFixed(1)+" "+botY.toFixed(1)
+        var area = smooth + " L"+pts[pts.length-1].x.toFixed(1)+" "+botY.toFixed(1)
           + " L"+pts[0].x.toFixed(1)+" "+botY.toFixed(1) + " Z";
-        var line = '<path class="tl-line tl-sel" d="'+top+'" stroke="'+col+'"/>';
+        var line = '<path class="tl-line tl-sel" pathLength="1" d="'+smooth+'" stroke="'+col+'"/>';
         selLine += '<path class="tl-area" d="'+area+'" fill="url(#'+gradId+')"/>' + line + dots;
       } else {
-        lines += '<polyline class="tl-line'+(dim?" tl-dim":"")+'" points="'+poly+'" stroke="'+col+'"/>'+dots;
+        lines += '<path class="tl-line'+(dim?" tl-dim":"")+'" pathLength="1" d="'+smooth+'" stroke="'+col+'"/>'+dots;
       }
       legend += '<span class="tl-lg'+(dim?" tl-dim":"")+(sel?" tl-sel":"")+'"><i style="background:'+col+'"></i>'+esc(m.name)+' '+Math.round(pts[pts.length-1].pc)+'%</span>';
     });
     lines += selLine;                                        // keep the selected master (area+line) on top
-    // ----- #6 snapping crosshair: a transparent overlay rect captures pointer X,
-    // a 1px vertical guide + nearest-snapshot marker draw on top, and the snapshot
-    // X positions (in SVG user-space) ride along as data so crosshairMove() can snap
-    // to the nearest discrete date without re-deriving the X scale. baseY/topY let
-    // it place the marker on the chart even when no master line is selected.
+    // data-snaps carries each snapshot's X anchor so chartClick maps a click to the
+    // nearest moment; a transparent rect over the plot guarantees clicks register on
+    // empty space between lines too. No hover crosshair / read-out popover.
     var snaps = ax.snaps;
     var crossData = ' data-snaps="'+esc(JSON.stringify(snaps))+'" data-topy="'+ptop+'" data-boty="'+Y(0).toFixed(1)+'"';
-    var crossLayer = '<line class="tl-cross" y1="'+ptop+'" y2="'+(ptop+ih).toFixed(1)+'"/>'
-      + '<circle class="tl-cross-mark" r="3.5"/>'
-      + '<rect class="tl-crossarea" x="'+pl+'" y="'+ptop+'" width="'+iw.toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
-    // ----- #8 brush-to-compare: a translucent band + two draggable handles drawn
-    // over the same plot. brushMove() snaps each edge to the nearest snapshot X
-    // (reusing data-snaps), inverts the forward X scale to recover dates, and on
-    // release writes them into state.dateA/dateB. The handles are focusable so the
-    // arrow keys nudge a focused edge. The <select> a11y fallback stays the source
-    // markup (dateDiffPanel below). All hidden until a drag begins.
-    var brushLayer = '<rect class="tl-brush" y="'+ptop+'" height="'+ih.toFixed(1)+'"/>'
-      + '<rect class="tl-brush-h" data-edge="a" tabindex="0" role="slider" aria-label="Compare range start" y="'+ptop+'" width="6" height="'+ih.toFixed(1)+'"/>'
-      + '<rect class="tl-brush-h" data-edge="b" tabindex="0" role="slider" aria-label="Compare range end" y="'+ptop+'" width="6" height="'+ih.toFixed(1)+'"/>';
-    // ----- #15 regression flags: a small red tick at the baseline on every snapshot
-    // X that carried >=1 backward move (regressionDates over the full history). Reuses
-    // ax.snaps so the tick sits exactly on the discrete date, like the crosshair.
-    var regDates = regressionDates();
-    var baseY = Y(0);
-    var flags = ax.snaps.filter(function(s){ return regDates[s.d]; }).map(function(s){
-      return '<line class="tl-flag" x1="'+s.x+'" y1="'+(baseY-6).toFixed(1)+'" x2="'+s.x+'" y2="'+baseY.toFixed(1)+'"><title>'+esc(dateLabel(s.d)+" · moved backward")+'</title></line>';
-    }).join("");
-    // #19 dashed deadline rule (reuses the calendar axis date->X math); dormant
-    // until a target date is stored, so this is "" by default.
-    var deadline = deadlineRule(ax);
-    var chart = '<svg class="tl-chart" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData+' aria-label="Completion over time per master. Hover or use the left and right arrow keys to read each snapshot.">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+grid+xticks+lines+flags+todayRule+deadline+brushLayer+crossLayer+'</svg>';
-    var foot = '<div class="tl-foot"><span>'+esc(series[0].date)+'</span><span>'+esc(series[series.length-1].date)+'</span></div>';
-    return { chart:chart, legend:legend, foot:foot };
-  }
-  // ----- #5 colour streamgraph (Flow mode) -----------------------------------
-  // Tally per-step counts for every date in H.trend.dates by calling stateAt over
-  // the chosen master (state.master, else the first master), bucketing each glyph's
-  // key into H.order (+ a "none" bucket for uncoloured/unknown keys). Render a
-  // stacked area: bands stack bottom->top by H.order with each step's own var, and
-  // the none bucket is hatched on top. Shares the #7 calendar X axis with the line
-  // chart and the same data-snaps so the crosshair read-out works in both modes.
-  // The crosshair card shows the per-step COUNTS at the snapped date.
-  function streamTally(masterId){
-    var dates = (H.trend && H.trend.dates) || [];
-    var order = H.order || [];
-    // per date: { byKey:{ stepKey: count }, none: count }
-    return dates.map(function(d){
-      var snap = stateAt(masterId, d);
-      var byKey = {}; order.forEach(function(k){ byKey[k] = 0; });
-      var none = 0;
-      for (var name in snap){
-        var sk = String(snap[name]);
-        if (snap[name] === -1 || order.indexOf(sk) === -1){ none++; } else { byKey[sk]++; }
-      }
-      return { date:d, byKey:byKey, none:none };
-    });
-  }
-  // Catmull-Rom -> cubic-bezier segments through pts ([[x,y],...]); no leading
-  // moveto (the caller emits M/L). Gives the Flow streamgraph its soft, flowing
-  // (less flat) band edges.
-  function curveSegs(pts){
-    var s = "", t = 0.16;
-    for (var i = 0; i < pts.length - 1; i++){
-      var p0 = pts[i-1] || pts[i], p1 = pts[i], p2 = pts[i+1], p3 = pts[i+2] || p2;
-      s += "C"+(p1[0]+(p2[0]-p0[0])*t).toFixed(1)+","+(p1[1]+(p2[1]-p0[1])*t).toFixed(1)
-         + " "+(p2[0]-(p3[0]-p1[0])*t).toFixed(1)+","+(p2[1]-(p3[1]-p1[1])*t).toFixed(1)
-         + " "+p2[0].toFixed(1)+","+p2[1].toFixed(1);
-    }
-    return s;
+    var hitLayer = '<rect class="tl-crossarea" x="'+pl+'" y="'+ptop+'" width="'+iw.toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
+    var chart = '<svg class="tl-chart'+(tlChartShouldAnim?" tl-anim":"")+'" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData+' aria-label="Completion over time per master. Click a point to pick that moment; left and right arrow keys step the picked moment.">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+grid+xticks+lines+ax.scrubRule+hitLayer+'</svg>';
+    return { chart:chart, legend:legend, foot:"" };   // the start/end date row moved to the navigator's ticks
   }
   function streamParts(W, Ht){
     var ax = calendarAxis(W, Ht);
     var pl = ax.pl, ptop = ax.ptop, ih = ax.ih, iw = ax.iw;
     var dayOff = ax.dayOff, X = ax.X, Y = ax.Y;
     var order = H.order || [];
-    var mid = state.master != null ? state.master : (H.masters[0] && H.masters[0].id);
-    var tally = streamTally(mid);
-    // denominator: whole-font total keeps band heights honest + comparable to the
-    // % grid; degrade to the max stacked count when glyphTotal is missing.
-    var denom = H.glyphTotal || tally.reduce(function(mx, t){
-      var s = t.none; for (var k in t.byKey){ s += t.byKey[k]; } return Math.max(mx, s);
-    }, 0) || 1;
+    // Scope: the focused master, else the AGGREGATE across all masters (the overall view).
+    // Tally over the (possibly zoom-windowed) axis dates so the bands line up with the X.
+    var scopeIds = state.master != null ? [state.master] : H.masters.map(function(m){ return m.id; });
+    var tally = ax.series.map(function(p){
+      var byKey = {}; order.forEach(function(k){ byKey[k] = 0; }); var none = 0;
+      scopeIds.forEach(function(mid){
+        var snap = stateAt(mid, p.date);
+        for (var name in snap){ if (!isCounted(name)) continue; var sk = String(snap[name]);
+          if (snap[name] === -1 || order.indexOf(sk) === -1){ none++; } else { byKey[sk]++; } }
+      });
+      return { date:p.date, byKey:byKey, none:none };
+    });
+    // Weighted decomposition of the graded completion %: each band's height is that
+    // colour's WEIGHTED contribution (step weight x count / total). So the stack TOP
+    // traces the same graded % as the Line, and the empty space above (up to 100%) is
+    // the work remaining. denom = the scope's whole total (the graded-% denominator,
+    // exporting-only-aware via countedTotal).
+    var WT = stepWeights().weight;
+    var denom = scopeIds.length * (countedTotal() || 1) || 1;
     var grid = [0,25,50,75,100].map(function(g){
       var y = Y(g).toFixed(1);
       return '<line class="tl-grid" x1="'+pl+'" y1="'+y+'" x2="'+(W-ax.pr)+'" y2="'+y+'"/>'
         + '<text class="tl-axis" x="'+(pl-5)+'" y="'+(parseFloat(y)+3).toFixed(1)+'" text-anchor="end">'+g+'</text>';
     }).join("");
-    // Flowing (smooth-curved) bands at lower opacity — no blur/saturate filter; the
-    // uncoloured band is a flat solid (no hatch).
+    // Flowing (smooth-curved) bands at lower opacity — no blur/saturate filter.
     var defs = "";
-    // build a stacked Y for every date: running cumulative % from the baseline up.
-    // bands stack bottom->top by H.order; the none band sits on top, solid.
+    // build a stacked Y for every date: running cumulative weighted-% from the baseline
+    // up. bands stack bottom->top by H.order; no uncoloured band (it has zero weight, so
+    // it lives in the empty space above the stack).
     var nPts = tally.length;
-    function pctOf(c){ return c / denom * 100; }
+    function bandPct(k, c){ return (WT[k] || 0) * c / denom * 100; }
+    // Band edges use the SAME smoothing as the lines (smoothPath), so the top band's
+    // upper edge exactly coincides with the graded top line drawn over it.
     function bandPath(lowerVals, upperVals){
-      var up = tally.map(function(t, i){ return [X(dayOff(t.date)), Y(upperVals[i])]; });
-      var lo = tally.map(function(t, i){ return [X(dayOff(t.date)), Y(lowerVals[i])]; }).reverse();
-      return "M"+up[0][0].toFixed(1)+","+up[0][1].toFixed(1)+curveSegs(up)
-           + "L"+lo[0][0].toFixed(1)+","+lo[0][1].toFixed(1)+curveSegs(lo)+"Z";
+      var up = tally.map(function(t, i){ return { x:X(dayOff(t.date)), y:Y(upperVals[i]) }; });
+      var lo = tally.map(function(t, i){ return { x:X(dayOff(t.date)), y:Y(lowerVals[i]) }; }).reverse();
+      return smoothPath(up) + smoothPath(lo).replace(/^M/, "L") + "Z";
     }
     var bandKeys = order.slice();                          // bottom -> top by palette order
     var bands = "";
@@ -1314,54 +1752,208 @@ DASHBOARD_JS = r"""
     var cum = tally.map(function(){ return 0; });
     bandKeys.forEach(function(k){
       var lower = cum.slice();
-      var upper = tally.map(function(t, i){ return cum[i] + pctOf(t.byKey[k] || 0); });
+      var upper = tally.map(function(t, i){ return cum[i] + bandPct(k, t.byKey[k] || 0); });
       for (var i = 0; i < nPts; i++){ cum[i] = upper[i]; }
       // skip an all-zero band so empty steps add no markup on sparse history.
       var any = upper.some(function(v, i){ return v - lower[i] > 0.0001; });
       if (!any){ return; }
       bands += '<path class="tl-band" d="'+bandPath(lower, upper)+'" fill="var('+varFor(k)+')"><title>'+esc(labelFor(k))+'</title></path>';
     });
-    // the uncoloured bucket, solid (no hatch), stacked last on top of the colours.
-    var noneLower = cum.slice();
-    var noneUpper = tally.map(function(t, i){ return cum[i] + pctOf(t.none); });
-    if (noneUpper.some(function(v, i){ return v - noneLower[i] > 0.0001; })){
-      bands += '<path class="tl-band tl-stream-none" d="'+bandPath(noneLower, noneUpper)+'" fill="var(--c-none-b)"><title>'+esc(H.noneLabel)+'</title></path>';
-    }
     var bandGroup = bands;
+    // The graded line traced along the stack TOP (the same curve as the colour-less Line
+    // view) + dots, labelled by scope ("Overall" when aggregating, else the master name).
+    var scopeName = "Overall";
+    if (state.master != null){
+      var sm = H.masters.filter(function(x){ return x.id === state.master; })[0];
+      scopeName = sm ? sm.name : "";
+    }
+    var topPts = tally.map(function(t, i){ return { x:X(dayOff(t.date)), y:Y(cum[i]) }; });
+    // No accent top-line in focus mode: the coloured band stack already traces the
+    // completion curve. Keep small dots as clickable per-snapshot moment markers.
+    var topDots = topPts.map(function(o, i){
+      return '<circle class="tl-dot" cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="2.5" fill="var(--accent)">'
+        + '<title>'+esc(scopeName+" · "+tally[i].date+" · "+Math.round(cum[i])+"%")+'</title></circle>';
+    }).join("");
+    bandGroup += topDots;
     // crosshair overlay shares the #7 data-snaps + the per-date counts so the
     // read-out (streamReadout) can show each step's count at the snapped date.
     var snaps = ax.snaps;
-    var crossData = ' data-snaps="'+esc(JSON.stringify(snaps))+'" data-topy="'+ptop+'" data-boty="'+Y(0).toFixed(1)+'"'
-      + ' data-stream="'+esc(JSON.stringify(tally))+'"';
-    var crossLayer = '<line class="tl-cross" y1="'+ptop+'" y2="'+(ptop+ih).toFixed(1)+'"/>'
-      + '<rect class="tl-crossarea" x="'+pl+'" y="'+ptop+'" width="'+iw.toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
-    var deadline = deadlineRule(ax);                         // #19: shared rule, Flow mode too
-    var chart = '<svg class="tl-chart tl-flow" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData
-      + ' aria-label="Stacked colour completion over time. Hover or use the left and right arrow keys to read each snapshot.">'
-      + (defs?'<defs>'+defs+'</defs>':'')+ax.weekBands+grid+bandGroup+ax.xticks+ax.todayRule+deadline+crossLayer+'</svg>';
+    var crossData = ' data-snaps="'+esc(JSON.stringify(snaps))+'" data-topy="'+ptop+'" data-boty="'+Y(0).toFixed(1)+'"';
+    var hitLayer = '<rect class="tl-crossarea" x="'+pl+'" y="'+ptop+'" width="'+iw.toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
+    var chart = '<svg class="tl-chart tl-flow'+(tlChartShouldAnim?" tl-anim":"")+'" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData
+      + ' aria-label="Stacked colour completion over time. Click a point to pick that moment.">'
+      + (defs?'<defs>'+defs+'</defs>':'')+ax.weekBands+grid+bandGroup+ax.xticks+ax.scrubRule+hitLayer+'</svg>';
     // legend: one swatch per step (+ uncoloured), mirroring the band fills.
     var legend = order.map(function(k){
       return '<span class="tl-lg"><i style="background:var('+varFor(k)+')"></i>'+esc(labelFor(k))+'</span>';
     }).join("") + '<span class="tl-lg"><i class="tl-lg-hatch"></i>'+esc(H.noneLabel)+'</span>';
-    var series = ax.series;
-    var foot = '<div class="tl-foot"><span>'+esc(series[0].date)+'</span><span>'+esc(series[series.length-1].date)+'</span></div>';
-    return { chart:chart, legend:legend, foot:foot };
+    return { chart:chart, legend:legend, foot:"" };   // the start/end date row moved to the navigator's ticks
   }
-  // The Line/Flow toggle: a two-button segmented control that sets state.tlMode and
-  // marks the active mode with aria-pressed. Default mode is Line (D2).
-  function tlModeToggle(){
-    var line = state.tlMode !== "flow";
-    return '<div class="tl-mode" role="group" aria-label="Timeline chart mode">'
-      + '<button type="button" class="chip tl-mode-btn" data-tlmode="line" aria-pressed="'+line+'" title="Per-master completion lines">Line</button>'
-      + '<button type="button" class="chip tl-mode-btn" data-tlmode="flow" aria-pressed="'+(!line)+'" title="Stacked colour streamgraph over time">Flow</button>'
-      + '</div>';
+  // Preset duration windows (1D / 1W / 1M / 1Y / All) that zoom the chart to the last N
+  // period. They drive the SAME zoom window as the range navigator (state.viewLo/viewHi),
+  // anchored on the latest snapshot (the data may be historical). "All" = full history.
+  var TL_SPANS = [["1d","1D",1],["1w","1W",7],["1m","1M",30],["1y","1Y",365],["all","All",0]];
+  function tlSpanToggle(){
+    if (fullSeries().length < 3){ return ""; }
+    var active = state.tlSpan || (isZoomed() ? "" : "all");
+    var btns = TL_SPANS.map(function(sp){
+      var on = active === sp[0];
+      return '<button type="button" class="tl-sw-btn tl-span-btn" data-tlspan="'+sp[0]+'" aria-pressed="'+on+'" title="'+(sp[0]==="all"?"Full history":"Last "+sp[1])+'">'+sp[1]+'</button>';
+    }).join("");
+    return '<div class="tl-switch tl-spanbar" role="group" aria-label="Timeline duration">'+btns+'</div>';
+  }
+  function setTlSpan(span){
+    state.tlSpan = span;
+    var s = fullSeries();
+    if (span === "all" || !s.length){ state.viewLo = null; state.viewHi = null; update(); return; }
+    var days = 0; TL_SPANS.forEach(function(sp){ if (sp[0] === span){ days = sp[2]; } });
+    var cutMs = cfdDate(s[s.length-1].date).getTime() - days*86400000;
+    var lo = 0;
+    for (var i = 0; i < s.length; i++){ if (cfdDate(s[i].date).getTime() >= cutMs){ lo = i; break; } }
+    state.viewLo = lo; state.viewHi = s.length - 1;
+    update();
   }
   function hasTrend(){ return ((H.trend && H.trend.series) || []).length >= 2; }
+
+  // ----- Range navigator: full-history overall-% area + a draggable zoom window -----
+  // The overall graded-% line (one value per snapshot, averaged over all masters) is the
+  // same metric the headline ring uses, reconstructed over time. It's expensive (stateAt
+  // per master per snapshot) but invariant while zooming, so it's cached and reused across
+  // the many re-renders a drag triggers.
+  var NAVCACHE = null, NAVCACHE_KEY = "";
+  function navOverallSeries(){
+    var s = fullSeries();
+    var key = state.tlGran + ":" + state.tlBucket + ":" + (state.exportingOnly ? 1 : 0)
+      + ":" + s.length + ":" + (s.length ? s[s.length-1].date : "");
+    if (NAVCACHE && NAVCACHE_KEY === key){ return NAVCACHE; }
+    var W = stepWeights().weight, denom = (H.masters.length * (countedTotal() || 1)) || 1;
+    NAVCACHE = s.map(function(p){
+      var sum = 0;
+      H.masters.forEach(function(m){
+        var snap = stateAt(m.id, p.date);
+        for (var name in snap){ if (!isCounted(name)) continue; var w = W[String(snap[name])]; if (w){ sum += w; } }
+      });
+      return sum / denom * 100;
+    });
+    NAVCACHE_KEY = key;
+    return NAVCACHE;
+  }
+  function rangeNav(W){
+    var s = fullSeries();
+    if (s.length < 5){ return ""; }              // not worth a navigator below ~5 snapshots
+    // Short strip (full width, same W as the main chart) — a compact overview, not a 2nd graph.
+    var Ht = 54, pl = 30, pr = 12, ptop = 9, pb = 15, iw = W - pl - pr, ih = Ht - ptop - pb;
+    // Match the main chart's spacing: even (ordinal) in both Time and Save modes so the
+    // progress line rises across the full width.
+    var even = true;
+    var t0 = new Date(s[0].date).getTime();
+    var span = (new Date(s[s.length-1].date).getTime() - t0) || 1;
+    function X(i){ return even ? (pl + (s.length < 2 ? 0 : i/(s.length-1))*iw)
+                               : (pl + (new Date(s[i].date).getTime() - t0)/span*iw); }
+    function Y(pc){ return ptop + ih - pc/100*ih; }
+    var oa = navOverallSeries();
+    var pts = s.map(function(p, i){ return { x:X(i), y:Y(oa[i]) }; });
+    var line = smoothPath(pts);                   // smooth, like the main chart
+    var base = (ptop+ih).toFixed(1);
+    var area = line + " L"+pts[pts.length-1].x.toFixed(1)+" "+base+" L"+pts[0].x.toFixed(1)+" "+base+" Z";
+    var b = viewBounds(), xLo = X(b[0]), xHi = X(b[1]);
+    var scrimL = '<rect class="tl-nav-scrim" x="'+pl+'" y="'+ptop+'" width="'+Math.max(0,xLo-pl).toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
+    var scrimR = '<rect class="tl-nav-scrim" x="'+xHi.toFixed(1)+'" y="'+ptop+'" width="'+Math.max(0,(W-pr)-xHi).toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
+    var win = '<rect class="tl-nav-win" data-navedge="mid" x="'+xLo.toFixed(1)+'" y="'+ptop+'" width="'+Math.max(0,xHi-xLo).toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
+    function handle(edge, x, label){
+      var gy = ptop + ih/2;
+      return '<g class="tl-nav-h" data-navedge="'+edge+'" tabindex="0" role="slider" aria-label="'+label+'" aria-valuemin="0" aria-valuemax="'+(s.length-1)+'">'
+        + '<rect class="tl-nav-h-hit" x="'+(x-7).toFixed(1)+'" y="'+ptop+'" width="14" height="'+ih.toFixed(1)+'"/>'
+        + '<rect class="tl-nav-h-bar" x="'+(x-3).toFixed(1)+'" y="'+(gy-9).toFixed(1)+'" width="6" height="18" rx="3"/>'
+        + '<line class="tl-nav-grip" x1="'+(x-1.3).toFixed(1)+'" y1="'+(gy-4).toFixed(1)+'" x2="'+(x-1.3).toFixed(1)+'" y2="'+(gy+4).toFixed(1)+'"/>'
+        + '<line class="tl-nav-grip" x1="'+(x+1.3).toFixed(1)+'" y1="'+(gy-4).toFixed(1)+'" x2="'+(x+1.3).toFixed(1)+'" y2="'+(gy+4).toFixed(1)+'"/></g>';
+    }
+    var snaps = s.map(function(p,i){ return { x:+X(i).toFixed(1), i:i }; });
+    // Date ticks below the navigator (replaces the old start/end date row): ~5 labels
+    // across the full history, bucket-aware via tickLabel, sitting in the bottom gutter.
+    var tickStep = Math.max(1, Math.ceil(s.length / 5));
+    var navTicks = "";
+    s.forEach(function(p, i){
+      if (i % tickStep !== 0 && i !== s.length - 1){ return; }
+      var anchor = i === 0 ? "start" : (i === s.length - 1 ? "end" : "middle");
+      navTicks += '<text class="tl-xtick" x="'+X(i).toFixed(1)+'" y="'+(ptop+ih+11).toFixed(1)+'" text-anchor="'+anchor+'">'+esc(tickLabel(p.date))+'</text>';
+    });
+    var reset = isZoomed() ? '<button type="button" class="tl-nav-reset" data-navreset="1" title="Show the full history">Reset zoom</button>' : "";
+    return '<div class="tl-nav-wrap">'
+      + '<svg class="tl-nav" viewBox="0 0 '+W+' '+Ht+'" data-navsnaps="'+esc(JSON.stringify(snaps))+'" role="group" aria-label="Range navigator — drag the handles to zoom the chart to a date range">'
+      + '<path class="tl-nav-area" d="'+area+'"/><path class="tl-nav-line" d="'+line+'"/>'
+      + scrimL + scrimR + win
+      + handle("lo", xLo, "Range start") + handle("hi", xHi, "Range end")
+      + navTicks
+      + '</svg>' + reset + '</div>';
+  }
+  function navSnaps(svg){ try { return JSON.parse(svg.getAttribute("data-navsnaps")||"[]"); } catch(e){ return []; } }
+  function navIndexFromClient(svg, clientX){
+    var snaps = navSnaps(svg); if (!snaps.length){ return -1; }
+    var box = svg.getBoundingClientRect(); if (!box.width){ return -1; }
+    var vb = svg.viewBox && svg.viewBox.baseVal, vbw = (vb && vb.width) || box.width;
+    var ux = (clientX - box.left) / box.width * vbw;
+    var nearest = 0, best = Infinity;
+    for (var i=0;i<snaps.length;i++){ var dx = Math.abs(snaps[i].x - ux); if (dx < best){ best = dx; nearest = i; } }
+    return nearest;
+  }
+  // pointerdown on a handle resizes that edge; on the window pans it (keeping width); on
+  // the side scrims starts a fresh selection. The main chart re-zooms live (rAF-throttled)
+  // by re-reading the navigator off the DOM each frame, since update() rebuilds it.
+  function navDrag(evt){
+    var svg = evt.target.closest && evt.target.closest(".tl-nav");
+    if (!svg){ return; }
+    var edgeEl = evt.target.closest("[data-navedge]");
+    var edge = edgeEl ? edgeEl.getAttribute("data-navedge") : "new";
+    var snaps = navSnaps(svg); var n = snaps.length; if (n < 2){ return; }
+    evt.preventDefault();
+    var b = viewBounds(), lo0 = b[0], hi0 = b[1], width = hi0 - lo0;
+    var startIdx = navIndexFromClient(svg, evt.clientX);
+    var grabOff = (edge === "mid") ? startIdx - lo0 : 0;
+    state.tlSpan = null;                        // manual zoom -> no preset is "active"
+    function setFromIdx(idx){
+      if (edge === "hi"){ state.viewLo = lo0; state.viewHi = Math.max(lo0 + 1, idx); }
+      else if (edge === "lo"){ state.viewHi = hi0; state.viewLo = Math.min(hi0 - 1, idx); }
+      else if (edge === "mid"){ var nlo = Math.max(0, Math.min(idx - grabOff, n - 1 - width)); state.viewLo = nlo; state.viewHi = nlo + width; }
+      else { state.viewLo = Math.min(startIdx, idx); state.viewHi = Math.max(startIdx, idx);
+             if (state.viewHi - state.viewLo < 1){ state.viewHi = Math.min(n - 1, state.viewLo + 1); } }
+    }
+    setFromIdx(startIdx); update();
+    var raf = 0, pend = startIdx;
+    function flush(){ raf = 0; setFromIdx(pend); update(); }
+    function onMove(mv){
+      var live = document.querySelector(".tl-nav"); if (!live){ return; }
+      var idx = navIndexFromClient(live, mv.clientX); if (idx < 0){ return; }
+      pend = idx;
+      if (!raf){ raf = (window.requestAnimationFrame || function(f){ return setTimeout(f, 16); })(flush); }
+    }
+    function onUp(){
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      if (raf){ (window.cancelAnimationFrame || clearTimeout)(raf); raf = 0; }
+      setFromIdx(pend); update();
+    }
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
+  // Keyboard: Left/Right nudge the focused handle by one snapshot.
+  function navKey(evt){
+    if (evt.key !== "ArrowLeft" && evt.key !== "ArrowRight"){ return; }
+    var h = evt.target.closest && evt.target.closest(".tl-nav-h"); if (!h){ return; }
+    var n = fullSeries().length; if (n < 2){ return; }
+    evt.preventDefault();
+    var edge = h.getAttribute("data-navedge");
+    var b = viewBounds(), lo = b[0], hi = b[1], step = evt.key === "ArrowRight" ? 1 : -1;
+    if (edge === "lo"){ state.viewLo = Math.max(0, Math.min(hi - 1, lo + step)); state.viewHi = hi; }
+    else { state.viewHi = Math.min(n - 1, Math.max(lo + 1, hi + step)); state.viewLo = lo; }
+    update();
+  }
+  function navReset(){ state.viewLo = null; state.viewHi = null; state.tlSpan = "all"; update(); }
   // graded value of one state map {glyph:key}: sum of the per-step weights used by
   // the existing % helpers (stepWeights().weight maps key -> (i+1)/N).
   function gradedStateSum(stateMap){
     var W = stepWeights().weight, s = 0;
-    for (var name in stateMap){ var w = W[stateMap[name]]; if (w) s += w; }
+    for (var name in stateMap){ if (!isCounted(name)) continue; var w = W[stateMap[name]]; if (w) s += w; }
     return s;
   }
   function diffCounts(masterId, isoA, isoB){
@@ -1378,8 +1970,8 @@ DASHBOARD_JS = r"""
       else unchanged++;
     }
     // net graded-% delta (spec #4): change in graded completion between A and B,
-    // over the whole-font denominator, same scale as the % cards. Signed.
-    var denom = H.glyphTotal || Object.keys(names).length || 1;
+    // over the whole-font denominator (exporting-only-aware), same scale as the % cards.
+    var denom = countedTotal() || Object.keys(names).length || 1;
     var deltaPct = Math.round((gradedStateSum(after) - gradedStateSum(before)) / denom * 100);
     return {advanced:advanced, regressed:regressed, unchanged:unchanged, deltaPct:deltaPct};
   }
@@ -1394,146 +1986,194 @@ DASHBOARD_JS = r"""
     }
     return pick;
   }
+  // Parse a timeline key — "YYYY-MM-DD" (per-day) or "YYYY-MM-DDTHH:MM:SS[.n]"
+  // (per-commit) — into a stable Date. Avoids the "...T...T00:00:00Z" invalid-date
+  // trap when commit-granularity datetime keys flow through the date math below.
+  function cfdDate(iso){
+    if (typeof iso !== "string") return new Date(NaN);
+    return (iso.indexOf("T") > 0) ? new Date(iso.slice(0, 19) + "Z")
+                                  : new Date(iso + "T00:00:00Z");
+  }
   // ISO date N days before another ISO date (UTC midnight, timezone-stable).
   function isoMinusDays(iso, days){
-    var d = new Date(iso + "T00:00:00Z");
+    var d = cfdDate(iso);
     d.setUTCDate(d.getUTCDate() - days);
     return d.toISOString().slice(0, 10);
   }
-  // Diff over [isoA, isoB] for the focused master, or rolled up across every master
-  // when none is selected: advanced/regressed are summed, the net % is the mean of the
-  // per-master nets so it stays on the same 0-100 scale as diffCounts' deltaPct.
-  function rollupDiff(isoA, isoB){
-    if (state.master != null) return diffCounts(state.master, isoA, isoB);
-    var advanced = 0, regressed = 0, unchanged = 0, netSum = 0, n = 0;
-    H.masters.forEach(function(m){
-      var c = diffCounts(m.id, isoA, isoB);
-      advanced += c.advanced; regressed += c.regressed; unchanged += c.unchanged;
-      netSum += c.deltaPct; n++;
-    });
-    return { advanced:advanced, regressed:regressed, unchanged:unchanged,
-             deltaPct: n ? Math.round(netSum / n) : 0 };
+  // Shared rank-arrow glyph + colour class for a signed change (used by the week
+  // digest, the category/script lanes and the per-master deadline verdict chips).
+  function rankArrow(value){
+    return { g: value > 0 ? "▲" : (value < 0 ? "▼" : "▬"),
+             c: value > 0 ? "tl-d-up" : (value < 0 ? "tl-d-down" : "tl-d-flat") };
   }
-  function weekDigest(){
-    var dates = (H.trend && H.trend.dates) || [];
-    if (dates.length < 2) return "";
-    var today = (H.trend && H.trend.today) || dates[dates.length-1];
-    // snap a ~7-days-before-today target onto a real snapshot; fall back to "since you
-    // started" when there is under a week of history (weekAgo lands on the first date).
-    var weekAgo = snapDate(dates, isoMinusDays(today, 7));
-    var started = weekAgo === dates[0]
-      && new Date(today+"T00:00:00Z").getTime() - new Date(dates[0]+"T00:00:00Z").getTime() < 7*86400000;
-    var label = started ? "since you started" : "vs " + esc(dateLabel(weekAgo));
-    var cur = rollupDiff(weekAgo, today);
-    // prior 7-day window: from a snapped ~7-days-before-weekAgo date up to weekAgo. Only
-    // meaningful when a real earlier snapshot exists, otherwise the arrow is suppressed.
-    var priorAnchor = snapDate(dates, isoMinusDays(weekAgo, 7));
-    var hasPrior = priorAnchor !== weekAgo;
-    var prior = hasPrior ? rollupDiff(priorAnchor, weekAgo) : null;
-    var arrow = "", arrowCls = "tl-d-flat", arrowTitle = "No earlier week to compare";
-    if (prior){
-      var diff = cur.deltaPct - prior.deltaPct;
-      arrow = diff > 0 ? "▲" : (diff < 0 ? "▼" : "▬");
-      arrowCls = diff > 0 ? "tl-d-up" : (diff < 0 ? "tl-d-down" : "tl-d-flat");
-      arrowTitle = "This week's net " + (cur.deltaPct>=0?"+":"") + cur.deltaPct
-        + "% vs prior week " + (prior.deltaPct>=0?"+":"") + prior.deltaPct + "%";
-    }
-    var net = (cur.deltaPct>=0?"+":"") + cur.deltaPct + "%";
-    // honest scope label: rolled up across every master, or the focused master's name.
-    var scope = "all masters";
-    if (state.master != null){ var mm = masterById(state.master); scope = mm ? esc(mm.name) : ""; }
-    return '<div class="tl-digest" role="group" aria-label="This week digest">'
-      + '<div class="tl-digest-head"><span class="tl-digest-title">This week</span>'
-      + '<span class="tl-digest-sub">'+label+(scope?' · '+scope:'')+'</span></div>'
-      + '<div class="tl-digest-body">'
-      + '<span class="tl-digest-net '+(cur.deltaPct>=0?"tl-d-up":"tl-d-down")+'">'+net+' net</span>'
-      + '<span class="tl-digest-arrow '+arrowCls+'" title="'+arrowTitle+'" aria-label="'+arrowTitle+'">'+arrow+'</span>'
-      + '</div>'
-      + '<div class="tl-digest-stats"><span class="dz dz-up">↑ '+cur.advanced+' advanced</span>'
-      + '<span class="dz dz-down">↓ '+cur.regressed+' regressed</span></div></div>';
-  }
-  function dateDiffPanel(){
-    var dates = (H.trend && H.trend.dates) || [];
-    if (dates.length < 2){
-      return '<div class="tl-diff"><p class="empty">Need at least two snapshots.</p></div>';
-    }
-    var a = state.dateA || dates[0];
-    var b = state.dateB || dates[dates.length-1];
-    var mid = state.master || (H.masters[0] && H.masters[0].id);
-    var opts = function(sel){ return dates.map(function(d){
-      return '<option value="'+esc(d)+'"'+(d===sel?" selected":"")+'>'+esc(d)+'</option>'; }).join(""); };
-    var c = diffCounts(mid, a, b);
-    return '<div class="tl-diff"><div class="tl-diff-h">Compare snapshots</div>'
-      + '<div class="tl-diff-pick">'
-      + '<label>From <select id="cfd-date-a">'+opts(a)+'</select></label>'
-      + '<label>To <select id="cfd-date-b">'+opts(b)+'</select></label></div>'
-      + '<div class="tl-diff-out"><span class="dz dz-up">↑ '+c.advanced+' advanced</span>'
-      + '<span class="dz dz-down">↓ '+c.regressed+' regressed</span>'
-      + '<span class="dz dz-flat">= '+c.unchanged+' unchanged</span>'
-      + '<span class="dz dz-net">'+(c.deltaPct>=0?"+":"")+c.deltaPct+'% net</span></div></div>';
-  }
-  // ----- #15 full-history regression log + chart flags -----------------------
-  // The active master for the full-history walk: the selected one, else the first.
-  // Distinct from regressionCard()/H.changes (last-save delta only) — this walks the
-  // entire snapshot history.
+  // The active master for the per-category / per-script lanes: the selected one, else
+  // the first. (The full-history regression log + red chart flags were removed.)
   function reglogMaster(){ return state.master || (H.masters[0] && H.masters[0].id); }
-  // Walk consecutive H.trend.dates for one master: for each adjacent pair compare
-  // stateAt(prev) vs stateAt(curr) and collect every glyph whose rank dropped
-  // (rankOf(now) < rankOf(was); a missing/uncoloured key reads as -1, so "-> none"
-  // counts as backward via rankOf's -1). Newest-first, one row per backward move.
-  function regressionWalk(){
-    var mid = reglogMaster();
-    var dates = (H.trend && H.trend.dates) || [];
-    if (!mid || dates.length < 2) return [];
-    var hits = [];
-    for (var i = 1; i < dates.length; i++){
-      var before = stateAt(mid, dates[i-1]), after = stateAt(mid, dates[i]);
-      var names = {};
-      for (var n1 in before){ names[n1] = true; }
-      for (var n2 in after){ names[n2] = true; }
-      for (var name in names){
-        var was = before[name]; if (was == null) was = -1;
-        var nw = after[name]; if (nw == null) nw = -1;
-        if (rankOf(nw) < rankOf(was)){                     // backward; -> uncoloured ranks -1
-          hits.push({ name:name, was:was, nw:nw, date:dates[i] });
-        }
-      }
+  // ----- #D Shape changes: glyphs whose OUTLINE changed between git commits ----
+  // H.outlineChanges = { iso_date: [{glyph, master, old:{d,vb}, new:{d,vb}}] }, built
+  // from the font's recent git history. Each day is a collapsible block (closed by
+  // default); expanding it shows the changed glyphs as onion-skin overlays — the old
+  // outline ghosted under the new, both drawn in a shared (union) viewBox so a moved
+  // shape reads as the real shift. Dormant (renders nothing) when the data is empty.
+  function ocUnionVB(a, b){
+    function parse(s){
+      var t = (s||"").split(/\s+/).map(parseFloat);
+      return (t.length===4 && t.every(function(n){ return !isNaN(n); })) ? t : null;
     }
-    hits.reverse();                                        // newest-first
-    return hits;
+    var pa = parse(a), pb = parse(b);
+    if (!pa && !pb) return "0 0 1000 1000";
+    if (!pa) return b; if (!pb) return a;
+    var x = Math.min(pa[0], pb[0]), y = Math.min(pa[1], pb[1]);
+    var right = Math.max(pa[0]+pa[2], pb[0]+pb[2]), bottom = Math.max(pa[1]+pa[3], pb[1]+pb[3]);
+    return x+" "+y+" "+(right-x)+" "+(bottom-y);
   }
-  // The set of snapshot dates carrying >=1 regression, for the chart tick flags.
-  function regressionDates(){
-    var out = {};
-    regressionWalk().forEach(function(h){ out[h.date] = true; });
-    return out;
+  // Shared onion-skin SVG for ONE outline change — the old outline ghosted under the
+  // new in their union viewBox. Used by both the per-day grid cells (ocCell) and the
+  // "Touched after done" watch-list rows, so the rendering never forks.
+  function ocOnionSVG(change){
+    var oldP = change.old || {}, newP = change.new || {};
+    var vb = ocUnionVB(oldP.vb, newP.vb);
+    return '<svg viewBox="'+esc(vb)+'" preserveAspectRatio="xMidYMid meet" aria-hidden="true">'
+      + (oldP.d ? '<path class="oc-old" d="'+esc(oldP.d)+'"/>' : '')
+      + (newP.d ? '<path class="oc-new" d="'+esc(newP.d)+'"/>' : '')
+      + '</svg>';
   }
-  // Newest-first was->now swatch table: top 8 + a "show all" expander (reuses the
-  // ovCard data-ovexpand idiom via state.ovExpand.reglog), rows open the journey
-  // modal. Renders nothing when the whole history is clean.
-  function regressionLog(){
-    var hits = regressionWalk();
-    if (!hits.length) return "";
-    var open = !!state.ovExpand.reglog;
-    var list = open ? hits : hits.slice(0, 8);
-    var rows = list.map(function(it){
-      return '<div class="rg-row" data-jglyph="'+esc(it.name)+'"><span class="rg-n">'+esc(it.name)+'</span>'
-        + swatchFor(it.was)+'<span class="rg-ar">→</span>'+swatchFor(it.nw)
-        + '<span class="rg-when">'+esc(dateLabel(it.date))+'</span></div>';
+  function ocCell(change){
+    var sub = state.master==null && change.master ? (" · "+change.master) : "";
+    return '<span class="oc-cell" title="'+esc(change.glyph+sub+" — outline changed")+'">'
+      + ocOnionSVG(change)
+      + '<span class="oc-glyph">'+esc(change.glyph)+'</span></span>';
+  }
+  function outlineChangesView(){
+    var oc = H.outlineChanges || {};
+    var dates = Object.keys(oc).sort().reverse();        // most recent day first
+    if (!dates.length) return "";
+    var blocks = dates.map(function(d){
+      var items = (oc[d]||[]).filter(function(c){ return state.master==null || c.master===state.master; });
+      if (!items.length) return "";
+      var open = !!state.ocOpen[d];
+      var grid = open ? '<div class="oc-grid">'+items.map(ocCell).join("")+'</div>' : "";
+      return '<div class="oc-day'+(open?" open":"")+'">'
+        + '<button type="button" class="oc-day-h" data-oc="'+esc(d)+'" aria-expanded="'+(!!open)+'" title="Show or hide the glyphs whose outline changed on '+esc(dateLabel(d))+'">'
+        + '<span class="oc-chev" aria-hidden="true">'+(open?"▾":"▸")+'</span>'
+        + '<span class="oc-date">'+esc(dateLabel(d))+'</span>'
+        + '<span class="oc-count">'+items.length+' glyph'+(items.length===1?"":"s")+'</span></button>'
+        + grid + '</div>';
     }).join("");
-    var head = '<div class="tl-reglog-h"><span>Moved backward over time ('+hits.length+')</span>'
-      + (hits.length > 8 ? '<button type="button" class="chip tl-reglog-all" data-ovexpand="reglog">'
-          + (open ? "Show top 8" : "Show all "+hits.length)+'</button>' : '')+'</div>';
-    return '<div class="tl-reglog">'+head+'<div class="tl-reglog-rows">'+rows+'</div></div>';
+    if (!blocks){ return ""; }                            // nothing for the focused master
+    return '<div class="oc" role="group" aria-label="Glyph outline changes by date">'
+      + '<div class="oc-h">Shape changes</div>'+blocks+'</div>';
+  }
+  // ----- "Touched after done" watch list: outline edits to FINISHED glyphs ----
+  // Client-side join of H.outlineChanges (per-day outline diffs, per master) with
+  // H.journeyIndex (per-glyph step change-events): a change on date D offends when the
+  // glyph ENTERED the final workflow step (last key in H.order) strictly before D and
+  // no later event moved it off that step before the change. Dormant when either
+  // dataset is empty (non-git / NoGlyphSVG reports never show the card).
+  function tadDoneTs(events, finalKey, changeDate){
+    // Timestamp the glyph entered the final step, scanning only events dated strictly
+    // BEFORE the change's day (same-day ordering is unknowable at day granularity);
+    // any later off-step event clears it. null = not done by the change.
+    var doneTs = null;
+    for (var i=0;i<events.length;i++){
+      var ts = String(events[i][0]);
+      if (ts.slice(0,10) >= changeDate) break;
+      if (String(events[i][1]) === finalKey){ if (doneTs === null) doneTs = ts; }
+      else { doneTs = null; }                  // moved off the final step -> not done
+    }
+    return doneTs;
+  }
+  function touchedAfterDone(){
+    // -> [{glyph, master, change, date, doneDate, gapDays}] sorted gap-descending.
+    // Scoped to the focused master when focused, else joined across every master.
+    var oc = H.outlineChanges || {}, index = H.journeyIndex || {};
+    var finalKey = (H.order && H.order.length) ? String(H.order[H.order.length-1]) : null;
+    if (!finalKey) return [];
+    var rows = [];
+    Object.keys(oc).forEach(function(d){
+      (oc[d]||[]).forEach(function(change){
+        if (state.master != null && change.master !== state.master) return;
+        var perGlyph = index[change.master] || {};
+        var doneTs = tadDoneTs(perGlyph[change.glyph] || [], finalKey, d);
+        if (doneTs === null) return;
+        var ms = cfdDate(d).getTime() - cfdDate(doneTs.slice(0,10)).getTime();
+        if (isNaN(ms) || ms <= 0) return;      // malformed dates -> not an offence
+        rows.push({ glyph: change.glyph, master: change.master, change: change,
+                    date: d, doneDate: doneTs.slice(0,10), gapDays: Math.round(ms/86400000) });
+      });
+    });
+    rows.sort(function(a,b){ return (b.gapDays - a.gapDays) || (a.glyph < b.glyph ? -1 : 1); });
+    return rows;
+  }
+  function tadMasterName(mid){
+    var m = (H.masters||[]).filter(function(x){ return x.id === mid; })[0];
+    return m ? m.name : mid;
+  }
+  function touchedAfterDoneView(){
+    var rows = touchedAfterDone();
+    if (!rows.length) return "";               // empty join or no outlineChanges -> hidden
+    var body = rows.map(function(row){
+      var masterTag = state.master == null
+        ? '<span class="tad-master">'+esc(tadMasterName(row.master))+'</span>' : "";
+      return '<button type="button" class="tad-row" data-jglyph="'+esc(row.glyph)
+        + '" title="Open the journey of '+esc(row.glyph)+'">'
+        + ocOnionSVG(row.change)
+        + '<span class="tad-glyph">'+esc(row.glyph)+'</span>'+masterTag
+        + '<span class="tad-when">done '+esc(dateLabel(row.doneDate))
+        + ' → outline changed '+esc(dateLabel(row.date))
+        + ' <b>('+row.gapDays+' day'+(row.gapDays===1?"":"s")+' later)</b></span></button>';
+    }).join("");
+    return '<div class="tad" role="group" aria-label="Touched after done — outline edits to glyphs already on the final step">'
+      + '<div class="tad-h">Touched after done <span class="tad-sub">outline edits to glyphs already on the final step</span></div>'
+      + body + '</div>';
+  }
+  // ----- shared lane maths (category + script lanes) -------------------------
+  // Graded completion % of a glyph-name set at a snapshot, for ONE master.
+  function laneGradedPctOne(mid, names, iso){
+    var st = stateAt(mid, iso), weight = stepWeights().weight, sum = 0, n = 0;
+    for (var i=0;i<names.length;i++){ if (!isCounted(names[i])) continue; n++; var w = weight[st[names[i]]]; if (w) sum += w; }
+    return n ? Math.round(sum/n*100) : 0;
+  }
+  // ...scoped to the focused master, or AVERAGED across the family in Global view, so a
+  // lane reads font-wide instead of silently tracking only the first master.
+  function laneGradedPct(names, iso){
+    if (state.master != null) return laneGradedPctOne(state.master, names, iso);
+    var sum=0, n=0;
+    for (var i=0;i<H.masters.length;i++){ sum += laneGradedPctOne(H.masters[i].id, names, iso); n++; }
+    return n ? Math.round(sum/n) : 0;
+  }
+  // The snapshot index the over-time lanes read: the moment picked by clicking the chart
+  // (state.tlScrub, via scrubIndex), in both Global and focused views, so the category /
+  // script panels follow the click. Defaults to the latest snapshot. Date-consistent.
+  function scrubScopeIdx(){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (!dates.length) return -1;
+    return scrubIndex();
+  }
+  // Tiny completion-over-time polyline for a lane (chart Y-flip idiom, mini box).
+  function laneSparkSVG(values){
+    var n = values.length, w = 64, h = 16, pad = 1.5, iw = w - pad*2, ih = h - pad*2;
+    if (n < 2) return "";
+    var pts = values.map(function(v, i){
+      var x = pad + i/(n-1)*iw;
+      var y = pad + ih - Math.max(0, Math.min(100, v))/100*ih;
+      return x.toFixed(1)+","+y.toFixed(1);
+    }).join(" ");
+    return '<svg class="tl-lane-spark" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true">'
+      + '<polyline points="'+pts+'" fill="none"/></svg>';
   }
   // ----- #17 per-category progress lanes over time ---------------------------
   function categoryLanes(){
+    // Shown in BOTH Global and focus mode. laneGradedPct scopes to the focused master
+    // (or averages the family in Global), so the lanes read for whatever's in focus.
     var dates = (H.trend && H.trend.dates) || [];
     if (dates.length < 1) return "";
     // Map each glyph to its category from the parallel H.glyphNames / H.categories
     // arrays, grouping the glyph names by category (empty categories never appear).
+    // Exporting-only drops excluded glyphs here so the lane counts read counted sizes.
     var allNames = H.glyphNames || [], allCats = H.categories || [], groups = {};
     for (var gi = 0; gi < allNames.length; gi++){
+      if (!isCounted(allNames[gi])) continue;
       var gcat = allCats[gi] || "Other";
       (groups[gcat] || (groups[gcat] = [])).push(allNames[gi]);
     }
@@ -1541,61 +2181,38 @@ DASHBOARD_JS = r"""
     if (!cats.length) return "";
     var mid = reglogMaster();
     if (!mid) return "";
-    var sparse = dates.length < 3;                 // 1-2 snapshots: bar, no over-time line
-    var weight = stepWeights().weight;             // shared palette-order step weights
-    // Graded completion % for one category at one snapshot date: sum the step weights
-    // over that category's glyphs (reconstructed via stateAt) over the category's glyph
-    // count, on the same 0-100 graded scale as the master/overall cards.
-    var laneStatePct = function(names, iso){
-      var st = stateAt(mid, iso), sum = 0;
-      for (var i = 0; i < names.length; i++){
-        var w = weight[st[names[i]]]; if (w) sum += w;
-      }
-      return names.length ? Math.round(sum / names.length * 100) : 0;
-    };
-    // Tiny completion-over-time polyline (reuses the chart's Y-flip idiom, scaled to a
-    // mini box); only drawn when there are >=2 snapshots to connect.
-    var laneSpark = function(values){
-      var n = values.length, w = 64, h = 16, pad = 1.5, iw = w - pad*2, ih = h - pad*2;
-      if (n < 2) return "";
-      var pts = values.map(function(v, i){
-        var x = pad + i/(n-1)*iw;
-        var y = pad + ih - Math.max(0, Math.min(100, v))/100*ih;
-        return x.toFixed(1)+","+y.toFixed(1);
-      }).join(" ");
-      return '<svg class="tl-lane-spark" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true">'
-        + '<polyline points="'+pts+'" fill="none"/></svg>';
-    };
-    // ~a week before the latest snapshot, snapped onto a real snapshot date.
-    var today = (H.trend && H.trend.today) || dates[dates.length-1];
-    var weekAgo = snapDate(dates, isoMinusDays(today, 7));
+    // Follow the moment picked on the chart (state.tlScrub via scrubScopeIdx), even in
+    // Global view: the % is at that snapshot, the sparkline runs up to it, the delta is
+    // vs the previous snapshot. Defaults to the latest snapshot when nothing is picked.
+    var idx = scrubScopeIdx();
+    var scrubISO = (idx>=0 && dates[idx]) ? dates[idx] : dates[dates.length-1];
+    var prevISO = idx > 0 ? dates[idx-1] : null;
+    var upto = idx >= 0 ? dates.slice(0, idx+1) : dates.slice();
     var lanes = cats.map(function(cat){
       var names = groups[cat];
-      var values = dates.map(function(d){ return laneStatePct(names, d); });
-      var cur = values[values.length-1];
-      var prevPct = laneStatePct(names, weekAgo);
-      var delta = cur - prevPct;
+      var values = upto.map(function(d){ return laneGradedPct(names, d); });
+      var cur = laneGradedPct(names, scrubISO);
+      var delta = prevISO ? cur - laneGradedPct(names, prevISO) : 0;
       return { cat:cat, count:names.length, values:values, cur:cur, delta:delta };
     });
     // laggard-first: lowest current % on top (name as a stable tie-breaker).
     lanes.sort(function(a, b){ return (a.cur - b.cur) || (a.cat < b.cat ? -1 : 1); });
     var rows = lanes.map(function(ln){
-      var arrow = ln.delta > 0 ? "▲" : (ln.delta < 0 ? "▼" : "▬");
-      var arrowCls = ln.delta > 0 ? "tl-d-up" : (ln.delta < 0 ? "tl-d-down" : "tl-d-flat");
-      var deltaTxt = (ln.delta>0?"+":"")+ln.delta+"% vs "+esc(dateLabel(weekAgo));
-      var mid2 = sparse
+      var ra = rankArrow(ln.delta); var arrow = ra.g, arrowCls = ra.c;
+      var deltaTxt = prevISO ? ((ln.delta>0?"+":"")+ln.delta+"% vs "+esc(dateLabel(prevISO))) : "first snapshot";
+      var mid2 = (ln.values.length < 2)
         ? '<span class="tl-lane-bar"><span style="width:'+ln.cur+'%"></span></span>'
-        : laneSpark(ln.values);
-      return '<div class="tl-lane">'
+        : laneSparkSVG(ln.values);
+      return '<div class="tl-lane'+(ln.cur>=100?" done":"")+'">'
         + '<span class="tl-lane-n" title="'+esc(ln.cat)+'">'+esc(ln.cat)+' <small>('+ln.count+')</small></span>'
         + '<span class="tl-lane-mid">'+mid2+'</span>'
-        + '<span class="tl-lane-pct">'+ln.cur+'%</span>'
+        + '<span class="tl-lane-pct" data-lanekey="cat:'+esc(ln.cat)+'" data-to="'+ln.cur+'">'+ln.cur+'%</span>'
         + '<span class="tl-lane-d '+arrowCls+'" title="'+deltaTxt+'" aria-label="'+deltaTxt+'">'+arrow+'</span>'
         + '</div>';
     }).join("");
-    return '<div class="tl-lanes"><div class="tl-lanes-h">By category'
-      + (sparse ? ' · current %' : ' · over time')+'</div>'+rows+'</div>';
+    return '<div class="tl-lanes">'+rows+'</div>';
   }
+  // Compact per-category header strip for the Time Machine grid blocks (master view):
   // ----- #18 per-script progress lanes over time -----------------------------
   // Mirror of categoryLanes (#17) but grouped by the per-glyph H.scripts array
   // (writing systems: Latin, Cyrillic, Greek, ...) instead of H.categories.
@@ -1604,174 +2221,51 @@ DASHBOARD_JS = r"""
     if (dates.length < 1) return "";
     // Map each glyph to its script from the parallel H.glyphNames / H.scripts
     // arrays, grouping the glyph names by script (empty scripts never appear).
+    // Exporting-only drops excluded glyphs here so the lane counts read counted sizes.
     var allNames = H.glyphNames || [], allScripts = H.scripts || [], groups = {};
     for (var gi = 0; gi < allNames.length; gi++){
+      if (!isCounted(allNames[gi])) continue;
       var gscript = allScripts[gi] || "Other";
       (groups[gscript] || (groups[gscript] = [])).push(allNames[gi]);
     }
-    var scripts = Object.keys(groups);
+    var scripts = Object.keys(groups).filter(function(s){ return s !== "Other"; });   // skip the "Other" bucket
     if (!scripts.length) return "";
     var mid = reglogMaster();
     if (!mid) return "";
-    var sparse = dates.length < 3;                 // 1-2 snapshots: bar, no over-time line
-    var weight = stepWeights().weight;             // shared palette-order step weights
-    // Graded completion % for one script at one snapshot date: sum the step weights
-    // over that script's glyphs (reconstructed via stateAt) over the script's glyph
-    // count, on the same 0-100 graded scale as the master/overall cards.
-    var laneStatePct = function(names, iso){
-      var st = stateAt(mid, iso), sum = 0;
-      for (var i = 0; i < names.length; i++){
-        var w = weight[st[names[i]]]; if (w) sum += w;
-      }
-      return names.length ? Math.round(sum / names.length * 100) : 0;
-    };
-    // Tiny completion-over-time polyline (reuses the chart's Y-flip idiom, scaled to a
-    // mini box); only drawn when there are >=2 snapshots to connect.
-    var laneSpark = function(values){
-      var n = values.length, w = 64, h = 16, pad = 1.5, iw = w - pad*2, ih = h - pad*2;
-      if (n < 2) return "";
-      var pts = values.map(function(v, i){
-        var x = pad + i/(n-1)*iw;
-        var y = pad + ih - Math.max(0, Math.min(100, v))/100*ih;
-        return x.toFixed(1)+","+y.toFixed(1);
-      }).join(" ");
-      return '<svg class="tl-lane-spark" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true">'
-        + '<polyline points="'+pts+'" fill="none"/></svg>';
-    };
-    // ~a week before the latest snapshot, snapped onto a real snapshot date.
-    var today = (H.trend && H.trend.today) || dates[dates.length-1];
-    var weekAgo = snapDate(dates, isoMinusDays(today, 7));
+    // read the scrubbed Time-Machine checkpoint (master view) / latest (global): the % at
+    // that date, the sparkline up to it, and the delta vs the PREVIOUS snapshot, so the
+    // script breakdown follows the slider the same way the category headers do.
+    var idx = scrubScopeIdx();
+    var scrubISO = (idx>=0 && dates[idx]) ? dates[idx] : dates[dates.length-1];
+    var prevISO = idx > 0 ? dates[idx-1] : null;
+    var upto = idx >= 0 ? dates.slice(0, idx+1) : dates.slice();
     var lanes = scripts.map(function(script){
       var names = groups[script];
-      var values = dates.map(function(d){ return laneStatePct(names, d); });
-      var cur = values[values.length-1];
-      var prevPct = laneStatePct(names, weekAgo);
-      var delta = cur - prevPct;
+      var values = upto.map(function(d){ return laneGradedPct(names, d); });
+      var cur = laneGradedPct(names, scrubISO);
+      var delta = prevISO ? cur - laneGradedPct(names, prevISO) : 0;
       return { script:script, count:names.length, values:values, cur:cur, delta:delta };
     });
     // laggard-first: lowest current % on top (name as a stable tie-breaker).
     lanes.sort(function(a, b){ return (a.cur - b.cur) || (a.script < b.script ? -1 : 1); });
     var rows = lanes.map(function(ln){
-      var arrow = ln.delta > 0 ? "▲" : (ln.delta < 0 ? "▼" : "▬");
-      var arrowCls = ln.delta > 0 ? "tl-d-up" : (ln.delta < 0 ? "tl-d-down" : "tl-d-flat");
-      var deltaTxt = (ln.delta>0?"+":"")+ln.delta+"% vs "+esc(dateLabel(weekAgo));
-      var mid2 = sparse
+      var ra = rankArrow(ln.delta); var arrow = ra.g, arrowCls = ra.c;
+      var deltaTxt = prevISO ? ((ln.delta>0?"+":"")+ln.delta+"% vs "+esc(dateLabel(prevISO))) : "first snapshot";
+      var mid2 = (ln.values.length < 2)
         ? '<span class="tl-lane-bar"><span style="width:'+ln.cur+'%"></span></span>'
-        : laneSpark(ln.values);
-      return '<div class="tl-lane">'
-        + '<span class="tl-lane-n" title="'+esc(ln.script)+'">'+esc(ln.script)+' <small>('+ln.count+')</small></span>'
+        : laneSparkSVG(ln.values);
+      return '<div class="tl-lane'+(ln.cur>=100?" done":"")+'">'
+        + '<span class="tl-lane-n" title="'+esc(prettyScript(ln.script))+'">'+esc(prettyScript(ln.script))+' <small>('+ln.count+')</small></span>'
         + '<span class="tl-lane-mid">'+mid2+'</span>'
-        + '<span class="tl-lane-pct">'+ln.cur+'%</span>'
+        + '<span class="tl-lane-pct" data-lanekey="scr:'+esc(ln.script)+'" data-to="'+ln.cur+'">'+ln.cur+'%</span>'
         + '<span class="tl-lane-d '+arrowCls+'" title="'+deltaTxt+'" aria-label="'+deltaTxt+'">'+arrow+'</span>'
         + '</div>';
     }).join("");
-    return '<div class="tl-lanes"><div class="tl-lanes-h">By script'
-      + (sparse ? ' · current %' : ' · over time')+'</div>'+rows+'</div>';
+    return '<div class="tl-lanes">'+rows+'</div>';
   }
-  // ----- #19 deadline marker + on-track verdict -----------------------------
-  // The target date persists in localStorage, keyed by the family name (D4) so it
-  // stays offline-safe and per-font. Empty by default → the feature is dormant
-  // (no rule on the chart, no verdict chips) until a date is entered.
-  function deadlineKey(){ return "cfd-deadline:" + (H.family || ""); }
-  function getDeadline(){
-    try { return localStorage.getItem(deadlineKey()) || ""; } catch(e){ return ""; }
-  }
-  function setDeadline(iso){
-    try {
-      if (iso){ localStorage.setItem(deadlineKey(), iso); }
-      else { localStorage.removeItem(deadlineKey()); }
-    } catch(e){}
-  }
-  // Dashed-red vertical rule + flag at the target date's X, reusing #7's calendar
-  // axis date->X math (ax.dayOff + ax.X). A target beyond the plotted span clamps
-  // to the right edge and carries an offset label so it never draws off-chart.
-  function deadlineRule(ax){
-    var iso = getDeadline();
-    if (!iso) return "";
-    var off = ax.dayOff(iso);
-    if (isNaN(off)) return "";
-    var beyond = off > ax.lastOff;
-    var x = beyond ? ax.X(ax.lastOff) : ax.X(Math.max(0, off));
-    var topY = ax.ptop, botY = ax.ptop + ax.ih;
-    var lab = dateLabel(iso) + (beyond ? " →" : "");
-    var pillW = lab.length * 5.5 + 12;
-    var pillX = Math.min(ax.X(ax.lastOff) + ax.pr - pillW, Math.max(ax.pl, x - pillW/2));
-    return '<g class="tl-deadline" aria-hidden="true">'
-      + '<line class="tl-deadline-rule" x1="'+x.toFixed(1)+'" y1="'+topY+'" x2="'+x.toFixed(1)+'" y2="'+botY.toFixed(1)+'"/>'
-      + '<rect class="tl-deadline-pill" x="'+pillX.toFixed(1)+'" y="'+(topY-1)+'" width="'+pillW.toFixed(1)+'" height="13" rx="6"/>'
-      + '<text class="tl-deadline-t" x="'+(pillX+pillW/2).toFixed(1)+'" y="'+(topY+8.5)+'" text-anchor="middle">'+esc(lab)+'</text>'
-      + '</g>';
-  }
-  // Whole UTC days from today (H.trend.today, else the last snapshot) up to the
-  // target. Negative when the target is already in the past; timezone-stable.
-  function daysUntil(iso){
-    var dates = (H.trend && H.trend.dates) || [];
-    var today = (H.trend && H.trend.today) || dates[dates.length-1];
-    if (!today || !iso) return null;
-    var ms = new Date(iso+"T00:00:00Z").getTime() - new Date(today+"T00:00:00Z").getTime();
-    if (isNaN(ms)) return null;
-    return Math.round(ms / 86400000);
-  }
-  // The date control + per-master verdict chips. Each chip compares the master's
-  // forecast.etaIso (estimated finish at the recent pace) against the target:
-  //   green  — ETA on or before the target (on track)
-  //   amber  — ETA slightly past (within a grace window of the days remaining)
-  //   red    — ETA well past, or no honest ETA at all (flat/regressing pace)
-  // and shows the required catch-up pace = remaining / daysUntilTarget (glyphs/day)
-  // so a behind master gets an actionable number, not just a colour.
-  function deadlinePanel(){
-    var iso = getDeadline();
-    var input = '<div class="tl-deadline-bar"><label class="tl-deadline-l" for="cfd-deadline">Target date</label>'
-      + '<input type="date" id="cfd-deadline" value="'+esc(iso)+'"'+(H.trend && H.trend.today ? ' max="9999-12-31"' : '')+' aria-label="Project deadline target date"/></div>';
-    if (!iso) return '<div class="tl-verdicts" role="group" aria-label="Deadline">'+input+'</div>';
-    var forecast = (H.trend && H.trend.forecast) || {};
-    var days = daysUntil(iso);
-    var chips = H.masters.map(function(m){
-      var fc = forecast[m.id] || {};
-      var eta = fc.etaIso || null;
-      var remaining = fc.remaining != null ? fc.remaining : null;
-      // verdict: a master already finished is on track; otherwise classify by ETA.
-      var cls, note;
-      if (remaining === 0){ cls = "tl-v-ok"; note = "done"; }
-      else if (!eta){ cls = "tl-v-late"; note = "no ETA at current pace"; }
-      else {
-        // grace window scales with the runway: a forecast within ~15% of the days
-        // remaining counts as amber rather than a hard red.
-        var grace = days != null && days > 0 ? Math.max(2, Math.round(days * 0.15)) : 2;
-        var etaMs = new Date(eta+"T00:00:00Z").getTime();
-        var tgtMs = new Date(iso+"T00:00:00Z").getTime();
-        var overDays = Math.round((etaMs - tgtMs) / 86400000);
-        if (overDays <= 0){ cls = "tl-v-ok"; note = "ETA " + esc(dateLabel(eta)); }
-        else if (overDays <= grace){ cls = "tl-v-amber"; note = esc(dateLabel(eta)) + " · " + overDays + "d late"; }
-        else { cls = "tl-v-late"; note = esc(dateLabel(eta)) + " · " + overDays + "d late"; }
-      }
-      // required catch-up pace to land on the target = remaining / daysUntilTarget.
-      // Only meaningful with a positive runway and work left to do.
-      var pace = "";
-      if (remaining != null && remaining > 0 && days != null && days > 0){
-        var perDay = remaining / days;
-        pace = '<span class="tl-v-pace">'+(perDay >= 10 ? Math.round(perDay) : perDay.toFixed(1))+'/day to hit it</span>';
-      } else if (remaining != null && remaining > 0 && days != null && days <= 0){
-        pace = '<span class="tl-v-pace">target passed</span>';
-      }
-      return '<span class="tl-verdict '+cls+'" title="'+esc(m.name+" — "+note)+'">'
-        + '<b class="tl-v-name">'+esc(m.name)+'</b>'
-        + '<span class="tl-v-note">'+note+'</span>'+pace+'</span>';
-    }).join("");
-    var runway = days != null
-      ? (days > 0 ? days + " day" + (days===1?"":"s") + " to go" : (days===0 ? "due today" : (-days) + " day" + (days===-1?"":"s") + " overdue"))
-      : "";
-    return '<div class="tl-verdicts" role="group" aria-label="Deadline and on-track verdict">'
-      + input
-      + (runway ? '<span class="tl-deadline-runway">'+runway+'</span>' : "")
-      + '<div class="tl-verdict-row">'+chips+'</div></div>';
-  }
-  // ----- #11 Time Machine scrubber -------------------------------------------
-  // D3: the main heatmap lives in the Overview tab, so the Timeline tab renders its
-  // OWN compact heatmap and replays it day by day. The master scrubbed is the focused
-  // one, else the first (same anchor the lanes use). The scrub index is clamped onto
-  // a real H.trend.dates entry; null means "latest snapshot".
-  function scrubMaster(){ return reglogMaster(); }
+  // (The #19 deadline / Target-date feature was removed — no target picker, no on-chart
+  //  deadline rule, no verdict chips.)
+  // ----- #11 moment scrubber -------------------------------------------------
   // The snapshot index currently scrubbed: state.tlScrub clamped to the dates range,
   // defaulting to the latest snapshot when unset.
   function scrubIndex(){
@@ -1780,167 +2274,21 @@ DASHBOARD_JS = r"""
     var idx = state.tlScrub == null ? dates.length-1 : state.tlScrub;
     return Math.max(0, Math.min(dates.length-1, idx));
   }
-  // The slider's day domain: snapshots map to their offset (in days) from the first
-  // snapshot, so the thumb + tick marks sit at true calendar spacing. Dragging lands on
-  // an arbitrary day; scrubDayToIndex snaps it back to the nearest real snapshot.
-  function scrubDayMs(iso){ return new Date(iso+"T00:00:00Z").getTime(); }
-  function scrubSpanDays(){
-    var dates = (H.trend && H.trend.dates) || [];
-    if (dates.length < 2) return 0;
-    return Math.round((scrubDayMs(dates[dates.length-1]) - scrubDayMs(dates[0])) / 86400000);
-  }
-  function scrubIndexToDay(i){
-    var dates = (H.trend && H.trend.dates) || [];
-    if (!dates.length) return 0;
-    return Math.round((scrubDayMs(dates[i]) - scrubDayMs(dates[0])) / 86400000);
-  }
-  function scrubDayToIndex(day){
-    var dates = (H.trend && H.trend.dates) || [];
-    var best = 0, bestD = Infinity;
-    for (var i=0;i<dates.length;i++){ var diff = Math.abs(scrubIndexToDay(i) - day); if (diff < bestD){ bestD = diff; best = i; } }
-    return best;
-  }
-  // Recolour the compact Time-Machine grid in place to the master's colour state at
-  // the scrubbed date. Reconstructs each cell's key via stateAt (no interpolation) and
-  // writes it back with the SAME color-mix idiom applyBeforeAfter uses, so dark/light
-  // themes and the swatch tokens stay consistent. Throttled to rAF by scrubSet.
-  function scrubRecolour(){
-    var grid = document.querySelector(".tl-machine .tl-machine-grid");
-    if (!grid) return;
-    var dates = (H.trend && H.trend.dates) || [];
-    var idx = scrubIndex();
-    if (idx < 0 || !dates[idx]) return;
-    var mid = scrubMaster();
-    var st = stateAt(mid, dates[idx]);
-    // #12: diff against the previous snapshot's state so each scrub step can flag the
-    // glyphs that moved THIS day. The first snapshot has no predecessor -> no diff.
-    var prev = idx > 0 ? stateAt(mid, dates[idx-1]) : null;
-    // Reduced-motion (or the test hook): swap the pulsing ring for a static border via
-    // the CSS variant, but the chip count below is still computed + shown either way.
-    var noAnim = window.__cfdNoAnim ||
-      (window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
-    var advanced = 0, regressed = 0;
-    var cells = grid.querySelectorAll(".cell");
-    for (var i=0;i<cells.length;i++){
-      var cell = cells[i], name = cell.getAttribute("data-glyph");
-      var key = (name != null && st[name] != null) ? st[name] : -1;
-      var v = varFor(key);
-      // The background change fades via the cell's CSS transition. No directional
-      // colour — every recolouring cell just fades to its new hue.
-      cell.style.background = "color-mix(in srgb,var("+v+") 35%,transparent)";
-      cell.classList.remove("tl-flash");
-      if (prev){
-        var was = (name != null && prev[name] != null) ? prev[name] : -1;
-        var dir = rankOf(key) - rankOf(was);
-        if (dir !== 0){
-          if (dir > 0) advanced++; else regressed++;
-          if (!noAnim){
-            // brighten the recolouring cell ~10% during the background fade, then let
-            // it ease back (filter transition) — replaces the old green/red stroke.
-            (function(el){
-              el.classList.add("tl-flash");
-              setTimeout(function(){ el.classList.remove("tl-flash"); }, 450);
-            })(cell);
-          }
-        }
-      }
-    }
-    var lab = document.querySelector(".tl-machine .tl-scrub-date");
-    if (lab) lab.textContent = dateLabel(dates[idx]);
-    // live "+A, -R today" chip: the per-step net of glyphs that moved this day.
-    var chip = document.querySelector(".tl-machine .tl-scrub-diff");
-    if (chip){
-      chip.innerHTML = prev
-        ? '<span class="du">+'+advanced+'</span>, <span class="dd">−'+regressed+'</span> today'
-        : "";
-    }
-  }
-  // Set the scrub index (clamped), keep the range input + state in sync, and recolour
-  // the grid throttled to a single rAF per frame so a fast drag stays smooth.
-  var scrubRaf = 0;
+  // Set the scrub index (clamped) and re-render. A full update() makes picking a moment
+  // update EVERYTHING tied to it — the colour disc, the category/script lanes and their
+  // %/deltas all recompute at the scrubbed index (scrubScopeIdx). Picking the latest
+  // snapshot clears the scrub (back to "live").
   function scrubSet(idx){
     var dates = (H.trend && H.trend.dates) || [];
     if (!dates.length) return;
-    state.tlScrub = Math.max(0, Math.min(dates.length-1, idx));
-    var input = document.querySelector(".tl-machine .tl-scrub");
-    var dv = String(scrubIndexToDay(state.tlScrub));   // slider is in the day domain
-    if (input && input.value !== dv){ input.value = dv; }
-    if (scrubRaf) return;                       // coalesce bursts of input events
-    scrubRaf = requestAnimationFrame(function(){ scrubRaf = 0; scrubRecolour(); });
-  }
-  // Keyboard on the scrubber: Left/Right step +-1 day, Home/End jump to the ends.
-  function scrubKey(evt){
-    var input = evt.target.closest && evt.target.closest(".tl-scrub");
-    if (!input) return;
-    var dates = (H.trend && H.trend.dates) || [];
-    if (!dates.length) return;
-    var cur = scrubIndex(), next = cur;
-    if (evt.key === "ArrowLeft"){ next = cur-1; }
-    else if (evt.key === "ArrowRight"){ next = cur+1; }
-    else if (evt.key === "Home"){ next = 0; }
-    else if (evt.key === "End"){ next = dates.length-1; }
-    else return;
-    evt.preventDefault();
-    scrubSet(next);
-  }
-  // Build one compact cell for the scrub grid: a div carrying data-glyph + the
-  // letterform (if the model embedded a path for this master), recoloured on render
-  // to the master's colour at the scrubbed date via the shared color-mix idiom.
-  function timeMachine(){
-    var dates = (H.trend && H.trend.dates) || [];
-    if (dates.length < 2) return "";            // <2 snapshots: nothing to replay
-    var mid = scrubMaster();
-    if (!mid) return "";
-    var idx = scrubIndex();
-    var st = stateAt(mid, dates[idx]);
-    var names = H.glyphNames || [];
-    var paths = (H.paths && H.paths[mid]) || {};
-    var cells = names.map(function(name){
-      var key = (st[name] != null) ? st[name] : -1;
-      var v = varFor(key);
-      var p = paths[name];
-      var inner = p ? '<svg viewBox="'+esc(p.vb)+'" preserveAspectRatio="xMidYMid meet"><path d="'+esc(p.d)+'"/></svg>' : '';
-      return '<span class="cell'+(p ? ' glyph' : '')+'" data-glyph="'+esc(name)+'"'
-        + ' style="background:color-mix(in srgb,var('+v+') 35%,transparent)"'
-        + ' title="'+esc(name)+'" aria-hidden="true">'+inner+'</span>';
-    }).join("");
-    // The slider runs in a DAY domain (0..span days) so ticks sit at true calendar
-    // spacing: a faint tick per day, an emphasised + thinned-label tick on each snapshot
-    // day. Dragging snaps to the nearest snapshot (only those have data).
-    var lastI = dates.length - 1;
-    var span = scrubSpanDays();
-    var dayOfIdx = scrubIndexToDay(idx);
-    var snapByDay = {}; for (var si=0; si<=lastI; si++){ snapByDay[scrubIndexToDay(si)] = si; }
-    var labelStep = Math.max(1, Math.ceil(lastI / 5));   // aim for <=6 dated ticks
-    var ticks = "";
-    for (var d=0; d<=span; d++){
-      var leftPct = span > 0 ? (d / span * 100) : 0;
-      var snapI = snapByDay[d], isSnap = snapI != null;
-      var labeled = isSnap && ((snapI % labelStep === 0) || (snapI === lastI && lastI % labelStep !== 0));
-      ticks += '<span class="tl-tick'+(isSnap?" tl-tick-snap":"")+(labeled?" tl-tick-lab":"")+'" style="left:'+leftPct.toFixed(2)+'%">'
-        + (labeled ? '<span class="tl-tick-d">'+esc(dateLabel(dates[snapI]))+'</span>' : '')
-        + '</span>';
-    }
-    var controls = '<div class="tl-scrub-bar">'
-      + '<div class="tl-scrub-wrap">'
-      + '<input type="range" class="tl-scrub" min="0" max="'+span+'" step="1" value="'+dayOfIdx+'"'
-      + ' aria-label="Scrub through snapshot history" aria-valuetext="'+esc(dateLabel(dates[idx]))+'"/>'
-      + '<div class="tl-scrub-ticks" aria-hidden="true">'+ticks+'</div>'
-      + '</div>'
-      + '<span class="tl-scrub-date" aria-live="polite">'+esc(dateLabel(dates[idx]))+'</span>'
-      // #12: live "+A, -R today" chip near the slider; filled by scrubRecolour.
-      + '<span class="tl-scrub-diff" aria-live="polite"></span>'
-      + '</div>';
-    return '<div class="tl-machine" role="group" aria-label="Time Machine: replay the heatmap by date">'
-      + '<div class="tl-machine-h">Time Machine</div>'
-      + controls
-      + '<div class="tl-machine-grid heat" aria-label="Glyph colours at the scrubbed date">'+cells+'</div>'
-      + '</div>';
+    var clamped = Math.max(0, Math.min(dates.length-1, idx));
+    state.tlScrub = (clamped === dates.length-1) ? null : clamped;
+    update();
   }
   // ----- #20 rich onboarding seed states for sparse history -------------------
   // One builder for both early states. <2 snapshots: a skeleton preview (dashed
   // placeholder line + ghost dots + ONE real solid "today" dot from the single
-  // snapshot) + locked preview chips + a "History: N of 60 days" meter. ==2: a
+  // snapshot) + locked preview chips + a "History: N of 3 days" meter. ==2: a
   // compact one-day diff (A/B picker hidden) + the same meter. >=3 never reaches
   // here (timelineView gates it). All theme-safe + a11y-labelled; reduced-motion
   // drops the skeleton shimmer via the shared __cfdNoAnim / matchMedia gate.
@@ -1948,10 +2296,14 @@ DASHBOARD_JS = r"""
     var dates = (H.trend && H.trend.dates) || [];
     var noAnim = window.__cfdNoAnim ||
       (window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
-    // shared "History: N of 60 days" meter; N is the real snapshot count, capped at 60.
-    var n = Math.min(60, dates.length);
-    var meterWidth = Math.round(n / 60 * 100);
-    var meterLabel = "History: " + n + " of 60 days";
+    // shared "History: N of 3 days" meter; 3 snapshots unlock the full timeline
+    // (history itself is uncapped). In Save mode the unlock is "another commit"/
+    // "another save", not a day.
+    var byCommit = state.tlGran === "save";
+    var units = byCommit ? fineUnits() : "days";
+    var n = Math.min(3, dates.length);
+    var meterWidth = Math.round(n / 3 * 100);
+    var meterLabel = "History: " + n + " of 3 " + units;
     var histMeter = '<div class="tl-histmeter" role="img" aria-label="'+esc(meterLabel)+'">'
       + '<span class="tl-histmeter-l">'+esc(meterLabel)+'</span>'
       + '<span class="tl-histmeter-bar"><i style="width:'+meterWidth+'%"></i></span></div>';
@@ -1962,10 +2314,10 @@ DASHBOARD_JS = r"""
       var c = diffCounts(midTwo, dates[0], dates[1]);
       var net = (c.deltaPct>=0?"+":"") + c.deltaPct + "%";
       return '<section class="tl-seed tl-seed-2" role="group" aria-label="Day-two progress">'
-        + '<div class="tl-seed-head">First two days in</div>'
-        + '<p class="tl-seed-line2">In 1 day you advanced <b>'+c.advanced+'</b> '
+        + '<div class="tl-seed-head">First two '+units+' in</div>'
+        + '<p class="tl-seed-line2">'+(byCommit?"Across those 2 "+fineUnits()+" you advanced ":"In 1 day you advanced ")+'<b>'+c.advanced+'</b> '
         + '<span class="tl-seed-net '+(c.deltaPct>=0?"tl-d-up":"tl-d-down")+'">('+net+')</span>.</p>'
-        + '<p class="tl-seed-sub">Save again tomorrow to unlock the full timeline (forecast, streak, brush-compare).</p>'
+        + '<p class="tl-seed-sub">'+(byCommit?"Make another "+fineNoun():"Save again tomorrow")+' to unlock the full timeline (streak, moment discs, shape changes).</p>'
         + histMeter
         + '</section>';
     }
@@ -1977,7 +2329,7 @@ DASHBOARD_JS = r"""
     var midOne = state.master || (H.masters[0] && H.masters[0].id);
     var pc = 0;
     if (single && midOne && single.masters[midOne] && single.masters[midOne].total){
-      pc = single.masters[midOne].final / single.masters[midOne].total * 100;
+      pc = gradedPctAt(midOne, single.date);        // graded (matches the ring), not final-step-only
     }
     var W = 320, Ht = 120, pad = 14, iw = W - pad*2, ih = Ht - pad*2;
     var gx = function(t){ return pad + t*iw; };                // t in [0,1]
@@ -1994,19 +2346,20 @@ DASHBOARD_JS = r"""
       + esc("Today · " + Math.round(pc) + "%") + '</title></circle>';
     var shimmer = noAnim ? "" : " tl-seed-shimmer";
     var skeleton = '<svg class="tl-seed-svg'+shimmer+'" viewBox="0 0 '+W+' '+Ht+'" role="img" aria-label="'
-      + esc("One snapshot so far at " + Math.round(pc) + "%. The chart unlocks once a second day of history is saved.")+'">'
+      + esc("One snapshot so far at " + Math.round(pc) + "%. The chart unlocks once a second " + (byCommit ? fineNoun()+" is recorded" : "day of history is saved") + ".")+'">'
       + ghostLine + ghostDots + todayDot + '</svg>';
-    // locked preview chips: Forecast / Streak / Compare, each muted "unlocks at 2 days".
-    var locks = ["Forecast", "Streak", "Compare"].map(function(name){
+    // locked preview chips: Streak / Moment discs / Shape changes, each muted "unlocks at 2 days".
+    var locks = ["Streak", "Moment discs", "Shape changes"].map(function(name){
       return '<span class="tl-lock" aria-disabled="true">'
         + '<span class="tl-lock-n">'+esc(name)+'</span>'
-        + '<span class="tl-lock-h">unlocks at 2 days</span></span>';
+        + '<span class="tl-lock-h">unlocks at 2 '+units+'</span></span>';
     }).join("");
     return '<section class="tl-seed tl-seed-1" role="group" aria-label="Getting started">'
       + '<div class="tl-seed-head">Building your timeline</div>'
       + skeleton
-      + '<p class="tl-seed-sub">Color Flow saves a snapshot each time you save the font. '
-      + 'The chart unlocks at 2 days of history.</p>'
+      + '<p class="tl-seed-sub">'+(byCommit
+          ? "Color Flow reads a snapshot from each git commit. The chart unlocks at 2 commits of history."
+          : "Color Flow saves a snapshot each time you save the font. The chart unlocks at 2 days of history.")+'</p>'
       + '<div class="tl-seed-locks">'+locks+'</div>'
       + histMeter
       + '</section>';
@@ -2029,7 +2382,18 @@ DASHBOARD_JS = r"""
     var maxC = 1; for (var k in counts){ if (counts[k] > maxC) maxC = counts[k]; }
     return function(c){ if (!c) return 1; var r = c/maxC; return r>0.66?4:r>0.33?3:2; };
   }
-  function calMasterId(){ return state.master != null ? state.master : (H.masters[0] && H.masters[0].id); }
+  // Activity counts for the calendar's active scope: the focused master, or summed
+  // across the whole family in Global view (so the calendar isn't just master #1).
+  function calActivityScoped(){
+    if (state.master != null) return calActivity(state.master);
+    var dates = (H.trend && H.trend.dates) || [], total = {};
+    dates.forEach(function(d){ total[d] = 0; });
+    H.masters.forEach(function(m){
+      var c = calActivity(m.id);
+      for (var k in c){ total[k] = (total[k]||0) + (c[k]||0); }
+    });
+    return total;
+  }
   // The displayed month for the Standard calendar; lazily seeded to the last snapshot's
   // month so the first thing the user sees is where their history actually is.
   function calMonthRef(){
@@ -2048,7 +2412,7 @@ DASHBOARD_JS = r"""
     var MONTHS = ["January","February","March","April","May","June",
                   "July","August","September","October","November","December"];
     var dates = (H.trend && H.trend.dates) || [];
-    var counts = calActivity(calMasterId());
+    var counts = calActivityScoped();
     var dateIdx = {}; dates.forEach(function(dt, i){ dateIdx[dt] = i; });
     var level = calLevelFn(counts);
     var ref = calMonthRef(), y = ref.y, m = ref.m;
@@ -2085,42 +2449,55 @@ DASHBOARD_JS = r"""
     return '<div class="tl-cal-card"><div class="tl-cal-h"><span class="tl-cal-ttl">Activity calendar</span></div>'
       + standardCalendar() + '</div>';
   }
+  // Timeline mode toggle: Time (group saves over time) vs Save (one point per save).
+  // In Time mode a second toggle picks the grouping bucket (Hours/Days/Months). Hidden
+  // without a fine dataset (then there is only one possible view).
+  function tlGranToggle(){
+    if (!H.hasCommits) return "";
+    // Save is the default base graph (every save). A single "Time" toggle switches into
+    // the grouped view; clicking it again returns to Save. The time-range buttons
+    // (Hours/Days/Months) only appear while Time is active — no separate Save button.
+    var time = state.tlGran === "time";
+    var timeTitle = H.fineKind === "save" ? "Group saves over time" : "Group commits over time";
+    var modes = '<div class="tl-mode" role="group" aria-label="Timeline mode">'
+      + '<button type="button" class="chip tl-mode-btn" data-tlgrantoggle="1" aria-pressed="'+time+'" title="'+timeTitle+'">Time</button>'
+      + '</div>';
+    var buckets = "";
+    if (time){
+      // Hours dropped: past days collapse to end-of-day (no intra-day history to group),
+      // and today's per-save detail already lives in the Save view.
+      var units = [["day","Days"],["month","Months"]];
+      buckets = '<div class="tl-mode tl-bucket" role="group" aria-label="Time grouping">'
+        + units.map(function(u){
+            return '<button type="button" class="chip tl-mode-btn" data-tlbucket="'+u[0]+'" aria-pressed="'+(state.tlBucket===u[0])+'" title="Group by '+u[1].toLowerCase()+'">'+u[1]+'</button>';
+          }).join("") + '</div>';
+    }
+    return '<div class="tl-granbar"><span class="tl-granlabel">Timeline</span>'+modes+buckets+'</div>';
+  }
   function timelineView(){
     // #20: <3 snapshots routes to the rich seed states (a skeleton + locked chips at
     // <2, a compact one-day diff at ==2). The full view needs >=3 to be meaningful.
+    // The granularity toggle sits ABOVE the seed gate so it stays reachable even when
+    // the active granularity has too few points (you can always switch back).
+    var gran = tlGranToggle();
     var dates = (H.trend && H.trend.dates) || [];
     if (dates.length < 3){
-      return '<section class="tl-empty">'+seedState()+'</section>';
+      return '<section class="timeline">'+gran+'<section class="tl-empty">'+seedState()+'</section></section>';
     }
-    // D2: Line is the default; Flow renders the stacked colour streamgraph (#5).
-    var parts = state.tlMode === "flow" ? streamParts(680, 200) : trendParts(680, 200);
-    // #14: This-week digest tops the tab (above the chart), per D1. No static legend
-    // line — the colour/name read-out only appears on hover (the snapping crosshair).
-    return '<section class="timeline">'+weekDigest()+'<div class="tl-chartbar">'+tlModeToggle()+'</div>'
-      + parts.chart+parts.foot+dateDiffPanel()+deadlinePanel()+timeMachine()+categoryLanes()+scriptLanes()+regressionLog()+'</section>';
-  }
-  function compareView(){
-    // columns = steps (+None); rows = masters, labelled by the master name.
-    var head = '<th scope="col">Master</th>'+H.steps.map(function(s){
-      return '<th scope="col" title="'+esc(s.label)+'" aria-label="'+esc(s.label)+'"><span class="dot" style="background:var('+varFor(s.key)+')"></span></th>';
-    }).join("");
-    var body = H.masters.map(function(m){
-      var aa = esc(m.name);
-      var cells = H.steps.map(function(s){
-        var p = pct(countFor(m,s.key),H.glyphTotal);
-        // a fully-set step shows just a checkmark — no % text, no colour bar
-        if (p >= 100) return '<td class="cmp-done">✅</td>';
-        return '<td><span class="cmpbar" style="width:'+p+'%;background:var('+varFor(s.key)+')"></span><span class="cmpn">'+p+'%</span></td>';
-      }).join("");
-      var cls = state.master==null ? "" : (m.id===state.master ? " cmp-sel" : " cmp-dim");
-      return '<tr class="cmprow'+cls+'" data-m="'+esc(m.id)+'" title="Click to focus this master"><th scope="row" class="cmp-m" aria-label="'+esc(m.name)+'">'+aa+'</th>'+cells+'</tr>';
-    }).join("");
-    return '<div class="cmp-wrap"><table class="cmp"><caption>Step completion by master</caption><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
+    // One graph (the graded completion Line). Global (no master) -> a neutral line per
+    // master. Focusing a master AUTO-SHOWS that master's weighted per-colour breakdown
+    // under its line (no Colours button — focus is the switch).
+    var parts = (state.master != null) ? streamParts(680, 200) : trendParts(680, 200);
+    tlChartShouldAnim = false;                   // consumed: animate only on entering Timeline, not on scrub/zoom
+    var chartBlock = '<div class="tl-chartbar">'+tlSpanToggle()+'</div>'+parts.chart+rangeNav(680)+parts.foot;
+    // Clicking the chart picks a moment (scrub): the left-sidebar discs + the category /
+    // script lanes recompute at that moment. The lanes sit in a two-column grid.
+    return '<section class="timeline">'+gran+chartBlock
+      + '<div class="tl-lanes-grid">'+categoryLanes()+scriptLanes()+'</div>'
+      + outlineChangesView()+touchedAfterDoneView()+'</section>';
   }
   function renderBody(){
-    return state.view==="compare" ? compareView()
-      : state.view==="coverage" ? coverageView()
-      : state.view==="timeline" ? timelineView()
+    return state.view==="timeline" ? timelineView()
       : tabsView();
   }
 
@@ -2151,7 +2528,8 @@ DASHBOARD_JS = r"""
       for (var i=0;i<events.length;i++){
         if (events[i][0] <= iso) key = events[i][1]; else break;
       }
-      if (key !== null) out[name] = key;
+      // a hidden colour (not in the visible order) reads as uncoloured, like m.keys
+      if (key !== null) out[name] = (key !== -1 && H.order.indexOf(String(key))===-1) ? -1 : key;
     }
     return out;
   }
@@ -2170,135 +2548,15 @@ DASHBOARD_JS = r"""
   }
   function hideTip(){ var tip = document.getElementById("cfd-tip"); if (tip) tip.style.display = "none"; }
 
-  // ----- #6 snapping crosshair read-out -------------------------------------
-  // Index of the snapshot the crosshair currently rests on (-1 = hidden). Kept on
-  // the module so Left/Right keyboard stepping shares the same anchor as the pointer.
-  var crossIdx = -1;
-  // The exact completion % of master m.id at snapshot p (same maths trendParts uses
-  // for the dots). Honest: reads the stored finals, never interpolates between dates.
-  function crossPctAt(p, masterId){
-    var mp = p.masters && p.masters[masterId];
-    return mp && mp.total ? mp.final/mp.total*100 : 0;
-  }
-  // Float the cfd-tip read-out: the snapshot date + every master's exact % there.
-  // In Flow mode the chart carries data-stream (per-date per-step tallies) instead
-  // of per-master %, so the read-out lists each step's count at the snapped date.
-  function crossReadout(svg, idx, clientX){
-    var series = (H.trend && H.trend.series) || [];
-    var p = series[idx]; if (!p){ hideTip(); return; }
-    var tip = document.getElementById("cfd-tip");
-    if (!tip){ tip = document.createElement("div"); tip.id = "cfd-tip"; tip.className = "cfd-tip"; document.body.appendChild(tip); }
-    var streamData = svg.getAttribute("data-stream");
-    var rows;
-    if (streamData){
-      var tally; try { tally = JSON.parse(streamData); } catch(e){ tally = []; }
-      var t = tally[idx] || { byKey:{}, none:0 };
-      rows = (H.order||[]).map(function(k){
-        return '<div class="tl-cross-row"><i style="background:var('+varFor(k)+')"></i>'
-          + esc(labelFor(k))+' <b>'+(t.byKey[k]||0)+'</b></div>';
-      }).join("")
-        + '<div class="tl-cross-row"><i class="tl-lg-hatch"></i>'+esc(H.noneLabel)+' <b>'+(t.none||0)+'</b></div>';
-    } else {
-      rows = H.masters.map(function(m, i){
-        if (!(p.masters && p.masters[m.id])) return "";
-        var col = "hsl("+masterHue(i)+",70%,55%)";
-        var bold = state.master!=null && m.id===state.master;
-        return '<div class="tl-cross-row'+(bold?" tl-sel":"")+'"><i style="background:'+col+'"></i>'
-          + esc(m.name)+' <b>'+Math.round(crossPctAt(p, m.id))+'%</b></div>';
-      }).join("");
-    }
-    tip.innerHTML = '<div class="tip-h">'+esc(dateLabel(p.date))+' · '+esc(p.date)+'</div>'+rows;
-    tip.style.display = "block";
-    var box = svg.getBoundingClientRect();
-    var anchorX = clientX != null ? clientX : box.left + box.width/2;
-    var left = Math.min(anchorX+14, window.innerWidth - tip.offsetWidth - 8);
-    tip.style.left = Math.max(8, left)+"px";
-    tip.style.top = Math.max(8, box.top - tip.offsetHeight - 4)+"px";
-  }
-  // Snap the guide + marker to snapshot `idx` and float the read-out. Reduced motion
-  // (or the test hook) means the guide jumps instantly — it never animates anyway,
-  // but we honour the shared gate by skipping any future transition opt-in.
-  function crossSnapTo(svg, idx, clientX){
-    var snaps; try { snaps = JSON.parse(svg.getAttribute("data-snaps")||"[]"); } catch(e){ snaps = []; }
-    if (!snaps.length || idx < 0 || idx >= snaps.length){ crossHide(svg); return; }
-    crossIdx = idx;
-    var snap = snaps[idx];
-    var topY = parseFloat(svg.getAttribute("data-topy")) || 0;
-    var botY = parseFloat(svg.getAttribute("data-boty")) || 0;
-    var guide = svg.querySelector(".tl-cross");
-    var mark = svg.querySelector(".tl-cross-mark");
-    if (guide){ guide.setAttribute("x1", snap.x); guide.setAttribute("x2", snap.x); guide.style.display = "block"; }
-    if (mark){
-      // marker sits on the selected master's value (honest dot) when one is focused,
-      // else parks at the top of the plot so it stays a pure x-locator.
-      var my = topY;
-      var series = (H.trend && H.trend.series) || [];
-      if (state.master!=null && series[idx]){ my = botY - crossPctAt(series[idx], state.master)/100*(botY-topY); }
-      mark.setAttribute("cx", snap.x); mark.setAttribute("cy", my.toFixed(1)); mark.style.display = "block";
-    }
-    crossReadout(svg, idx, clientX);
-  }
-  function crossHide(svg){
-    crossIdx = -1;
-    var guide = svg && svg.querySelector(".tl-cross"); if (guide) guide.style.display = "none";
-    var mark = svg && svg.querySelector(".tl-cross-mark"); if (mark) mark.style.display = "none";
-    hideTip();
-  }
-  // Pointer handler: map the client X into SVG user-space (viewBox width / box width),
-  // then pick the NEAREST snapshot X — discrete series, so no interpolation. Resolves
-  // the chart from the event target so it works as a delegated #cfd-body listener.
-  function crosshairMove(evt){
-    var svg = evt.target.closest && evt.target.closest(".tl-chart");
-    if (!svg){ return; }
-    var snaps; try { snaps = JSON.parse(svg.getAttribute("data-snaps")||"[]"); } catch(e){ snaps = []; }
-    if (!snaps.length){ return; }
-    var box = svg.getBoundingClientRect();
-    if (!box.width){ return; }
-    var vb = svg.viewBox && svg.viewBox.baseVal;
-    var vbw = (vb && vb.width) || box.width;
-    var ux = (evt.clientX - box.left) / box.width * vbw;   // pointer X in SVG user-space
-    var nearest = 0, best = Infinity;
-    for (var i=0;i<snaps.length;i++){
-      var d = Math.abs(snaps[i].x - ux);
-      if (d < best){ best = d; nearest = i; }
-    }
-    crossSnapTo(svg, nearest, evt.clientX);
-  }
-  // Pointer left the chart: drop the guide + read-out.
-  function crosshairLeave(evt){
-    var svg = evt.target.closest && evt.target.closest(".tl-chart");
-    if (svg){ crossHide(svg); }
-  }
-  // Keyboard: Left/Right step the snapped snapshot and refresh the same read-out.
-  function crosshairKey(evt){
-    if (evt.key!=="ArrowLeft" && evt.key!=="ArrowRight"){ return; }
-    // a focused brush handle owns the arrow keys (brushKey) — don't also step the crosshair.
-    if (evt.target.closest && evt.target.closest(".tl-brush-h")){ return; }
-    var svg = evt.target.closest && evt.target.closest(".tl-chart");
-    if (!svg){ return; }
-    var snaps; try { snaps = JSON.parse(svg.getAttribute("data-snaps")||"[]"); } catch(e){ snaps = []; }
-    if (!snaps.length){ return; }
-    evt.preventDefault();
-    var idx = crossIdx < 0 ? (evt.key==="ArrowLeft" ? snaps.length-1 : 0)
-      : Math.max(0, Math.min(snaps.length-1, crossIdx + (evt.key==="ArrowRight" ? 1 : -1)));
-    crossSnapTo(svg, idx, null);
-  }
+  // (The #6 hover crosshair + floating read-out popover were removed. The chart's only
+  //  pointer interaction is now click-to-pick-a-moment; hover shows nothing.)
 
-  // ----- #8 brush-to-compare ------------------------------------------------
-  // The two snapshot indices the brush currently spans (low..high). Live during a
-  // drag/nudge so the band + handles stay coherent before the diff settles.
-  var brushA = -1, brushB = -1;
-  // Read the snapshot X anchors off the SVG (same data-snaps the crosshair uses).
-  function brushSnaps(svg){
+  // Map a client X to the NEAREST snapshot index. The forward map is
+  // X(off)=pl+off/lastOff*iw drawn into the viewBox, so we only need the snapshot X
+  // anchors (data-snaps) and the box->viewBox ratio — no interpolation, series is discrete.
+  function chartIndexFromClient(svg, clientX){
     var snaps; try { snaps = JSON.parse(svg.getAttribute("data-snaps")||"[]"); } catch(e){ snaps = []; }
-    return snaps;
-  }
-  // Invert the forward X scale: map a client X to the NEAREST snapshot index. The
-  // forward map is X(off)=pl+off/lastOff*iw drawn into the viewBox, so we only need
-  // the snapshot X anchors and the box->viewBox ratio to recover the date under the
-  // pointer — no interpolation, the series is discrete.
-  function brushIndexFromClient(svg, clientX){
-    var snaps = brushSnaps(svg); if (!snaps.length){ return -1; }
+    if (!snaps.length){ return -1; }
     var box = svg.getBoundingClientRect(); if (!box.width){ return -1; }
     var vb = svg.viewBox && svg.viewBox.baseVal;
     var vbw = (vb && vb.width) || box.width;
@@ -2310,97 +2568,23 @@ DASHBOARD_JS = r"""
     }
     return nearest;
   }
-  // Position the translucent band + the two handles for the current brush span.
-  function brushPaint(svg){
-    var snaps = brushSnaps(svg);
-    var band = svg.querySelector(".tl-brush");
-    var handles = svg.querySelectorAll(".tl-brush-h");
-    if (brushA < 0 || brushB < 0 || !snaps.length){
-      if (band){ band.style.display = "none"; }
-      return;
-    }
-    var lo = Math.min(brushA, brushB), hi = Math.max(brushA, brushB);
-    var xLo = snaps[lo].x, xHi = snaps[hi].x;
-    if (band){
-      band.setAttribute("x", xLo);
-      band.setAttribute("width", Math.max(0, xHi - xLo).toFixed(1));
-      band.style.display = "block";
-    }
-    for (var i=0;i<handles.length;i++){
-      var edge = handles[i].getAttribute("data-edge");
-      var hx = (edge === "a") ? xLo : xHi;
-      handles[i].setAttribute("x", (hx - 3).toFixed(1));   // centre the 6px-wide handle
-      handles[i].style.display = "block";
-    }
-  }
-  // Settle the compare: write the two snapped dates into state.dateA/dateB and the
-  // <select> a11y fallback, then re-render so dateDiffPanel recomputes advanced/
-  // regressed/unchanged/net for the range. Reduced-motion is honoured implicitly —
-  // dateDiffPanel just renders numbers, no live animation runs while dragging.
-  function brushApply(svg){
-    var snaps = brushSnaps(svg);
-    if (brushA < 0 || brushB < 0 || !snaps.length){ return; }
-    var lo = Math.min(brushA, brushB), hi = Math.max(brushA, brushB);
-    state.dateA = snaps[lo].d;
-    state.dateB = snaps[hi].d;
-    update();
-  }
-  // Named brush handler: pointerdown on the chart starts a drag; pointermove paints
-  // the live band; pointerup snaps both endpoints into the compare. A drag that
-  // starts on a handle drags that single edge; otherwise both edges track the drag.
-  function brushMove(evt){
+  // Click anywhere on the chart to PICK that moment (scrub): the per-master colour discs
+  // and the category/script lanes recompute at that snapshot. Map the windowed index back
+  // to the full series. Clicking the latest point clears the scrub (back to live).
+  function chartClick(evt){
     var svg = evt.target.closest && evt.target.closest(".tl-chart");
     if (!svg){ return; }
-    var snaps = brushSnaps(svg); if (snaps.length < 2){ return; }
-    var start = brushIndexFromClient(svg, evt.clientX); if (start < 0){ return; }
-    var onHandle = evt.target.closest && evt.target.closest(".tl-brush-h");
-    var dragEdge = onHandle ? onHandle.getAttribute("data-edge") : null;
-    if (dragEdge){
-      // dragging a single existing handle; keep the other edge anchored.
-      if (dragEdge === "a"){ brushA = start; } else { brushB = start; }
-    } else {
-      brushA = start; brushB = start;     // fresh drag: collapse, then expand on move
-    }
-    brushPaint(svg);
-    evt.preventDefault();
-    function onPointerMove(moveEvt){
-      var idx = brushIndexFromClient(svg, moveEvt.clientX); if (idx < 0){ return; }
-      if (dragEdge === "a"){ brushA = idx; }
-      else if (dragEdge === "b"){ brushB = idx; }
-      else { brushB = idx; }
-      brushPaint(svg);
-    }
-    function onPointerUp(){
-      document.removeEventListener("pointermove", onPointerMove);
-      document.removeEventListener("pointerup", onPointerUp);
-      brushApply(svg);
-    }
-    document.addEventListener("pointermove", onPointerMove);
-    document.addEventListener("pointerup", onPointerUp);
+    var idx = chartIndexFromClient(svg, evt.clientX); if (idx < 0){ return; }
+    scrubSet(viewBounds()[0] + idx);
   }
-  // Keyboard: Left/Right nudge the focused handle by one snapshot, then settle.
-  function brushKey(evt){
+  // Keyboard: Left/Right step the picked moment by one snapshot while the chart is focused.
+  function chartKey(evt){
     if (evt.key!=="ArrowLeft" && evt.key!=="ArrowRight"){ return; }
-    var handle = evt.target.closest && evt.target.closest(".tl-brush-h");
-    if (!handle){ return; }
-    var svg = handle.closest(".tl-chart"); if (!svg){ return; }
-    var snaps = brushSnaps(svg); if (snaps.length < 2){ return; }
+    var svg = evt.target.closest && evt.target.closest(".tl-chart"); if (!svg){ return; }
+    var dates = (H.trend && H.trend.dates) || []; if (dates.length < 2){ return; }
     evt.preventDefault();
-    var edge = handle.getAttribute("data-edge");
-    // seed from the current compare endpoints if the brush has not been dragged yet,
-    // so a keyboard-only user still gets a coherent range to nudge.
-    if (brushA < 0 || brushB < 0){
-      brushA = 0; brushB = snaps.length-1;
-      for (var i=0;i<snaps.length;i++){
-        if (state.dateA && snaps[i].d===state.dateA){ brushA = i; }
-        if (state.dateB && snaps[i].d===state.dateB){ brushB = i; }
-      }
-    }
     var step = evt.key==="ArrowRight" ? 1 : -1;
-    if (edge === "a"){ brushA = Math.max(0, Math.min(snaps.length-1, brushA + step)); }
-    else { brushB = Math.max(0, Math.min(snaps.length-1, brushB + step)); }
-    brushPaint(svg);
-    brushApply(svg);
+    scrubSet(Math.max(0, Math.min(dates.length-1, scrubIndex() + step)));
   }
 
   // Animate the heatmap cells between their last-run ("before") and current
@@ -2416,18 +2600,45 @@ DASHBOARD_JS = r"""
     }
   }
 
+  // Count-up a lane's percentage from -> to (uses the rAF timestamp, no clock).
+  function tweenNumber(el, from, to, dur){
+    requestAnimationFrame(function step(ts){
+      if (step.t0 == null){ step.t0 = ts; }
+      var p = Math.min(1, (ts - step.t0) / dur), ease = p*p*(3-2*p);
+      el.textContent = Math.round(from + (to - from) * ease) + "%";
+      if (p < 1){ requestAnimationFrame(step); }
+    });
+  }
+  // Animate the category/script lane numbers whenever they change (picking a different
+  // moment on the chart, or focusing a master). Each render carries the new value in
+  // data-to; we tween from the last shown value cached per lane key. Reduced-motion /
+  // headless snap straight to the value. Zoom drags don't change the numbers, so they
+  // never trigger a tween.
+  function animateLaneNumbers(){
+    var anim = !window.__cfdNoAnim && !(window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
+    var els = document.querySelectorAll(".timeline .tl-lane-pct[data-lanekey]");
+    for (var i = 0; i < els.length; i++){
+      var el = els[i], key = el.getAttribute("data-lanekey"), to = parseInt(el.getAttribute("data-to"), 10) || 0;
+      var from = (key in laneNumCache) ? laneNumCache[key] : to;
+      laneNumCache[key] = to;
+      if (!anim || from === to){ el.textContent = to + "%"; continue; }
+      el.textContent = from + "%";
+      tweenNumber(el, from, to, 460);
+    }
+  }
+
   function update(){
     hideTip();
     barsAnim = !introPlayed;                    // fill the colour bar once on first paint, never on master switches
     introPlayed = true;
     document.getElementById("cfd-body").innerHTML = renderBody();
     document.documentElement.setAttribute("data-theme", state.theme);
-    var cmp = document.getElementById("cfd-compare"); if (cmp) cmp.setAttribute("aria-pressed", state.view==="compare");
-    var cov = document.getElementById("cfd-coverage"); if (cov) cov.setAttribute("aria-pressed", state.view==="coverage");
     var tl = document.getElementById("cfd-timeline"); if (tl) tl.setAttribute("aria-pressed", state.view==="timeline");
     var ov = document.getElementById("cfd-overview"); if (ov) ov.setAttribute("aria-pressed", state.view==="tabs");
+    var exo = document.getElementById("cfd-exonly"); if (exo) exo.setAttribute("aria-pressed", !!state.exportingOnly);
     var sb = document.getElementById("cfd-sort"); if (sb) sb.textContent = "↕ Sort: "+(state.sort==="progress"?"progress":"workflow");
     paintScriptCards();
+    animateLaneNumbers();                        // count-up the lane %s when the picked moment / focus changes
   }
 
   // Re-organise the heatmap when the focused colour changes (a FLIP animation):
@@ -2502,13 +2713,16 @@ DASHBOARD_JS = r"""
 
   // ----- Status export: CSV / JSON for stakeholders + trackers (#22) -----
   function exportRows(){
-    var rows = [];
+    // Follows the exporting-only toggle (countFor / uncoloredFor / countedTotal are
+    // exclusion-aware), so an export always matches the percentages on screen.
+    var rows = [], total = countedTotal();
     H.masters.forEach(function(m){
       H.steps.forEach(function(s){
         var c = countFor(m, s.key);
-        rows.push({master:m.name, step:s.key, label:s.label, count:c, total:H.glyphTotal, pct:pct(c,H.glyphTotal)});
+        rows.push({master:m.name, step:s.key, label:s.label, count:c, total:total, pct:pct(c,total)});
       });
-      rows.push({master:m.name, step:"None", label:H.noneLabel, count:m.uncolored, total:H.glyphTotal, pct:pct(m.uncolored,H.glyphTotal)});
+      var un = uncoloredFor(m);
+      rows.push({master:m.name, step:"None", label:H.noneLabel, count:un, total:total, pct:pct(un,total)});
     });
     return rows;
   }
@@ -2527,12 +2741,16 @@ DASHBOARD_JS = r"""
     return lines.join("\n");
   }
   function exportJSON(){
+    // countFor / uncoloredFor / countedTotal follow the exporting-only toggle, so
+    // the JSON matches the on-screen numbers (raw m.counts passthrough when off).
     return JSON.stringify({
       family:H.family, fileName:H.fileName, version:H.version, mode:H.mode,
       generated:H.generated, glyphTotal:H.glyphTotal, steps:H.steps,
+      exportingOnly:!!(countedSet()),
       masters:H.masters.map(function(m){
-        return { id:m.id, name:m.name, counts:m.counts, uncolored:m.uncolored,
-                 started:startedOf(m), total:H.glyphTotal };
+        var counts = {}; (H.order||[]).forEach(function(k){ counts[k] = countFor(m,k); });
+        return { id:m.id, name:m.name, counts:counts, uncolored:uncoloredFor(m),
+                 started:startedOf(m), total:countedTotal() };
       })
     }, null, 2);
   }
@@ -2551,12 +2769,15 @@ DASHBOARD_JS = r"""
   // ----- Full PDF report: a contents page with clickable jump links, then every
   //       section (overview, each master, compare, coverage, timeline) -----
   function printCoverageRows(){
-    var cov = (H.coverage && H.coverage.byCategory) || {};
-    var rows = cov[state.master] || [];
+    // The active scope via covRows(): focused master -> that master's rows; global
+    // (no focus) -> the font-wide merge — same as the on-screen category card, so
+    // printing from the unfocused overview no longer yields an empty section.
+    var rows = covRows("byCategory");
     if (!rows.length) return '<p class="empty">No coverage data.</p>';
     return '<div class="cov-rows">'+rows.map(function(r){
+      var count = (r.glyphs != null ? r.glyphs : r.total);
       return '<div class="cov-row"><span class="cov-name" title="'+esc(r.key)+'">'+esc(r.key)+'</span>'
-        + covStacked(r) + '<span class="num">'+r.total+'</span></div>';
+        + covStacked(r) + '<span class="num">'+count+'</span></div>';
     }).join("")+'</div>';
   }
   function buildPrintReport(){
@@ -2565,9 +2786,8 @@ DASHBOARD_JS = r"""
       toc.push('<a class="ptab" href="#'+id+'">'+esc(title)+'</a>');
       secs += '<section class="psec" id="'+id+'"><h2 class="ph">'+esc(title)+'</h2>'+inner+'</section>';
     }
-    add("psec-overview", "Overview", overall());
+    add("psec-overview", "Overview", overall()+recipeCard());
     H.masters.forEach(function(m){ add("psec-m-"+m.id, m.name, masterOverall(m)+heatmap(m)); });
-    add("psec-compare", "Compare by master", compareView());
     add("psec-coverage", "Coverage by category", printCoverageRows());
     add("psec-timeline", "Progress over time", timelineView());
     return '<section class="pcover"><div class="pcover-ttl">'+esc(H.family)+'</div>'
@@ -2622,13 +2842,11 @@ DASHBOARD_JS = r"""
       ? '<div class="hp-row">'+swatchFor(null)
         + '<span class="hp-n">'+esc(H.noneLabel)+'</span><span class="hp-pos">uncoloured</span></div>'
       : "";
-    var glossary = '<div class="hp-gloss">'
-      + '<p><b>% complete</b> — weighted progress across the colour steps.</p>'
-      + '<p><b>forecast</b> — estimated finish date at the recent pace; never a hard date.</p>'
-      + '<p><b>regression</b> — a glyph that moved backward in the flow since the last save.</p></div>';
-    return '<div class="cfd-modal-box" role="dialog" aria-label="Help and legend" aria-modal="true">'
-      + '<div class="cfd-modal-h">Legend &amp; help</div>'
-      + '<div class="cfd-cards hp-list">'+legend+none+glossary+'</div></div>';
+    // labels-only: the colour-label legend (+ uncoloured row). The metric definitions
+    // that used to sit at the bottom of this panel have been removed.
+    return '<div class="cfd-modal-box" role="dialog" aria-label="Colour labels" aria-modal="true">'
+      + '<div class="cfd-modal-h">Colour labels</div>'
+      + '<div class="cfd-cards hp-list">'+legend+none+'</div></div>';
   }
   function closeHelp(){ var m = document.getElementById("cfd-help-modal"); if (m) m.style.display = "none"; state.helpOpen = false; }
   function openHelp(){
@@ -2674,14 +2892,17 @@ DASHBOARD_JS = r"""
     function toggleView(name){
       var v = state.view===name ? "tabs" : name;
       if (v!=="tabs"){ state.focus = null; }
+      if (v==="timeline"){ tlChartShouldAnim = true; }   // draw-in the chart on entering Timeline
       state.view = v; update();
     }
     document.getElementById("cfd-overview").addEventListener("click", function(){ state.view = "tabs"; state.master = null; update(); });
-    document.getElementById("cfd-compare").addEventListener("click", function(){ toggleView("compare"); });
-    document.getElementById("cfd-coverage").addEventListener("click", function(){ toggleView("coverage"); });
     document.getElementById("cfd-timeline").addEventListener("click", function(){ toggleView("timeline"); });
     document.getElementById("cfd-export").addEventListener("click", openExport);
     document.getElementById("cfd-help").addEventListener("click", openHelp);
+    // Exporting-only toggle (only rendered when H.nonExporting has entries): flips
+    // the client-side exclusion; update() keeps its aria-pressed in sync.
+    var exonly = document.getElementById("cfd-exonly");
+    if (exonly) exonly.addEventListener("click", function(){ setExportingOnly(!state.exportingOnly); });
     document.addEventListener("keydown", function(e){
       if (e.key==="Escape"){ closeExport(); closeJourney(); closeHelp(); if (state.focus!==null){ setFocus(null); } }
     });
@@ -2695,59 +2916,61 @@ DASHBOARD_JS = r"""
     bodyEl.addEventListener("click", function(e){
       var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); update(); return; }
       var ox = e.target.closest("[data-ovexpand]"); if (ox){ var ok=ox.getAttribute("data-ovexpand"); state.ovExpand[ok]=!state.ovExpand[ok]; update(); return; }
-      var cr = e.target.closest(".cmprow[data-m],.lb-row[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; update(); return; }
-      var tm = e.target.closest("[data-tlmode]"); if (tm){ state.tlMode = tm.getAttribute("data-tlmode"); update(); return; }
+      var hs = e.target.closest("[data-hsort]"); if (hs){ state.heatSort = hs.getAttribute("data-hsort"); update(); return; }
+      var fn = e.target.closest("[data-funnel]"); if (fn){ state.funnelOpen = (state.funnelOpen === false); update(); return; }
+      var tc = e.target.closest("[data-tlcat]"); if (tc){ var ck=tc.getAttribute("data-tlcat"); state.tlCatOpen[ck]=!state.tlCatOpen[ck]; update(); return; }
+      var oc = e.target.closest("[data-oc]"); if (oc){ var ok=oc.getAttribute("data-oc"); state.ocOpen[ok]=!state.ocOpen[ok]; update(); return; }
+      var cr = e.target.closest(".lb-row[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; update(); return; }
+      var sp = e.target.closest("[data-tlspan]"); if (sp){ setTlSpan(sp.getAttribute("data-tlspan")); return; }
+      var tg = e.target.closest("[data-tlgrantoggle]"); if (tg){ setGranularity(state.tlGran==="time" ? "save" : "time"); return; }
+      var tb = e.target.closest("[data-tlbucket]"); if (tb){ setBucket(tb.getAttribute("data-tlbucket")); return; }
+      var nr = e.target.closest("[data-navreset]"); if (nr){ navReset(); return; }
       var cnv = e.target.closest("[data-calnav]"); if (cnv){
         calMonthRef();                                   // ensure calY/calM seeded
         state.calM += parseInt(cnv.getAttribute("data-calnav"),10);
         while (state.calM < 0){ state.calM += 12; state.calY--; }
         while (state.calM > 11){ state.calM -= 12; state.calY++; }
         update(); return; }
-      var gs = e.target.closest("[data-gsort]"); if (gs){ state.glyphSort = gs.getAttribute("data-gsort"); update(); return; }
       var cd = e.target.closest("[data-calday]"); if (cd){
         var ci = parseInt(cd.getAttribute("data-calday"),10);
-        state.tlScrub = ci;                                          // seed the scrub index
-        if (!document.querySelector(".tl-machine .tl-machine-grid")){ // calendar on Overview:
-          state.view = "timeline"; state.focus = null; update();      // bring up the Time Machine
-        }
-        scrubSet(ci); return; }
+        if (state.view !== "timeline"){ state.view = "timeline"; state.focus = null; }  // hop to the chart
+        scrubSet(ci); return; }                                       // pick that moment (disc + lanes follow)
       var fc = e.target.closest("[data-fclear]"); if (fc){ setFocus(null); return; }
+      // heatmap time-travel pill: clear the picked moment (same reset scrubSet applies
+      // when the latest snapshot is picked) and re-render through the normal update()
+      // path, so the .cell background transition crossfades back to today's colours.
+      var scl = e.target.closest("[data-scrubclear]"); if (scl){ state.tlScrub = null; update(); return; }
+      var cmd = e.target.closest("[data-cmdiffer]"); if (cmd){
+        // Cross-master "differ" drill-down: toggle in place, skipping the full
+        // re-render, so the CSS max-height transition can play; __cfdNoAnim snaps it
+        // open instantly like the prefers-reduced-motion CSS gate. state keeps it
+        // across re-renders.
+        state.cmDifferOpen = !state.cmDifferOpen;
+        var pnl = document.getElementById("cm-differ-panel");
+        if (pnl){
+          if (window.__cfdNoAnim){ pnl.style.transition = "none"; }
+          pnl.classList.toggle("open", state.cmDifferOpen);
+        }
+        cmd.setAttribute("aria-expanded", state.cmDifferOpen);
+        var chev = cmd.querySelector(".cm-chev");
+        if (chev){ chev.textContent = state.cmDifferOpen ? "▾" : "▸"; }
+        return; }
       var jr = e.target.closest("[data-jglyph]"); if (jr){ openJourney(jr.getAttribute("data-jglyph")); return; }
       var jc = e.target.closest(".heat .cell"); if (jc && (e.metaKey || e.ctrlKey)){ e.preventDefault(); openJourney(jc.getAttribute("data-glyph")); return; }
       var ba = e.target.closest(".ba-toggle");
       if (ba){ e.preventDefault(); state.before = !state.before; ba.setAttribute("aria-pressed", state.before); ba.textContent = state.before ? "Before" : "After"; applyBeforeAfter(); return; }
     });
-    bodyEl.addEventListener("change", function(e){
-      if (e.target.id === "cfd-date-a"){ state.dateA = e.target.value; update(); }
-      else if (e.target.id === "cfd-date-b"){ state.dateB = e.target.value; update(); }
-      // #19: persist the deadline target (family-scoped) and re-render so the rule
-      // + verdict chips refresh without a reload.
-      else if (e.target.id === "cfd-deadline"){ setDeadline(e.target.value); update(); }
+    // Click the chart to PICK a moment (scrub -> sidebar discs + lanes follow); the
+    // left/right arrow keys step the picked moment while the chart is focused.
+    bodyEl.addEventListener("pointerdown", chartClick);
+    bodyEl.addEventListener("keydown", chartKey);
+    // Range navigator: drag a handle/window/scrim to zoom the main chart live; arrow keys
+    // nudge a focused handle; double-clicking the navigator resets to the full history.
+    bodyEl.addEventListener("pointerdown", navDrag);
+    bodyEl.addEventListener("keydown", navKey);
+    bodyEl.addEventListener("dblclick", function(e){
+      if (e.target.closest && e.target.closest(".tl-nav")){ navReset(); }
     });
-    // #11 Time Machine: dragging the range slider scrubs the date. The slider is in the
-    // day domain, so map the dragged day to the nearest snapshot before scrubbing;
-    // scrubSet throttles the grid recolour to rAF so a fast drag stays smooth.
-    bodyEl.addEventListener("input", function(e){
-      var sc = e.target.closest && e.target.closest(".tl-scrub");
-      if (sc){ scrubSet(scrubDayToIndex(parseInt(sc.value, 10) || 0)); }
-    });
-    bodyEl.addEventListener("keydown", scrubKey);
-    // #6 snapping crosshair: the chart SVG is rebuilt on every update(), so delegate
-    // its pointer + keyboard interaction at the #cfd-body level (same idiom as the
-    // heatmap tip above). pointermove snaps to the nearest snapshot; leaving the
-    // chart hides the guide; Left/Right step snapshots while the chart is focused.
-    bodyEl.addEventListener("pointermove", crosshairMove);
-    bodyEl.addEventListener("pointerout", function(e){
-      var chart = e.target.closest && e.target.closest(".tl-chart");
-      if (chart && (!e.relatedTarget || !chart.contains(e.relatedTarget))){ crosshairLeave(e); }
-    });
-    bodyEl.addEventListener("keydown", crosshairKey);
-    // #8 brush-to-compare: pointerdown on the chart starts a drag that paints a
-    // band between two snapped snapshots and, on release, drives state.dateA/dateB
-    // (dateDiffPanel recomputes the range). Arrow keys nudge a focused handle. The
-    // <select> a11y fallback in dateDiffPanel stays synced via update().
-    bodyEl.addEventListener("pointerdown", brushMove);
-    bodyEl.addEventListener("keydown", brushKey);
     // Colour-bar segments live both in the static global bar and in the per-master
     // card (inside #cfd-body), so delegate their clicks at the document level.
     document.addEventListener("click", function(e){
@@ -2772,7 +2995,9 @@ DASHBOARD_JS = r"""
     // keeping all geometry in CSS-pixel units. fit() recomputes dpr on resize; the
     // offscreen builders below read this same closure var. dpr=1 reproduces 1x exactly.
     var dpr = Math.min(window.devicePixelRatio || 1, 3);
-    var DISC_ALPHA = 0.95, tilt = 0.5, trimVal = 0.5, opacityVal = 0.32;
+    var DISC_ALPHA = 0.95, tilt = 0.5, trimVal = 0.5, opacityVal = 0.37;
+    var DISC_BRIGHT = 1.2;  // every lit disc rendered 20% lighter (global)
+    var FOCUS_GLOW = 1.4;   // selected disc: +40% halo glow on top
     var rot = -0.5, focusAmt = [];
     var VISIBLE = Math.min(16, H.masters.length);   // discs shown at once
     var vt = 0;                                      // scroll: master index at window top
@@ -2783,10 +3008,32 @@ DASHBOARD_JS = r"""
       var v=(getComputedStyle(document.documentElement).getPropertyValue("--c"+i)||"").trim();
       return v || hueHsl(i);
     }
+    // Per-colour glyph counts for a master. Scrub-aware: when a moment is picked on the
+    // Timeline chart (state.tlScrub set), reconstruct that master's colour state at the
+    // picked snapshot via stateAt — so clicking the graph spins these discs back in time.
+    // Otherwise the live (current) label keys.
     function countsOf(m){
-      var c = [0,0,0,0,0,0,0,0,0,0,0,0], keys = m.keys || [];
-      for (var i=0;i<keys.length;i++){ var k=keys[i]; if (k>=0 && k<12) c[k]++; }
+      var c = [0,0,0,0,0,0,0,0,0,0,0,0], i;
+      if (state.tlScrub != null){
+        var dates = (H.trend && H.trend.dates) || [], date = dates[scrubIndex()];
+        if (date != null){
+          var snap = stateAt(m.id, date);
+          for (var name in snap){ var sk = snap[name]; if (sk>=0 && sk<12) c[sk]++; }
+          return c;
+        }
+      }
+      var keys = m.keys || [];
+      for (i=0;i<keys.length;i++){ var k=keys[i]; if (k>=0 && k<12) c[k]++; }
       return c;
+    }
+    // Uncoloured share consistent with countsOf: at a scrubbed moment it's whatever the
+    // glyph total minus the coloured count is; live it's the master's stored uncolored.
+    function uncoloredOf(m, counts){
+      if (state.tlScrub != null){
+        var s=0; for (var i=0;i<12;i++){ s+=counts[i]; }
+        return Math.max(0, (H.glyphTotal||0) - s);
+      }
+      return m.uncolored || 0;
     }
     var UNCOL = "hsl(225,8%,4%)";   // dark neutral grey for the uncoloured share
     function buildField(counts, uncolored){
@@ -2835,9 +3082,9 @@ DASHBOARD_JS = r"""
     // that colour's share; everything else folds into the uncoloured grey. fk<0
     // or null restores the full label distribution.
     function focusedCounts(m, fk){
-      var c = countsOf(m);
-      if (fk==null) return { counts:c, uncolored:(m.uncolored||0) };                          // no focus -> full distribution
-      if (fk<0 || fk>11) return { counts:[0,0,0,0,0,0,0,0,0,0,0,0], uncolored:(m.uncolored||0) };  // None focused -> grey share only
+      var c = countsOf(m), unc = uncoloredOf(m, c);
+      if (fk==null) return { counts:c, uncolored:unc };                                       // no focus -> full distribution
+      if (fk<0 || fk>11) return { counts:[0,0,0,0,0,0,0,0,0,0,0,0], uncolored:unc };          // None focused -> grey share only
       var only=[0,0,0,0,0,0,0,0,0,0,0,0]; only[fk]=c[fk];
       return { counts:only, uncolored:(H.glyphTotal||0)-c[fk] };                               // one colour -> its wedge + grey rest
     }
@@ -2847,12 +3094,35 @@ DASHBOARD_JS = r"""
       EMPTY = H.masters.map(function(m){ var d=focusedCounts(m,fk), s=0, i; for(i=0;i<12;i++) s+=d.counts[i]; return (s+d.uncolored)===0; });
     }
     var curFocus = (state.focus==null?null:state.focus);
+    var curScrub = state.tlScrub;   // rebuild the disc fields when the picked moment changes
     buildFields(curFocus);
+    // Smoothly crossfade each disc's colour field old -> new when the focused colour or
+    // picked moment changes, instead of snapping. Reduced-motion / headless = instant.
+    var TOWER_ANIM = !window.__cfdNoAnim && !(window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
+    var PREV_FIELDS = null, morph = 1, MORPH_STEP = 0.022;   // slow colour dissolve (a touch faster)
+    var mtmp = document.createElement("canvas"); mtmp.width = mtmp.height = Math.round(FS*dpr);
+    var mctx = mtmp.getContext("2d");
+    function fieldFor(i){
+      if (morph >= 1 || !PREV_FIELDS || !PREV_FIELDS[i]) return FIELDS[i];
+      var nf = FIELDS[i];
+      if (mtmp.width !== nf.width || mtmp.height !== nf.height){ mtmp.width = nf.width; mtmp.height = nf.height; }
+      var t = morph*morph*(3-2*morph);                       // smoothstep dissolve
+      mctx.clearRect(0,0,mtmp.width,mtmp.height);
+      mctx.globalAlpha = 1; mctx.drawImage(PREV_FIELDS[i],0,0,mtmp.width,mtmp.height);   // old colours beneath
+      mctx.globalAlpha = t; mctx.drawImage(nf,0,0,mtmp.width,mtmp.height);               // new colours fade in
+      mctx.globalAlpha = 1;
+      return mtmp;
+    }
     var FROST = (function(){
       var c=document.createElement("canvas"); c.width=c.height=Math.round(FS*dpr); var g=c.getContext("2d");
       g.setTransform(dpr,0,0,dpr,0,0);
+      // white frost sparkle
       for (var k=0;k<1600;k++){ var x=Math.random()*FS,y=Math.random()*FS,r=Math.random()*1.6+0.3;
         g.fillStyle="rgba(255,255,255,"+(Math.random()*0.07)+")"; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); }
+      // fine dark dust grains interleaved so the surface reads as frozen/dusty texture
+      // rather than only sparkle — finer + fainter than the frost, kept subtle.
+      for (var kd=0;kd<1100;kd++){ var dx=Math.random()*FS,dy=Math.random()*FS,dr=Math.random()*0.9+0.2;
+        g.fillStyle="rgba(0,0,0,"+(Math.random()*0.05+0.008)+")"; g.beginPath(); g.arc(dx,dy,dr,0,7); g.fill(); }
       var o=document.createElement("canvas"); o.width=o.height=Math.round(FS*dpr); var og=o.getContext("2d");
       og.setTransform(dpr,0,0,dpr,0,0);
       if (CTX_FILTER_OK){ og.filter="blur(0.6px)"; og.drawImage(c,0,0,FS,FS); og.filter="none"; }
@@ -2882,7 +3152,16 @@ DASHBOARD_JS = r"""
       g.restore();
       g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.rotate(rot);
       g.beginPath(); g.arc(0,0,rx,0,7); g.clip();
-      if (CTX_FILTER_OK && glow>1) g.filter="brightness("+(1+(glow-1)*0.7)+")";
+      // a focused disc renders the OTHERS as dark matte greyscale (glow<1 == not the
+      // selected master): fully desaturate + darken to charcoal. Browser path only —
+      // WebKit keeps the existing dim.
+      if (CTX_FILTER_OK){
+        var desat = 1 - Math.max(0, Math.min(1, glow));   // 1 for non-focused -> greyscale
+        var filt = "";
+        if (desat>0) filt = "saturate("+(1-desat).toFixed(3)+") brightness("+(1-desat*0.5).toFixed(3)+")";
+        else filt = "brightness("+DISC_BRIGHT.toFixed(3)+")";   // every lit disc 20% lighter (global)
+        if (filt) g.filter=filt;
+      }
       g.globalAlpha=DISC_ALPHA; g.drawImage(fA,-o,-o,o*2,o*2);
       g.filter="none"; g.globalAlpha=1; g.restore();
       g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.beginPath(); g.arc(0,0,rx,0,7); g.clip();
@@ -2946,13 +3225,14 @@ DASHBOARD_JS = r"""
       function group(idxs){
         if (!idxs.length) return;
         bctx.clearRect(0,0,W,Hc);
-        for (var k=0;k<idxs.length;k++){ var ii=idxs[k], cyy=cyOf(ii); if(!EMPTY[ii]) shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,0,EMPTY[ii]); }
+        for (var k=0;k<idxs.length;k++){ var ii=idxs[k], cyy=cyOf(ii); if(!EMPTY[ii]) shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,fieldFor(ii),cx,cyy,rx,ry,1,0,EMPTY[ii]); }
         bctx.save(); bctx.globalCompositeOperation="source-atop"; bctx.fillStyle="rgba(0,0,0,"+trimVal+")"; bctx.fillRect(0,0,W,Hc); bctx.restore();
         edgeFade(bctx);
         ctx.save(); ctx.globalAlpha=opacityVal; ctx.drawImage(buf,0,0,W,Hc); ctx.restore();
       }
       function focusDisc(ii){ var amt=focusAmt[ii], cyy=cyOf(ii);
-        bctx.clearRect(0,0,W,Hc); if(!EMPTY[ii]) shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,FIELDS[ii],cx,cyy,rx,ry,1,1-amt,EMPTY[ii]);
+        var glowV = (sel>=0 && ii===sel) ? FOCUS_GLOW : (1-amt);   // selected disc: +40% halo glow (halo alpha *glow)
+        bctx.clearRect(0,0,W,Hc); if(!EMPTY[ii]) shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,fieldFor(ii),cx,cyy,rx,ry,1,glowV,EMPTY[ii]);
         var trim=amt*trimVal; if (trim>0){ bctx.save(); bctx.globalCompositeOperation="source-atop"; bctx.fillStyle="rgba(0,0,0,"+trim+")"; bctx.fillRect(0,0,W,Hc); bctx.restore(); }
         edgeFade(bctx);
         ctx.save(); ctx.globalAlpha=1-amt*(1-opacityVal); ctx.drawImage(buf,0,0,W,Hc); ctx.restore();
@@ -2997,11 +3277,52 @@ DASHBOARD_JS = r"""
     }
     fit();
     window.addEventListener("resize", fit);
+    // Motion etiquette for the spin loop:
+    //  - EASE-IN: the spin ramps 0 -> full speed over ~1.5s (smoothstep on the rot
+    //    increment), gated by TOWER_ANIM (the shared __cfdNoAnim / reduced-motion flag).
+    //  - PAUSE WHEN HIDDEN: visibilitychange stops scheduling rAF in hidden tabs and
+    //    resumes on return — frame counters just continue, so no time-jump.
+    //  - REDUCED-MOTION: TOWER_ANIM false = no spin at all; the stack renders once and
+    //    repaints only when focus/scrub/master/scroll/size change (the crossfade morph
+    //    is already instant in that mode: morph snaps to 1, never animates).
+    var SPIN_SPEED = 0.00768;                  // full speed (~20% slower auto-spin)
+    var SPIN_RAMP = 1/90, spinT = 0;           // ease-in progress: ~1.5s at 60fps
+    var rafId = null;
+    var lastVt = null, lastSel = null, lastW = 0, lastHc = 0;   // reduced-motion dirty tracking
     function loop(){
+      rafId = null;
       var fk = (state.focus==null?null:state.focus);
-      if (fk!==curFocus){ curFocus=fk; buildFields(curFocus); }   // colour focus changed -> refilter discs
-      rot+=0.00768; render(); requestAnimationFrame(loop);   // ~20% slower auto-spin
+      var sc = state.tlScrub;
+      var changed = false;
+      if (fk!==curFocus || sc!==curScrub){
+        curFocus=fk; curScrub=sc;
+        var old=FIELDS; buildFields(curFocus);               // new disc fields for the picked moment / colour
+        if (TOWER_ANIM){ PREV_FIELDS=old; morph=0; } else { PREV_FIELDS=null; morph=1; }   // crossfade old -> new colours
+        changed = true;
+      }
+      if (morph<1){ morph=Math.min(1, morph+MORPH_STEP); if (morph>=1){ PREV_FIELDS=null; } changed = true; }
+      var sel = selIndex();
+      if (vt!==lastVt || sel!==lastSel || W!==lastW || Hc!==lastHc){
+        lastVt=vt; lastSel=sel; lastW=W; lastHc=Hc; changed = true;   // wheel scroll / master pick / resize
+      }
+      if (TOWER_ANIM){
+        if (spinT<1) spinT = Math.min(1, spinT+SPIN_RAMP);
+        var ramp = spinT*spinT*(3-2*spinT);                  // smoothstep ease-in on the increment
+        rot += SPIN_SPEED*ramp;
+        render();
+      } else if (changed){
+        render();                                            // reduced motion: no spin, repaint on change only
+      }
+      schedule();
     }
+    function schedule(){
+      if (rafId!=null || document.hidden) return;            // hidden tab: stop scheduling rAF entirely
+      rafId = requestAnimationFrame(loop);
+    }
+    document.addEventListener("visibilitychange", function(){
+      if (document.hidden){ if (rafId!=null){ cancelAnimationFrame(rafId); rafId=null; } }
+      else schedule();                                       // visible again: resume where we left off
+    });
     cv.addEventListener("wheel", function(e){ e.preventDefault();
       vt += e.deltaY*0.02; vt=Math.max(0, Math.min(Math.max(0,H.masters.length-VISIBLE), vt));
     }, {passive:false});
@@ -3055,11 +3376,33 @@ DASHBOARD_JS = r"""
   }
   function start(){
     loadModel().then(function(model){
-      H = model; lastOrder = H.order.length ? H.order[H.order.length-1] : null;
+      H = model; normalizeHiddenKeys(); lastOrder = H.order.length ? H.order[H.order.length-1] : null;
+      // Seed the exporting-only toggle from the palette pref (only meaningful when
+      // there is anything to exclude; countedSet() no-ops otherwise).
+      state.exportingOnly = !!H.exportingOnly;
+      // Stash both timeline granularities; the toggle swaps which drives H.trend etc.
+      tlDay = { trend: H.trend, journeys: H.journeys, journeyIndex: H.journeyIndex };
+      tlCommit = H.hasCommits
+        ? { trend: H.trendCommits, journeys: H.journeysCommits, journeyIndex: H.journeyIndexCommits }
+        : null;
+      if (!tlCommit && state.tlGran === "save") state.tlGran = "time";   // no fine set -> Save unavailable
+      applyGranularity();
       init();
     }).catch(function(err){
+      // Boot failure. The body ships opacity:0 until "ready" (the first-paint gate,
+      // normally added by init()), so without it the error page renders invisibly —
+      // add it here too. Theme attr likewise normally comes from update(); set it so
+      // the card honours the saved/OS theme. The card itself is pure CSS (.err-card,
+      // hard-coded rainbow mark) — it must not lean on the model, which just failed.
+      document.documentElement.setAttribute("data-theme", state.theme);
+      document.body.classList.add("ready");
       var app = document.getElementById("cfd-app");
-      if (app) app.innerHTML = '<p style="padding:48px 24px;color:#888;font:14px/1.5 system-ui,sans-serif">'+esc(err && err.message || "Could not load the report data.")+'</p>';
+      if (app) app.innerHTML =
+        '<div class="err-wrap"><div class="err-card" role="alert">'
+        + '<span class="err-mark" aria-hidden="true"></span>'
+        + '<p class="err-title">This report couldn’t load its data.</p>'
+        + '<p class="err-msg">'+esc(err && err.message || "Could not load the report data.")+'</p>'
+        + '</div></div>';
     });
   }
   if (document.readyState!=="loading") start();
