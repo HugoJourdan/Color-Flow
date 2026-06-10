@@ -5,7 +5,7 @@ run — so a fresh install has no timeline. When the font lives in a git repo we
 backfill that history: for each past day, check out that day's last commit of the
 font, read its per-master ``layer.color`` state, and synthesise the exact same
 ``{iso_date: {master_id: {glyph_name: key}}}`` shape the live snapshots use. Every
-downstream forecast/journey/streak function then works unchanged.
+downstream journey/streak function then works unchanged.
 
 This module is the import-clean, fully unit-tested plumbing: it shells out to git
 and extracts historical file content, but the font-reading step is injected as a
@@ -24,9 +24,10 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-# Matches colorflow_dashboard.HISTORY_CAP; passed in explicitly by callers, but a
-# local default keeps this module standalone for tests.
-DEFAULT_CAP = 60
+# 0 = unlimited: the timeline keeps a project's whole history. Callers that need to
+# bound the (expensive) per-commit headless opens pass a positive cap explicitly —
+# e.g. the outline-changes view's day window.
+DEFAULT_CAP = 0
 
 # One per-master colour snapshot: {master_id: {glyph_name: key}}.
 Snapshot = dict[str, dict[str, int]]
@@ -142,6 +143,75 @@ def extract_commit(repo: Path, target: Path, sha: str, dest_dir: Path) -> Path |
     return out_path
 
 
+def commit_points(
+    repo: Path, target: Path, cap: int = DEFAULT_CAP
+) -> list[tuple[str, str]]:
+    """Every commit of ``target`` (first-parent), oldest-first, as ``(key, sha)``.
+
+    Unlike :func:`day_commits` this does NOT collapse to one commit per calendar day —
+    each commit is its own point, keyed by a sortable local datetime
+    (``YYYY-MM-DDTHH:MM:SS``). At most ``cap`` most-recent commits are kept. Keys are
+    made unique (commits within the same second get a ``.1``/``.2`` suffix) so they can
+    index a snapshot dict and still sort lexicographically."""
+    rel = _rel(repo, target)
+    out = _git_text(
+        ["log", "--first-parent", "--date=format-local:%Y-%m-%dT%H:%M:%S",
+         "--format=%cd|%H", "--", rel], repo
+    )
+    if not out:
+        return []
+    raw: list[tuple[str, str]] = []
+    for line in out.splitlines():
+        line = line.strip()
+        if "|" not in line:
+            continue
+        when, sha = line.split("|", 1)
+        if when and sha:
+            raw.append((when, sha))
+    raw.reverse()                                # git log is newest-first -> oldest-first
+    if cap and len(raw) > cap:
+        raw = raw[-cap:]                         # keep the most-recent `cap` commits
+    counts: dict[str, int] = {}
+    points: list[tuple[str, str]] = []
+    for when, sha in raw:
+        seen = counts.get(when, 0)
+        counts[when] = seen + 1
+        key = when if seen == 0 else f"{when}.{seen}"
+        points.append((key, sha))
+    return points
+
+
+def _collect_snapshots(
+    repo: Path, target: Path, load_colors: Callable[[Path], Snapshot | None],
+    points: list[tuple[str, str]], progress: Callable[[float], None] | None,
+) -> dict[str, Snapshot]:
+    """Extract each ``(key, sha)`` point's font into a temp dir and load its snapshot,
+    returning ``{key: snapshot}``. Points that fail to extract or load are skipped."""
+    history: dict[str, Snapshot] = {}
+    if not points:
+        return history
+    work_root = Path(tempfile.mkdtemp(prefix="cfgit-"))
+    try:
+        for index, (key, sha) in enumerate(points):
+            sub = work_root / sha[:12]
+            extracted = extract_commit(repo, target, sha, sub)
+            if extracted is not None:
+                try:
+                    colors = load_colors(extracted)
+                except Exception:  # noqa: BLE001 - one bad commit must not abort the rest
+                    colors = None
+                if colors:
+                    history[key] = colors
+            if progress is not None:
+                try:
+                    progress((index + 1) / len(points))
+                except Exception:  # noqa: BLE001 - progress is best-effort
+                    pass
+    finally:
+        shutil.rmtree(work_root, ignore_errors=True)
+    return history
+
+
 def collect_git_history(
     font_path: str | Path,
     load_colors: Callable[[Path], Snapshot | None],
@@ -160,30 +230,25 @@ def collect_git_history(
     repo = git_root(target)
     if repo is None or not is_tracked(repo, target):
         return {}
-    commits = day_commits(repo, target, cap, skip)
-    if not commits:
+    return _collect_snapshots(
+        repo, target, load_colors, day_commits(repo, target, cap, skip), progress)
+
+
+def collect_commit_history(
+    font_path: str | Path,
+    load_colors: Callable[[Path], Snapshot | None],
+    cap: int = DEFAULT_CAP,
+    progress: Callable[[float], None] | None = None,
+) -> dict[str, Snapshot]:
+    """Reconstruct ``{commit_datetime: snapshot}`` from EVERY commit of ``font_path``
+    (not collapsed to one per day) — the substrate for the timeline's per-commit view.
+    Returns ``{}`` when the path is not in a git repo or not tracked."""
+    target = Path(font_path)
+    repo = git_root(target)
+    if repo is None or not is_tracked(repo, target):
         return {}
-    history: dict[str, Snapshot] = {}
-    work_root = Path(tempfile.mkdtemp(prefix="cfgit-"))
-    try:
-        for index, (iso, sha) in enumerate(commits):
-            sub = work_root / sha[:12]
-            extracted = extract_commit(repo, target, sha, sub)
-            if extracted is not None:
-                try:
-                    colors = load_colors(extracted)
-                except Exception:  # noqa: BLE001 - one bad commit must not abort the rest
-                    colors = None
-                if colors:
-                    history[iso] = colors
-            if progress is not None:
-                try:
-                    progress((index + 1) / len(commits))
-                except Exception:  # noqa: BLE001 - progress is best-effort
-                    pass
-    finally:
-        shutil.rmtree(work_root, ignore_errors=True)
-    return history
+    return _collect_snapshots(
+        repo, target, load_colors, commit_points(repo, target, cap), progress)
 
 
 def merge_history(
@@ -191,7 +256,7 @@ def merge_history(
 ) -> dict[str, Snapshot]:
     """Merge git-derived history under any existing live snapshots. Live snapshots
     win on a shared date (the user actually recorded those), git fills the gaps; the
-    result is capped to the most-recent ``cap`` dates."""
+    result is capped to the most-recent ``cap`` dates (0 = uncapped, the default)."""
     merged: dict[str, Snapshot] = dict(git_history)
     merged.update(existing)                  # live snapshots take precedence
     if cap and len(merged) > cap:

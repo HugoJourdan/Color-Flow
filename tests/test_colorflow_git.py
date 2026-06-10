@@ -209,3 +209,54 @@ def test_merge_history_caps_to_most_recent() -> None:
     git_hist = {f"2026-06-0{day}": _snap({"A": day}) for day in range(1, 6)}
     merged = git.merge_history({}, git_hist, cap=2)
     assert sorted(merged) == ["2026-06-04", "2026-06-05"]
+
+
+# --------------------------------------------------------------------------- #
+# commit_points / collect_commit_history (the timeline's per-commit view)
+# --------------------------------------------------------------------------- #
+
+def _commit_at(repo: Path, snapshot: dict, when: str, name: str = "font.glyphs") -> None:
+    """Write+commit ``snapshot`` with an explicit local datetime (YYYY-MM-DDTHH:MM:SS)."""
+    (repo / name).write_text(json.dumps(snapshot), encoding="utf-8")
+    _run(["add", name], repo)
+    _run(["commit", "-q", "-m", when], repo, date=when)
+
+
+_PLAN = [
+    (_snap({"A": 0}), "2026-06-01T09:00:00"),
+    (_snap({"A": 1}), "2026-06-01T15:00:00"),   # same day as the first -> NOT collapsed
+    (_snap({"A": 2}), "2026-06-02T10:00:00"),
+]
+
+
+def test_commit_points_keeps_every_commit_not_collapsed(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    for snap, when in _PLAN:
+        _commit_at(repo, snap, when)
+    keys = [key for key, _sha in git.commit_points(repo, repo / "font.glyphs")]
+    assert keys == ["2026-06-01T09:00:00", "2026-06-01T15:00:00", "2026-06-02T10:00:00"]
+
+
+def test_commit_points_caps_to_most_recent(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    for snap, when in _PLAN:
+        _commit_at(repo, snap, when)
+    keys = [key for key, _sha in git.commit_points(repo, repo / "font.glyphs", cap=2)]
+    assert keys == ["2026-06-01T15:00:00", "2026-06-02T10:00:00"]   # oldest dropped
+
+
+def test_collect_commit_history_one_snapshot_per_commit(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    for snap, when in _PLAN:
+        _commit_at(repo, snap, when)
+    history = git.collect_commit_history(
+        repo / "font.glyphs", lambda path: json.loads(Path(path).read_text(encoding="utf-8")))
+    assert list(history) == ["2026-06-01T09:00:00", "2026-06-01T15:00:00", "2026-06-02T10:00:00"]
+    assert history["2026-06-01T15:00:00"] == {"m1": {"A": 1}}
+    assert history["2026-06-02T10:00:00"] == {"m1": {"A": 2}}
+
+
+def test_collect_commit_history_empty_when_not_in_repo(tmp_path: Path) -> None:
+    loose = tmp_path / "loose.glyphs"
+    loose.write_text("{}", encoding="utf-8")
+    assert git.collect_commit_history(loose, lambda path: {"m1": {}}) == {}
