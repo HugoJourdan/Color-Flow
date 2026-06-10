@@ -220,8 +220,50 @@ def test_line_chart_draw_in_animation_and_nav_aligned() -> None:
     assert ".tl-anim .tl-line{stroke-dasharray:1;stroke-dashoffset:1;animation:tlDraw" in css
     rm = css.split("@media (prefers-reduced-motion:reduce){", 1)[1]
     assert ".tl-anim .tl-line{animation:none" in rm           # reduced-motion neutralises the draw-in
-    # navigator inset to match the chart's inner width (1px border + 4px padding = 5px)
-    assert ".tl-nav-wrap{position:relative;margin:6px 0 2px;padding:0 5px}" in css
+    # navigator now carries the SAME box as the chart (border+padding+radius) so its
+    # outer width equals the chart's full-width bordered box (and plots stay aligned).
+    assert ".tl-nav-wrap{position:relative;margin:6px 0 2px;padding:0}" in css
+    assert ".tl-nav{display:block;width:100%;height:auto;cursor:crosshair;touch-action:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}" in css
+
+
+def test_lane_sparklines_draw_in_on_focus_switch() -> None:
+    """The per-category/script lane sparklines draw in (left-to-right) when the
+    focused master switches — a flag set at each master-switch site, consumed once
+    the lanes render, reusing the chart's tlDraw keyframe; reduced-motion neutralises."""
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    # the polyline carries pathLength + the svg gets .tl-spark-anim when the flag is set
+    assert 'var animCls = laneSparkShouldAnim ? " tl-spark-anim" : "";' in js
+    assert 'pathLength="1" fill="none"' in js
+    # flag set at every focus-master switch (leaderboard row, tab, tower click, arrows)
+    assert js.count("laneSparkShouldAnim = true;") >= 4
+    # consumed after the lanes render so scrub/zoom don't re-animate
+    assert "laneSparkShouldAnim = false;" in js
+    assert ".tl-spark-anim polyline{stroke-dasharray:1;stroke-dashoffset:1;animation:tlDraw" in css
+    rm = css.split("@media (prefers-reduced-motion:reduce){", 1)[1]
+    assert ".tl-spark-anim polyline{animation:none" in rm
+
+
+def test_chart_has_savepoint_vertical_bars() -> None:
+    """A faint light-gray vertical rule sits at every savepoint/day snapshot, behind
+    the line, in both the per-master and the focus-mode (flow) chart."""
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    assert 'class="tl-vgrid"' in js                       # built in calendarAxis
+    assert "var colBars = snaps.map(" in js
+    assert js.count("+weekBands+ax.colBars+grid+") + js.count("+ax.weekBands+ax.colBars+grid+") >= 2
+    assert ".tl-vgrid{stroke:var(--tl-vgrid);stroke-width:1" in css
+    # theme-aware faint gray token in both themes
+    assert "--tl-vgrid:rgba(255,255,255,.10)" in css and "--tl-vgrid:rgba(20,24,33,.10)" in css
+
+
+def test_chart_dots_are_white() -> None:
+    """Snapshot dots in both chart builders use the white --tl-dot token (dark theme),
+    overridden to --text in light theme so they stay visible."""
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    assert 'fill="var(--tl-dot)"' in js
+    assert js.count('fill="var(--tl-dot)"') >= 2          # per-master line dots + flow dots
+    assert "--tl-dot:#ffffff" in css                      # white in dark theme
+    light = css.split("html[data-theme=light]{", 1)[1].split("}", 1)[0]
+    assert "--tl-dot:var(--text)" in light
 
 
 def test_chart_curve_not_clickable() -> None:
@@ -1173,43 +1215,25 @@ def test_dashboard_js_journey_modal_wired_from_cell_click() -> None:
     assert ".heat .cell" in js
 
 
-def test_dashboard_js_has_help_panel_and_button() -> None:
+def test_dashboard_js_has_no_help_panel_or_button() -> None:
+    """The Colour-label "?" help button + its panel were removed; the colour
+    legend lives beside the Overview ring (.ov-legend) instead."""
     js = assets.DASHBOARD_JS
-    assert "function helpPanel(" in js
-    assert "function openHelp(" in js
-    assert "function closeHelp(" in js
-    assert 'id="cfd-help"' in js               # the ? header button
-    assert "state.helpOpen" in js
-    # the help panel is labels-only: the colour-label legend (+ uncoloured row), titled
-    # "Colour labels". The metric glossary (% complete / forecast / regression) is removed.
-    help_panel = js.split("function helpPanel(", 1)[1].split("\n  function ", 1)[0]
-    assert "H.steps" in help_panel               # legend rows from steps
-    assert "Colour labels" in help_panel
-    assert "hp-gloss" not in help_panel          # glossary block gone
-    assert "forecast" not in help_panel and "regression" not in help_panel
-
-
-def test_build_html_help_button_present_and_self_contained() -> None:
-    html = assets.build_html(_model())
-    assert 'id="cfd-help"' in html
-    assert "http://" not in html and "https://" not in html   # invariant preserved
-
-
-def test_dashboard_js_escape_closes_help_modal() -> None:
-    js = assets.DASHBOARD_JS
-    # The single Escape keydown branch must dismiss every modal, including help.
+    assert "function helpPanel(" not in js
+    assert "function openHelp(" not in js
+    assert 'id="cfd-help"' not in js
+    assert "state.helpOpen" not in js
+    # the Escape branch no longer calls closeHelp
     start = js.index('if (e.key==="Escape"){')
     branch = js[start:js.index("}", start) + 1]
-    assert "closeExport()" in branch
-    assert "closeJourney()" in branch
-    assert "closeHelp()" in branch
+    assert "closeHelp()" not in branch
+    assert "closeExport()" in branch and "closeJourney()" in branch
 
 
-def test_dashboard_css_styles_help_panel() -> None:
-    css = assets.DASHBOARD_CSS
-    # The legend rows the help panel emits must carry layout/alignment rules.
-    for selector in (".hp-list", ".hp-row", ".hp-n", ".hp-pos", ".rg-sw"):
-        assert selector in css, selector
+def test_build_html_has_no_help_button() -> None:
+    html = assets.build_html(_model())
+    assert 'id="cfd-help"' not in html
+    assert "http://" not in html and "https://" not in html   # invariant preserved
 
 
 def test_dashboard_css_styles_cross_master_card() -> None:
@@ -1245,11 +1269,10 @@ def test_build_html_wires_all_report_insight_features() -> None:
     # render units
     for marker in ("function crossMasterCard(",
                    "function recentCard(", "function categoryLanes(",
-                   "function openJourney(", "function helpPanel(",
+                   "function openJourney(",
                    "function journeyOf(", "function stateAt("):
         assert marker in html, marker
-    # wiring: header button, cell + row triggers, journey index
-    assert 'id="cfd-help"' in html
+    # wiring: cell + row triggers, journey index
     assert "data-jglyph" in html
     assert "H.journeyIndex" in html
     # spec #4 net graded-% delta engine reaches the document; swatches reuse varFor
@@ -1272,8 +1295,8 @@ def test_dashboard_css_styles_report_insight_classes() -> None:
     # the progress lanes + their two-column grid (replaces the removed moment-disc row)
     for selector in (".tl-lanes", ".tl-lane", ".tl-lanes-grid"):
         assert selector in css, selector
-    # journey modal rows + help/legend panel
-    for selector in (".jm-list", ".jm-row", ".jm-date", ".jm-lab", ".hp-row"):
+    # journey modal rows (the help/legend panel was removed)
+    for selector in (".jm-list", ".jm-row", ".jm-date", ".jm-lab"):
         assert selector in css, selector
     # the swatch must declare an explicit size: guards the zero-size regression
     # that made every swatch invisible.

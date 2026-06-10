@@ -84,6 +84,7 @@ DASHBOARD_CSS = """
   --bg:#0a0b0e;--surface:#0e1014;--surface-2:#101217;--border:#1c1f26;--border-2:#23262e;
   --text:#e6e8ec;--muted:#9aa0ab;--muted-2:#6b7280;--accent:#6e7bff;--ok:#3fb950;
   --track:#15171c;--swatch-outline:rgba(255,255,255,.10);--glyph-ink:var(--text);
+  --tl-dot:#ffffff;--tl-vgrid:rgba(255,255,255,.10);
   --c-none-a:#0e1116;--c-none-b:#3a3f4a;
   --c0:#f97e55;--c1:#ffbe68;--c2:#ba9d6d;--c3:#fff157;--c4:#c1ec8a;--c5:#6bab59;
   --c6:#64a5ef;--c7:#576ef1;--c8:#a962e7;--c9:#e77eb4;--c10:#c5c5c5;--c11:#5f5f5f;
@@ -96,6 +97,7 @@ html[data-theme=light]{
   --bg:#f6f7f9;--surface:#ffffff;--surface-2:#f1f3f6;--border:#e3e6ea;--border-2:#d6dae0;
   --text:#15171c;--muted:#5b6270;--muted-2:#8b919c;--accent:#5b62ff;--ok:#1a7f37;
   --track:#eceef2;--swatch-outline:rgba(20,24,33,.18);
+  --tl-dot:var(--text);--tl-vgrid:rgba(20,24,33,.10);
   --c-none-a:#dfe3e9;--c-none-b:#aab2bf;color-scheme:light;
 }
 *{box-sizing:border-box}
@@ -104,7 +106,7 @@ html,body{margin:0}
 body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains Mono",monospace;
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
-@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro{animation:none}.heat,.heat.fading{transition:none;opacity:1}.tl-seed-shimmer .tl-seed-ghost{animation:none}.ov-viz.intro .rdr-poly{animation:none}.funnel.intro .fnl-fill{animation:none}.tl-anim .tl-line{animation:none;stroke-dasharray:none;stroke-dashoffset:0}.tl-anim .tl-band,.tl-anim .tl-area,.tl-anim .tl-dot{animation:none;opacity:1}.cm-differ-panel{transition:none}}
+@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro{animation:none}.heat,.heat.fading{transition:none;opacity:1}.tl-seed-shimmer .tl-seed-ghost{animation:none}.ov-viz.intro .rdr-poly{animation:none}.funnel.intro .fnl-fill{animation:none}.tl-anim .tl-line{animation:none;stroke-dasharray:none;stroke-dashoffset:0}.tl-anim .tl-band,.tl-anim .tl-area,.tl-anim .tl-dot{animation:none;opacity:1}.tl-spark-anim polyline{animation:none;stroke-dasharray:none;stroke-dashoffset:0}.cm-differ-panel{transition:none}}
 #cfd-app{max-width:1180px;margin:0 auto;padding:0 20px}
 #cfd-main{display:flex;gap:24px;align-items:flex-start}
 #cfd-tower{position:sticky;top:0;flex:0 0 240px;width:240px}
@@ -283,6 +285,7 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-anim .tl-line{stroke-dasharray:1;stroke-dashoffset:1;animation:tlDraw 1s cubic-bezier(.4,0,.2,1) forwards}
 .tl-anim .tl-area,.tl-anim .tl-band{animation:tlFade .8s ease both}
 .tl-anim .tl-dot{animation:tlFade .5s ease both;animation-delay:.55s}
+.tl-spark-anim polyline{stroke-dasharray:1;stroke-dashoffset:1;animation:tlDraw .6s cubic-bezier(.4,0,.2,1) forwards}
 .tl-area{stroke:none}
 .tl-dot{transition:opacity .2s ease}
 .tl-dot.tl-dim{opacity:.16}
@@ -290,13 +293,14 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-lg.tl-dim{opacity:.4}
 .tl-lg.tl-sel{font-weight:600}
 .tl-grid{stroke:var(--track);stroke-width:1}
+.tl-vgrid{stroke:var(--tl-vgrid);stroke-width:1;shape-rendering:crispEdges}
 .tl-axis{fill:var(--muted-2);font-size:10px}
 .tl-xtick{fill:var(--muted-2);font-size:9px}
 .tl-crossarea{fill:transparent;cursor:pointer}
 .tl-chart{cursor:pointer}
 .tl-chart:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.tl-nav-wrap{position:relative;margin:6px 0 2px;padding:0 5px}
-.tl-nav{display:block;width:100%;height:auto;cursor:crosshair;touch-action:none}
+.tl-nav-wrap{position:relative;margin:6px 0 2px;padding:0}
+.tl-nav{display:block;width:100%;height:auto;cursor:crosshair;touch-action:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
 .tl-nav-area{fill:var(--accent);opacity:.13}
 .tl-nav-line{fill:none;stroke:var(--accent);stroke-width:1.2;opacity:.6}
 .tl-nav-scrim{fill:var(--bg);opacity:.58}
@@ -357,11 +361,7 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .cfd-card-ic{font-size:22px;line-height:1.1}
 .cfd-card b{font-size:var(--fs-sm)}
 .cfd-card small{font-size:var(--fs-2xs);color:var(--muted-2)}
-.cfd-cards.hp-list{display:flex;flex-direction:column;gap:8px;text-align:left}
 .rg-sw{display:inline-block;width:12px;height:12px;border-radius:3px;flex:none;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
-.hp-row{display:flex;align-items:center;gap:9px;font-size:var(--fs-sm)}
-.hp-n{flex:1;color:var(--text)}
-.hp-pos{font-size:var(--fs-xs);color:var(--muted-2)}
 .rg-row{display:flex;align-items:center;gap:7px;font-size:var(--fs-xs);padding:4px 0}
 .rg-row+.rg-row{border-top:1px solid var(--track)}
 .rg-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
@@ -535,7 +535,7 @@ DASHBOARD_JS = r"""
     tlScrub: null,                         // picked-moment scrubber index (null -> latest snapshot)
     viewLo: null, viewHi: null,            // Range-navigator zoom window (snapshot indices; null = full)
     tlSpan: null,                          // active duration preset ("1d".."1y"/"all"; null = custom/full)
-    journeyGlyph: null, helpOpen: false,   // journey modal + help panel
+    journeyGlyph: null,                    // journey modal
     theme: savedTheme || (prefersLight ? "light" : "dark")
   };
   // Timeline datasets: the per-day set (always) and the fine-grain per-save/per-commit set
@@ -598,6 +598,7 @@ DASHBOARD_JS = r"""
   // master switches or any later re-render.
   var barsAnim = false, introPlayed = false;
   var tlChartShouldAnim = false;                // draw-in the timeline chart once when entering the Timeline
+  var laneSparkShouldAnim = false;              // draw-in the lane sparklines when the focused master switches
   var laneNumCache = {};                        // last-shown lane % per lane key, for count-up tweening
   var vizIntroPlayed = false;                   // colour-spread radar build-animates once
 
@@ -777,7 +778,6 @@ DASHBOARD_JS = r"""
     return '<header class="hd">'+fam
       + '<span class="sp"></span>'
       + streakBadge()
-      + '<button type="button" id="cfd-help" class="icon" aria-label="Help and legend">?</button>'
       + '<button type="button" id="cfd-theme" class="icon" aria-label="Toggle light or dark theme">◐</button></header>';
   }
   function toolbar(){
@@ -1513,6 +1513,11 @@ DASHBOARD_JS = r"""
     var todayRule = "";   // the always-on "today" line + date bubble were removed
     // snapshot X anchors in SVG user-space — crosshair + brush snap to these.
     var snaps = series.map(function(p){ return { x:+X(dayOff(p.date)).toFixed(1), d:p.date }; });
+    // Faint light-gray vertical rule at every savepoint/save-or-day snapshot, so each
+    // data point reads as its own column behind the line.
+    var colBars = snaps.map(function(s){
+      return '<line class="tl-vgrid" x1="'+s.x+'" y1="'+ptop+'" x2="'+s.x+'" y2="'+(ptop+ih).toFixed(1)+'"/>';
+    }).join("");
     // Persistent marker at the clicked/scrubbed snapshot (state.tlScrub is a FULL-series
     // index; map it into the possibly-windowed series). Lets a click on the chart show
     // which moment is selected (the colour disc reads the same index).
@@ -1582,7 +1587,7 @@ DASHBOARD_JS = r"""
       var dim = state.master!=null && m.id!==state.master;   // a master is selected, not this one
       var sel = state.master!=null && m.id===state.master;
       var smooth = smoothPath(pts);                          // every line is smooth, not just the focused one
-      var dots = pts.map(function(o){ return '<circle class="tl-dot'+(dim?" tl-dim":"")+'" cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="'+(sel?3:2.5)+'" fill="'+col+'"><title>'+esc(m.name+" · "+o.date+" · "+Math.round(o.pc)+"%")+'</title></circle>'; }).join("");
+      var dots = pts.map(function(o){ return '<circle class="tl-dot'+(dim?" tl-dim":"")+'" cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="'+(sel?3:2.5)+'" fill="var(--tl-dot)"><title>'+esc(m.name+" · "+o.date+" · "+Math.round(o.pc)+"%")+'</title></circle>'; }).join("");
       if (sel){
         // #10 hero area: gentle smoothed line + a soft gradient fill that closes
         // down to the baseline Y(0). Dots above stay at exact values (honest).
@@ -1608,7 +1613,7 @@ DASHBOARD_JS = r"""
     var snaps = ax.snaps;
     var crossData = ' data-snaps="'+esc(JSON.stringify(snaps))+'" data-topy="'+ptop+'" data-boty="'+Y(0).toFixed(1)+'"';
     var hitLayer = '<rect class="tl-crossarea" x="'+pl+'" y="'+ptop+'" width="'+iw.toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
-    var chart = '<svg class="tl-chart'+(tlChartShouldAnim?" tl-anim":"")+'" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData+' aria-label="Completion over time per master. Click a point to pick that moment; left and right arrow keys step the picked moment.">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+grid+xticks+lines+ax.scrubRule+hitLayer+'</svg>';
+    var chart = '<svg class="tl-chart'+(tlChartShouldAnim?" tl-anim":"")+'" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData+' aria-label="Completion over time per master. Click a point to pick that moment; left and right arrow keys step the picked moment.">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+ax.colBars+grid+xticks+lines+ax.scrubRule+hitLayer+'</svg>';
     return { chart:chart, legend:legend, foot:"" };   // the start/end date row moved to the navigator's ticks
   }
   function streamParts(W, Ht){
@@ -1679,7 +1684,7 @@ DASHBOARD_JS = r"""
     // No accent top-line in focus mode: the coloured band stack already traces the
     // completion curve. Keep small dots as clickable per-snapshot moment markers.
     var topDots = topPts.map(function(o, i){
-      return '<circle class="tl-dot" cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="2.5" fill="var(--accent)">'
+      return '<circle class="tl-dot" cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="2.5" fill="var(--tl-dot)">'
         + '<title>'+esc(scopeName+" · "+tally[i].date+" · "+Math.round(cum[i])+"%")+'</title></circle>';
     }).join("");
     bandGroup += topDots;
@@ -1690,7 +1695,7 @@ DASHBOARD_JS = r"""
     var hitLayer = '<rect class="tl-crossarea" x="'+pl+'" y="'+ptop+'" width="'+iw.toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
     var chart = '<svg class="tl-chart tl-flow'+(tlChartShouldAnim?" tl-anim":"")+'" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData
       + ' aria-label="Stacked colour completion over time. Click a point to pick that moment.">'
-      + (defs?'<defs>'+defs+'</defs>':'')+ax.weekBands+grid+bandGroup+ax.xticks+ax.scrubRule+hitLayer+'</svg>';
+      + (defs?'<defs>'+defs+'</defs>':'')+ax.weekBands+ax.colBars+grid+bandGroup+ax.xticks+ax.scrubRule+hitLayer+'</svg>';
     // legend: one swatch per step (+ uncoloured), mirroring the band fills.
     var legend = order.map(function(k){
       return '<span class="tl-lg"><i style="background:var('+varFor(k)+')"></i>'+esc(labelFor(k))+'</span>';
@@ -1750,7 +1755,9 @@ DASHBOARD_JS = r"""
     var s = fullSeries();
     if (s.length < 5){ return ""; }              // not worth a navigator below ~5 snapshots
     // Short strip (full width, same W as the main chart) — a compact overview, not a 2nd graph.
-    var Ht = 54, pl = 30, pr = 12, ptop = 9, pb = 15, iw = W - pl - pr, ih = Ht - ptop - pb;
+    // No y-axis labels here (unlike the main chart's pl=30 gutter), so inset only enough to
+    // keep the 6px drag handles inside the box: the area/line fills the box edge-to-edge.
+    var Ht = 54, pl = 8, pr = 8, ptop = 9, pb = 15, iw = W - pl - pr, ih = Ht - ptop - pb;
     // Match the main chart's spacing: even (ordinal) in both Time and Save modes so the
     // progress line rises across the full width.
     var even = true;
@@ -2067,8 +2074,11 @@ DASHBOARD_JS = r"""
       var y = pad + ih - Math.max(0, Math.min(100, v))/100*ih;
       return x.toFixed(1)+","+y.toFixed(1);
     }).join(" ");
-    return '<svg class="tl-lane-spark" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true">'
-      + '<polyline points="'+pts+'" fill="none"/></svg>';
+    // Draw-in the line when switching focused master (laneSparkShouldAnim), reusing the
+    // chart's tlDraw keyframe via pathLength="1". Reduced-motion neutralises it.
+    var animCls = laneSparkShouldAnim ? " tl-spark-anim" : "";
+    return '<svg class="tl-lane-spark'+animCls+'" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true">'
+      + '<polyline points="'+pts+'" pathLength="1" fill="none"/></svg>';
   }
   // ----- #17 per-category progress lanes over time ---------------------------
   function categoryLanes(){
@@ -2400,8 +2410,9 @@ DASHBOARD_JS = r"""
     var chartBlock = '<div class="tl-chartbar">'+tlSpanToggle()+'</div>'+parts.chart+rangeNav(680)+parts.foot;
     // Clicking the chart picks a moment (scrub): the left-sidebar discs + the category /
     // script lanes recompute at that moment. The lanes sit in a two-column grid.
-    return '<section class="timeline">'+gran+chartBlock
-      + '<div class="tl-lanes-grid">'+categoryLanes()+scriptLanes()+'</div>'
+    var lanesGrid = '<div class="tl-lanes-grid">'+categoryLanes()+scriptLanes()+'</div>';
+    laneSparkShouldAnim = false;                  // consumed: lanes draw-in once per focus switch, not on scrub/zoom
+    return '<section class="timeline">'+gran+chartBlock+lanesGrid
       + outlineChangesView()+touchedAfterDoneView()+'</section>';
   }
   function renderBody(){
@@ -2738,36 +2749,6 @@ DASHBOARD_JS = r"""
       + '<div class="cfd-cards jm-list">'+rows+'</div></div>';
     modal.style.display = "flex";
   }
-  function helpPanel(){
-    var steps = H.steps || [];
-    // reuse `swatchFor` (which wraps the canonical `varFor`); step keys are real
-    // ints, the none row passes null so `swatchFor` emits the `--c-none` var.
-    var legend = steps.map(function(s, i){
-      return '<div class="hp-row">'+swatchFor(s.key)
-        + '<span class="hp-n">'+esc(s.label)+'</span><span class="hp-pos">step '+(i+1)+' of '+steps.length+'</span></div>';
-    }).join("");
-    var none = H.noneLabel
-      ? '<div class="hp-row">'+swatchFor(null)
-        + '<span class="hp-n">'+esc(H.noneLabel)+'</span><span class="hp-pos">uncoloured</span></div>'
-      : "";
-    // labels-only: the colour-label legend (+ uncoloured row). The metric definitions
-    // that used to sit at the bottom of this panel have been removed.
-    return '<div class="cfd-modal-box" role="dialog" aria-label="Colour labels" aria-modal="true">'
-      + '<div class="cfd-modal-h">Colour labels</div>'
-      + '<div class="cfd-cards hp-list">'+legend+none+'</div></div>';
-  }
-  function closeHelp(){ var m = document.getElementById("cfd-help-modal"); if (m) m.style.display = "none"; state.helpOpen = false; }
-  function openHelp(){
-    state.helpOpen = true;
-    var modal = document.getElementById("cfd-help-modal");
-    if (!modal){
-      modal = document.createElement("div"); modal.id = "cfd-help-modal"; modal.className = "cfd-modal";
-      modal.addEventListener("click", function(e){ if (e.target===modal) closeHelp(); });
-      document.body.appendChild(modal);
-    }
-    modal.innerHTML = helpPanel();
-    modal.style.display = "flex";
-  }
   function openExport(){
     var modal = document.getElementById("cfd-export-modal");
     if (!modal){
@@ -2806,9 +2787,8 @@ DASHBOARD_JS = r"""
     document.getElementById("cfd-overview").addEventListener("click", function(){ state.view = "tabs"; state.master = null; update(); });
     document.getElementById("cfd-timeline").addEventListener("click", function(){ toggleView("timeline"); });
     document.getElementById("cfd-export").addEventListener("click", openExport);
-    document.getElementById("cfd-help").addEventListener("click", openHelp);
     document.addEventListener("keydown", function(e){
-      if (e.key==="Escape"){ closeExport(); closeJourney(); closeHelp(); if (state.focus!==null){ setFocus(null); } }
+      if (e.key==="Escape"){ closeExport(); closeJourney(); if (state.focus!==null){ setFocus(null); } }
     });
     var bodyEl = document.getElementById("cfd-body");
     bodyEl.addEventListener("mouseover", function(e){
@@ -2818,13 +2798,13 @@ DASHBOARD_JS = r"""
       if (e.target.closest(".heat .cell")) hideTip();
     });
     bodyEl.addEventListener("click", function(e){
-      var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); update(); return; }
+      var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); laneSparkShouldAnim = true; update(); return; }
       var ox = e.target.closest("[data-ovexpand]"); if (ox){ var ok=ox.getAttribute("data-ovexpand"); state.ovExpand[ok]=!state.ovExpand[ok]; update(); return; }
       var hs = e.target.closest("[data-hsort]"); if (hs){ state.heatSort = hs.getAttribute("data-hsort"); update(); return; }
       var fn = e.target.closest("[data-funnel]"); if (fn){ state.funnelOpen = (state.funnelOpen === false); update(); return; }
       var tc = e.target.closest("[data-tlcat]"); if (tc){ var ck=tc.getAttribute("data-tlcat"); state.tlCatOpen[ck]=!state.tlCatOpen[ck]; update(); return; }
       var oc = e.target.closest("[data-oc]"); if (oc){ var ok=oc.getAttribute("data-oc"); state.ocOpen[ok]=!state.ocOpen[ok]; update(); return; }
-      var cr = e.target.closest(".lb-row[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; update(); return; }
+      var cr = e.target.closest(".lb-row[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; laneSparkShouldAnim = true; update(); return; }
       var sp = e.target.closest("[data-tlspan]"); if (sp){ setTlSpan(sp.getAttribute("data-tlspan")); return; }
       var tg = e.target.closest("[data-tlgrantoggle]"); if (tg){ setGranularity(state.tlGran==="time" ? "save" : "time"); return; }
       var tb = e.target.closest("[data-tlbucket]"); if (tb){ setBucket(tb.getAttribute("data-tlbucket")); return; }
@@ -2940,7 +2920,7 @@ DASHBOARD_JS = r"""
       return m.uncolored || 0;
     }
     var UNCOL = "hsl(225,8%,4%)";   // dark neutral grey for the uncoloured share
-    function buildField(counts, uncolored){
+    function buildField(counts, uncolored, grey){
       var off=document.createElement("canvas"); off.width=off.height=Math.round(FS*dpr);
       var g=off.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
       var cx=FS/2, cy=FS/2, R=FS*0.46, sum=0, i;
@@ -2950,8 +2930,8 @@ DASHBOARD_JS = r"""
         // one wedge per present colour (hue) + the uncoloured share (grey), all
         // proportional to the master's glyph total so uncoloured glyphs show too
         var segs=[];
-        for (i=0;i<12;i++){ if(counts[i]>0) segs.push([counts[i]/total, slotColor(i)]); }
-        if (uncolored>0) segs.push([uncolored/total, UNCOL]);
+        for (i=0;i<12;i++){ if(counts[i]>0) segs.push([counts[i]/total, grey?"#3a3f49":slotColor(i)]); }
+        if (uncolored>0) segs.push([uncolored/total, grey?"#23262d":UNCOL]);
         var filled=false;
         try {
           // true proportional wedges (hard edges): each colour spans exactly its
@@ -3003,6 +2983,15 @@ DASHBOARD_JS = r"""
     // Smoothly crossfade each disc's colour field old -> new when the focused colour or
     // picked moment changes, instead of snapping. Reduced-motion / headless = instant.
     var TOWER_ANIM = !window.__cfdNoAnim && !(window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
+    // ----- Colour Bloom opening intro (variant 4: smootherstep, ~760ms/disc, ~120ms stagger) -----
+    // Each disc starts as a grey blank; its colour wedge sweeps in (conic wipe from 12 o'clock),
+    // staggered top->bottom down the stack. Plays ONCE on open, frame-paced like the spin ramp
+    // (~60fps). Reduced-motion / headless: skipped entirely (discs render full colour at once).
+    var GREYFIELDS = H.masters.map(function(m){ var d=focusedCounts(m,null); return buildField(d.counts,d.uncolored,true); });
+    function smootherstep(t){ t=t<0?0:(t>1?1:t); return t*t*t*(t*(t*6-15)+10); }
+    var INTRO_PER = 46, INTRO_STAG = 7;            // ~760ms per disc, ~120ms stagger at 60fps
+    var introFrame = 0, introDone = !TOWER_ANIM;   // reduced-motion: no intro, full colour immediately
+    function introReveal(i){ if (introDone) return 1; return smootherstep((introFrame - i*INTRO_STAG)/INTRO_PER); }
     var PREV_FIELDS = null, morph = 1, MORPH_STEP = 0.022;   // slow colour dissolve (a touch faster)
     var mtmp = document.createElement("canvas"); mtmp.width = mtmp.height = Math.round(FS*dpr);
     var mctx = mtmp.getContext("2d");
@@ -3036,8 +3025,9 @@ DASHBOARD_JS = r"""
     var buf=document.createElement("canvas"); buf.width=Math.round(W*dpr); buf.height=Math.round(Hc*dpr); var bctx=buf.getContext("2d");
     bctx.setTransform(dpr,0,0,dpr,0,0);
 
-    function paintDisc(g,fA,cx,cy,rx,ry,holeFrac,glow,empty){
+    function paintDisc(g,fA,cx,cy,rx,ry,holeFrac,glow,empty,greyA,reveal){
       if (glow===undefined) glow=1;
+      if (reveal===undefined) reveal=1;
       if (empty){   // no colours: a near-background tone at lower opacity (mixes with the bg)
         g.save(); g.translate(cx,cy); g.scale(1,ry/rx);
         g.globalAlpha=0.6; g.fillStyle=EMPTYFILL; g.beginPath(); g.arc(0,0,rx,0,7); g.fill(); g.globalAlpha=1;
@@ -3050,7 +3040,7 @@ DASHBOARD_JS = r"""
       g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.rotate(rot);
       if (CTX_FILTER_OK){   // the halo is pure blur — skip it (not a sharp ghost) on WebKit
         var halo=[[1.006,3,0.11],[1.025,6,0.07],[1.06,12,0.04]];
-        for (var h=0;h<halo.length;h++){ g.globalAlpha=halo[h][2]*glow; g.filter="blur("+halo[h][1]+"px)"; var hh=rx*halo[h][0]; g.drawImage(fA,-hh,-hh,hh*2,hh*2); }
+        for (var h=0;h<halo.length;h++){ g.globalAlpha=halo[h][2]*glow*reveal; g.filter="blur("+halo[h][1]+"px)"; var hh=rx*halo[h][0]; g.drawImage(fA,-hh,-hh,hh*2,hh*2); }
         g.filter="none"; g.globalAlpha=1;
       }
       g.restore();
@@ -3066,7 +3056,13 @@ DASHBOARD_JS = r"""
         else filt = "brightness("+DISC_BRIGHT.toFixed(3)+")";   // every lit disc 20% lighter (global)
         if (filt) g.filter=filt;
       }
-      g.globalAlpha=DISC_ALPHA; g.drawImage(fA,-o,-o,o*2,o*2);
+      g.globalAlpha=DISC_ALPHA;
+      if (reveal<1 && greyA){            // Colour Bloom intro: grey blank base, colour wedge wipes in
+        g.drawImage(greyA,-o,-o,o*2,o*2);
+        if (reveal>0){ g.save(); g.beginPath(); g.moveTo(0,0);
+          g.arc(0,0,rx*1.3,-Math.PI/2,-Math.PI/2+reveal*Math.PI*2); g.closePath(); g.clip();
+          g.drawImage(fA,-o,-o,o*2,o*2); g.restore(); }
+      } else { g.drawImage(fA,-o,-o,o*2,o*2); }
       g.filter="none"; g.globalAlpha=1; g.restore();
       g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.beginPath(); g.arc(0,0,rx,0,7); g.clip();
       g.fillStyle="rgba(255,255,255,0.05)"; g.beginPath(); g.arc(0,0,rx,0,7); g.fill();
@@ -3129,14 +3125,14 @@ DASHBOARD_JS = r"""
       function group(idxs){
         if (!idxs.length) return;
         bctx.clearRect(0,0,W,Hc);
-        for (var k=0;k<idxs.length;k++){ var ii=idxs[k], cyy=cyOf(ii); if(!EMPTY[ii]) shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,fieldFor(ii),cx,cyy,rx,ry,1,0,EMPTY[ii]); }
+        for (var k=0;k<idxs.length;k++){ var ii=idxs[k], cyy=cyOf(ii); if(!EMPTY[ii]) shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,fieldFor(ii),cx,cyy,rx,ry,1,0,EMPTY[ii],GREYFIELDS[ii],introReveal(ii)); }
         bctx.save(); bctx.globalCompositeOperation="source-atop"; bctx.fillStyle="rgba(0,0,0,"+trimVal+")"; bctx.fillRect(0,0,W,Hc); bctx.restore();
         edgeFade(bctx);
         ctx.save(); ctx.globalAlpha=opacityVal; ctx.drawImage(buf,0,0,W,Hc); ctx.restore();
       }
       function focusDisc(ii){ var amt=focusAmt[ii], cyy=cyOf(ii);
         var glowV = (sel>=0 && ii===sel) ? FOCUS_GLOW : (1-amt);   // selected disc: +40% halo glow (halo alpha *glow)
-        bctx.clearRect(0,0,W,Hc); if(!EMPTY[ii]) shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,fieldFor(ii),cx,cyy,rx,ry,1,glowV,EMPTY[ii]);
+        bctx.clearRect(0,0,W,Hc); if(!EMPTY[ii]) shadowInto(bctx,cx,cyy,rx,ry); paintDisc(bctx,fieldFor(ii),cx,cyy,rx,ry,1,glowV,EMPTY[ii],GREYFIELDS[ii],introReveal(ii));
         var trim=amt*trimVal; if (trim>0){ bctx.save(); bctx.globalCompositeOperation="source-atop"; bctx.fillStyle="rgba(0,0,0,"+trim+")"; bctx.fillRect(0,0,W,Hc); bctx.restore(); }
         edgeFade(bctx);
         ctx.save(); ctx.globalAlpha=1-amt*(1-opacityVal); ctx.drawImage(buf,0,0,W,Hc); ctx.restore();
@@ -3210,6 +3206,7 @@ DASHBOARD_JS = r"""
         lastVt=vt; lastSel=sel; lastW=W; lastHc=Hc; changed = true;   // wheel scroll / master pick / resize
       }
       if (TOWER_ANIM){
+        if (!introDone){ introFrame++; if (introFrame > (VISIBLE-1)*INTRO_STAG + INTRO_PER + 4) introDone = true; }
         if (spinT<1) spinT = Math.min(1, spinT+SPIN_RAMP);
         var ramp = spinT*spinT*(3-2*spinT);                  // smoothstep ease-in on the increment
         rot += SPIN_SPEED*ramp;
@@ -3238,7 +3235,7 @@ DASHBOARD_JS = r"""
         var ex=(px-geo.cx)/geo.rx, ey=(py-cy)/geo.ry;
         if (ex*ex+ey*ey<=1){ var id=H.masters[i].id;
           state.master = (state.master===id) ? null : id;   // click the selected disc -> clear focus
-          update(); return; } }                              // keep the current view (tabs/coverage/...)
+          laneSparkShouldAnim = true; update(); return; } }  // keep the current view (tabs/coverage/...)
     });
     // up/down arrows switch the focused master (up = toward the top disc)
     window.addEventListener("keydown", function(e){
@@ -3248,7 +3245,7 @@ DASHBOARD_JS = r"""
       var cur=selIndex(), step=(e.key==="ArrowDown")?1:-1;
       var ni = cur<0 ? (step>0?0:M-1) : Math.max(0, Math.min(M-1, cur+step));
       e.preventDefault();
-      state.master=H.masters[ni].id; update();   // keep the current view
+      state.master=H.masters[ni].id; laneSparkShouldAnim = true; update();   // keep the current view
     });
     loop();
   }
