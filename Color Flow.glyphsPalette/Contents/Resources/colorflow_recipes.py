@@ -18,12 +18,46 @@ import json
 
 _MATCH_KEYS = ("category", "script", "subCategory", "case")
 
+# ---------------------------------------------------------------------- editor
+# The pure surface the recipes-editor UI (plugin.py) builds its popups from.
+
+# Match criteria a recipe may use, with the labels the editor shows.
+MATCH_FIELDS = (
+    ("category", "Category"),
+    ("script", "Script"),
+    ("subCategory", "Subcategory"),
+    ("case", "Case"),
+)
+
+# Static popup fallbacks for when no font is open (values found in the actual
+# font win — see :func:`match_options`). Categories/subcategories mirror Glyphs'
+# own GlyphData vocabulary; scripts list the common ones.
+DEFAULT_CATEGORIES = ("Letter", "Mark", "Number", "Punctuation", "Separator", "Symbol")
+DEFAULT_SCRIPTS = ("arabic", "cyrillic", "devanagari", "greek", "han", "hangul",
+                   "hebrew", "kana", "latin", "thai")
+DEFAULT_SUBCATEGORIES = ("Currency", "Decimal Digit", "Fraction", "Letter", "Ligature",
+                         "Math", "Modifier", "Nonspacing", "Quote", "Small", "Space",
+                         "Spacing", "Spacing Combining", "Superscript")
+
+# ``glyph.case`` is a GS enum int (GSUppercase=1 … GSMinor=4); the report's
+# glyph_meta stringifies it, so recipes match on the stringified value while the
+# editor shows the human name.
+CASE_OPTIONS = (("1", "Uppercase"), ("2", "Lowercase"), ("3", "Smallcaps"), ("4", "Minor"))
+
+_DEFAULT_FIELD_VALUES = {
+    "category": DEFAULT_CATEGORIES,
+    "script": DEFAULT_SCRIPTS,
+    "subCategory": DEFAULT_SUBCATEGORIES,
+}
+
 
 def parse_recipes(raw) -> list[dict]:
     """Normalise a recipes config into ``[{match, steps}]``. ``raw`` may be a JSON
     string or an already-decoded list. Each recipe carries a ``match`` dict (any
-    of category/script/subCategory/case) and ``steps`` (str colour-index keys).
-    Anything malformed is dropped; a non-list yields ``[]`` (= recipes off)."""
+    of category/script/subCategory/case), ``steps`` (str colour-index keys) and an
+    optional display ``name`` (kept only when non-blank, so name-less configs are
+    untouched). Anything malformed is dropped; a non-list yields ``[]``
+    (= recipes off)."""
     if isinstance(raw, str):
         try:
             raw = json.loads(raw)
@@ -40,8 +74,47 @@ def parse_recipes(raw) -> list[dict]:
             continue
         cleaned = {key: str(value) for key, value in match.items() if key in _MATCH_KEYS}
         steps = [str(step) for step in (entry.get("steps") or [])]
-        recipes.append({"match": cleaned, "steps": steps})
+        recipe = {"match": cleaned, "steps": steps}
+        name = str(entry.get("name") or "").strip()
+        if name:
+            recipe["name"] = name
+        recipes.append(recipe)
     return recipes
+
+
+def serialize_recipes(recipes: list) -> str:
+    """Inverse of :func:`parse_recipes`: normalise ``recipes`` through the same
+    cleaning rules and dump the JSON string stored under the defaults key. The
+    result is validated to round-trip (``parse_recipes`` reads back exactly what
+    was written) so the editor can never persist something the engine would
+    interpret differently."""
+    cleaned = parse_recipes(recipes)
+    text = json.dumps(cleaned, ensure_ascii=False)
+    if parse_recipes(text) != cleaned:  # pragma: no cover - impossible by construction
+        raise ValueError("Color Flow recipes failed to round-trip through JSON.")
+    return text
+
+
+def match_options(field: str, font_values: list | None = None,
+                  selected: str | None = None) -> list[tuple[str, str]]:
+    """``(value, label)`` pairs for one match-field popup in the recipes editor.
+    Values actually present in the font win (sorted, deduped, blanks dropped);
+    with no font (or none found) the static vocabulary above is the fallback.
+    ``case`` always uses its fixed enum/label pairs (font values are bare ints
+    with no labels of their own). ``selected`` is appended when missing so
+    editing an existing recipe never silently loses a value the open font
+    happens to lack."""
+    if field == "case":
+        pairs = list(CASE_OPTIONS)
+    else:
+        values = sorted({str(value).strip() for value in (font_values or [])
+                         if str(value).strip()})
+        if not values:
+            values = list(_DEFAULT_FIELD_VALUES.get(field, ()))
+        pairs = [(value, value) for value in values]
+    if selected and selected not in {value for value, _label in pairs}:
+        pairs.append((selected, selected))
+    return pairs
 
 
 def _matches(match: dict, meta: dict) -> bool:
