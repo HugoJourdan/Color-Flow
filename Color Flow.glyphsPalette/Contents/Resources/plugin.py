@@ -626,6 +626,17 @@ def _broadcast_settings_changed() -> None:
 		print("Color Flow [settings broadcast] error:\n" + traceback.format_exc())
 
 
+def _rgba_close(first, second, tol: float = 1e-4) -> bool:
+	"""True when two ``(r, g, b, a)`` tuples match within ``tol`` per channel. Used to
+	decide whether a colour well ACTUALLY changed before rewriting the twelve label
+	colours — an unchanged well must compare equal so editing a name / visibility never
+	churns (and colour-space-drifts) the colours."""
+	try:
+		return all(abs(float(left) - float(right)) <= tol for left, right in zip(first, second))
+	except Exception:
+		return False
+
+
 def _apply_label_colors(colors: list) -> None:
 	"""Persist the twelve label colours, live-refresh the app, and broadcast."""
 	if len(colors) != 12:
@@ -1051,40 +1062,66 @@ class ColorFlowSettingsView:
 
 	def _slot_edited(self, sender) -> None:
 		"""Fires after the user edits ANY cell (eye/checkbox, colour well or name) in the
-		combined list. List2 has already written the new value into the edited row dict, so we
-		read the live state of all 12 rows and persist colours, names AND visibility
-		(idempotent): _apply_label_colors rewrites the 12 label colours, _apply_label_names
-		rewrites the names PRESERVING visibility, _apply_label_visibility writes each slot's
-		explicit show/hide flag (a named row can be hidden and keep its name). Each broadcasts
-		so open palettes refresh live. Finally the list is re-set so a toggled row re-pins into
-		the visible block or the hidden block below."""
+		combined list. List2 has already written the new value into the edited row dict, but a
+		single editCallback can't say WHICH column changed — so we DIFF the live rows against
+		the currently-persisted state and apply ONLY the store that actually moved:
+
+		- colours: rewritten only when a well differs from the saved colour. The well is read
+		  in DEVICE RGB (symmetric with how it was built and how write_label_colors stores it),
+		  so an untouched well compares equal and the twelve colours are NOT rewritten — this is
+		  what stops a hide/rename from colour-space-drifting every colour.
+		- names: rewritten only when a label differs (PRESERVING visibility).
+		- visibility: rewritten only when a show/hide flag flipped; that case also re-sets the
+		  list to re-pin the toggled row into the visible or hidden block.
+
+		Each apply broadcasts so open palettes refresh live. Applying only the changed store
+		also keeps the colour-panel refresh/redraw out of a plain rename, so renaming commits
+		cleanly."""
 		try:
-			items = list(self._slot_items)
-			# Colours, indexed by slot (fall back to the on-disk colour for any missing slot).
-			colors_by_slot = dict(zip(range(12), labelcolors.read_label_colors()))
-			labels_by_index: dict[int, str] = {}
-			visibility_by_index: dict[int, bool] = {}
-			for item in items:
+			font = Glyphs.font
+			by_slot: dict[int, dict] = {}
+			for item in list(self._slot_items):
 				slot = int(item.get("slot", -1))
-				if not 0 <= slot < 12:
-					continue
+				if 0 <= slot < 12:
+					by_slot[slot] = item
+
+			# --- colours: only rewrite when a well genuinely changed (device-space read) ---
+			baseline_colors = labelcolors.read_label_colors()
+			new_colors = list(baseline_colors)
+			colors_changed = False
+			for slot, item in by_slot.items():
 				native = item.get("color")
-				if native is not None:
-					rgb = native.colorUsingColorSpaceName_("NSCalibratedRGBColorSpace") or native
-					colors_by_slot[slot] = (rgb.redComponent(), rgb.greenComponent(),
-						rgb.blueComponent(), rgb.alphaComponent())
-				labels_by_index[slot] = str(item.get("name", ""))
-				visibility_by_index[slot] = bool(item.get("visible"))
-			_apply_label_colors([colors_by_slot[slot] for slot in range(12)])
-			_apply_label_names(Glyphs.font, labels_by_index)
-			_apply_label_visibility(Glyphs.font, visibility_by_index)
-			# Re-pin ONLY when a visibility toggle broke the visible-first partition (a shown
-			# row now trails a hidden one, or vice-versa). A pure name/colour edit leaves the
-			# partition intact, so we skip the re-set to avoid stealing focus mid-type or
-			# reordering rows under the user.
-			shown_flags = [bool(item.get("visible")) for item in items]
-			if self._slot_list is not None and shown_flags != sorted(shown_flags, reverse=True):
-				self._slot_list.set(self._slot_list_items(Glyphs.font))
+				if native is None:
+					continue
+				rgb = native.colorUsingColorSpaceName_("NSDeviceRGBColorSpace") or native
+				comps = (rgb.redComponent(), rgb.greenComponent(),
+					rgb.blueComponent(), rgb.alphaComponent())
+				new_colors[slot] = comps
+				if not _rgba_close(comps, baseline_colors[slot]):
+					colors_changed = True
+			if colors_changed:
+				_apply_label_colors(new_colors)
+
+			# --- names + visibility: diff against the persisted colorNames settings ---
+			persisted_rows, _none = colornames.parse_settings(self._effective_label_text(font))
+			persisted_names = {index: label for index, label, _vis in persisted_rows}
+			persisted_visible = {index: vis for index, _label, vis in persisted_rows}
+			labels_by_index = {slot: str(item.get("name", "")).strip()
+				for slot, item in by_slot.items()}
+			visibility_by_index = {slot: bool(item.get("visible"))
+				for slot, item in by_slot.items()}
+
+			if any(labels_by_index[slot] != persisted_names.get(slot)
+					for slot in labels_by_index):
+				_apply_label_names(font, labels_by_index)
+			if any(visibility_by_index[slot] != persisted_visible.get(slot)
+					for slot in visibility_by_index):
+				_apply_label_visibility(font, visibility_by_index)
+				# A flag flipped: re-set so the toggled row re-pins into the visible block or
+				# the hidden block below. (A pure name/colour edit leaves the partition intact,
+				# so we skip the re-set to avoid stealing focus mid-type.)
+				if self._slot_list is not None:
+					self._slot_list.set(self._slot_list_items(font))
 		except Exception:
 			import traceback
 			print("Color Flow [pane slot edit] error:\n" + traceback.format_exc())

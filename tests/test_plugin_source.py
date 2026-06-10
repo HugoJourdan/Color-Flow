@@ -367,21 +367,37 @@ def test_slot_drop_persists_via_shared_helper() -> None:
     assert "_broadcast_settings_changed()" in helper
 
 
-def test_slot_edit_persists_colours_names_and_visibility_with_broadcast() -> None:
+def test_slot_edit_applies_only_the_changed_field() -> None:
     body = _method_body("_slot_edited")
-    # Editing a well / name / eye checkbox writes colours, names AND visibility (each
-    # broadcasts), then re-sets the list so a toggled row re-pins.
-    assert "_apply_label_colors(" in body
-    assert "_apply_label_names(Glyphs.font, labels_by_index)" in body
-    assert "_apply_label_visibility(Glyphs.font, visibility_by_index)" in body
-    assert 'visibility_by_index[slot] = bool(item.get("visible"))' in body
-    # A visibility flip re-pins the list (only when the visible-first partition broke).
-    assert "self._slot_list.set(self._slot_list_items(Glyphs.font))" in body
-    assert "sorted(shown_flags, reverse=True)" in body
+    # A single editCallback can't say which column changed, so the handler DIFFS the live
+    # rows against the persisted state and applies ONLY the store that moved. This is the
+    # fix for "hiding/renaming silently changes the colours": an untouched well must NOT
+    # trigger a colour rewrite.
+    assert "_apply_label_colors(new_colors)" in body
+    assert "if colors_changed:" in body
+    # Wells are read in DEVICE RGB (symmetric with how they're built + stored), so an
+    # unchanged well compares equal and never colour-space-drifts.
+    assert 'native.colorUsingColorSpaceName_("NSDeviceRGBColorSpace")' in body
+    assert "_rgba_close(comps, baseline_colors[slot])" in body
+    # Names + visibility are each diffed against the persisted colorNames settings.
+    assert "colornames.parse_settings(self._effective_label_text(font))" in body
+    assert "_apply_label_names(font, labels_by_index)" in body
+    assert "_apply_label_visibility(font, visibility_by_index)" in body
+    # A visibility flip (and only that) re-pins the list.
+    assert "self._slot_list.set(self._slot_list_items(font))" in body
     colors_helper = _module_function_body("_apply_label_colors")
     assert "_broadcast_settings_changed()" in colors_helper
     names_helper = _module_function_body("_apply_label_names")
     assert "_broadcast_settings_changed()" in names_helper
+
+
+def test_label_colours_read_and_write_use_the_same_colourspace() -> None:
+    # read_label_colors must read in the SAME RGB space write_label_colors stores in
+    # (device), so a save/load round-trip is the identity and colours don't drift.
+    source = (RESOURCES / "labelcolors.py").read_text(encoding="utf-8")
+    assert 'colorUsingColorSpaceName_("NSDeviceRGBColorSpace")' in source
+    assert "NSCalibratedRGBColorSpace" not in source
+    assert "colorWithDeviceRed_green_blue_alpha_" in source
 
 
 def test_visibility_persists_via_set_label_visibility_and_broadcast() -> None:

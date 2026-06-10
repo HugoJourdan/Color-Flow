@@ -55,7 +55,11 @@ def read_label_colors() -> list[tuple[float, float, float, float]]:
     for index in range(12):
         try:
             color = NSUnarchiver.unarchiveObjectWithData_(stored[index])
-            rgb = color.colorUsingColorSpaceName_("NSCalibratedRGBColorSpace") or color
+            # Read in DEVICE RGB — the same space write_label_colors stores them in
+            # (``colorWithDeviceRed:``). A device->device round-trip is the identity, so a
+            # colour written by Color Flow reads back byte-for-byte; converting to calibrated
+            # here would shift every component and make each save/load cycle drift the colours.
+            rgb = color.colorUsingColorSpaceName_("NSDeviceRGBColorSpace") or color
             colors.append((rgb.redComponent(), rgb.greenComponent(),
                            rgb.blueComponent(), rgb.alphaComponent()))
         except Exception:
