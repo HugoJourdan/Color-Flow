@@ -89,7 +89,7 @@ In the example below the Layer Color is `Orange` — even though `Light Green` a
 
 <img src="img/howcolorsetup1.jpg" width="450">   <img src="img/howcolorsetup2.jpg" width="450">
 
-> **Palette UI screenshots coming soon** — drag‑to‑reorder colours, double‑click‑to‑rename labels, focus mode, and the starter‑profile picker.
+> **Palette UI screenshots coming soon** — drag‑to‑reorder colours, double‑click‑to‑rename labels, and focus mode.
 
 ### Shortcuts
 
