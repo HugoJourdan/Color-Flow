@@ -8,7 +8,7 @@ only thing left to manual testing is the real ``from GlyphsApp import ...`` line
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import SupportsIndex, overload
 
 import colorflow_dashboard as db
@@ -36,6 +36,7 @@ class _FakeGlyph:
         self.subCategory: str | None = None
         self.case: str | None = None
         self.unicode: str | None = None
+        self.export: bool = True            # GSGlyph default: glyphs export
 
 
 class _FakeMaster:
@@ -64,9 +65,12 @@ class _FakeGlyphs(list["_FakeGlyph"]):
 class _FakeFont:
     versionMajor = 2
     versionMinor = 5
+    # Bare annotation: type-check dynamic `font.customParameters = [...]` assignments
+    # without creating a runtime attribute (so getattr(..., None) reads None when unset).
+    customParameters: list
 
     def __init__(self, masters: list, glyphs: list | None = None,
-                 filepath: str = "/fonts/Acme.glyphs", family: str = "Acme Sans") -> None:
+                 filepath: str | None = "/fonts/Acme.glyphs", family: str = "Acme Sans") -> None:
         self.masters = masters
         self.glyphs = _FakeGlyphs(glyphs if glyphs is not None else [])
         self.filepath = filepath
@@ -74,6 +78,9 @@ class _FakeFont:
         # The per-session outline cache lives here (a JSON string per key); tests
         # that exercise the cache assign a plain dict.
         self.tempData: dict[str, object] = {}
+        # The dated timeline history is now stored here (gzip+base64 string),
+        # mirroring GSFont.userData — a dict-like that travels with the file.
+        self.userData: dict[str, object] = {}
 
 
 class _Defaults(dict):
@@ -207,60 +214,121 @@ def test_build_master_glyph_colors_all_glyphs_layer_color_only() -> None:
 # default_glyph_order — bypass the glyphOrder custom parameter
 # --------------------------------------------------------------------------- #
 
-class _FakeGlyphsInfo:
-    """Stand-in for ``GSGlyphsInfo``: maps a glyph to its GlyphData index, with
-    ``NS_NOT_FOUND`` for glyphs the database doesn't know."""
+class _FakeGlyphOrderParam:
+    """A ``glyphOrder`` custom parameter whose ``active`` flag, when flipped,
+    re-sorts the owning fake font's ``glyphs`` between a custom and a default order
+    — mirroring how Glyphs re-sorts ``font.glyphs`` when the parameter is toggled."""
 
-    def __init__(self, index_by_name: dict) -> None:
-        self._index = index_by_name
+    name = "glyphOrder"
 
-    def glyphIndex_(self, glyph) -> int:
-        return self._index.get(glyph.name, db.NS_NOT_FOUND)
+    def __init__(self, font: _FakeFontWithGlyphOrder, default_order: list[str],
+                 custom_order: list[str], active: bool = True) -> None:
+        self._font = font
+        self._default = default_order
+        self._custom = custom_order
+        self._active = active
+
+    @property
+    def active(self) -> bool:
+        return self._active
+
+    @active.setter
+    def active(self, value: object) -> None:
+        self._active = bool(value)
+        self._font._apply_order(self._custom if self._active else self._default)
 
 
-class _FakeFontWithInfo(_FakeFont):
-    def __init__(self, masters: list, glyphs: list, index_by_name: dict) -> None:
-        super().__init__(masters, glyphs)
-        self._info = _FakeGlyphsInfo(index_by_name)
+class _FakeFontWithGlyphOrder(_FakeFont):
+    """A font whose ``glyphs`` follow an active ``glyphOrder`` parameter: while it is
+    active the glyphs iterate in ``custom_order``; deactivating the parameter falls
+    back to ``default_order`` (what Glyphs' default sort would give)."""
 
-    def glyphsInfo(self) -> _FakeGlyphsInfo:
-        return self._info
+    def __init__(self, masters: list, glyphs_by_name: dict,
+                 default_order: list[str], custom_order: list[str]) -> None:
+        super().__init__(masters, [glyphs_by_name[name] for name in custom_order])
+        self._by_name = glyphs_by_name
+        self.customParameters = [
+            _FakeGlyphOrderParam(self, default_order, custom_order, active=True)
+        ]
+
+    def _apply_order(self, order: list[str]) -> None:
+        self.glyphs = _FakeGlyphs(self._by_name[name] for name in order)
 
 
-def test_default_glyph_order_sorts_by_glyphdata_index_ignoring_custom_order() -> None:
-    # font.glyphs is in a custom (glyphOrder) order: C, A, B
-    glyphs = [_FakeGlyph("C", {}), _FakeGlyph("A", {}), _FakeGlyph("B", {})]
-    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0, "B": 1, "C": 2})
+def _glyph_order_font(default_order: list[str],
+                      custom_order: list[str]) -> _FakeFontWithGlyphOrder:
+    by_name = {name: _FakeGlyph(name, {}) for name in default_order}
+    return _FakeFontWithGlyphOrder([_FakeMaster("m1", "R")], by_name,
+                                   default_order, custom_order)
+
+
+def test_default_glyph_order_ignores_active_glyphorder_param() -> None:
+    # font.glyphs iterates in the custom glyphOrder C, A, B; default is A, B, C.
+    font = _glyph_order_font(["A", "B", "C"], ["C", "A", "B"])
     assert db.default_glyph_order(font, ["C", "A", "B"]) == ["A", "B", "C"]
 
 
-def test_default_glyph_order_unknown_glyphs_sort_last_keeping_relative_order() -> None:
-    glyphs = [_FakeGlyph("zz", {}), _FakeGlyph("A", {}), _FakeGlyph("yy", {})]
-    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0})  # zz, yy unknown
-    assert db.default_glyph_order(font, ["zz", "A", "yy"]) == ["A", "zz", "yy"]
+def test_default_glyph_order_restores_param_active_state() -> None:
+    font = _glyph_order_font(["A", "B", "C"], ["C", "A", "B"])
+    db.default_glyph_order(font, ["C", "A", "B"])
+    # the parameter is switched back on and glyphs return to the custom order
+    assert font.customParameters[0].active is True
+    assert [glyph.name for glyph in font.glyphs] == ["C", "A", "B"]
 
 
-def test_default_glyph_order_passthrough_without_glyphs_info() -> None:
+def test_default_glyph_order_appends_names_absent_from_font() -> None:
+    font = _glyph_order_font(["A", "B"], ["B", "A"])
+    # "ghost" isn't in font.glyphs -> kept at the end in its given order
+    assert db.default_glyph_order(font, ["B", "A", "ghost"]) == ["A", "B", "ghost"]
+
+
+def test_default_glyph_order_passthrough_without_custom_parameters() -> None:
     glyphs = [_FakeGlyph("B", {}), _FakeGlyph("A", {})]
-    font = _FakeFont([_FakeMaster("m1", "R")], glyphs)  # no glyphsInfo()
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs)  # no customParameters API
+    assert db.default_glyph_order(font, ["B", "A"]) == ["B", "A"]
+
+
+def test_default_glyph_order_passthrough_without_glyphorder_param() -> None:
+    glyphs = [_FakeGlyph("B", {}), _FakeGlyph("A", {})]
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs)
+    font.customParameters = []  # has the API, but no glyphOrder parameter
     assert db.default_glyph_order(font, ["B", "A"]) == ["B", "A"]
 
 
 def test_build_model_uses_default_order_over_glyph_iteration_order(tmp_path) -> None:
-    glyphs = [_FakeGlyph("C", {"m1": _FakeLayerColor(0)}),
-              _FakeGlyph("A", {"m1": _FakeLayerColor(0)}),
-              _FakeGlyph("B", {"m1": _FakeLayerColor(0)})]
-    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0, "B": 1, "C": 2})
+    by_name = {name: _FakeGlyph(name, {"m1": _FakeLayerColor(0)})
+               for name in ("A", "B", "C")}
+    # font.glyphs iterates in the custom glyphOrder C, A, B; default is A, B, C.
+    font = _FakeFontWithGlyphOrder([_FakeMaster("m1", "R")], by_name,
+                                   default_order=["A", "B", "C"],
+                                   custom_order=["C", "A", "B"])
     font.filepath = str(tmp_path / "Font.glyphs")
     current = db.build_master_glyph_colors(font)
     model = db.build_model(font, datetime(2026, 6, 5), current, current)
     assert model["glyphNames"] == ["A", "B", "C"]
 
 
+def test_build_model_omits_paths_when_no_glyph_svg(tmp_path, monkeypatch) -> None:
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(0)}),
+              _FakeGlyph("B", {"m1": _FakeLayerColor(0)})]
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs)
+    font.filepath = str(tmp_path / "Font.glyphs")
+    current = db.build_master_glyph_colors(font)
+    # default (pref off): the per-master outline dict is embedded
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["paths"]
+    # hidden pref on: outlines omitted entirely -> a much lighter report
+    fake = _FakeGlyphsApp()
+    fake.defaults[db.NO_GLYPH_SVG_KEY] = True
+    monkeypatch.setattr(db, "Glyphs", fake)
+    lighter = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert lighter["paths"] == {}
+
+
 def test_outline_paths_reports_monotonic_progress(tmp_path) -> None:
     glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(0)}),
               _FakeGlyph("B", {"m1": _FakeLayerColor(0)})]
-    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0, "B": 1})
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs)
     font.filepath = str(tmp_path / "Font.glyphs")
     seen: list[float] = []
     db._outline_paths(font, ["A", "B"], progress=seen.append)
@@ -273,7 +341,7 @@ def test_outline_paths_reports_monotonic_progress(tmp_path) -> None:
 def test_build_model_reports_monotonic_progress(tmp_path) -> None:
     glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(0)}),
               _FakeGlyph("B", {"m1": _FakeLayerColor(0)})]
-    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0, "B": 1})
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs)
     font.filepath = str(tmp_path / "Font.glyphs")
     current = db.build_master_glyph_colors(font)
     seen: list[float] = []
@@ -287,7 +355,7 @@ def test_build_model_reports_monotonic_progress(tmp_path) -> None:
 def test_main_reports_progress_and_opens_report(tmp_path, monkeypatch) -> None:
     glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(0)}),
               _FakeGlyph("B", {"m1": _FakeLayerColor(1)})]
-    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0, "B": 1})
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs)
     font.filepath = str(tmp_path / "Font.glyphs")
     opened: list[str] = []
     monkeypatch.setattr(db.webbrowser, "open", lambda uri: opened.append(uri))
@@ -302,7 +370,7 @@ def test_main_reports_progress_and_opens_report(tmp_path, monkeypatch) -> None:
 def test_main_open_when_done_false_returns_path_without_opening(tmp_path, monkeypatch) -> None:
     glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(0)}),
               _FakeGlyph("B", {"m1": _FakeLayerColor(1)})]
-    font = _FakeFontWithInfo([_FakeMaster("m1", "R")], glyphs, {"A": 0, "B": 1})
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs)
     font.filepath = str(tmp_path / "Font.glyphs")
     opened: list[str] = []
     monkeypatch.setattr(db.webbrowser, "open", lambda uri: opened.append(uri))
@@ -324,6 +392,60 @@ def test_free_mode_reads_global_pref(monkeypatch) -> None:
 def test_free_mode_defaults_to_step_without_glyphs(monkeypatch) -> None:
     monkeypatch.setattr(db, "Glyphs", None)
     assert db.free_mode() is False
+
+
+def test_no_glyph_svg_reads_hidden_pref(monkeypatch) -> None:
+    fake = _FakeGlyphsApp()
+    fake.defaults[db.NO_GLYPH_SVG_KEY] = True
+    monkeypatch.setattr(db, "Glyphs", fake)
+    assert db.no_glyph_svg() is True
+    fake.defaults[db.NO_GLYPH_SVG_KEY] = False
+    assert db.no_glyph_svg() is False
+
+
+def test_no_glyph_svg_defaults_off_without_glyphs(monkeypatch) -> None:
+    monkeypatch.setattr(db, "Glyphs", None)
+    assert db.no_glyph_svg() is False
+
+
+def test_outline_change_days_reads_pref(monkeypatch) -> None:
+    monkeypatch.setattr(db, "Glyphs", None)
+    assert db.outline_change_days() == 0                      # dormant without Glyphs
+    fake = _FakeGlyphsApp()
+    monkeypatch.setattr(db, "Glyphs", fake)
+    assert db.outline_change_days() == db.OUTLINE_CHANGE_DAYS_DEFAULT  # key unset -> default
+    fake.defaults[db.OUTLINE_CHANGE_DAYS_KEY] = 5
+    assert db.outline_change_days() == 5
+    fake.defaults[db.OUTLINE_CHANGE_DAYS_KEY] = 0
+    assert db.outline_change_days() == 0                      # 0 disables
+
+
+def test_collect_outline_changes_empty_when_not_git_tracked(tmp_path, monkeypatch) -> None:
+    fake = _FakeGlyphsApp()
+    monkeypatch.setattr(db, "Glyphs", fake)
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath=str(tmp_path / "Font.glyphs"))
+    # tmp_path is not a git repo -> the feature stays dormant (no changes, no crash)
+    assert db.collect_outline_changes(font) == {}
+
+
+def test_build_model_includes_outline_changes_key(tmp_path) -> None:
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(0)})]
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs)
+    font.filepath = str(tmp_path / "Font.glyphs")
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert "outlineChanges" in model
+    assert model["outlineChanges"] == {}
+
+
+def test_meaning_and_none_prefers_in_font_userdata(tmp_path) -> None:
+    """C: labels stored in font.userData win over the sidecar key file, so a shared
+    .glyphs file reports the labels its author saved."""
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath=str(tmp_path / "Font.glyphs"))
+    font.userData = {cc.FONT_LABELS_KEY:
+                     cc.DEFAULT_COLOR_NAMES.replace("red=🚨 Red", "red=Shared Red")}
+    meaning, _none = db._meaning_and_none(font)
+    assert meaning["0"] == "Shared Red"
 
 
 def test_meaning_and_none_reads_font_dir_color_names(tmp_path) -> None:
@@ -358,68 +480,134 @@ def test_record_history_round_trips_and_sorts(monkeypatch) -> None:
     db.record_history(font, {"m1": {"A": 3}}, datetime(2026, 6, 6))
     db.record_history(font, {"m1": {"A": 4}}, datetime(2026, 6, 5))
     history = db.load_history(font)
-    assert list(history.keys()) == ["2026-06-04", "2026-06-05", "2026-06-06"]   # oldest-first
-    assert history["2026-06-06"] == {"m1": {"A": 3}}
+    assert list(history.keys()) == [                          # datetime keys, oldest-first
+        "2026-06-04T00:00:00", "2026-06-05T00:00:00", "2026-06-06T00:00:00"]
+    assert history["2026-06-06T00:00:00"] == {"m1": {"A": 3}}
 
 
-def test_record_history_same_day_overwrites(monkeypatch) -> None:
+def test_record_history_logs_each_save_not_per_day(monkeypatch) -> None:
+    # One entry per SAVE (datetime key), not one per day: two saves the same day with
+    # different colours keep BOTH; the report groups them by date later.
     monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
     font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
     db.record_history(font, {"m1": {"A": 0}}, datetime(2026, 6, 6, 9))
     db.record_history(font, {"m1": {"A": 8}}, datetime(2026, 6, 6, 17))
     history = db.load_history(font)
-    assert list(history.keys()) == ["2026-06-06"]
-    assert history["2026-06-06"] == {"m1": {"A": 8}}         # latest capture of the day wins
+    assert list(history.keys()) == ["2026-06-06T09:00:00", "2026-06-06T17:00:00"]
+    # grouping by date collapses to the last save of the day
+    assert db.group_saves_by_date(history) == {"2026-06-06": {"m1": {"A": 8}}}
 
 
-def test_record_history_caps_to_most_recent(monkeypatch) -> None:
+def test_record_history_skips_unchanged_save(monkeypatch) -> None:
+    # A save that changes no colour (e.g. an outline-only edit, or a double save) adds
+    # no entry — the log only grows on colour-changing saves.
     monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
     font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
-    for day in range(1, 6):
-        db.record_history(font, {"m1": {"A": day}}, datetime(2026, 6, day), cap=3)
+    db.record_history(font, {"m1": {"A": 5}}, datetime(2026, 6, 6, 9))
+    db.record_history(font, {"m1": {"A": 5}}, datetime(2026, 6, 6, 10))   # identical -> skipped
+    db.record_history(font, {"m1": {"A": 6}}, datetime(2026, 6, 6, 11))   # changed  -> kept
+    assert list(db.load_history(font).keys()) == [
+        "2026-06-06T09:00:00", "2026-06-06T11:00:00"]
+
+
+def test_record_history_is_uncapped_keeps_all_days(monkeypatch) -> None:
+    # No day-window pruning: a long-running project keeps its entire dated history
+    # (each past day collapsed to its closing save, so growth stays small).
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    days = [datetime(2026, 1, 1) + timedelta(days=offset) for offset in range(70)]
+    for index, day in enumerate(days):
+        db.record_history(font, {"m1": {"A": index % 12}}, day)
     history = db.load_history(font)
-    assert list(history.keys()) == ["2026-06-03", "2026-06-04", "2026-06-05"]  # oldest dropped
+    assert len(history) == 70                                  # nothing dropped
+    assert min(history) == "2026-01-01T00:00:00"               # the very first day survives
 
 
-def test_history_no_op_without_glyphs_or_filepath(monkeypatch) -> None:
+def test_record_history_keeps_only_last_save_of_past_days(monkeypatch) -> None:
+    # Once work moves to a new day, the old day's intra-day saves collapse to its
+    # final save (end-of-day state); the current day keeps every save.
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    db.record_history(font, {"m1": {"A": 0}}, datetime(2026, 6, 1, 9))
+    db.record_history(font, {"m1": {"A": 1}}, datetime(2026, 6, 1, 17))   # day 1 closing state
+    db.record_history(font, {"m1": {"A": 2}}, datetime(2026, 6, 2, 9))    # new day -> day 1 coalesces
+    db.record_history(font, {"m1": {"A": 3}}, datetime(2026, 6, 2, 17))   # current day: all saves kept
+    assert list(db.load_history(font).keys()) == [
+        "2026-06-01T17:00:00", "2026-06-02T09:00:00", "2026-06-02T17:00:00"]
+
+
+def test_history_no_op_without_glyphs(monkeypatch) -> None:
     monkeypatch.setattr(db, "Glyphs", None)
     font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
     db.record_history(font, {"m1": {"A": 0}}, datetime(2026, 6, 6))   # silently no-op
     assert db.load_history(font) == {}
+
+
+def test_history_records_into_unsaved_font_userdata(monkeypatch) -> None:
+    # userData travels with the file, so we can accrue history before the first save
+    # (an unsaved font with no filepath). It persists once the file is first written.
     monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
     unsaved = _FakeFont([_FakeMaster("m1", "R")], filepath="")
     db.record_history(unsaved, {"m1": {"A": 0}}, datetime(2026, 6, 6))
-    assert db.load_history(unsaved) == {}
+    assert db.load_history(unsaved) == {"2026-06-06T00:00:00": {"m1": {"A": 0}}}
 
 
-def test_write_history_replaces_and_caps(monkeypatch) -> None:
+def test_history_stored_in_userdata_not_defaults(monkeypatch) -> None:
+    # the snapshot lives in the font's userData (travels with the file), not in the
+    # machine-local Glyphs.defaults store.
+    fake = _FakeGlyphsApp()
+    monkeypatch.setattr(db, "Glyphs", fake)
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    db.record_history(font, {"m1": {"A": 2}}, datetime(2026, 6, 6))
+    assert db.TIMELINE_USERDATA_KEY in font.userData
+    assert fake.defaults[db.HISTORY_KEY] is None                 # nothing written to defaults
+
+
+def test_load_history_migrates_from_legacy_defaults(monkeypatch) -> None:
+    # a font saved by an older build has history in Glyphs.defaults but nothing in
+    # userData yet -> load_history falls back to the legacy store.
+    fake = _FakeGlyphsApp()
+    monkeypatch.setattr(db, "Glyphs", fake)
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    fake.defaults[db.HISTORY_KEY] = {font.filepath: {"2026-06-01": {"m1": {"A": 4}}}}
+    assert db.load_history(font) == {"2026-06-01": {"m1": {"A": 4}}}
+
+
+def test_write_history_replaces_uncapped_and_coalesces_past_days(monkeypatch) -> None:
     monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
     font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
     db.record_history(font, {"m1": {"A": 0}}, datetime(2026, 6, 9))   # a pre-existing day
-    db.write_history(font, {f"2026-06-0{day}": {"m1": {"A": day}} for day in range(1, 6)}, cap=3)
+    db.write_history(font, {
+        "2026-06-01T09:00:00": {"m1": {"A": 1}},
+        "2026-06-01T17:00:00": {"m1": {"A": 2}},   # past day -> only this closing save kept
+        "2026-06-02T09:00:00": {"m1": {"A": 3}},
+        "2026-06-02T17:00:00": {"m1": {"A": 4}},   # latest day -> every save kept
+    })
     history = db.load_history(font)
-    assert list(history) == ["2026-06-03", "2026-06-04", "2026-06-05"]  # replaced + capped
+    assert list(history) == [                       # replaced wholesale, nothing day-capped
+        "2026-06-01T17:00:00", "2026-06-02T09:00:00", "2026-06-02T17:00:00"]
 
 
-def test_backfill_from_git_merges_into_history(monkeypatch) -> None:
+def test_backfill_from_git_imports_commits_under_live_saves(monkeypatch) -> None:
+    # Backfill imports git COMMIT datetimes into the per-save log; a live save wins on a
+    # shared key, and only non-colliding commits count as newly imported.
     monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
     font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
-    db.record_history(font, {"m1": {"A": 5}}, datetime(2026, 6, 2))   # a live snapshot
-    captured: dict = {}
+    db.record_history(font, {"m1": {"A": 5}}, datetime(2026, 6, 2, 12))   # a live save
 
-    def fake_collect(path, load, cap=60, progress=None, skip=None) -> dict:
-        captured["skip"] = skip
-        full = {"2026-06-01": {"m1": {"A": 0}}, "2026-06-02": {"m1": {"A": 9}}}
-        return {date: snap for date, snap in full.items() if not skip or date not in skip}
+    def fake_commits(path, load, cap=60, progress=None) -> dict:
+        return {
+            "2026-06-01T09:00:00": {"m1": {"A": 0}},
+            "2026-06-02T12:00:00": {"m1": {"A": 9}},   # collides with the live save's key
+        }
 
-    monkeypatch.setattr(db.colorflow_git, "collect_git_history", fake_collect)
+    monkeypatch.setattr(db.colorflow_git, "collect_commit_history", fake_commits)
     imported = db.backfill_from_git(font)
-    assert captured["skip"] == {"2026-06-02"}    # already-recorded day skipped (incremental)
-    assert imported == 1                          # only the new day imported
+    assert imported == 1                          # only the non-colliding commit is new
     history = db.load_history(font)
     assert history == {
-        "2026-06-01": {"m1": {"A": 0}},
-        "2026-06-02": {"m1": {"A": 5}},          # live snapshot preserved
+        "2026-06-01T09:00:00": {"m1": {"A": 0}},
+        "2026-06-02T12:00:00": {"m1": {"A": 5}},   # live save wins the shared key
     }
 
 
@@ -427,8 +615,8 @@ def test_backfill_from_git_no_op_when_not_in_repo(monkeypatch) -> None:
     monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
     font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
     monkeypatch.setattr(
-        db.colorflow_git, "collect_git_history",
-        lambda path, load, cap=60, progress=None, skip=None: {},  # not a git repo / nothing tracked
+        db.colorflow_git, "collect_commit_history",
+        lambda path, load, cap=60, progress=None: {},  # not a git repo / nothing tracked
     )
     assert db.backfill_from_git(font) == 0
     assert db.load_history(font) == {}
@@ -441,7 +629,7 @@ def test_coerce_history_stringifies_dates_and_ints() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Burndown / velocity / forecast
+# Burndown / velocity
 # --------------------------------------------------------------------------- #
 
 _FC_ORDER = ["0", "1", "2"]   # 3 workflow steps; "2" is the final step
@@ -463,47 +651,6 @@ def test_history_series_reduces_to_per_master_counts() -> None:
     series = db.history_series(history, _FC_ORDER, is_free=False)
     assert [point["date"] for point in series] == ["2026-06-01", "2026-06-08"]
     assert series[1]["masters"]["m1"] == {"final": 4, "started": 4, "total": 10}
-
-
-def test_forecast_steady_progress_gives_eta_and_high_confidence() -> None:
-    series = db.history_series(
-        _history([("2026-06-01", 2), ("2026-06-08", 4), ("2026-06-15", 6), ("2026-06-22", 8)]),
-        _FC_ORDER, is_free=False)
-    out = db.forecast_master(series, "m1", total=10, now=datetime(2026, 6, 22), is_free=False)
-    assert out["velocityPerWeek"] == 2.0      # +6 over 21 days = 2/week
-    assert out["remaining"] == 2 and out["final"] == 8
-    assert out["etaIso"] == "2026-06-29"      # 2 remaining / (2/7 per day) = 7 days
-    assert out["bandDays"] == 1               # perfectly steady -> tight band
-    assert out["confidence"] == "high"
-
-
-def test_forecast_two_points_is_low_confidence_but_still_estimates() -> None:
-    series = db.history_series(_history([("2026-06-01", 3), ("2026-06-08", 6)]),
-                              _FC_ORDER, is_free=False)
-    out = db.forecast_master(series, "m1", total=10, now=datetime(2026, 6, 8), is_free=False)
-    assert out["velocityPerWeek"] == 3.0
-    assert out["etaIso"] is not None and out["confidence"] == "low"
-
-
-def test_forecast_flat_history_has_no_eta() -> None:
-    series = db.history_series(_history([("2026-06-01", 5), ("2026-06-08", 5)]),
-                              _FC_ORDER, is_free=False)
-    out = db.forecast_master(series, "m1", total=10, now=datetime(2026, 6, 8), is_free=False)
-    assert out["velocityPerWeek"] == 0.0
-    assert out["etaIso"] is None and out["confidence"] == "none"
-
-
-def test_forecast_single_point_has_no_eta() -> None:
-    series = db.history_series(_history([("2026-06-08", 4)]), _FC_ORDER, is_free=False)
-    out = db.forecast_master(series, "m1", total=10, now=datetime(2026, 6, 8), is_free=False)
-    assert out["etaIso"] is None and out["confidence"] == "none" and out["points"] == 1
-
-
-def test_forecast_done_master_reports_done() -> None:
-    series = db.history_series(_history([("2026-06-01", 6), ("2026-06-08", 10)]),
-                              _FC_ORDER, is_free=False)
-    out = db.forecast_master(series, "m1", total=10, now=datetime(2026, 6, 8), is_free=False)
-    assert out["remaining"] == 0 and out["confidence"] == "done" and out["etaIso"] is None
 
 
 def test_master_point_free_mode_final_equals_started() -> None:
@@ -780,7 +927,8 @@ def test_build_model_empty_font_has_empty_scripts(monkeypatch, tmp_path) -> None
     assert model["scripts"] == [] and model["glyphNames"] == []
 
 
-def test_build_model_emits_journey_index_field(tmp_path) -> None:
+def test_build_model_emits_journey_index_field(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(db, "is_git_tracked", lambda font: True)   # timeline needs git
     (tmp_path / "colorNames.txt").write_text(
         "purple=Outline\nyellow=Ready\nNone=Nothing\n", encoding="utf-8")
     master = _FakeMaster("m1", "Regular")
@@ -791,6 +939,122 @@ def test_build_model_emits_journey_index_field(tmp_path) -> None:
     assert "journeyIndex" in model
     # One master, today's snapshot only -> one initial event for A.
     assert model["journeyIndex"]["m1"]["A"] == [["2026-06-05", 8]]
+
+
+def test_build_model_timeline_present_without_git(tmp_path) -> None:
+    """The timeline no longer requires git: history lives in the font's userData and
+    travels with the file, so even a non-git font folds today's snapshot in and gets a
+    populated trend/journey. Git-only extras (outline changes) stay empty with no repo."""
+    (tmp_path / "colorNames.txt").write_text("purple=Outline\nNone=Nothing\n", encoding="utf-8")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)})]
+    font = _FakeFont([_FakeMaster("m1", "Regular")], glyphs, filepath=str(tmp_path / "Font.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    # tmp_path is not a git repo, yet the timeline still populates from the folded snapshot
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["trend"]["dates"] == ["2026-06-05"]           # today folded in (no git needed)
+    assert model["journeyIndex"]["m1"]["A"] == [["2026-06-05", 8]]
+    assert model["outlineChanges"] == {}                       # git-only feature, no repo here
+    # current-state fields still populated
+    assert model["glyphNames"] == ["A"]
+    assert model["masters"][0]["keys"] == [8]
+
+
+def test_build_model_has_no_commit_timeline_without_git(tmp_path) -> None:
+    # per-commit view is git-only: no repo -> trendCommits is None and hasCommits False.
+    (tmp_path / "colorNames.txt").write_text("purple=Outline\nNone=Nothing\n", encoding="utf-8")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)})]
+    font = _FakeFont([_FakeMaster("m1", "Regular")], glyphs, filepath=str(tmp_path / "F.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["hasCommits"] is False
+    assert model["trendCommits"] is None
+    assert model["journeyIndexCommits"] is None
+    assert model["fineKind"] is None                            # no commits and no saves logged
+
+
+def test_build_model_builds_per_commit_timeline_when_available(monkeypatch, tmp_path) -> None:
+    # with git commit history available, the model ships a parallel per-commit dataset
+    # (datetime-keyed) plus today's live work folded in as the newest point.
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    (tmp_path / "colorNames.txt").write_text("purple=Outline\nNone=Nothing\n", encoding="utf-8")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)})]
+    font = _FakeFont([_FakeMaster("m1", "Regular")], glyphs, filepath=str(tmp_path / "F.glyphs"))
+    monkeypatch.setattr(db, "commit_timeline_history", lambda font: {
+        "2026-06-01T09:00:00": {"m1": {"A": cc.NO_COLOR}},
+        "2026-06-01T15:00:00": {"m1": {"A": 8}},
+    })
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5, 11, 30), current, current)
+    assert model["hasCommits"] is True
+    commit_dates = model["trendCommits"]["dates"]
+    assert commit_dates[0] == "2026-06-01T09:00:00"
+    assert commit_dates[1] == "2026-06-01T15:00:00"
+    assert commit_dates[-1] == "2026-06-05T11:30:00"          # current work folded in
+    assert "m1" in model["journeyIndexCommits"]
+
+
+def test_git_day_history_empty_without_filepath_or_glyphs(monkeypatch, tmp_path) -> None:
+    # git_day_history needs a saved font and a live Glyphs; otherwise it stays dormant.
+    font_unsaved = _FakeFont([_FakeMaster("m1", "Regular")], filepath=None)
+    assert db.git_day_history(font_unsaved) == {}
+    font = _FakeFont([_FakeMaster("m1", "Regular")], filepath=str(tmp_path / "F.glyphs"))
+    monkeypatch.setattr(db, "Glyphs", None)
+    assert db.git_day_history(font) == {}
+
+
+def test_build_model_merges_git_day_history_userdata_wins(monkeypatch, tmp_path) -> None:
+    # When the font is git-tracked, the day-timeline reads from git and merges it under
+    # any frozen pre-git userData past. On a shared day the live userData snapshot wins
+    # (it's the actual save state, not a commit reconstruction).
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    (tmp_path / "colorNames.txt").write_text("purple=Outline\nNone=Nothing\n", encoding="utf-8")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)})]
+    font = _FakeFont([_FakeMaster("m1", "Regular")], glyphs, filepath=str(tmp_path / "F.glyphs"))
+    db.record_history(font, {"m1": {"A": 8}}, datetime(2026, 6, 2))   # frozen pre-git userData day
+    monkeypatch.setattr(db, "git_day_history", lambda font: {
+        "2026-06-01": {"m1": {"A": cc.NO_COLOR}},                     # git fills an earlier gap
+        "2026-06-02": {"m1": {"A": 3}},                              # collides with userData's 8
+    })
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["trend"]["dates"] == ["2026-06-01", "2026-06-02", "2026-06-05"]  # union of all
+    # A: first seen uncoloured (git, 06-01), then 8 on 06-02 (userData wins over git's 3),
+    # unchanged through 06-05 -> exactly two change-events.
+    assert model["journeyIndex"]["m1"]["A"] == [["2026-06-01", cc.NO_COLOR], ["2026-06-02", 8]]
+
+
+def test_build_model_fine_dataset_is_per_save_without_git(monkeypatch, tmp_path) -> None:
+    # No git repo: the fine-grain Time Machine dataset comes from the userData per-save
+    # log (fineKind == "save"), so non-git fonts also get a "Per save" granularity.
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    (tmp_path / "colorNames.txt").write_text("purple=Outline\nNone=Nothing\n", encoding="utf-8")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)})]
+    font = _FakeFont([_FakeMaster("m1", "Regular")], glyphs, filepath=str(tmp_path / "F.glyphs"))
+    db.record_history(font, {"m1": {"A": cc.NO_COLOR}}, datetime(2026, 6, 4, 9))   # a prior save
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5, 14, 0), current, current)
+    assert model["fineKind"] == "save"
+    assert model["hasCommits"] is True                              # 2 fine points -> toggle shows
+    fine_dates = model["trendCommits"]["dates"]
+    assert fine_dates[0] == "2026-06-04T09:00:00"                   # the prior save
+    assert fine_dates[-1] == "2026-06-05T14:00:00"                  # today's live work, datetime-keyed
+
+
+def test_build_model_fine_kind_is_commit_with_git(monkeypatch, tmp_path) -> None:
+    # With git commit history, the fine dataset is per-commit (fineKind == "commit"),
+    # even if a userData save log also exists (git takes precedence).
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    (tmp_path / "colorNames.txt").write_text("purple=Outline\nNone=Nothing\n", encoding="utf-8")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)})]
+    font = _FakeFont([_FakeMaster("m1", "Regular")], glyphs, filepath=str(tmp_path / "F.glyphs"))
+    monkeypatch.setattr(db, "commit_timeline_history", lambda font: {
+        "2026-06-01T09:00:00": {"m1": {"A": cc.NO_COLOR}},
+        "2026-06-01T15:00:00": {"m1": {"A": 8}},
+    })
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5, 11, 30), current, current)
+    assert model["fineKind"] == "commit"
+    assert model["hasCommits"] is True
 
 
 def test_build_model_emits_cross_master_summary(tmp_path) -> None:
@@ -1107,6 +1371,7 @@ def test_build_model_folds_today_into_trend_on_first_run(monkeypatch, tmp_path) 
     # First run with EMPTY persisted history must still yield a trend point for
     # today (build_model folds the live snapshot in before deriving the series).
     monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    monkeypatch.setattr(db, "is_git_tracked", lambda font: True)   # timeline needs git
     (tmp_path / "colorNames.txt").write_text("purple=A\nyellow=Done\n", encoding="utf-8")
     glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(3)}),   # at final step
               _FakeGlyph("B", {"m1": _FakeLayerColor(8)})]   # started, not final
@@ -1124,6 +1389,7 @@ def test_build_model_latest_series_point_is_todays_data_not_prior_capture(
     # Persisted history already holds an EARLIER capture for today; the run's
     # latest series point must reflect today's live ``current``, not that capture.
     monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    monkeypatch.setattr(db, "is_git_tracked", lambda font: True)   # timeline needs git
     (tmp_path / "colorNames.txt").write_text("purple=A\nyellow=Done\n", encoding="utf-8")
     glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(3)}),
               _FakeGlyph("B", {"m1": _FakeLayerColor(3)})]    # both at final step now
@@ -1142,6 +1408,7 @@ def test_build_model_empty_font_does_not_crash(monkeypatch, tmp_path) -> None:
     # No glyphs and no masters: build_model must produce a sane, empty-ish model
     # rather than raise (glyphTotal == 0, no masters to index).
     monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    monkeypatch.setattr(db, "is_git_tracked", lambda font: True)   # exercise the folded-trend path
     (tmp_path / "colorNames.txt").write_text("red=R\n", encoding="utf-8")
     font = _FakeFont([], [], filepath=str(tmp_path / "Empty.glyphs"))
     current = db.build_master_glyph_colors(font)            # {} -> no masters
@@ -1149,5 +1416,76 @@ def test_build_model_empty_font_does_not_crash(monkeypatch, tmp_path) -> None:
     assert model["glyphTotal"] == 0
     assert model["glyphNames"] == [] and model["masters"] == []
     assert model["paths"] == {} and model["coverage"]["byScript"] == {}
-    assert model["trend"]["forecast"] == {}                # no masters -> no forecasts
+    assert "forecast" not in model["trend"]                # forecast feature removed
     assert model["trend"]["series"][-1]["date"] == "2026-06-05"   # today still folded in
+
+
+# --------------------------------------------------------------------------- #
+# Exporting-only mode (count exporting glyphs only)
+# --------------------------------------------------------------------------- #
+
+def test_exporting_only_reads_pref(monkeypatch) -> None:
+    fake = _FakeGlyphsApp()
+    fake.defaults[db.EXPORTING_ONLY_KEY] = True
+    monkeypatch.setattr(db, "Glyphs", fake)
+    assert db.exporting_only() is True
+    fake.defaults[db.EXPORTING_ONLY_KEY] = False
+    assert db.exporting_only() is False
+
+
+def test_exporting_only_defaults_off_without_glyphs(monkeypatch) -> None:
+    monkeypatch.setattr(db, "Glyphs", None)
+    assert db.exporting_only() is False
+
+
+def test_non_exporting_names_sorted_from_font() -> None:
+    glyphs = [_FakeGlyph("zeta", {}), _FakeGlyph("A", {}), _FakeGlyph("comma", {})]
+    glyphs[0].export = False
+    glyphs[2].export = False
+    font = _FakeFont([_FakeMaster("m1", "R")], glyphs)
+    assert db.non_exporting_names(font) == ["comma", "zeta"]    # sorted
+
+
+def test_build_model_ships_non_exporting_and_pref_keys(tmp_path) -> None:
+    (tmp_path / "colorNames.txt").write_text("red=R\nNone=Nothing\n", encoding="utf-8")
+    master = _FakeMaster("m1", "Regular")
+    letter_a = _FakeGlyph("A", {"m1": _FakeLayerColor(0)})
+    ornament = _FakeGlyph("ornament", {"m1": _FakeLayerColor(0)})
+    ornament.export = False
+    font = _FakeFont([master], [letter_a, ornament], filepath=str(tmp_path / "Font.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["nonExporting"] == ["ornament"]
+    assert model["exportingOnly"] is False                      # honest default: OFF
+
+
+def test_build_model_non_exporting_empty_when_all_export(tmp_path) -> None:
+    (tmp_path / "colorNames.txt").write_text("red=R\n", encoding="utf-8")
+    master = _FakeMaster("m1", "Regular")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(0)})]
+    font = _FakeFont([master], glyphs, filepath=str(tmp_path / "Font.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["nonExporting"] == []
+
+
+def test_build_model_counts_stay_raw_when_exporting_only_on(tmp_path, monkeypatch) -> None:
+    # PARITY INVARIANT: with the pref ON the embedded per-master counts/keys still
+    # ship ALL glyphs (raw truth) — the report applies the exclusion client-side,
+    # so its displayed numbers match the palette's displayed (excluded) counts.
+    fake = _FakeGlyphsApp()
+    fake.defaults[db.EXPORTING_ONLY_KEY] = True
+    monkeypatch.setattr(db, "Glyphs", fake)
+    (tmp_path / "colorNames.txt").write_text("red=R\nNone=Nothing\n", encoding="utf-8")
+    master = _FakeMaster("m1", "Regular")
+    letter_a = _FakeGlyph("A", {"m1": _FakeLayerColor(0)})
+    ornament = _FakeGlyph("ornament", {"m1": _FakeLayerColor(0)})
+    ornament.export = False
+    font = _FakeFont([master], [letter_a, ornament], filepath=str(tmp_path / "Font.glyphs"))
+    current = db.build_master_glyph_colors(font)
+    model = db.build_model(font, datetime(2026, 6, 5), current, current)
+    assert model["exportingOnly"] is True
+    assert model["nonExporting"] == ["ornament"]
+    assert model["glyphTotal"] == 2                             # raw total
+    assert model["masters"][0]["counts"] == {"0": 2}            # raw: both glyphs counted
+    assert len(model["masters"][0]["keys"]) == 2                # keys ship every glyph

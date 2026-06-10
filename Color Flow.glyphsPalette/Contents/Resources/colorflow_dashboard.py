@@ -33,13 +33,15 @@ import json
 import re
 import tempfile
 import webbrowser
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import quote
 
 import colorflow_assets
 import colorflow_git
+import colorflow_history_store
+import colorflow_outline_diff
 import colorflow_recipes
 import colornames
 import glyphsvg
@@ -65,6 +67,28 @@ FREE_KEY = "com.hugojourdan.ColorFlow-FreeMode"
 # Opt-in workflow recipes (#5) live here as JSON; absent/empty = recipes off,
 # in which case the recipe-adjusted completion equals standard completion.
 RECIPES_KEY = "com.hugojourdan.ColorFlow-Recipes"
+
+# Opt-in "count exporting glyphs only" mode — the same global pref the palette's
+# action-popover checkbox toggles (plugin.py:_EXPORTING_ONLY_KEY). Parity rule:
+# the embedded per-master counts/keys always ship ALL glyphs (raw truth); when
+# the pref is ON the report recomputes its DISPLAYED percentages client-side
+# without the non-exporting glyphs, matching the palette's displayed counts.
+EXPORTING_ONLY_KEY = "com.hugojourdan.ColorFlow-ExportingOnly"
+
+# Hidden power-user pref: when truthy, the per-glyph outline SVGs are omitted from
+# the report. The embedded glyph paths are by far the heaviest part of the file, so
+# skipping them makes the report dramatically lighter (cells render as plain colour
+# swatches). Set from the Macro panel:
+#   Glyphs.defaults["com.hugojourdan.ColorFlow-NoGlyphSVG"] = True
+NO_GLYPH_SVG_KEY = "com.hugojourdan.ColorFlow-NoGlyphSVG"
+
+# Outline-changes view (#D): how many recent git-committed days to diff for glyph
+# shape changes. Re-opening each historical commit is expensive, so this is a small
+# recent window by default. Set to 0 to disable the feature entirely. Tunable via:
+#   Glyphs.defaults["com.hugojourdan.ColorFlow-OutlineChangeDays"] = 10
+OUTLINE_CHANGE_DAYS_KEY = "com.hugojourdan.ColorFlow-OutlineChangeDays"
+OUTLINE_CHANGE_DAYS_DEFAULT = 10   # diff the last ~10 committed days
+OUTLINE_CHANGE_LIMIT = 60          # cap changed glyphs kept per day (avoid huge days)
 
 
 # --------------------------------------------------------------------------- #
@@ -142,6 +166,31 @@ def free_mode() -> bool:
     return bool(Glyphs.defaults[FREE_KEY])
 
 
+def no_glyph_svg() -> bool:
+    """Hidden pref: skip embedding per-glyph outline SVGs to make the report much
+    lighter. ``False`` (embed the outlines) when Glyphs is absent or the key unset."""
+    if Glyphs is None:
+        return False
+    return bool(Glyphs.defaults[NO_GLYPH_SVG_KEY])
+
+
+def exporting_only() -> bool:
+    """Opt-in "count exporting glyphs only" pref, read from the SAME key the
+    palette toggles so the two can never disagree. ``False`` (everything counts)
+    when Glyphs is absent or the key unset."""
+    if Glyphs is None:
+        return False
+    return bool(Glyphs.defaults[EXPORTING_ONLY_KEY])
+
+
+def non_exporting_names(font) -> list[str]:
+    """Sorted names of this font's non-exporting glyphs (``glyph.export`` is
+    falsy). Cheap (one ``font.glyphs`` pass) and shipped in the model
+    unconditionally, so the report's toggle can offer the mode whenever there is
+    anything to exclude — empty list when every glyph exports."""
+    return sorted(colornames.non_exporting_names(font.glyphs))
+
+
 def load_recipes() -> list:
     """Opt-in workflow recipes from ``Glyphs.defaults`` (JSON). ``[]`` when Glyphs
     is absent or no recipes are set — the recipe-adjusted metric then equals the
@@ -166,8 +215,10 @@ def _meaning_and_none(font) -> tuple[dict[str, str], str]:
     (and therefore the counting ``order``) is identical to the palette's."""
     font_dir = str(Path(font.filepath).parent) if font.filepath else None
     path = colornames.resolve_key_file(font_dir)
-    content = colornames.read_color_names(path)
-    text = content if content.strip() else colornames.DEFAULT_COLOR_NAMES
+    # in-font labels (userData) win over the sidecar key file, so a shared .glyphs file
+    # reports the same labels its author saved; the key file is the offline fallback.
+    text = colornames.pick_settings_text(
+        colornames.font_labels_text(font), colornames.read_color_names(path))
     meaning = colornames.parse_color_names(text)
     none_label = colornames.parse_settings(text)[1]
     return meaning, none_label
@@ -194,53 +245,48 @@ def build_master_glyph_colors(font) -> dict[str, dict[str, int]]:
     return data
 
 
-# NSNotFound (NSIntegerMax) — what GSGlyphsInfo.glyphIndex_ returns for a glyph
-# the GlyphData database doesn't know about; such glyphs sort to the very end.
-NS_NOT_FOUND = (1 << 63) - 1
-
-
-def _font_glyphs_info(font) -> object | None:
-    """The font's ``GSGlyphsInfo`` (the GlyphData database), or ``None`` outside
-    Glyphs (tests / non-app context). Read by name so the data layer stays
-    import-clean and never imports GlyphsApp directly."""
-    getter = getattr(font, "glyphsInfo", None)
-    if getter is None:
-        return None
-    try:
-        return getter() if callable(getter) else getter
-    except Exception:  # pragma: no cover - defensive, app-only call path
-        return None
-
-
 def default_glyph_order(font, glyph_names: list[str]) -> list[str]:
-    """Return ``glyph_names`` in Glyphs' *default* GlyphData sort order, ignoring
-    any ``glyphOrder`` custom parameter.
+    """Return ``glyph_names`` in the font's *default* glyph order, ignoring any
+    ``glyphOrder`` custom parameter.
 
-    ``font.glyphs`` (the source of ``glyph_names``) iterates in the order set by a
-    ``glyphOrder`` custom parameter when one is present, so a user's hand-tuned
-    order would otherwise drive the heatmap. Sorting by each glyph's index in the
-    GlyphData database (``GSGlyphsInfo.glyphIndex_``) reproduces the order Glyphs
-    uses when no ``glyphOrder`` parameter exists. The sort is stable, so glyphs
-    unknown to the database (index == ``NS_NOT_FOUND``) keep their original
-    relative order at the end. Falls back to the input order unchanged when the
-    sorting API is unavailable (tests / non-Glyphs context)."""
-    info = _font_glyphs_info(font)
-    glyph_index = getattr(info, "glyphIndex_", None)
-    if glyph_index is None:
+    ``font.glyphs`` (the source of ``glyph_names``) iterates in the order imposed
+    by a ``glyphOrder`` custom parameter whenever one is active — a user's
+    hand-tuned order, or our own Rainbow grouping order — so that would otherwise
+    drive the report. We temporarily deactivate that parameter, which makes Glyphs
+    re-sort ``font.glyphs`` to its default order, read that order, then restore the
+    parameter's previous active state. The result is filtered to the glyphs present
+    in ``glyph_names``; any names not found in ``font.glyphs`` keep their original
+    relative order at the end. Falls back to the input order unchanged outside
+    Glyphs (tests) or when the ``customParameters`` / ``glyphs`` API is missing."""
+    params = getattr(font, "customParameters", None)
+    if params is None:
         return glyph_names
-    by_name = {glyph.name: glyph for glyph in font.glyphs}
-
-    def sort_index(name: str) -> int:
-        glyph = by_name.get(name)
-        if glyph is None:
-            return NS_NOT_FOUND
-        try:
-            value = int(glyph_index(glyph))
-        except Exception:  # pragma: no cover - defensive, app-only call path
-            return NS_NOT_FOUND
-        return value if 0 <= value < NS_NOT_FOUND else NS_NOT_FOUND
-
-    return sorted(glyph_names, key=sort_index)
+    try:
+        order_param = next(
+            (param for param in params if getattr(param, "name", None) == "glyphOrder"),
+            None,
+        )
+    except Exception:  # pragma: no cover - defensive, app-only call path
+        return glyph_names
+    previous_active: bool | None = None
+    try:
+        if order_param is not None:
+            previous_active = bool(order_param.active)
+            order_param.active = False               # Glyphs re-sorts to default
+        default_order = [glyph.name for glyph in font.glyphs]
+    except Exception:  # pragma: no cover - defensive, app-only call path
+        return glyph_names
+    finally:
+        if order_param is not None and previous_active is not None:
+            try:
+                order_param.active = previous_active  # restore the user's setting
+            except Exception:  # pragma: no cover - defensive, app-only call path
+                pass
+    wanted = set(glyph_names)
+    ordered = [name for name in default_order if name in wanted]
+    seen = set(ordered)
+    ordered.extend(name for name in glyph_names if name not in seen)
+    return ordered
 
 
 def _coerce_snapshot(raw) -> dict[str, dict[str, int]]:
@@ -278,13 +324,17 @@ def save_snapshot(font, snapshot: dict) -> None:
 
 # --------------------------------------------------------------------------- #
 # Dated history — a capped series of per-glyph snapshots, the substrate for the
-# dashboard's burndown / velocity / finish-date forecast and the per-glyph
-# step-journey sparkline. Stored in Glyphs.defaults (not the .glyphs file),
-# keyed by file path then ISO date; same-day captures overwrite.
+# dashboard's burndown / velocity and the per-glyph step-journey sparkline.
+#
+# Stored IN THE FONT (userData), gzip+base64-compacted, so the timeline travels
+# WITH the file: a shared .glyphs/.glyphspackage shows the same history on any
+# machine, with no git repo or sidecar needed. (Older builds kept this in
+# Glyphs.defaults keyed by file path; that store is still read once as a fallback
+# so existing users don't lose their history on upgrade.)
 # --------------------------------------------------------------------------- #
 
-HISTORY_KEY = "com.hugojourdan.ColorFlow-DashboardHistory"
-HISTORY_CAP = 60
+HISTORY_KEY = "com.hugojourdan.ColorFlow-DashboardHistory"           # legacy (Glyphs.defaults)
+TIMELINE_USERDATA_KEY = "com.hugojourdan.ColorFlow.timelineHistory"  # primary (font userData)
 
 
 def _coerce_history(raw) -> dict[str, dict[str, dict[str, int]]]:
@@ -298,51 +348,120 @@ def _coerce_history(raw) -> dict[str, dict[str, dict[str, int]]]:
     return history
 
 
-def load_history(font) -> dict[str, dict[str, dict[str, int]]]:
-    """This font's dated per-glyph snapshots from ``Glyphs.defaults`` (keyed by
-    file path), ordered oldest-first. Empty when none / unsaved / unavailable."""
-    if Glyphs is None or not font.filepath:
+def _read_user_data(font, key: str) -> object:
+    """Safely read ``font.userData[key]`` (``None`` when absent / unavailable)."""
+    try:
+        user_data = getattr(font, "userData", None)
+        if user_data is None:
+            return None
+        try:
+            return user_data[key]
+        except (KeyError, TypeError):
+            return None
+    except Exception:  # pragma: no cover - defensive, app-only call path
+        return None
+
+
+def _write_user_data(font, key: str, value: str) -> None:
+    """Safely set ``font.userData[key] = value`` (no-op when unavailable)."""
+    try:
+        user_data = getattr(font, "userData", None)
+        if user_data is None:
+            return
+        user_data[key] = value
+    except Exception:  # pragma: no cover - defensive, app-only call path
+        pass
+
+
+def _legacy_history(font) -> dict[str, dict[str, dict[str, int]]]:
+    """One-time migration read of the old machine-local history from
+    ``Glyphs.defaults`` (keyed by file path). Empty when none / unavailable."""
+    if Glyphs is None or not getattr(font, "filepath", None):
         return {}
     store = Glyphs.defaults[HISTORY_KEY]
     if not store or not hasattr(store, "get"):
         return {}
-    history = _coerce_history(store.get(font.filepath))
-    return {date: history[date] for date in sorted(history)}
+    return _coerce_history(store.get(font.filepath))
 
 
-def record_history(font, snapshot: dict, now: datetime, cap: int = HISTORY_CAP) -> None:
-    """Append today's per-glyph ``snapshot`` to this font's dated history under
-    ``Glyphs.defaults`` (same-day capture overwrites), keeping at most ``cap`` most
-    recent dates. No-op without Glyphs or an unsaved font."""
-    if Glyphs is None or not font.filepath:
+def load_history(font) -> dict[str, dict[str, dict[str, int]]]:
+    """This font's per-*save* snapshot log, ordered oldest-first — one entry per save,
+    keyed by ISO datetime (``%Y-%m-%dT%H:%M:%S``). The report groups these by date for
+    the per-day timeline (:func:`group_saves_by_date`) and uses the raw log for the
+    per-save view. Read from the font's ``userData`` (so the timeline travels with the
+    file); falls back to the legacy ``Glyphs.defaults`` store for fonts saved by older
+    builds (those entries are date-keyed and pass through fine). Empty when none /
+    unavailable. Datetime keys sort lexicographically = chronologically."""
+    if Glyphs is None or font is None:
+        return {}
+    history = colorflow_history_store.decode_history(
+        _read_user_data(font, TIMELINE_USERDATA_KEY))
+    if not history:
+        history = _legacy_history(font)
+    return {key: history[key] for key in sorted(history)}
+
+
+def group_saves_by_date(log: dict) -> dict[str, dict[str, dict[str, int]]]:
+    """Collapse a per-save log (``{iso_datetime: snapshot}``) to a per-day history
+    (``{iso_date: snapshot}``), keeping the LAST save of each day (the latest state
+    that day). Legacy date-keyed entries (10-char keys) pass through unchanged."""
+    grouped: dict[str, dict[str, dict[str, int]]] = {}
+    for key in sorted(log):                  # chronological; later same-day wins
+        grouped[str(key)[:10]] = log[key]
+    return grouped
+
+
+def _keep_last_save_of_past_days(series: dict) -> dict:
+    """Collapse every *past* day to its final save (end-of-day state), keeping every
+    save of the most-recent day. Once work moves to a new day the old day's intra-day
+    saves stop mattering, so only its closing state is kept — this is what bounds the
+    log's growth (one entry per past day, forever; no day-window cap)."""
+    if not series:
+        return {}
+    keys = sorted(series)
+    latest_day = str(keys[-1])[:10]
+    last_of_day: dict[str, str] = {}
+    for key in keys:                          # chronological; later same-day wins
+        last_of_day[str(key)[:10]] = key
+    return {
+        key: series[key]
+        for key in keys
+        if str(key)[:10] == latest_day or last_of_day[str(key)[:10]] == key
+    }
+
+
+def record_history(font, snapshot: dict, now: datetime) -> None:
+    """Append a per-glyph ``snapshot`` to this font's per-*save* log in ``userData``,
+    keyed by save datetime (one entry per save, not per day). Skips a no-op save: if
+    the snapshot equals the most-recent stored one (e.g. an outline-only edit or a
+    double save with no colour change), nothing is written, so the log only grows on
+    colour-changing saves. The log is never day-capped; instead each *past* day keeps
+    only its final save (see :func:`_keep_last_save_of_past_days`). The value is
+    written into the font object; Glyphs persists it on the next save, so call this
+    from a *will-save* hook to have it land in that save. No-op without Glyphs/font."""
+    if Glyphs is None or font is None:
         return
-    store = Glyphs.defaults[HISTORY_KEY]
-    store = dict(store) if hasattr(store, "keys") else {}
-    series = store.get(font.filepath) or {}
-    series = {str(date): series[date] for date in series}
-    series[now.strftime("%Y-%m-%d")] = snapshot
-    if cap and len(series) > cap:
-        for old_date in sorted(series)[:len(series) - cap]:
-            del series[old_date]
-    store[font.filepath] = series
-    Glyphs.defaults[HISTORY_KEY] = store
+    series = load_history(font)
+    series = {str(key): series[key] for key in series}
+    if series and series[max(series)] == snapshot:
+        return                                          # nothing changed -> no junk entry
+    series[now.strftime("%Y-%m-%dT%H:%M:%S")] = snapshot
+    series = _keep_last_save_of_past_days(series)
+    _write_user_data(
+        font, TIMELINE_USERDATA_KEY, colorflow_history_store.encode_history(series))
 
 
-def write_history(font, history: dict, cap: int = HISTORY_CAP) -> None:
-    """Replace this font's entire dated history in ``Glyphs.defaults`` with
-    ``history`` (``{iso_date: snapshot}``), capped to the most-recent ``cap`` dates.
-    Used by the git backfill to install reconstructed history wholesale. No-op
-    without Glyphs or an unsaved font."""
-    if Glyphs is None or not font.filepath:
+def write_history(font, history: dict) -> None:
+    """Replace this font's entire save log in ``userData`` with ``history``
+    (``{iso_datetime: snapshot}``), each past day collapsed to its final save (the
+    same end-of-day policy as :func:`record_history`; never day-capped). Used by the
+    git backfill to install reconstructed history wholesale. No-op without Glyphs or
+    a font."""
+    if Glyphs is None or font is None:
         return
-    store = Glyphs.defaults[HISTORY_KEY]
-    store = dict(store) if hasattr(store, "keys") else {}
-    series = {str(date): history[date] for date in history}
-    if cap and len(series) > cap:
-        for old_date in sorted(series)[: len(series) - cap]:
-            del series[old_date]
-    store[font.filepath] = series
-    Glyphs.defaults[HISTORY_KEY] = store
+    series = _keep_last_save_of_past_days({str(key): history[key] for key in history})
+    _write_user_data(
+        font, TIMELINE_USERDATA_KEY, colorflow_history_store.encode_history(series))
 
 
 def _git_open_colors(path) -> dict | None:
@@ -369,27 +488,151 @@ def _git_open_colors(path) -> dict | None:
                 pass
 
 
-def backfill_from_git(font, progress=None, cap: int = HISTORY_CAP) -> int:
-    """Reconstruct this font's dated history from its git commits and merge it under
-    any existing live snapshots. Returns the number of days imported from git (0 when
-    the font isn't in a git repo, isn't saved, or Glyphs is unavailable)."""
+def _history_paths(font) -> dict:
+    """``{master_id: {glyph_name: {"d","vb"}}}`` of every glyph's outline in a
+    historical font, sharing each master's em box (the same shape ``_outline_paths``
+    emits, minus the live-font cache). Used to diff shape changes across commits."""
+    ems = _em_boxes(font)
+    out: dict = {master_id: {} for master_id in ems}
+    budget = 100000
+    produced = 0
+    for glyph in font.glyphs:
+        if produced >= budget:
+            break
+        name = glyph.name
+        for master_id in ems:
+            try:
+                layer = glyph.layers[master_id]
+            except Exception:
+                layer = None
+            outline = glyphsvg.layer_outline_em(layer, ems[master_id]) if layer is not None else {}
+            if outline:
+                out[master_id][name] = outline
+                produced += 1
+    return out
+
+
+def _git_open_paths(path) -> dict | None:
+    """Open a historical font headlessly and return its per-master outline path map
+    (see :func:`_history_paths`). Glyphs-only; ``None`` outside Glyphs or on failure."""
+    if Glyphs is None:
+        return None
+    font = None
+    try:
+        font = Glyphs.open(str(path), showInterface=False)
+        if font is None:
+            return None
+        return _history_paths(font)
+    except Exception:  # pragma: no cover - app-only path
+        return None
+    finally:
+        if font is not None:
+            try:  # pragma: no cover - app-only path
+                document = getattr(font, "parent", None)
+                if document is not None:
+                    document.close()
+            except Exception:  # pragma: no cover - app-only path
+                pass
+
+
+def outline_change_days() -> int:
+    """Recent committed-day window to diff for the outline-changes view. Reads the
+    tunable pref, defaulting to ``OUTLINE_CHANGE_DAYS_DEFAULT``; 0 disables the view.
+    ``0`` when Glyphs is absent (the feature only makes sense in the app)."""
+    if Glyphs is None:
+        return 0
+    raw = Glyphs.defaults[OUTLINE_CHANGE_DAYS_KEY]
+    if raw is None:
+        return OUTLINE_CHANGE_DAYS_DEFAULT
+    try:
+        return max(0, int(raw))
+    except (TypeError, ValueError):
+        return OUTLINE_CHANGE_DAYS_DEFAULT
+
+
+def collect_outline_changes(font) -> dict:
+    """``{iso_date: [change, ...]}`` of glyph outline changes across this font's recent
+    git commits (see ``colorflow_outline_diff``). Empty when the font isn't git-tracked,
+    the light-report pref is on, or the day window is 0 — so the view stays dormant."""
+    if Glyphs is None or not font.filepath or no_glyph_svg():
+        return {}
+    cap_days = outline_change_days()
+    if cap_days <= 0:
+        return {}
+    # collect_git_history is generic over the per-day payload; here _git_open_paths
+    # returns outline path maps rather than colour snapshots, so cast for the type.
+    day_maps = cast(dict, colorflow_git.collect_git_history(
+        font.filepath, _git_open_paths, cap=cap_days))
+    return colorflow_outline_diff.outline_changes(day_maps, limit_per_day=OUTLINE_CHANGE_LIMIT)
+
+
+def is_git_tracked(font) -> bool:
+    """Whether this font's source file lives in a git repo and is tracked there.
+
+    The timeline is no longer gated on this (history now lives in the font's userData
+    and travels with the file); git is only an *optional* extra history source via the
+    backfill. Cheap (two quick git calls); ``False`` when the font is unsaved or git is
+    unavailable."""
+    path = getattr(font, "filepath", None)
+    if not path:
+        return False
+    try:
+        target = Path(path)
+        repo = colorflow_git.git_root(target)
+        return repo is not None and colorflow_git.is_tracked(repo, target)
+    except Exception:
+        return False
+
+
+def backfill_from_git(font, progress=None) -> int:
+    """Bake this font's git commit history into its userData save log (each commit is
+    a per-save-equivalent datetime entry), merged under any existing live saves — so
+    the timeline travels with the file even without the .git folder. Live saves win on
+    a shared key. Returns the number of newly-imported commits (0 when the font isn't
+    in a git repo, isn't saved, or Glyphs is unavailable)."""
     if Glyphs is None or not font.filepath:
         return 0
     existing = load_history(font)
-    # Incremental: don't re-open days we already have a snapshot for, so only the
-    # first run pays the full cost and later runs import just newly-committed days.
-    git_history = colorflow_git.collect_git_history(
-        font.filepath, _git_open_colors, cap=cap, progress=progress, skip=set(existing)
-    )
+    git_history = colorflow_git.collect_commit_history(
+        font.filepath, _git_open_colors, progress=progress)
     if not git_history:
         return 0
-    merged = colorflow_git.merge_history(existing, git_history, cap)
-    write_history(font, merged, cap)
-    return len(git_history)
+    new_keys = [key for key in git_history if key not in existing]
+    merged = {**git_history, **existing}            # existing (live saves) win on collision
+    write_history(font, merged)
+    return len(new_keys)
+
+
+def commit_timeline_history(font) -> dict[str, dict[str, dict[str, int]]]:
+    """Per-commit colour history (``{commit_datetime: snapshot}``) reconstructed from
+    the font's git commits — the substrate for the timeline's per-commit view. Empty
+    when the font is unsaved, not in a git repo, or Glyphs is unavailable. Computed
+    fresh on each report (not persisted to userData)."""
+    if Glyphs is None or not getattr(font, "filepath", None):
+        return {}
+    try:
+        return colorflow_git.collect_commit_history(font.filepath, _git_open_colors)
+    except Exception:
+        return {}
+
+
+def git_day_history(font) -> dict[str, dict[str, dict[str, int]]]:
+    """Per-*day* colour history (``{iso_date: snapshot}``) reconstructed from the font's
+    git commits (newest commit of each day wins). This is the day-timeline's substrate
+    when the font is git-tracked: git is the store, so we read history straight from it
+    rather than from userData. Empty when the font is unsaved, not in a git repo, or
+    Glyphs is unavailable. Computed fresh per report (not persisted)."""
+    if Glyphs is None or not getattr(font, "filepath", None):
+        return {}
+    try:
+        return cast(dict, colorflow_git.collect_git_history(
+            font.filepath, _git_open_colors))
+    except Exception:
+        return {}
 
 
 # --------------------------------------------------------------------------- #
-# Burndown / velocity / forecast — pure functions over the dated history.
+# Burndown / velocity — pure functions over the dated history.
 # "final" is the completion metric: in step mode the cumulative count at the
 # last workflow step; in free mode (no cumulative final) it equals "started".
 # --------------------------------------------------------------------------- #
@@ -397,18 +640,6 @@ def backfill_from_git(font, progress=None, cap: int = HISTORY_CAP) -> int:
 def _parse_iso(date: str) -> datetime:
     """ISO ``YYYY-MM-DD`` -> ``datetime`` (history keys are always this shape)."""
     return datetime.strptime(date, "%Y-%m-%d")
-
-
-def _coefficient_of_variation(values: list[float]) -> float:
-    """Std/mean of ``values`` (population). ``1.0`` for empty or non-positive mean
-    — used as a worst-case spread when the rate signal is weak."""
-    if not values:
-        return 1.0
-    mean = sum(values) / len(values)
-    if mean <= 0:
-        return 1.0
-    variance = sum((value - mean) ** 2 for value in values) / len(values)
-    return (variance ** 0.5) / mean
 
 
 def _master_point(per_glyph: dict, order: list[str], is_free: bool) -> dict[str, int]:
@@ -431,52 +662,6 @@ def history_series(history: dict, order: list[str], is_free: bool) -> list[dict]
                    for master_id, per_glyph in history[date].items()}
         series.append({"date": date, "masters": masters})
     return series
-
-
-def forecast_master(series: list[dict], master_id: str, total: int, now: datetime,
-                    is_free: bool, window_days: int = 28) -> dict:
-    """Velocity + a hedged finish-date for one master from its ``final`` history.
-
-    Rate is the completion gained per day over a trailing ``window_days`` window
-    (falling back to the last two points). Returns a never-a-hard-date estimate:
-    an ETA with a ``±`` band derived from how variable the recent pace was, plus a
-    confidence label. No ETA when there is too little data, no recent progress, or
-    the master is already done."""
-    points = [(point["date"], point["masters"][master_id]["final"])
-              for point in series if master_id in point["masters"]]
-    final_now = points[-1][1] if points else 0
-    remaining = max(0, total - final_now)
-    result = {"velocityPerWeek": 0.0, "remaining": remaining, "final": final_now,
-              "total": total, "etaIso": None, "bandDays": None,
-              "confidence": "none", "points": len(points)}
-    if len(points) < 2:
-        return result
-
-    cutoff = now - timedelta(days=window_days)
-    windowed = [(date, final) for (date, final) in points if _parse_iso(date) >= cutoff]
-    if len(windowed) < 2:
-        windowed = points[-2:]
-
-    span_days = max(1, (_parse_iso(windowed[-1][0]) - _parse_iso(windowed[0][0])).days)
-    rate = (windowed[-1][1] - windowed[0][1]) / span_days
-    result["velocityPerWeek"] = round(rate * 7, 1)
-    if remaining <= 0:
-        result["confidence"] = "done"
-        return result
-    if rate <= 0:
-        return result  # flat or regressing — no honest ETA
-
-    eta_days = remaining / rate
-    interval_rates = [
-        (later_final - earlier_final) / max(1, (_parse_iso(later) - _parse_iso(earlier)).days)
-        for (earlier, earlier_final), (later, later_final) in zip(windowed, windowed[1:])
-    ]
-    band_fraction = min(1.0, max(0.15, _coefficient_of_variation(interval_rates)))
-    result["etaIso"] = (now + timedelta(days=eta_days)).strftime("%Y-%m-%d")
-    result["bandDays"] = int(round(eta_days * band_fraction))
-    result["confidence"] = ("high" if len(windowed) >= 4 and band_fraction < 0.5
-                            else "med" if len(windowed) >= 3 else "low")
-    return result
 
 
 def progress_streak(history: dict, order: list[str], is_free: bool) -> dict:
@@ -1055,27 +1240,63 @@ def build_model(font, now: datetime, current: dict, previous: dict, progress=Non
             except Exception:
                 pass
 
-    paths = _outline_paths(font, glyph_names, progress=_outline_progress)
+    # Hidden pref: skip the (heavy) per-glyph outline SVGs for a much lighter report.
+    # The report JS already falls back to plain colour swatches when paths are absent.
+    paths = {} if no_glyph_svg() else _outline_paths(font, glyph_names, progress=_outline_progress)
 
-    # Fold today's live snapshot into the loaded history under today's date BEFORE
-    # deriving trend/forecast/journeys/streak, so the first run already shows a
-    # trend point for today and later runs reflect today's data rather than the
-    # previous capture (record_history persists the same snapshot afterwards, and
-    # its same-day-overwrite keeps re-running the same day idempotent).
+    # Day-timeline substrate. Storage rule mirrors how history is recorded:
+    #   * No git  -> the userData per-save log, grouped by date (last save of each day).
+    #   * Git     -> git commits are the store; read the per-day history from them and
+    #                merge it under any *frozen* pre-git userData past (live userData
+    #                saves win on a shared day, being the actual save state).
+    # When there's no repo, ``git_day_history`` is empty and this reduces to userData.
+    # Either way, fold today's live snapshot in under today's date so the newest point
+    # reflects current work (same-day overwrite keeps re-running idempotent).
     today = now.strftime("%Y-%m-%d")
-    history = {**load_history(font), today: current}
+    day_history = group_saves_by_date(load_history(font))
+    git_days = git_day_history(font)
+    if git_days:
+        day_history = colorflow_git.merge_history(day_history, git_days)
+    history = {**day_history, today: current}
     series = history_series(history, order, is_free)
     dates = [point["date"] for point in series]
     trend = {
         "series": series,
-        "forecast": {master.id: forecast_master(series, master.id, glyph_total, now, is_free)
-                     for master in font.masters},
         "dates": dates,
         "today": today,
         "streak": progress_streak(history, order, is_free),
     }
     journeys = _glyph_journeys(history, dates, current, glyph_names, order, is_free)
     journey_index = build_journey_index(history, dates)
+
+    # Fine-grain timeline: every checkpoint is its own point, finer than the per-day
+    # view. Source depends on the storage mode — git per-commit when the font is in a
+    # repo, else the no-git per-save log from userData (both are {datetime: snapshot}).
+    # Computed fresh (commits) / read from userData (saves); the report ships this as the
+    # "commit" dataset plus a ``fineKind`` tag so the granularity toggle can label itself
+    # ("With commits" vs "Per save"), and swaps which dataset drives the whole timeline.
+    commit_trend = commit_journeys = commit_journey_index = None
+    fine_kind = None
+    fine_history = commit_timeline_history(font)
+    if fine_history:
+        fine_kind = "commit"
+    else:
+        fine_history = load_history(font)            # no-git: the per-save log
+        if fine_history:
+            fine_kind = "save"
+    if fine_history:
+        fine_history = {**fine_history, now.strftime("%Y-%m-%dT%H:%M:%S"): current}
+        commit_series = history_series(fine_history, order, is_free)
+        commit_dates = [point["date"] for point in commit_series]
+        commit_trend = {
+            "series": commit_series,
+            "dates": commit_dates,
+            "today": commit_dates[-1] if commit_dates else None,
+            "streak": progress_streak(fine_history, order, is_free),
+        }
+        commit_journeys = _glyph_journeys(
+            fine_history, commit_dates, current, glyph_names, order, is_free)
+        commit_journey_index = build_journey_index(fine_history, commit_dates)
 
     recipes = load_recipes()
     meta = glyph_meta(font)
@@ -1109,16 +1330,26 @@ def build_model(font, now: datetime, current: dict, previous: dict, progress=Non
         "glyphNames": glyph_names,
         "categories": categories,
         "scripts": scripts,
+        # Exporting-only mode (parity invariant): masters[].counts/keys above ship
+        # ALL glyphs (raw truth); the report applies this exclusion client-side.
+        "nonExporting": non_exporting_names(font),
+        "exportingOnly": exporting_only(),
         "masters": masters,
         "colors": {str(index): labelcolors.hex_for(rgba)
                    for index, rgba in enumerate(labelcolors.read_label_colors())},
         "filePath": font.filepath or "",
         "paths": paths,
+        "outlineChanges": collect_outline_changes(font),
         "favicon": _favicon_data_uri(),
         "logo": _family_logo(font),
         "trend": trend,
         "journeys": journeys,
         "journeyIndex": journey_index,
+        "trendCommits": commit_trend,                # fine-grain set (git commits OR no-git saves)
+        "journeysCommits": commit_journeys,
+        "journeyIndexCommits": commit_journey_index,
+        "hasCommits": bool(commit_trend and len(commit_trend["series"]) >= 2),
+        "fineKind": fine_kind,                        # "commit" | "save" | None (labels the toggle)
         "lastEdit": glyph_last_edit(font, now),
         "recipes": recipes,
         "recipeCompletion": recipe_completion,
@@ -1174,7 +1405,9 @@ def main(font=None, progress=None, open_when_done: bool = True) -> Path | None:
     html = colorflow_assets.build_html(model)
     _emit(0.94)
     save_snapshot(font, current)
-    record_history(font, current, now)
+    # Note: today's snapshot is NOT persisted here — generating a report must not modify
+    # the font. The plugin records it into userData on save (a will-save hook); the
+    # report still shows today via the in-memory fold above.
     _emit(0.96)
 
     base = Path(font.filepath).stem if font.filepath else (font.familyName or "font")
