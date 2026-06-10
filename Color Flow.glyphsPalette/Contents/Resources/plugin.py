@@ -691,6 +691,19 @@ def _apply_label_visibility(font, visibility_by_index: dict) -> None:
 	_broadcast_settings_changed()
 
 
+def _reset_colors_and_order(font) -> None:
+	"""Reset the twelve label colours to the Glyphs defaults AND the workflow
+	names/order/visibility to the Color Flow default sequence, keep the in-font copy in sync
+	when this font stores its labels in-file, then broadcast so every palette rebuilds."""
+	labelcolors.write_label_colors(labelcolors.DEFAULTS)
+	labelcolors.refresh_app_label_colors(labelcolors.DEFAULTS)
+	path = colornames.get_key_file(_font_dir_for(font))
+	colornames.write_color_names(path, colornames.DEFAULT_COLOR_NAMES)
+	if font is not None and colornames.font_labels_text(font) is not None:
+		font.userData[colornames.FONT_LABELS_KEY] = colornames.DEFAULT_COLOR_NAMES
+	_broadcast_settings_changed()
+
+
 def _apply_rainbow_source(font, segment: int) -> None:
 	"""Mirror the popover's Default/Layer/Glyph segmented control: 0 disables Font Glyph
 	Order grouping, 1 = Layer colour, 2 = Glyph colour. Best-effort; broadcasts."""
@@ -730,8 +743,8 @@ class ColorFlowSettingsView:
 	Held module-globally (not per palette instance) because the pane is GLOBAL: it is added
 	to Glyphs > Settings once per session and shared across all document windows."""
 
-	WIDTH = 161          # 30% narrower than the old 230
-	MARGIN = 8           # slim margins so the controls take the full pane width
+	WIDTH = 460          # base width; the view + controls stretch to fill the Settings tab
+	MARGIN = 12          # slim margins so the controls take the full pane width
 
 	def __init__(self) -> None:
 		# One combined List2 of all 12 label slots: each row = colour well + editable name.
@@ -754,7 +767,9 @@ class ColorFlowSettingsView:
 		ns_view = self.group.getNSView()
 		try:
 			ns_view.setFrame_(AppKit.NSMakeRect(0, 0, self.WIDTH, self._height))
-			ns_view.setAutoresizingMask_(AppKit.NSViewMaxXMargin | AppKit.NSViewMinYMargin)
+			# Fill the Settings tab's width (the window itself is sized by Glyphs / other
+			# panes — we can't narrow it, only fill it); pin to the top, keep our height.
+			ns_view.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewMinYMargin)
 		except Exception:
 			pass
 		return ns_view
@@ -784,8 +799,10 @@ class ColorFlowSettingsView:
 		lc_list_y = lc_label_y + 24
 		# 12 rows; List2 row height is ~24pt on modern macOS, plus a little chrome.
 		lc_list_h = 12 * 26 + 8
-		# Font Glyph Order (directly below the list — the inline legend was removed) ---
-		fgo_sep_y = lc_list_y + lc_list_h + 12
+		# Reset button (right under the list) -----------------------------------
+		lc_reset_y = lc_list_y + lc_list_h + 8
+		# Font Glyph Order (below the reset button — the inline legend was removed) ---
+		fgo_sep_y = lc_reset_y + 26 + 12
 		fgo_label_y = fgo_sep_y + 12
 		fgo_seg_y = fgo_label_y + 22
 		# Behaviour (below Font Glyph Order) ------------------------------------
@@ -850,6 +867,10 @@ class ColorFlowSettingsView:
 			print("Color Flow [pane slot list build] error:\n" + traceback.format_exc())
 			self._slot_list = None
 
+		# Reset colours & order (left-aligned, fixed width) ---------------------
+		group.resetButton = Button((margin, lc_reset_y, 180, 22),
+			"Reset colours & order", callback=self._reset_clicked, sizeStyle='small')
+
 		# Font Glyph Order (bottom) ---------------------------------------------
 		group.fgoSep = HorizontalLine((margin, fgo_sep_y, inner, 1))
 		group.fgoLabel = TextBox((margin, fgo_label_y, inner, 18), "Font Glyph Order")
@@ -867,6 +888,20 @@ class ColorFlowSettingsView:
 			value=bool(Glyphs.defaults[SWAP_KEY]),
 			callback=self._swap_routing_changed)
 		self._swap_checkbox = group.swapRouting
+
+		# Make the full-width controls grow with the Settings tab (the reset button keeps
+		# its fixed width, left-aligned). Each is pinned to the top, width flexible.
+		for _name in ("lcLabel", "lcList", "fgoSep", "fgoLabel", "rainbow",
+				"behSep", "behLabel", "swapRouting"):
+			try:
+				getattr(group, _name).getNSView().setAutoresizingMask_(
+					AppKit.NSViewWidthSizable | AppKit.NSViewMinYMargin)
+			except Exception:
+				pass
+		try:
+			group.resetButton.getNSView().setAutoresizingMask_(AppKit.NSViewMinYMargin)
+		except Exception:
+			pass
 
 	# ------------------------------------------------------------------ slot list
 	def _slot_list_items(self, font) -> list[dict]:
@@ -994,6 +1029,25 @@ class ColorFlowSettingsView:
 		except Exception:
 			import traceback
 			print("Color Flow [pane swap routing] error:\n" + traceback.format_exc())
+
+	def _reset_clicked(self, sender) -> None:
+		"""Confirm, then reset the 12 label colours + the names/order/visibility to defaults
+		(via the shared _reset_colors_and_order helper) and refresh the pane's own list."""
+		try:
+			alert = AppKit.NSAlert.alloc().init()
+			alert.setMessageText_("Reset colours and order?")
+			alert.setInformativeText_(
+				"This restores the twelve label colours and the workflow "
+				"names, order and visibility to their defaults.")
+			alert.addButtonWithTitle_("Reset")
+			alert.addButtonWithTitle_("Cancel")
+			if alert.runModal() != AppKit.NSAlertFirstButtonReturn:
+				return
+			_reset_colors_and_order(Glyphs.font)
+			self.reload()
+		except Exception:
+			import traceback
+			print("Color Flow [pane reset] error:\n" + traceback.format_exc())
 
 	def _slot_edited(self, sender) -> None:
 		"""Fires after the user edits ANY cell (eye/checkbox, colour well or name) in the

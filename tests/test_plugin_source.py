@@ -267,13 +267,26 @@ def test_settings_pane_build_order_labels_then_font_glyph_order() -> None:
     # The inline legend is gone.
     assert "group.legend = TextBox" not in PLUGIN_SOURCE
     assert "def _legend_text(" not in PLUGIN_SOURCE
-    # Pane width: 460 -> 230 -> 161 (30% narrower).
-    assert "WIDTH = 161" in PLUGIN_SOURCE
+    # Pane base width 460; the view + full-width controls stretch to fill the Settings tab.
+    assert "WIDTH = 460" in PLUGIN_SOURCE
+    assert "AppKit.NSViewWidthSizable | AppKit.NSViewMinYMargin" in PLUGIN_SOURCE
 
 
 def test_settings_panel_module_deleted() -> None:
     # The dead settings_panel.py module is gone.
     assert not (RESOURCES / "settings_panel.py").exists()
+
+
+def test_settings_pane_has_reset_colours_and_order_button() -> None:
+    # A reset button restores the 12 label colours + the names/order/visibility to defaults.
+    assert "group.resetButton = Button(" in PLUGIN_SOURCE
+    assert "Reset colours & order" in PLUGIN_SOURCE
+    assert "def _reset_clicked(" in PLUGIN_SOURCE
+    # It routes through the shared module helper, which writes the defaults and broadcasts.
+    body = _module_function_body("_reset_colors_and_order")
+    assert "labelcolors.DEFAULTS" in body
+    assert "colornames.DEFAULT_COLOR_NAMES" in body
+    assert "_broadcast_settings_changed()" in body
 
 
 # --------------------------------------------------------------------------- #
@@ -298,8 +311,7 @@ def test_settings_pane_has_single_combined_slot_list() -> None:
     assert build.index('identifier="visible"') < build.index('identifier="color"')
     # All three columns are editable so any slot can be shown/hidden, recoloured, renamed.
     assert build.count("editable=True") >= 3
-    # WIDTH stays 161; the checkbox column is narrow (22) and the colour well is 44.
-    assert "WIDTH = 161" in PLUGIN_SOURCE
+    # The checkbox column is narrow (22) and the colour well is 44; name fills the rest.
     assert "width=22" in build
     # Edits route through one combined handler; drag-reorder + self-drop are wired.
     assert "editCallback=self._slot_edited" in build
