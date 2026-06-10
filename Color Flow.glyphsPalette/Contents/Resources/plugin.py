@@ -711,8 +711,8 @@ class ColorFlowSettingsView:
 	Held module-globally (not per palette instance) because the pane is GLOBAL: it is added
 	to Glyphs > Settings once per session and shared across all document windows."""
 
-	WIDTH = 230
-	MARGIN = 20
+	WIDTH = 161          # 30% narrower than the old 230
+	MARGIN = 8           # slim margins so the controls take the full pane width
 
 	def __init__(self) -> None:
 		# One combined List2 of all 12 label slots: each row = colour well + editable name.
@@ -765,11 +765,8 @@ class ColorFlowSettingsView:
 		lc_list_y = lc_label_y + 24
 		# 12 rows; List2 row height is ~24pt on modern macOS, plus a little chrome.
 		lc_list_h = 12 * 26 + 8
-		# Legend ----------------------------------------------------------------
-		legend_top = lc_list_y + lc_list_h + 12
-		legend_height = 100
-		# Font Glyph Order (moved to the bottom) --------------------------------
-		fgo_sep_y = legend_top + 10 + legend_height + 12
+		# Font Glyph Order (directly below the list — the inline legend was removed) ---
+		fgo_sep_y = lc_list_y + lc_list_h + 12
 		fgo_label_y = fgo_sep_y + 12
 		fgo_seg_y = fgo_label_y + 22
 		# Behaviour (below Font Glyph Order) ------------------------------------
@@ -829,11 +826,6 @@ class ColorFlowSettingsView:
 			print("Color Flow [pane slot list build] error:\n" + traceback.format_exc())
 			self._slot_list = None
 
-		# Legend (rendered inline — it is a settings pane) ----------------------
-		group.legendSep = HorizontalLine((margin, legend_top, inner, 1))
-		group.legend = TextBox((margin, legend_top + 10, inner, legend_height),
-			self._legend_text(), sizeStyle='small')
-
 		# Font Glyph Order (bottom) ---------------------------------------------
 		group.fgoSep = HorizontalLine((margin, fgo_sep_y, inner, 1))
 		group.fgoLabel = TextBox((margin, fgo_label_y, inner, 18), "Font Glyph Order")
@@ -851,19 +843,6 @@ class ColorFlowSettingsView:
 			value=bool(Glyphs.defaults[SWAP_KEY]),
 			callback=self._swap_routing_changed)
 		self._swap_checkbox = group.swapRouting
-
-	def _legend_text(self) -> str:
-		try:
-			font = Glyphs.font
-			meaning = colornames.load_meaning(_font_dir_for(font)) if font is not None else {}
-			visible = colornames.visible_labels(meaning)
-			lines = ["A colour means every step up to it is done.", ""]
-			for position, (color, label) in enumerate(visible.items(), start=1):
-				name = colornames.COLOR_NAMES.get(int(color), str(color))
-				lines.append(f"{position}. {label}  ({name})")
-			return "\n".join(lines)
-		except Exception:
-			return "A colour means every step up to it is done."
 
 	# ------------------------------------------------------------------ slot list
 	def _slot_list_items(self, font) -> list[dict]:
@@ -966,7 +945,6 @@ class ColorFlowSettingsView:
 				self._segment.set(_rainbow_segment_for_font(font))
 			if self._swap_checkbox is not None:
 				self._swap_checkbox.set(bool(Glyphs.defaults[SWAP_KEY]))
-			self.group.legend.set(self._legend_text())
 		except Exception:
 			import traceback
 			print("Color Flow [pane reload] error:\n" + traceback.format_exc())
@@ -1013,7 +991,6 @@ class ColorFlowSettingsView:
 				labels_by_index[slot] = str(item.get("name", ""))
 			_apply_label_colors([colors_by_slot[slot] for slot in range(12)])
 			_apply_label_names(Glyphs.font, labels_by_index)
-			self.group.legend.set(self._legend_text())
 		except Exception:
 			import traceback
 			print("Color Flow [pane slot edit] error:\n" + traceback.format_exc())

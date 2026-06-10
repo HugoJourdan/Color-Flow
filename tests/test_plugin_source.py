@@ -257,15 +257,18 @@ def test_store_labels_and_profile_controls_removed_from_pane() -> None:
 def test_settings_pane_build_order_labels_then_font_glyph_order() -> None:
     build = PLUGIN_SOURCE[
         PLUGIN_SOURCE.index("def _build(self) -> None:") :
-        PLUGIN_SOURCE.index("def _legend_text(")
+        PLUGIN_SOURCE.index("def _slot_list_items(")
     ]
-    # Top-to-bottom: Labels & Colours header, the combined list, legend, then Font Glyph Order.
+    # Top-to-bottom: Labels & Colours header, the combined list, then Font Glyph Order
+    # (the inline legend was removed).
     labels = build.index('"Labels & Colours"')
-    legend = build.index("group.legend = TextBox")
     fgo = build.index('"Font Glyph Order"')
-    assert labels < legend < fgo
-    # Narrower pane (was 460) and no negative-coordinate controls in the pane build.
-    assert "WIDTH = 230" in PLUGIN_SOURCE
+    assert labels < fgo
+    # The inline legend is gone.
+    assert "group.legend = TextBox" not in PLUGIN_SOURCE
+    assert "def _legend_text(" not in PLUGIN_SOURCE
+    # Pane width: 460 -> 230 -> 161 (30% narrower).
+    assert "WIDTH = 161" in PLUGIN_SOURCE
 
 
 def test_settings_panel_module_deleted() -> None:
@@ -281,7 +284,7 @@ def test_settings_panel_module_deleted() -> None:
 def test_settings_pane_has_single_combined_slot_list() -> None:
     build = PLUGIN_SOURCE[
         PLUGIN_SOURCE.index("def _build(self) -> None:") :
-        PLUGIN_SOURCE.index("def _legend_text(")
+        PLUGIN_SOURCE.index("def _slot_list_items(")
     ]
     # ONE List2 holds all label slots: a colour-well column + an editable name column.
     assert "group.lcList = List2(" in build
