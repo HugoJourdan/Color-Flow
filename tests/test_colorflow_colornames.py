@@ -628,3 +628,46 @@ def test_exclude_named_colors_threads_into_exact_counting() -> None:
     excluded = cc.single_counts_from_colors(
         cc.exclude_named_colors(named, {"nonexp"}), order)
     assert excluded == {"0": 1, "1": 1}
+
+
+# --------------------------------------------------------------------------- #
+# reorder_visible_rows — Settings-pane drag-to-reorder persistence
+# --------------------------------------------------------------------------- #
+
+
+def test_reorder_visible_rows_reorders_visible_block() -> None:
+    rows = [(0, "A", True), (1, "B", True), (2, "C", True)]
+    assert cc.reorder_visible_rows(rows, [2, 0, 1]) == [
+        (2, "C", True), (0, "A", True), (1, "B", True)]
+
+
+def test_reorder_visible_rows_keeps_hidden_rows_trailing() -> None:
+    rows = [(0, "A", True), (1, "B", False), (2, "C", True)]
+    # Only the visible rows (0, 2) reorder; the hidden row (1) trails unchanged.
+    assert cc.reorder_visible_rows(rows, [2, 0]) == [
+        (2, "C", True), (0, "A", True), (1, "B", False)]
+
+
+def test_reorder_visible_rows_appends_omitted_visible_rows() -> None:
+    rows = [(0, "A", True), (1, "B", True), (2, "C", True)]
+    # New order names only one visible index; the rest keep original order after it.
+    assert cc.reorder_visible_rows(rows, [2]) == [
+        (2, "C", True), (0, "A", True), (1, "B", True)]
+
+
+def test_reorder_visible_rows_ignores_unknown_and_duplicate_indices() -> None:
+    rows = [(0, "A", True), (1, "B", True)]
+    # 9 isn't present, 0 is duplicated — both ignored; result stays valid + complete.
+    assert cc.reorder_visible_rows(rows, [1, 9, 0, 0]) == [
+        (1, "B", True), (0, "A", True)]
+
+
+def test_reorder_visible_rows_roundtrips_through_render_and_parse() -> None:
+    text = "red=A\norange=B\nyellow=C\n"
+    rows, none_label = cc.parse_settings(text)
+    visible_indices = [index for index, _label, visible in rows if visible]
+    new_order = list(reversed(visible_indices))
+    reordered = cc.reorder_visible_rows(rows, new_order)
+    out = cc.render_settings(reordered, none_label)
+    again, _ = cc.parse_settings(out)
+    assert [index for index, _l, vis in again if vis] == new_order

@@ -547,6 +547,33 @@ def render_settings(rows: list[tuple[int, str, bool]], none_label: str = "") -> 
     return "\n".join(lines) + "\n"
 
 
+def reorder_visible_rows(
+    rows: list[tuple[int, str, bool]], new_visible_order: list[int]
+) -> list[tuple[int, str, bool]]:
+    """Return ``rows`` with the VISIBLE entries reordered to ``new_visible_order``.
+
+    ``new_visible_order`` is the desired sequence of colour indices for the visible
+    rows. Hidden rows keep their relative order and trail the visible block (matching
+    how the colorNames.txt order was always persisted). Indices that aren't present,
+    or are duplicated, are ignored; any visible row omitted from ``new_visible_order``
+    is appended in its original order so nothing is lost."""
+    by_index = {index: (index, label, visible) for index, label, visible in rows}
+    visible_indices = [index for index, _label, visible in rows if visible]
+    hidden_rows = [(index, label, visible) for index, label, visible in rows if not visible]
+    visible_set = set(visible_indices)
+    ordered: list[tuple[int, str, bool]] = []
+    placed: set[int] = set()
+    for index in new_visible_order:
+        if index in visible_set and index not in placed:
+            ordered.append(by_index[index])
+            placed.add(index)
+    for index in visible_indices:           # any visible row not named in new order
+        if index not in placed:
+            ordered.append(by_index[index])
+            placed.add(index)
+    return ordered + hidden_rows
+
+
 def render_key_file(meaning: dict[int, str], order: list[int]) -> str:
     """Serialise an int-keyed meaning/order mapping back to colorNames.txt text,
     preserving order (used to persist inline label edits)."""
