@@ -747,6 +747,46 @@ def _rainbow_segment_for_font(font) -> int:
 		return 0
 
 
+def _eye_symbol(name: str):
+	"""SF Symbol ``NSImage`` for an eye glyph (``eye.fill`` / ``eye.slash``), or ``None`` on a
+	macOS too old for symbol images (the cell then falls back to a plain checkbox)."""
+	try:
+		return AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, None)
+	except Exception:
+		return None
+
+
+class EyeToggleList2Cell(CheckBoxList2Cell):
+	"""The visibility column drawn as an eye icon instead of a checkbox: ``eye.fill`` when the
+	colour is SHOWN, ``eye.slash`` when HIDDEN. It is still a CheckBox underneath, so clicking
+	toggles the state, writes the bool back into the row dict and fires the list editCallback —
+	exactly like the checkbox it replaces. We just restyle the NSButton as a borderless
+	push-on/push-off toggle whose normal image is the OFF (hidden) eye and whose alternate image
+	is the ON (shown) eye."""
+
+	def __init__(self, title=None, editable=False, callback=None) -> None:
+		super().__init__(title=None, editable=editable, callback=callback)
+		try:
+			button = self.getNSButton()
+			toggle_type = getattr(AppKit, "NSButtonTypeToggle", None)
+			if toggle_type is None:                              # pre-10.12 constant name
+				toggle_type = getattr(AppKit, "NSToggleButton", 2)
+			button.setButtonType_(toggle_type)
+			button.setBordered_(False)
+			button.setImagePosition_(getattr(AppKit, "NSImageOnly", 5))
+			button.setImageScaling_(AppKit.NSImageScaleProportionallyDown)
+			button.setTitle_("")
+			off_eye = _eye_symbol("eye.slash")                   # state OFF = hidden
+			on_eye = _eye_symbol("eye.fill")                     # state ON  = shown
+			if off_eye is not None:
+				button.setImage_(off_eye)
+			if on_eye is not None:
+				button.setAlternateImage_(on_eye)
+		except Exception:
+			import traceback
+			print("Color Flow [eye cell] error:\n" + traceback.format_exc())
+
+
 class ColorFlowSettingsView:
 	"""Builds + owns the vanilla controls for the Color Flow preferences pane and routes
 	every edit through the module-level shared helpers (which broadcast to open palettes).
@@ -799,21 +839,23 @@ class ColorFlowSettingsView:
 		# EVERY control uses POSITIVE, absolute coords (no -margin / -100 right anchors):
 		# vanilla resolves negatives against the live parent frame, which collapses inside
 		# Glyphs' tab view. ``inner`` is the full content width between the margins.
-		# Top-to-bottom: Labels & Colours header, ONE combined 12-row list (colour well +
-		# editable name, visible rows draggable to reorder), legend, then Font Glyph Order.
+		# Top-to-bottom: Color Labels title (+ reload-reset icon), a help line, ONE combined
+		# 12-row list (colour well + editable name, visible rows draggable to reorder), then
+		# Font Glyph Order.
 		font = Glyphs.font
 		margin = self.MARGIN
 		inner = self.WIDTH - 2 * margin
 
-		# Labels & Colours (combined editor + order) ----------------------------
+		# Color Labels (title + reload-reset icon, help line, combined editor) ---
 		lc_label_y = 16
-		lc_list_y = lc_label_y + 24
+		# One help line under the title explaining how to edit a row.
+		lc_help_y = lc_label_y + 22
+		lc_help_h = 30
+		lc_list_y = lc_help_y + lc_help_h + 6
 		# 12 rows; List2 row height is ~24pt on modern macOS, plus a little chrome.
 		lc_list_h = 12 * 26 + 8
-		# Reset button (right under the list) -----------------------------------
-		lc_reset_y = lc_list_y + lc_list_h + 8
-		# Font Glyph Order (below the reset button — the inline legend was removed) ---
-		fgo_sep_y = lc_reset_y + 26 + 12
+		# Font Glyph Order (below the list — reset is now the title's reload icon) ---
+		fgo_sep_y = lc_list_y + lc_list_h + 12
 		fgo_label_y = fgo_sep_y + 12
 		fgo_seg_y = fgo_label_y + 22
 		# Behaviour (below Font Glyph Order) ------------------------------------
@@ -835,7 +877,27 @@ class ColorFlowSettingsView:
 		except Exception:
 			pass
 
-		group.lcLabel = TextBox((margin, lc_label_y, inner, 18), "Labels & Colours")
+		group.lcLabel = TextBox((margin, lc_label_y, 96, 18), "Color Labels")
+
+		# Reset icon (a "reload" arrow) sits next to the title; it confirms, then restores the
+		# twelve label colours + the names/order/visibility to their defaults. Replaces the old
+		# full-width reset button.
+		reload_image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(
+			"arrow.clockwise", "Reset colours and order")
+		if reload_image is None:                                  # pre-SF-Symbols fallback
+			reload_image = AppKit.NSImage.imageNamed_(AppKit.NSImageNameRefreshTemplate)
+		group.resetButton = ImageButton((margin + 98, lc_label_y - 2, 20, 20),
+			imageObject=reload_image, bordered=False, callback=self._reset_clicked)
+		try:
+			group.resetButton.getNSButton().setToolTip_("Reset colours and order")
+		except Exception:
+			pass
+
+		# Help line: how to edit a row. Renaming is a double-click (not obvious), so spell it out.
+		group.lcHelp = TextBox((margin, lc_help_y, inner, lc_help_h),
+			"Double-click a name to rename it. Click the swatch to recolour, the eye to "
+			"show or hide, and drag shown rows to reorder.",
+			sizeStyle="small")
 
 		# ONE combined control: a List2 of all 12 label slots. Each row carries an EYE
 		# checkbox (show/hide the slot), a colour well (recolour) and an editable name
@@ -849,10 +911,11 @@ class ColorFlowSettingsView:
 				(margin, lc_list_y, inner, lc_list_h),
 				self._slot_list_items(font),
 				columnDescriptions=[
-					# Eye/checkbox = "shown". Editable so a click flips visibility (the
-					# bool is written back into the row dict, then editCallback fires).
-					dict(identifier="visible", title="", cellClass=CheckBoxList2Cell,
-						editable=True, width=22),
+					# Eye toggle = "shown" (eye.fill) / "hidden" (eye.slash). Editable so a
+					# click flips visibility (the bool is written back into the row dict,
+					# then editCallback fires).
+					dict(identifier="visible", title="", cellClass=EyeToggleList2Cell,
+						editable=True, width=24),
 					dict(identifier="color", title="", cellClass=ColorWellList2Cell,
 						editable=True, width=44),
 					dict(identifier="name", title="", cellClass=EditTextList2Cell,
@@ -878,10 +941,6 @@ class ColorFlowSettingsView:
 			print("Color Flow [pane slot list build] error:\n" + traceback.format_exc())
 			self._slot_list = None
 
-		# Reset colours & order (left-aligned, fixed width) ---------------------
-		group.resetButton = Button((margin, lc_reset_y, 180, 22),
-			"Reset colours & order", callback=self._reset_clicked, sizeStyle='small')
-
 		# Font Glyph Order (bottom) ---------------------------------------------
 		group.fgoSep = HorizontalLine((margin, fgo_sep_y, inner, 1))
 		group.fgoLabel = TextBox((margin, fgo_label_y, inner, 18), "Font Glyph Order")
@@ -900,19 +959,21 @@ class ColorFlowSettingsView:
 			callback=self._swap_routing_changed)
 		self._swap_checkbox = group.swapRouting
 
-		# Make the full-width controls grow with the Settings tab (the reset button keeps
-		# its fixed width, left-aligned). Each is pinned to the top, width flexible.
-		for _name in ("lcLabel", "lcList", "fgoSep", "fgoLabel", "rainbow",
+		# Make the full-width controls grow with the Settings tab. Each is pinned to the top,
+		# width flexible. The title + its reload-reset icon keep a fixed width/position
+		# (top-left), so the icon stays next to the title rather than drifting right.
+		for _name in ("lcHelp", "lcList", "fgoSep", "fgoLabel", "rainbow",
 				"behSep", "behLabel", "swapRouting"):
 			try:
 				getattr(group, _name).getNSView().setAutoresizingMask_(
 					AppKit.NSViewWidthSizable | AppKit.NSViewMinYMargin)
 			except Exception:
 				pass
-		try:
-			group.resetButton.getNSView().setAutoresizingMask_(AppKit.NSViewMinYMargin)
-		except Exception:
-			pass
+		for _name in ("lcLabel", "resetButton"):
+			try:
+				getattr(group, _name).getNSView().setAutoresizingMask_(AppKit.NSViewMinYMargin)
+			except Exception:
+				pass
 
 	# ------------------------------------------------------------------ slot list
 	def _slot_list_items(self, font) -> list[dict]:

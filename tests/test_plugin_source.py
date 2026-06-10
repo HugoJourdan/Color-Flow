@@ -259,11 +259,16 @@ def test_settings_pane_build_order_labels_then_font_glyph_order() -> None:
         PLUGIN_SOURCE.index("def _build(self) -> None:") :
         PLUGIN_SOURCE.index("def _slot_list_items(")
     ]
-    # Top-to-bottom: Labels & Colours header, the combined list, then Font Glyph Order
-    # (the inline legend was removed).
-    labels = build.index('"Labels & Colours"')
+    # Top-to-bottom: Color Labels title, the help line, the combined list, then Font Glyph
+    # Order (the inline legend was removed; the header now reads "Color Labels").
+    labels = build.index('"Color Labels"')
     fgo = build.index('"Font Glyph Order"')
     assert labels < fgo
+    assert '"Labels & Colours"' not in PLUGIN_SOURCE
+    # A help line under the title explains how to edit a row (rename = double-click).
+    help_index = build.index("group.lcHelp = TextBox")
+    assert labels < help_index < build.index("group.lcList = List2")
+    assert "Double-click a name to rename it." in build
     # The inline legend is gone.
     assert "group.legend = TextBox" not in PLUGIN_SOURCE
     assert "def _legend_text(" not in PLUGIN_SOURCE
@@ -277,10 +282,14 @@ def test_settings_panel_module_deleted() -> None:
     assert not (RESOURCES / "settings_panel.py").exists()
 
 
-def test_settings_pane_has_reset_colours_and_order_button() -> None:
-    # A reset button restores the 12 label colours + the names/order/visibility to defaults.
-    assert "group.resetButton = Button(" in PLUGIN_SOURCE
-    assert "Reset colours & order" in PLUGIN_SOURCE
+def test_settings_pane_reset_is_a_reload_icon_next_to_the_title() -> None:
+    # Reset is now a borderless "reload" (arrow.clockwise) icon button next to the title,
+    # NOT the old full-width "Reset colours & order" button.
+    assert "group.resetButton = ImageButton(" in PLUGIN_SOURCE
+    assert 'imageWithSystemSymbolName_accessibilityDescription_(\n\t\t\t"arrow.clockwise"' in PLUGIN_SOURCE
+    assert "callback=self._reset_clicked" in PLUGIN_SOURCE
+    assert "Reset colours & order" not in PLUGIN_SOURCE
+    assert "group.resetButton = Button(" not in PLUGIN_SOURCE
     assert "def _reset_clicked(" in PLUGIN_SOURCE
     # It routes through the shared module helper, which writes the defaults and broadcasts.
     body = _module_function_body("_reset_colors_and_order")
@@ -299,25 +308,43 @@ def test_settings_pane_has_single_combined_slot_list() -> None:
         PLUGIN_SOURCE.index("def _build(self) -> None:") :
         PLUGIN_SOURCE.index("def _slot_list_items(")
     ]
-    # ONE List2 holds all label slots: an eye/visible checkbox + a colour-well column
-    # + an editable name column (eye/checkbox FIRST so it reads left-to-right).
+    # ONE List2 holds all label slots: an eye-toggle visibility column + a colour-well
+    # column + an editable name column (eye FIRST so it reads left-to-right).
     assert "group.lcList = List2(" in build
     assert "self._slot_list_items(font)" in build
     assert 'identifier="visible"' in build
-    assert "cellClass=CheckBoxList2Cell" in build
+    assert "cellClass=EyeToggleList2Cell" in build
     assert "cellClass=ColorWellList2Cell" in build
     assert "cellClass=EditTextList2Cell" in build
-    # The visible checkbox column comes BEFORE the colour well.
+    # The visible eye column comes BEFORE the colour well.
     assert build.index('identifier="visible"') < build.index('identifier="color"')
     # All three columns are editable so any slot can be shown/hidden, recoloured, renamed.
     assert build.count("editable=True") >= 3
-    # The checkbox column is narrow (22) and the colour well is 44; name fills the rest.
-    assert "width=22" in build
+    # The eye column is narrow (24) and the colour well is 44; name fills the rest.
+    assert "width=24" in build
     # Edits route through one combined handler; drag-reorder + self-drop are wired.
     assert "editCallback=self._slot_edited" in build
     assert "dragCandidateCallback=self._slot_drag_candidate" in build
     assert "makeDragDataCallback=self._slot_make_drag_data" in build
     assert "performDropCallback=self._slot_perform_drop" in build
+
+
+def test_visibility_cell_is_an_eye_toggle() -> None:
+    # The visibility cell is a CheckBox restyled as an eye toggle: eye.fill (shown) /
+    # eye.slash (hidden), driven by the on/off state of a borderless toggle button.
+    assert "class EyeToggleList2Cell(CheckBoxList2Cell):" in PLUGIN_SOURCE
+    cell = PLUGIN_SOURCE[
+        PLUGIN_SOURCE.index("class EyeToggleList2Cell(CheckBoxList2Cell):") :
+        PLUGIN_SOURCE.index("class ColorFlowSettingsView:")
+    ]
+    assert '_eye_symbol("eye.slash")' in cell      # state OFF = hidden
+    assert '_eye_symbol("eye.fill")' in cell        # state ON  = shown
+    assert "button.setImage_(off_eye)" in cell
+    assert "button.setAlternateImage_(on_eye)" in cell
+    assert "NSButtonTypeToggle" in cell
+    assert "button.setBordered_(False)" in cell
+    helper = _module_function_body("_eye_symbol")
+    assert "imageWithSystemSymbolName_accessibilityDescription_(name, None)" in helper
 
 
 def test_old_separate_order_list_removed() -> None:
