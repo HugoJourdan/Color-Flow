@@ -23,7 +23,6 @@ from typing import Any
 
 import AppKit
 import colorflow_filters
-import colorflow_profile
 
 # Shared, GlyphsApp-free colorNames logic (also embedded into the jump
 # shortcut script by tools/generate_shortcuts.py). Glyphs puts this bundle's
@@ -34,20 +33,19 @@ import colornames
 # shortcut by tools/generate_shortcuts.py).
 import colornav
 
+# Pure swap-Option-color-routing decision logic (no AppKit); the swizzled
+# setColorIndex: replacement below delegates its two decisions here.
+import colorflow_routing
+
 # Font-View colour grouping engine (the merged Rainbow FontView half).
 import fontview
 import labelcolors
 import objc
 from AppKit import (
 	NSClickGestureRecognizer,
-	NSCursor,
-	NSGestureRecognizerStateBegan,
-	NSGestureRecognizerStateChanged,
-	NSGestureRecognizerStateEnded,
 	NSMenuItem,
 	NSOffState,
 	NSOnState,
-	NSPanGestureRecognizer,
 )
 from Foundation import NSDate, NSObject, NSRunLoop, NSRunLoopCommonModes
 
@@ -288,6 +286,11 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 _SHORTCUT_GROUP = "Color Flow"
 _SHORTCUT_ID_PREFIX = "com.hugojourdan.ColorFlow."
 _SHORTCUT_COUNTS_KEY = "com.hugojourdan.ColorFlow-counts-"
+
+# Boolean default backing the "Swap Option color routing" toggle (Settings pane).
+# Read at call time by the swizzled setColorIndex: replacement, so flipping it
+# takes effect with no re-swizzle. Matches the com.hugojourdan.ColorFlow-* convention.
+SWAP_KEY = "com.hugojourdan.ColorFlow-SwapColorRouting"
 # Glyphs marked non-exporting in Glyphs are ALWAYS excluded from every
 # completion percentage — palette counts/bars here, and the report's displayed
 # percentages (colorflow_dashboard ships the same exclusion set client-side).
@@ -389,6 +392,735 @@ def _register_native_shortcuts() -> None:
 		"",  # unassigned — the user picks a key in Settings > Shortcuts
 		0,
 	)
+
+
+########################################################################################################
+#																									   #
+#	SWAP OPTION COLOR ROUTING (swizzle of -[GSFontViewController setColorIndex:])				   #
+#																									   #
+########################################################################################################
+#
+# Stock Glyphs: click a swatch -> glyph colour; Option-click -> active layer colour. This fork is
+# baked into the compiled -[GSFontViewController setColorIndex:], which re-reads modifierFlags
+# internally, so an IMP-preserving swizzle cannot invert it (the original would just re-make the
+# stock choice). We FULLY REPLACE the (small, self-contained) method body. The replacement reads the
+# SWAP_KEY default at CALL TIME, so flipping the Settings toggle needs no re-swizzle. The decision
+# logic lives in the pure, unit-tested colorflow_routing module.
+
+# Idempotency guard: Glyphs builds one palette instance per document window; the installer must run
+# its class-method replacement exactly once per app session.
+_CF_ROUTING_INSTALLED = False
+
+
+def _cf_setColorIndex_(self, color_index) -> None:
+	"""Replacement for -[GSFontViewController setColorIndex:] implementing swap routing.
+
+	Signed ``v@:C`` (void, self, _cmd, unsigned char) so it matches the GSLabelColors
+	(uint8_t) argument — 0xFF (NoColor / reset) flows through unchanged. Fully guarded:
+	any failure prints to the Macro panel and the routing is simply skipped, never crashes
+	the Font View. Non-mouse callers (keyboard shortcut, programmatic) fall back to stock
+	glyph routing so a held Option key during a key event can't misroute.
+	"""
+	try:
+		event = AppKit.NSApp.currentEvent() if AppKit.NSApp is not None else None
+		swap = bool(Glyphs.defaults[SWAP_KEY])
+		event_type = event.type() if event is not None else None
+
+		try:
+			layers = list(self.selectedLayers() or [])
+		except Exception:
+			layers = []
+
+		if event is None or not colorflow_routing.should_apply_swap(event_type):
+			# Non-mouse / no event: stock GLYPH routing, ignore Option (safe default).
+			# (The `event is None` test is redundant with should_apply_swap — a None
+			# event_type already returns False — but it lets the type checker narrow
+			# `event` to non-None in the else branch where modifierFlags() is read.)
+			target = "glyph"
+		else:
+			option = bool(event.modifierFlags() & AppKit.NSEventModifierFlagOption)
+			target = colorflow_routing.resolve_color_target(option, swap)
+
+		# Wrap the mutation in the font's disable/enableUpdateInterface so the UI
+		# updates once (mirrors stock). The accessor lives on GSFont; reach it via a
+		# selected layer's glyph.parent (== the font). Best-effort: if we can't find
+		# it, just mutate without the batching.
+		font = None
+		if layers:
+			try:
+				glyph = layers[0].glyph
+				font = glyph.parent if glyph is not None else None
+			except Exception:
+				font = None
+
+		if font is not None:
+			try:
+				font.disableUpdateInterface()
+			except Exception:
+				font = None  # don't try to re-enable something we couldn't disable
+		try:
+			for layer in layers:
+				if target == "layer":
+					layer.colorIndex = color_index
+				else:
+					glyph = layer.glyph
+					if glyph is not None:
+						glyph.colorIndex = color_index
+		finally:
+			if font is not None:
+				try:
+					font.enableUpdateInterface()
+				except Exception:
+					pass
+	except Exception:
+		import traceback
+		print("Color Flow [setColorIndex swap] error:\n" + traceback.format_exc())
+
+
+def _install_color_routing_hook() -> None:
+	"""Replace -[GSFontViewController setColorIndex:] with the swap-aware version.
+
+	Idempotent (module-level _CF_ROUTING_INSTALLED guard) so reloading or multiple
+	document windows never double-install. Whole body guarded: a missing GSFontViewController
+	symbol on a future Glyphs, or any PyObjC signature/dispatch failure, only prints to the
+	Macro panel and leaves stock routing intact — palette load is never broken.
+	"""
+	global _CF_ROUTING_INSTALLED
+	if _CF_ROUTING_INSTALLED:
+		return
+	try:
+		try:
+			font_view_controller = objc.lookUpClass("GSFontViewController")
+		except Exception:
+			import traceback
+			print("Color Flow [routing hook] GSFontViewController not found:\n"
+				+ traceback.format_exc())
+			return
+		# Mark installed BEFORE the swap: a partial failure must not let the next window
+		# re-attempt (it would only fail again).
+		_CF_ROUTING_INSTALLED = True
+		# REPLACE the EXISTING -[GSFontViewController setColorIndex:] IMP. Both PyObjC's
+		# classAddMethods AND objc.Category only ADD new selectors (Category internally calls
+		# classAddMethods too) — neither overrides an already-implemented selector, so they
+		# leave the stock IMP in place. We therefore: (1) add our Python impl under a NEW
+		# private selector (classAddMethods works for a new name), then (2) copy that IMP onto
+		# the existing setColorIndex: via the Objective-C runtime's class_replaceMethod (ctypes).
+		# The IMP is a PyObjC trampoline bound to our callable, so it dispatches correctly under
+		# either selector. Signature v@:C matches the verified encoding (v20@0:8C16, uint8_t arg).
+		private = objc.selector(
+			_cf_setColorIndex_, selector=b"cf_swapSetColorIndex:", signature=b"v@:C")
+		objc.classAddMethods(font_view_controller, [private])
+		if _runtime_copy_imp("GSFontViewController", b"cf_swapSetColorIndex:",
+				b"setColorIndex:", b"v@:C"):
+			print("Color Flow: swap-routing hook installed on "
+				"-[GSFontViewController setColorIndex:].")
+		else:
+			print("Color Flow [routing hook] could not replace setColorIndex: IMP; "
+				"stock routing left intact.")
+	except Exception:
+		import traceback
+		print("Color Flow [routing hook] error:\n" + traceback.format_exc())
+
+
+def _runtime_copy_imp(
+	class_name: str, source_selector: bytes, target_selector: bytes, type_encoding: bytes
+) -> bool:
+	"""Copy ``class_name``'s ``source_selector`` IMP onto its ``target_selector`` via the
+	Objective-C runtime (method_setImplementation), using ctypes/libobjc — the only reliable
+	way to OVERRIDE an already-implemented COMPILED method from PyObjC (both classAddMethods
+	and objc.Category only ADD new selectors). ``target_selector`` is a compiled GlyphsCore
+	method, so it dispatches purely through its IMP slot and the swap takes effect. Returns
+	True on success; any failure prints and returns False so stock routing is left intact.
+
+	(Verified against a compiled method in isolation: copying a private PyObjC selector's IMP
+	onto -[__NSArrayM count] made count() return the patched value.)"""
+	try:
+		import ctypes
+
+		libobjc = ctypes.CDLL("/usr/lib/libobjc.A.dylib")
+		libobjc.objc_getClass.restype = ctypes.c_void_p
+		libobjc.objc_getClass.argtypes = [ctypes.c_char_p]
+		libobjc.sel_registerName.restype = ctypes.c_void_p
+		libobjc.sel_registerName.argtypes = [ctypes.c_char_p]
+		libobjc.class_getInstanceMethod.restype = ctypes.c_void_p
+		libobjc.class_getInstanceMethod.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+		libobjc.method_getImplementation.restype = ctypes.c_void_p
+		libobjc.method_getImplementation.argtypes = [ctypes.c_void_p]
+		libobjc.method_setImplementation.restype = ctypes.c_void_p
+		libobjc.method_setImplementation.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+
+		_ = type_encoding   # the target method already carries its encoding; kept for the API
+		cls = libobjc.objc_getClass(class_name.encode())
+		if not cls:
+			return False
+		source_method = libobjc.class_getInstanceMethod(cls, libobjc.sel_registerName(source_selector))
+		target_method = libobjc.class_getInstanceMethod(cls, libobjc.sel_registerName(target_selector))
+		if not source_method or not target_method:
+			return False
+		imp = libobjc.method_getImplementation(source_method)
+		if not imp:
+			return False
+		libobjc.method_setImplementation(target_method, imp)
+		return True
+	except Exception:
+		import traceback
+		print("Color Flow [routing hook] runtime IMP copy failed:\n" + traceback.format_exc())
+		return False
+
+
+########################################################################################################
+#																									   #
+#	COLOR FLOW SETTINGS PANE (Glyphs > Settings > Color Flow)									       #
+#																									   #
+########################################################################################################
+#
+# The label/colour controls used to live in a per-palette popover. They now live in a single GLOBAL
+# preferences pane added to Glyphs > Settings via the app delegate's addViewToPreferences:. Because
+# the pane is shared across every document window, edits there are routed through the same pure
+# helpers the palette uses (labelcolors / colornames) and then broadcast with an NSNotification so
+# every open palette instance refreshes live.
+
+# The notification name every palette instance observes; the pane posts it after any edit.
+COLORFLOW_SETTINGS_CHANGED = "ColorFlowSettingsChanged"
+
+# The pane's Settings tab identifier AND its visible label. Verified against GlyphsCore:
+# -addViewController: makes the tab identifier = vc.representedObject and the label =
+# vc.title, and showMainPreferencesWithIdentifier: selects the tab by that identifier. So
+# we set representedObject = title = this string, and jump to the same string.
+COLORFLOW_PREF_IDENTIFIER = "Color Flow"
+
+# Registered exactly once per app session (palettes instantiate once per document window). The VC is
+# held module-globally so AppKit does not deallocate it out from under the Settings window.
+_PREF_PANE_ADDED = False
+_PREF_PANE_VC = None
+_PREF_PANE_CONTROLLER = None
+
+
+def _app_delegate() -> Any:
+	"""The Glyphs app delegate (it implements addViewToPreferences: / showMainPreferencesWithIdentifier:).
+	Prefer Glyphs.delegate(); fall back to the shared application's delegate."""
+	try:
+		delegate = Glyphs.delegate()
+		if delegate is not None:
+			return delegate
+	except Exception:
+		pass
+	try:
+		return AppKit.NSApplication.sharedApplication().delegate()
+	except Exception:
+		return None
+
+
+def _font_dir_for(font) -> str | None:
+	return os.path.dirname(font.filepath) if (font is not None and font.filepath) else None
+
+
+def _broadcast_settings_changed() -> None:
+	"""Tell every open palette instance to re-read its settings and rebuild."""
+	try:
+		from Foundation import NSNotificationCenter
+		NSNotificationCenter.defaultCenter().postNotificationName_object_(
+			COLORFLOW_SETTINGS_CHANGED, None)
+	except Exception:
+		import traceback
+		print("Color Flow [settings broadcast] error:\n" + traceback.format_exc())
+
+
+def _apply_label_colors(colors: list) -> None:
+	"""Persist the twelve label colours, live-refresh the app, and broadcast."""
+	if len(colors) != 12:
+		return
+	labelcolors.write_label_colors(colors)
+	labelcolors.refresh_app_label_colors(colors)
+	_broadcast_settings_changed()
+
+
+def _apply_label_names(font, labels_by_index: dict) -> None:
+	"""Rewrite colorNames.txt from the edited name fields (empty = hidden), keep the
+	in-font copy in sync when this font stores its labels in-file, then broadcast."""
+	path = colornames.get_key_file(_font_dir_for(font))
+	text = colornames.pick_settings_text(
+		colornames.font_labels_text(font), colornames.read_color_names(path))
+	rows, none_label = colornames.parse_settings(text)
+	new_rows = []
+	for index, label, visible in rows:
+		if index in labels_by_index:
+			new_label = labels_by_index[index].strip()
+			new_rows.append((index, new_label, bool(new_label)))
+		else:
+			new_rows.append((index, label, visible))
+	new_text = colornames.render_settings(new_rows, none_label)
+	colornames.write_color_names(path, new_text)
+	if font is not None and colornames.font_labels_text(font) is not None:
+		font.userData[colornames.FONT_LABELS_KEY] = new_text
+	_broadcast_settings_changed()
+
+
+def _apply_color_order(font, new_visible_order: list[int]) -> None:
+	"""Persist a new visible-colour order to colorNames.txt (and the in-font copy when this
+	font stores its labels in-file), then broadcast so every palette rebuilds. The reorder
+	math lives in the pure, unit-tested colornames.reorder_visible_rows."""
+	path = colornames.get_key_file(_font_dir_for(font))
+	text = colornames.pick_settings_text(
+		colornames.font_labels_text(font), colornames.read_color_names(path))
+	rows, none_label = colornames.parse_settings(text)
+	new_rows = colornames.reorder_visible_rows(rows, new_visible_order)
+	new_text = colornames.render_settings(new_rows, none_label)
+	colornames.write_color_names(path, new_text)
+	if font is not None and colornames.font_labels_text(font) is not None:
+		font.userData[colornames.FONT_LABELS_KEY] = new_text
+	_broadcast_settings_changed()
+
+
+def _apply_rainbow_source(font, segment: int) -> None:
+	"""Mirror the popover's Default/Layer/Glyph segmented control: 0 disables Font Glyph
+	Order grouping, 1 = Layer colour, 2 = Glyph colour. Best-effort; broadcasts."""
+	if font is None:
+		return
+	grouping = fontview.FontViewGrouping()
+	try:
+		if segment == 0:
+			if grouping.is_enabled(font):
+				grouping.disable(font)
+		else:
+			grouping.set_mode(font, "Layer" if segment == 1 else "Glyph")
+			if not grouping.is_enabled(font):
+				grouping.enable(font)
+	except Exception:
+		import traceback
+		print("Color Flow [rainbow source] error:\n" + traceback.format_exc())
+
+
+def _rainbow_segment_for_font(font) -> int:
+	"""Current grouping state -> segment index (0 Default / 1 Layer / 2 Glyph)."""
+	if font is None:
+		return 0
+	grouping = fontview.FontViewGrouping()
+	try:
+		if not grouping.is_enabled(font):
+			return 0
+		return 2 if grouping.mode(font) == "Glyph" else 1
+	except Exception:
+		return 0
+
+
+class ColorFlowSettingsView:
+	"""Builds + owns the vanilla controls for the Color Flow preferences pane and routes
+	every edit through the module-level shared helpers (which broadcast to open palettes).
+
+	Held module-globally (not per palette instance) because the pane is GLOBAL: it is added
+	to Glyphs > Settings once per session and shared across all document windows."""
+
+	WIDTH = 230
+	MARGIN = 20
+
+	def __init__(self) -> None:
+		# One combined List2 of all 12 label slots: each row = colour well + editable name.
+		# ``_slot_items`` is the parallel list of row dicts (slot/color/name) so callbacks can
+		# map an edited/dragged row back to its colour index.
+		self._slot_list = None
+		self._slot_items: list[dict] = []
+		self._segment = None
+		self._swap_checkbox = None
+		self._height = 0
+		self._build()
+
+	@property
+	def view(self) -> Any:
+		# Pin the backing view to its built size and let Glyphs' tab view position (not
+		# deform) it. Vanilla resolves negative/zero widths against the LIVE parent frame,
+		# which is ~0 the moment Glyphs first lays the pane out — collapsing every full-width
+		# control to the top-left. We avoid that two ways: every control below uses POSITIVE
+		# absolute coords, and we fix the view's frame + min size here.
+		ns_view = self.group.getNSView()
+		try:
+			ns_view.setFrame_(AppKit.NSMakeRect(0, 0, self.WIDTH, self._height))
+			ns_view.setAutoresizingMask_(AppKit.NSViewMaxXMargin | AppKit.NSViewMinYMargin)
+		except Exception:
+			pass
+		return ns_view
+
+	# ------------------------------------------------------------------ build
+	def _effective_label_text(self, font) -> str:
+		try:
+			key_text = colornames.read_color_names(
+				colornames.get_key_file(_font_dir_for(font)))
+			return colornames.pick_settings_text(
+				colornames.font_labels_text(font), key_text)
+		except Exception:
+			return colornames.DEFAULT_COLOR_NAMES
+
+	def _build(self) -> None:
+		# EVERY control uses POSITIVE, absolute coords (no -margin / -100 right anchors):
+		# vanilla resolves negatives against the live parent frame, which collapses inside
+		# Glyphs' tab view. ``inner`` is the full content width between the margins.
+		# Top-to-bottom: Labels & Colours header, ONE combined 12-row list (colour well +
+		# editable name, visible rows draggable to reorder), legend, then Font Glyph Order.
+		font = Glyphs.font
+		margin = self.MARGIN
+		inner = self.WIDTH - 2 * margin
+
+		# Labels & Colours (combined editor + order) ----------------------------
+		lc_label_y = 16
+		lc_list_y = lc_label_y + 24
+		# 12 rows; List2 row height is ~24pt on modern macOS, plus a little chrome.
+		lc_list_h = 12 * 26 + 8
+		# Legend ----------------------------------------------------------------
+		legend_top = lc_list_y + lc_list_h + 12
+		legend_height = 100
+		# Font Glyph Order (moved to the bottom) --------------------------------
+		fgo_sep_y = legend_top + 10 + legend_height + 12
+		fgo_label_y = fgo_sep_y + 12
+		fgo_seg_y = fgo_label_y + 22
+		# Behaviour (below Font Glyph Order) ------------------------------------
+		beh_sep_y = fgo_seg_y + 24 + 12
+		beh_label_y = beh_sep_y + 12
+		beh_check_y = beh_label_y + 22
+		height = beh_check_y + 22 + margin
+		self._height = height
+
+		self.group = Group((0, 0, self.WIDTH, height))
+		group = self.group
+		# Vanilla creates the Group's NSView with a ZERO frame and only applies the posSize
+		# when a PARENT lays it out. Here the Group has no vanilla parent (its view becomes an
+		# NSViewController.view), so we set the frame ourselves BEFORE adding children — every
+		# child's frame is computed against the Group's CURRENT frame (vanilla flips top-origin
+		# posSize using the parent height), and a zero height would push every row off-view.
+		try:
+			group.getNSView().setFrame_(AppKit.NSMakeRect(0, 0, self.WIDTH, height))
+		except Exception:
+			pass
+
+		group.lcLabel = TextBox((margin, lc_label_y, inner, 18), "Labels & Colours")
+
+		# ONE combined control: a List2 of all 12 label slots. Each row carries a colour
+		# well (recolour any slot) and an editable name (rename / show / hide any slot).
+		# Visible (named) rows are draggable to reorder the workflow sequence; hidden
+		# (blank-name) rows are pinned below and are NOT draggable. The drop persists via
+		# the shared _apply_color_order -> colornames.reorder_visible_rows path and broadcasts.
+		drag_type = "dev.colorflow.slotRow"
+		try:
+			group.lcList = List2(
+				(margin, lc_list_y, inner, lc_list_h),
+				self._slot_list_items(font),
+				columnDescriptions=[
+					dict(identifier="color", title="", cellClass=ColorWellList2Cell,
+						editable=True, width=44),
+					dict(identifier="name", title="", cellClass=EditTextList2Cell,
+						editable=True),
+				],
+				showColumnTitles=False,
+				allowsSorting=False,
+				allowsMultipleSelection=False,
+				allowsEmptySelection=True,
+				drawFocusRing=False,
+				editCallback=self._slot_edited,
+				dragSettings=dict(
+					dragCandidateCallback=self._slot_drag_candidate,
+					makeDragDataCallback=self._slot_make_drag_data),
+				dropSettings=dict(
+					pasteboardTypes=[drag_type],
+					dropCandidateCallback=self._slot_drop_candidate,
+					performDropCallback=self._slot_perform_drop),
+			)
+			self._slot_list = group.lcList
+		except Exception:
+			import traceback
+			print("Color Flow [pane slot list build] error:\n" + traceback.format_exc())
+			self._slot_list = None
+
+		# Legend (rendered inline — it is a settings pane) ----------------------
+		group.legendSep = HorizontalLine((margin, legend_top, inner, 1))
+		group.legend = TextBox((margin, legend_top + 10, inner, legend_height),
+			self._legend_text(), sizeStyle='small')
+
+		# Font Glyph Order (bottom) ---------------------------------------------
+		group.fgoSep = HorizontalLine((margin, fgo_sep_y, inner, 1))
+		group.fgoLabel = TextBox((margin, fgo_label_y, inner, 18), "Font Glyph Order")
+		group.rainbow = SegmentedButton((margin, fgo_seg_y, inner, 24),
+			[dict(title="Default"), dict(title="Layer"), dict(title="Glyph")],
+			callback=self._rainbow_changed)
+		group.rainbow.set(_rainbow_segment_for_font(font))
+		self._segment = group.rainbow
+
+		# Behaviour (bottom) ----------------------------------------------------
+		group.behSep = HorizontalLine((margin, beh_sep_y, inner, 1))
+		group.behLabel = TextBox((margin, beh_label_y, inner, 18), "Behaviour")
+		group.swapRouting = CheckBox((margin, beh_check_y, inner, 18),
+			"Swap Option color routing (plain → layer)",
+			value=bool(Glyphs.defaults[SWAP_KEY]),
+			callback=self._swap_routing_changed)
+		self._swap_checkbox = group.swapRouting
+
+	def _legend_text(self) -> str:
+		try:
+			font = Glyphs.font
+			meaning = colornames.load_meaning(_font_dir_for(font)) if font is not None else {}
+			visible = colornames.visible_labels(meaning)
+			lines = ["A colour means every step up to it is done.", ""]
+			for position, (color, label) in enumerate(visible.items(), start=1):
+				name = colornames.COLOR_NAMES.get(int(color), str(color))
+				lines.append(f"{position}. {label}  ({name})")
+			return "\n".join(lines)
+		except Exception:
+			return "A colour means every step up to it is done."
+
+	# ------------------------------------------------------------------ slot list
+	def _slot_list_items(self, font) -> list[dict]:
+		"""All 12 label slots as List2 row dicts, VISIBLE (named) first in their current
+		workflow order, then HIDDEN (blank) pinned below. Each dict carries the colour
+		index (``slot``), the live NSColor (``color``) and the editable label (``name``).
+		Also caches the list in ``self._slot_items`` so callbacks can map rows back to
+		colours and recompute the visible order on drag/edit."""
+		items: list[dict] = []
+		try:
+			rgba_list = labelcolors.read_label_colors()
+			rows, _none = colornames.parse_settings(self._effective_label_text(font))
+			visible_rows = [(index, label) for index, label, visible in rows if visible]
+			hidden_rows = [(index, label) for index, label, visible in rows if not visible]
+			for index, label in visible_rows + hidden_rows:
+				color = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(*rgba_list[index])
+				items.append(dict(slot=int(index), color=color, name=label))
+		except Exception:
+			import traceback
+			print("Color Flow [pane slot items] error:\n" + traceback.format_exc())
+			items = []
+		self._slot_items = items
+		return items
+
+	@staticmethod
+	def _slot_is_visible(item: dict) -> bool:
+		"""A slot row is VISIBLE (named, draggable, part of the workflow order) when its
+		name field holds non-blank text — matching how colorNames.txt marks visibility."""
+		return bool(str(item.get("name", "")).strip())
+
+	def _visible_slot_count(self) -> int:
+		"""Number of leading VISIBLE rows (the draggable block, pinned above the hidden ones)."""
+		return sum(1 for item in self._slot_items if self._slot_is_visible(item))
+
+	def _slot_drag_candidate(self, indexes) -> bool:
+		"""Allow a drag only when every picked row is VISIBLE (named). Hidden rows are fixed."""
+		try:
+			return bool(indexes) and all(
+				0 <= int(i) < len(self._slot_items)
+				and self._slot_is_visible(self._slot_items[int(i)])
+				for i in indexes
+			)
+		except Exception:
+			return False
+
+	def _slot_make_drag_data(self, index) -> dict:
+		"""Pack the dragged source row index onto the pasteboard for the self-reorder."""
+		return {"dev.colorflow.slotRow": int(index)}
+
+	def _slot_drop_candidate(self, info) -> str:
+		"""Accept a self-move drop (rejects external drags, which carry no source)."""
+		try:
+			return "move" if info.get("source") is self._slot_list else "none"
+		except Exception:
+			return "none"
+
+	def _slot_perform_drop(self, info) -> bool:
+		"""Self-drop reorder: move the dragged VISIBLE rows to the drop position (clamped to
+		stay within the visible block, above the pinned hidden rows), refresh the list, then
+		persist the new visible-colour order via the shared _apply_color_order helper."""
+		try:
+			sender = info.get("sender")
+			source_indexes = sorted(
+				int(i) for i in sender.getDropItemValues(
+					info.get("items") or [], "dev.colorflow.slotRow"))
+			items = list(self._slot_items)
+			moved = [items[i] for i in source_indexes if 0 <= i < len(items)]
+			if not moved or not all(self._slot_is_visible(item) for item in moved):
+				return False
+			source_set = set(source_indexes)
+			remaining = [item for pos, item in enumerate(items) if pos not in source_set]
+			drop_index = info.get("index")
+			visible_remaining = sum(1 for item in remaining if self._slot_is_visible(item))
+			if drop_index is None:
+				insert_at = visible_remaining
+			else:
+				insert_at = int(drop_index) - sum(1 for i in source_indexes if i < int(drop_index))
+			# Keep the moved (visible) rows inside the visible block, above hidden rows.
+			insert_at = max(0, min(visible_remaining, insert_at))
+			new_items = remaining[:insert_at] + moved + remaining[insert_at:]
+			self._slot_items = new_items
+			if self._slot_list is not None:
+				self._slot_list.set(new_items)
+			new_order = [item["slot"] for item in new_items if self._slot_is_visible(item)]
+			_apply_color_order(Glyphs.font, new_order)
+			return True
+		except Exception:
+			import traceback
+			print("Color Flow [pane slot drop] error:\n" + traceback.format_exc())
+			return False
+
+	# ------------------------------------------------------------------ refresh
+	def reload(self) -> None:
+		"""Re-read settings into the pane's controls (e.g. after the active font changes)."""
+		try:
+			font = Glyphs.font
+			if self._slot_list is not None:
+				self._slot_list.set(self._slot_list_items(font))
+			if self._segment is not None:
+				self._segment.set(_rainbow_segment_for_font(font))
+			if self._swap_checkbox is not None:
+				self._swap_checkbox.set(bool(Glyphs.defaults[SWAP_KEY]))
+			self.group.legend.set(self._legend_text())
+		except Exception:
+			import traceback
+			print("Color Flow [pane reload] error:\n" + traceback.format_exc())
+
+	# ------------------------------------------------------------------ callbacks
+	def _rainbow_changed(self, sender) -> None:
+		try:
+			_apply_rainbow_source(Glyphs.font, sender.get())
+		except Exception:
+			import traceback
+			print("Color Flow [pane rainbow] error:\n" + traceback.format_exc())
+
+	def _swap_routing_changed(self, sender) -> None:
+		"""Persist the swap toggle. The swizzled setColorIndex: reads SWAP_KEY at call
+		time, so no re-swizzle is needed; routing doesn't change palette display, so no
+		broadcast either."""
+		try:
+			Glyphs.defaults[SWAP_KEY] = bool(sender.get())
+		except Exception:
+			import traceback
+			print("Color Flow [pane swap routing] error:\n" + traceback.format_exc())
+
+	def _slot_edited(self, sender) -> None:
+		"""Fires after the user edits ANY cell (colour well or name) in the combined list.
+		List2 has already written the new value into the edited row dict, so we read the
+		live state of all 12 rows and persist BOTH the colours and the names (idempotent):
+		_apply_label_colors rewrites the 12 label colours, _apply_label_names rewrites the
+		names (blank = hidden, naming a blank slot makes it visible). Each broadcasts so open
+		palettes refresh live. The combined list keeps its row order until the next reload."""
+		try:
+			items = list(self._slot_items)
+			# Colours, indexed by slot (fall back to the on-disk colour for any missing slot).
+			colors_by_slot = dict(zip(range(12), labelcolors.read_label_colors()))
+			labels_by_index: dict[int, str] = {}
+			for item in items:
+				slot = int(item.get("slot", -1))
+				if not 0 <= slot < 12:
+					continue
+				native = item.get("color")
+				if native is not None:
+					rgb = native.colorUsingColorSpaceName_("NSCalibratedRGBColorSpace") or native
+					colors_by_slot[slot] = (rgb.redComponent(), rgb.greenComponent(),
+						rgb.blueComponent(), rgb.alphaComponent())
+				labels_by_index[slot] = str(item.get("name", ""))
+			_apply_label_colors([colors_by_slot[slot] for slot in range(12)])
+			_apply_label_names(Glyphs.font, labels_by_index)
+			self.group.legend.set(self._legend_text())
+		except Exception:
+			import traceback
+			print("Color Flow [pane slot edit] error:\n" + traceback.format_exc())
+
+
+class ColorFlowPreferencesController(AppKit.NSViewController):
+	"""NSViewController whose view is the Color Flow settings pane. Glyphs' Settings
+	window holds it via addViewToPreferences:. The heavy lifting lives on the
+	module-level ColorFlowSettingsView so the title-only VC stays thin."""
+
+	def initWithSettingsView_(self, settings_view) -> Any:
+		self = objc.super(ColorFlowPreferencesController, self).init()
+		if self is None:
+			return None
+		self._settingsView = settings_view
+		# Glyphs' GSPreferencesController -addViewController: builds the Settings tab as:
+		#     item = [[NSTabViewItem alloc] initWithIdentifier: vc.representedObject];
+		#     item.view  = vc.view;  item.label = vc.title;
+		# and -showPrefpaneWithIdentifier: selects the tab by that identifier. So the tab
+		# IDENTIFIER comes from representedObject (must be the string we jump to) and the
+		# visible toolbar LABEL comes from title. Both are "Color Flow".
+		try:
+			self.setTitle_(COLORFLOW_PREF_IDENTIFIER)
+		except Exception:
+			pass
+		try:
+			self.setRepresentedObject_(COLORFLOW_PREF_IDENTIFIER)
+		except Exception:
+			pass
+		return self
+
+	def loadView(self) -> None:
+		try:
+			self.setView_(self._settingsView.view)
+		except Exception:
+			import traceback
+			print("Color Flow [pref loadView] error:\n" + traceback.format_exc())
+
+
+def _register_preferences_pane() -> None:
+	"""Add the Color Flow pane to Glyphs > Settings exactly once per app session.
+
+	Glyphs builds one palette instance per document window, so the module-level
+	_PREF_PANE_ADDED guard prevents duplicate panes. The VC + its backing view are
+	retained module-globally so AppKit cannot deallocate them. Fully guarded: any
+	failure only prints to the Macro panel and never breaks plugin load.
+	"""
+	global _PREF_PANE_ADDED, _PREF_PANE_VC, _PREF_PANE_CONTROLLER
+	if _PREF_PANE_ADDED:
+		return
+	delegate = _app_delegate()
+	if delegate is None or not hasattr(delegate, "addViewToPreferences_"):
+		return
+	controller = ColorFlowSettingsView()
+	view_controller = ColorFlowPreferencesController.alloc().initWithSettingsView_(controller)
+	if view_controller is None:
+		return
+	# title -> the Settings tab's visible label; representedObject -> the tab IDENTIFIER
+	# that showMainPreferencesWithIdentifier: matches (see initWithSettingsView_). Set both
+	# again here defensively in case a subclass init path skipped them.
+	try:
+		view_controller.setTitle_(COLORFLOW_PREF_IDENTIFIER)
+	except Exception:
+		pass
+	try:
+		view_controller.setRepresentedObject_(COLORFLOW_PREF_IDENTIFIER)
+	except Exception:
+		pass
+	# NOTE: Glyphs builds the Settings pane toolbar entry as a TEXT button (its
+	# mapTabsToToolbar reads only label + identifier), so the pane has no custom icon —
+	# it shows the "Color Flow" label. Do not set representedObject to an NSImage: that
+	# would become the tab identifier and break the jump.
+	# Mark added BEFORE the call so a partial failure cannot re-register on the next window.
+	_PREF_PANE_ADDED = True
+	_PREF_PANE_CONTROLLER = controller
+	_PREF_PANE_VC = view_controller
+	delegate.addViewToPreferences_(view_controller)
+
+
+def _open_preferences_pane() -> None:
+	"""Open Glyphs > Settings to the Color Flow pane (registering it first if needed).
+
+	showMainPreferencesWithIdentifier: -> GSPreferencesController -showPrefpaneWithIdentifier:
+	-> [mainTabView selectTabViewItemWithIdentifier: ident]. Our tab's identifier is the VC's
+	representedObject, which we set to COLORFLOW_PREF_IDENTIFIER — so the jump matches. If it
+	ever throws (older Glyphs / no such item), fall back to just opening Settings so the user
+	still lands in the window and can click the Color Flow pane manually."""
+	_register_preferences_pane()
+	delegate = _app_delegate()
+	if delegate is None:
+		return
+	if hasattr(delegate, "showMainPreferencesWithIdentifier_"):
+		try:
+			delegate.showMainPreferencesWithIdentifier_(COLORFLOW_PREF_IDENTIFIER)
+			return
+		except Exception:
+			pass  # fall through to a plain Settings open
+	for selector in ("showMainPreferences_", "showPreferencesPanel_",
+			"showPreferences_", "openPreferences_"):
+		try:
+			method = getattr(delegate, selector, None)
+			if method is not None:
+				method(None)
+				return
+		except Exception:
+			continue
+
 
 
 class ColorFlow(PalettePlugin):
@@ -547,12 +1279,19 @@ class ColorFlow(PalettePlugin):
 		self._strippedForSave = False
 		try:
 			self._install_rainbow_menu()
-			self._install_settings_menu()
-			self._install_backfill_menu()
 			self._rainbow_conflict_check()
 		except Exception:
 			import traceback
 			print("Color Flow [Rainbow setup] error:\n" + traceback.format_exc())
+
+		# Swap Option color routing: replace -[GSFontViewController setColorIndex:]
+		# once per session (idempotent installer). Guarded like the rest — any
+		# failure only prints and leaves stock routing intact.
+		try:
+			_install_color_routing_hook()
+		except Exception:
+			import traceback
+			print("Color Flow [routing hook] error:\n" + traceback.format_exc())
 
 		# Native shortcut command in Glyphs > Settings > Shortcuts (remappable,
 		# no Scripts-folder copying). Guarded like the Rainbow setup: a missing
@@ -563,6 +1302,23 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("Color Flow [shortcuts] error:\n" + traceback.format_exc())
+
+		# Add the Color Flow pane to Glyphs > Settings exactly once per app session
+		# (module-level _PREF_PANE_ADDED guard). Guarded: a failure only prints.
+		try:
+			_register_preferences_pane()
+		except Exception:
+			import traceback
+			print("Color Flow [prefs pane] error:\n" + traceback.format_exc())
+
+		# Observe edits made in the global Settings pane so THIS palette refreshes live.
+		try:
+			from Foundation import NSNotificationCenter
+			NSNotificationCenter.defaultCenter().addObserver_selector_name_object_(
+				self, "colorFlowSettingsChanged:", COLORFLOW_SETTINGS_CHANGED, None)
+		except Exception:
+			import traceback
+			print("Color Flow [settings observer] error:\n" + traceback.format_exc())
 		try:
 			self.performSelector_withObject_afterDelay_("deferredHeaderSetup:", None, 2.0)
 		except Exception:
@@ -593,183 +1349,6 @@ class ColorFlow(PalettePlugin):
 	def _rainbow_menu_title(self) -> str:
 		return "Color Flow: Font Glyph Order"
 
-	# Action popover: a Default/Layer/Glyph segmented control + label/colour
-	# for the Font Glyph Order grouping. Replaces the old ⋯ menu.
-	@objc.python_method
-	def Open_Action_Popover(self, sender) -> None:
-		try:
-			button = self._popover_anchor_view(sender)
-			if button is None:
-				# Nothing on screen can host the popover (no palette, no window) —
-				# bail gracefully instead of letting NSPopover throw.
-				print("Color Flow: no visible view to anchor the settings popover to.")
-				return
-			self._popover = Popover((220, 518), parentView=button,
-				preferredEdge='left', behavior='semitransient')
-			popover = self._popover
-			popover.fgoLabel = TextBox((12, 12, -12, 16), "Font Glyph Order",
-				sizeStyle='small')
-			popover.rainbow = SegmentedButton((12, 32, -12, 22),
-				[dict(title="Default"), dict(title="Layer"), dict(title="Glyph")],
-				callback=self._popover_rainbow, sizeStyle='small')
-			popover.rainbow.set(self._rainbow_segment_index())
-			popover.lcSep = HorizontalLine((12, 62, -12, 1))
-			self._labelColorsEdited = False
-			popover.lcLabel = TextBox((12, 71, -84, 14), "Labels & Colours", sizeStyle='small')
-			popover.lcImport = Button((-78, 68, 20, 20), "", callback=self._import_profile, sizeStyle='small')
-			popover.lcExport = Button((-55, 68, 20, 20), "", callback=self._export_profile, sizeStyle='small')
-			popover.lcReset = Button((-32, 68, 20, 20), "", callback=self._label_colors_reset, sizeStyle='small')
-			# Borderless SF-Symbol icons via NSImage (NOT the symbol font as a title);
-			# the literal glyph is only a fallback if the named image is unavailable.
-			for _name, _sym, _fallback in (("lcImport", "square.and.arrow.down", "􀈄"),
-					("lcExport", "square.and.arrow.up", "􀈂"),
-					("lcReset", "arrow.counterclockwise", "􀎀")):
-				try:
-					_b = self._ns_button(getattr(popover, _name))
-					_b.setBordered_(False)
-					_img = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(_sym, None)
-					if _img is not None:
-						_b.setImage_(_img)
-						_b.setImageScaling_(AppKit.NSImageScaleProportionallyDown)
-					else:
-						_b.setTitle_(_fallback)
-						_b.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
-				except Exception:
-					pass
-			self._labelWells = []
-			self._labelFields = {}
-			rgbaList = labelcolors.read_label_colors()
-			try:
-				# in-font labels (userData) win over the sidecar key file so a shared font
-				# shows the labels its author saved.
-				_keyText = colornames.read_color_names(colornames.get_key_file(self._font_dir(Glyphs.font)))
-				settingsText = colornames.pick_settings_text(
-					colornames.font_labels_text(Glyphs.font), _keyText)
-			except Exception:
-				settingsText = colornames.DEFAULT_COLOR_NAMES
-			labelRows, _noneLabel = colornames.parse_settings(settingsText)
-			labelByIndex = {index: label for index, label, _visible in labelRows}
-			for index in range(12):
-				rowY = 94 + index * 26
-				wellColor = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(*rgbaList[index])
-				well = ColorWell((12, rowY, 26, 22), callback=self._label_color_changed, color=wellColor)
-				setattr(popover, f"lcWell{index}", well)
-				self._labelWells.append(well)
-				field = EditText((44, rowY, -12, 22), labelByIndex.get(index, ""),
-					callback=self._label_name_changed, continuous=False, sizeStyle='small')
-				setattr(popover, f"lcField{index}", field)
-				self._labelFields[index] = field
-			reportY = 94 + 12 * 26 + 6
-			popover.reportSep = HorizontalLine((12, reportY, -12, 1))
-			popover.dashboard = Button((12, reportY + 8, -12, 22), "Generate Colorflow Report",
-				callback=self._popover_dashboard, sizeStyle='small')
-			legendY = reportY + 8 + 22 + 8
-			popover.legend = Button((12, legendY, 20, 22), "?",
-				callback=self._open_legend, sizeStyle='small')
-			# Settings ported from the never-reachable settings_panel.py: storing the
-			# labels inside this .glyphs file (userData) so they travel when the font
-			# is shared.
-			settingsY = legendY + 22 + 8
-			popover.settingsSep = HorizontalLine((12, settingsY, -12, 1))
-			popover.storeInFont = CheckBox((12, settingsY + 8, -12, 18),
-				"Store labels in this font",
-				value=colornames.font_labels_text(Glyphs.font) is not None,
-				callback=self._popover_store_in_font, sizeStyle='small')
-			if Glyphs.font is None:
-				popover.storeInFont.enable(False)
-			# The button has no background or border of its own; the animated GIF
-			# (which bakes in its own button shape) provides the entire visual. The
-			# native bezel is removed and an NSImageView the exact size of the button
-			# sits just behind it, playing the GIF unclipped at its own aspect ratio.
-			# The borderless button on top draws only the label (white, 100%, for
-			# contrast on the bright gradient) and stays the click target.
-			try:
-				_gif = os.path.join(os.path.dirname(__file__), "report-loading.gif")
-				_img = AppKit.NSImage.alloc().initWithContentsOfFile_(_gif)
-				if _img is not None:
-					_btn = self._ns_button(popover.dashboard)
-					_btn.setBordered_(False)
-					_titleAttrs = {AppKit.NSForegroundColorAttributeName: AppKit.NSColor.whiteColor()}
-					if _btn.font() is not None:
-						_titleAttrs[AppKit.NSFontAttributeName] = _btn.font()
-					_btn.setAttributedTitle_(AppKit.NSAttributedString.alloc().initWithString_attributes_(
-						_btn.title(), _titleAttrs))
-					_f = _btn.frame()
-					_iv = AppKit.NSImageView.alloc().initWithFrame_(_f)
-					_iv.setImage_(_img)
-					_iv.setAnimates_(True)
-					_iv.setImageScaling_(AppKit.NSImageScaleProportionallyUpOrDown)
-					_iv.setAutoresizingMask_(AppKit.NSViewWidthSizable)
-					_btn.superview().addSubview_positioned_relativeTo_(_iv, AppKit.NSWindowBelow, _btn)
-					self._reportGifView = _iv
-			except Exception:
-				import traceback
-				print("Color Flow [report gif] error:\n" + traceback.format_exc())
-			# Strip the blue AppKit focus ring (halo) from every control in the popover.
-			try:
-				self._strip_focus_rings(self._ns_button(popover.dashboard).superview())
-			except Exception:
-				pass
-			try:
-				popover.bind("did close", self._popover_did_close)
-			except Exception:
-				pass
-			popover.open()
-		except Exception:
-			import traceback
-			print("Color Flow [popover] error:\n" + traceback.format_exc())
-
-	# Resolve the view the action popover anchors to. The Edit-menu item passes an
-	# NSMenuItem (no view), and a collapsed palette section leaves self.dialog
-	# hidden / without a window — anchoring NSPopover to either throws inside
-	# AppKit. Try the sender's own view, then the palette view, then the key/main
-	# window's content view; None when nothing on screen can host the popover
-	# (the caller bails gracefully, no crash).
-	@objc.python_method
-	def _popover_anchor_view(self, sender) -> Any:
-		candidates = []
-		if sender is not None:
-			if hasattr(sender, "_nsObject"):
-				try:
-					candidates.append(self._ns_button(sender))
-				except Exception:
-					pass
-			elif hasattr(sender, "superview"):
-				candidates.append(sender)
-		candidates.append(getattr(self, "dialog", None))
-		try:
-			app = AppKit.NSApplication.sharedApplication()
-			window = app.keyWindow() or app.mainWindow()
-			if window is not None:
-				candidates.append(window.contentView())
-		except Exception:
-			pass
-		for view in candidates:
-			try:
-				if (view is not None and view.window() is not None
-						and not view.isHiddenOrHasHiddenAncestor()):
-					return view
-			except Exception:
-				continue
-		return None
-
-	# Current grouping state -> segment index (0 Default / 1 Layer / 2 Glyph).
-	@objc.python_method
-	def _rainbow_segment_index(self) -> int:
-		font = Glyphs.font
-		if font is None or not self.fontview.is_enabled(font):
-			return 0
-		return 2 if self.fontview.mode(font) == "Glyph" else 1
-
-	# Popover closed and the user edited at least one label colour: prompt for the
-	# Glyphs restart its own views need (Color Flow already updated live).
-	@objc.python_method
-	def _popover_did_close(self, sender) -> None:
-		if getattr(self, "_labelColorsEdited", False):
-			self._labelColorsEdited = False
-			Message("Restart Glyphs for the new label colours to take effect in its "
-				"own Font and Edit views. Color Flow already updated.", title="Color Flow")
-
 	@objc.python_method
 	def _close_popover(self) -> None:
 		popover = getattr(self, "_popover", None)
@@ -780,219 +1359,9 @@ class ColorFlow(PalettePlugin):
 				pass
 			self._popover = None
 
-	# Gather all twelve wells -> write LabelColors, best-effort live-refresh the
-	# app, and refresh Color Flow's own swatches immediately.
-	@objc.python_method
-	def _label_color_changed(self, sender) -> None:
-		try:
-			colors = []
-			for well in getattr(self, "_labelWells", []):
-				native = well.get()
-				rgb = native.colorUsingColorSpaceName_("NSCalibratedRGBColorSpace") or native
-				colors.append((rgb.redComponent(), rgb.greenComponent(),
-					rgb.blueComponent(), rgb.alphaComponent()))
-			if len(colors) == 12:
-				labelcolors.write_label_colors(colors)
-				labelcolors.refresh_app_label_colors(colors)
-				self._labelColorsEdited = True
-				self.colorKeys = self._label_color_keys()
-				self.reload_after_settings()
-		except Exception:
-			import traceback
-			print("Color Flow [label colour] error:\n" + traceback.format_exc())
-
-	# Rename workflow labels from the settings window: gather all 12 fields and
-	# rewrite colorNames.txt (a non-empty field = visible, empty = hidden),
-	# preserving the colour order + the None label.
-	@objc.python_method
-	def _label_name_changed(self, sender) -> None:
-		try:
-			font = Glyphs.font
-			path = colornames.get_key_file(self._font_dir(font))
-			text = colornames.pick_settings_text(
-				colornames.font_labels_text(font), colornames.read_color_names(path))
-			rows, noneLabel = colornames.parse_settings(text)
-			fields = getattr(self, "_labelFields", {})
-			newRows = []
-			for index, label, visible in rows:
-				field = fields.get(index)
-				if field is not None:
-					newLabel = field.get().strip()
-					newRows.append((index, newLabel, bool(newLabel)))
-				else:
-					newRows.append((index, label, visible))
-			newText = colornames.render_settings(newRows, noneLabel)
-			colornames.write_color_names(path, newText)
-			# keep the in-font copy in sync when this font stores its labels in-file
-			if font is not None and colornames.font_labels_text(font) is not None:
-				font.userData[colornames.FONT_LABELS_KEY] = newText
-			self.meaning = self.Load_Meaning()
-			self._lastSignature = None
-			self.Update_Plugin_UI()
-			try:
-				if getattr(self, "fontview", None) and font is not None and self.fontview.is_enabled(font):
-					self.fontview.maybe_rebuild(font)
-			except Exception:
-				pass
-		except Exception:
-			import traceback
-			print("Color Flow [rename label] error:\n" + traceback.format_exc())
-
-	@objc.python_method
-	def _label_colors_reset(self, sender) -> None:
-		try:
-			labelcolors.reset_label_colors()
-			rgbaList = labelcolors.read_label_colors()
-			for index, well in enumerate(getattr(self, "_labelWells", [])):
-				well.set(AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(*rgbaList[index]))
-			labelcolors.refresh_app_label_colors(rgbaList)
-			self.colorKeys = self._label_color_keys()
-			self.reload_after_settings()
-		except Exception:
-			import traceback
-			print("Color Flow [label reset] error:\n" + traceback.format_exc())
-
-	# ------------------------------------------------------------------ workflow profiles (.colorflow)
-
-	@objc.python_method
-	def _live_profile(self, font, font_dir, name="") -> dict:
-		# Gather the current Color Flow config into a portable profile dict.
-		color_names = colornames.read_color_names(colornames.get_key_file(font_dir))
-		source = self.fontview.mode(font) if font is not None else "Layer"
-		return colorflow_profile.build_profile(
-			color_names=color_names, rainbow_source=source,
-			label_colors=labelcolors.read_label_colors(), name=name)
-
 	@objc.python_method
 	def _font_dir(self, font) -> str | None:
 		return os.path.dirname(font.filepath) if (font is not None and font.filepath) else None
-
-	@objc.python_method
-	def _export_profile(self, sender) -> None:
-		try:
-			font = Glyphs.font
-			family = (font.familyName if font is not None else "") or "Color Flow profile"
-			profile = self._live_profile(font, self._font_dir(font), name=family)
-			path = GetSaveFile("Export Color Flow profile", "Color-Flow-Profile.json", ["json"])
-			if not path:
-				return
-			with open(path, "w", encoding="utf-8") as handle:
-				handle.write(colorflow_profile.serialize(profile))
-			Message("Saved Color Flow profile.", title="Color Flow")
-		except Exception:
-			import traceback
-			print("Color Flow [export profile] error:\n" + traceback.format_exc())
-
-	@objc.python_method
-	def _import_profile(self, sender) -> None:
-		try:
-			path = GetOpenFile("Import Color Flow profile", False, ["json", "colorflow"])
-			if not path:
-				return
-			with open(path, encoding="utf-8") as handle:
-				incoming = colorflow_profile.parse(handle.read())
-			font = Glyphs.font
-			font_dir = self._font_dir(font)
-			diffs = colorflow_profile.diff_profile(self._live_profile(font, font_dir), incoming)
-			if not self._confirm_import(incoming, diffs):
-				return
-			self._apply_profile(incoming, font, font_dir)
-		except ValueError as error:
-			Message(str(error), title="Color Flow")
-		except Exception:
-			import traceback
-			print("Color Flow [import profile] error:\n" + traceback.format_exc())
-
-	@objc.python_method
-	def _confirm_import(self, incoming, diffs) -> bool:
-		# Surface what will change before applying, so a shared profile never
-		# silently overwrites local choices.
-		if diffs:
-			shown = diffs[:12]
-			summary = "\n".join(f"• {d['field']}: {d['detail']}" for d in shown)
-			if len(diffs) > len(shown):
-				summary += f"\n• …and {len(diffs) - len(shown)} more"
-			info = f"Importing “{incoming.get('name', 'profile')}” will change:\n\n{summary}"
-		else:
-			info = "This profile matches your current settings."
-		alert = AppKit.NSAlert.alloc().init()
-		alert.setMessageText_("Import Color Flow profile?")
-		alert.setInformativeText_(info)
-		alert.addButtonWithTitle_("Apply")
-		alert.addButtonWithTitle_("Cancel")
-		return alert.runModal() == AppKit.NSAlertFirstButtonReturn
-
-	@objc.python_method
-	def _apply_profile(self, incoming, font, font_dir) -> None:
-		# Never overwrite the user's colorNames with an empty file: parse()
-		# normalises a missing/null colorNames to "", so a profile built from a
-		# font that had no key file would otherwise wipe local labels/order.
-		incoming_names = incoming.get("colorNames", "")
-		if incoming_names.strip():
-			colornames.write_color_names(colornames.get_key_file(font_dir), incoming_names)
-		if font is not None:
-			self.fontview.set_mode(font, incoming.get("rainbowSource", "Layer"))
-		colors = [tuple(rgba) for rgba in incoming.get("labelColors", [])]
-		if len(colors) == 12:
-			labelcolors.write_label_colors(colors)
-			labelcolors.refresh_app_label_colors(colors)
-		self.colorKeys = self._label_color_keys()
-		self.reload_after_settings()
-		Message("Imported Color Flow profile. Restart Glyphs if the label colours do not "
-			"update in its own Font and Edit views.", title="Color Flow")
-
-	@objc.python_method
-	def _open_legend(self, sender) -> None:
-		try:
-			meaning = getattr(self, "meaning", {}) or {}
-			visible = colornames.visible_labels(meaning)
-			lines = ["A colour means every step up to it is done.", ""]
-			for position, (color, label) in enumerate(visible.items(), start=1):
-				name = colornames.COLOR_NAMES.get(int(color), str(color))
-				lines.append(f"{position}. {label}  ({name})")
-			Message("\n".join(lines), title="Color Flow — Legend")
-		except Exception:
-			import traceback
-			print("Color Flow [legend] error:\n" + traceback.format_exc())
-
-	# Store-labels checkbox (ported from settings_panel._save): ticking mirrors the
-	# current effective label text into font.userData[FONT_LABELS_KEY] so the
-	# labels travel with the shared .glyphs file; unticking clears the key so the
-	# external colorNames.txt takes over again.
-	@objc.python_method
-	def _popover_store_in_font(self, sender) -> None:
-		try:
-			font = Glyphs.font
-			if font is None:
-				return
-			if bool(sender.get()):
-				path = colornames.get_key_file(self._font_dir(font))
-				text = colornames.pick_settings_text(
-					colornames.font_labels_text(font), colornames.read_color_names(path))
-				font.userData[colornames.FONT_LABELS_KEY] = text
-			elif font.userData[colornames.FONT_LABELS_KEY] is not None:
-				del font.userData[colornames.FONT_LABELS_KEY]
-			# Unticking can swap which source wins, so re-resolve the popover's
-			# name fields and rebuild the palette from the effective text.
-			self._refresh_popover_label_fields(font)
-			self.reload_after_settings()
-		except Exception:
-			import traceback
-			print("Color Flow [store labels] error:\n" + traceback.format_exc())
-
-	@objc.python_method
-	def _refresh_popover_label_fields(self, font) -> None:
-		# Push the re-resolved effective label text into the open popover's fields.
-		try:
-			text = colornames.pick_settings_text(
-				colornames.font_labels_text(font),
-				colornames.read_color_names(colornames.get_key_file(self._font_dir(font))))
-			rows, _noneLabel = colornames.parse_settings(text)
-			labels = {index: label for index, label, _visible in rows}
-			for index, field in getattr(self, "_labelFields", {}).items():
-				field.set(labels.get(index, ""))
-		except Exception:
-			pass
 
 	@objc.python_method
 	def _generate_smart_filters(self, sender) -> None:
@@ -1559,26 +1928,6 @@ class ColorFlow(PalettePlugin):
 			pass
 		self._reportPanel = None
 
-	# Default / Layer / Glyph for the Font Glyph Order grouping (popover stays open
-	# so the source can be switched without reopening).
-	@objc.python_method
-	def _popover_rainbow(self, sender) -> None:
-		font = Glyphs.font
-		if font is None:
-			return
-		segment = sender.get()
-		try:
-			if segment == 0:
-				if self.fontview.is_enabled(font):
-					self.fontview.disable(font)
-			else:
-				self.fontview.set_mode(font, "Layer" if segment == 1 else "Glyph")
-				if not self.fontview.is_enabled(font):
-					self.fontview.enable(font)
-		except Exception:
-			import traceback
-			print("Color Flow [rainbow] error:\n" + traceback.format_exc())
-
 	@objc.python_method
 	def _install_rainbow_menu(self) -> None:
 		# Add a File-menu toggle, removing any stale copy from a previous load.
@@ -1609,99 +1958,17 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			pass
 
-	@objc.python_method
-	def _install_settings_menu(self) -> None:
-		title = "Color Flow settings\u2026"
-		self._settingsMenuItem = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(title, self.openSettings_, "")
-		self._settingsMenuItem.setTarget_(self)
-		barItem = Glyphs.menu[EDIT_MENU]
-		submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
-		if submenu is not None:
-			for item in list(submenu.itemArray()):
-				if item.title() == title:
-					submenu.removeItem_(item)
-			submenu.addItem_(self._settingsMenuItem)
-		else:
-			barItem.append(self._settingsMenuItem)
-
-	@objc.python_method
-	def _teardown_settings_menu(self) -> None:
+	def colorFlowSettingsChanged_(self, notification) -> None:
+		# Posted by the global Settings pane after any edit; rebuild this palette live.
 		try:
-			barItem = Glyphs.menu[EDIT_MENU]
-			submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
-			if submenu is not None:
-				for item in list(submenu.itemArray()):
-					if item.title() == "Color Flow settings\u2026":
-						submenu.removeItem_(item)
+			self.colorKeys = self._label_color_keys()
 		except Exception:
 			pass
-
-	def openSettings_(self, sender) -> None:
 		try:
-			self.Open_Action_Popover(sender)
+			self.reload_after_settings()
 		except Exception:
 			import traceback
-			print("Color Flow [settings menu] error:\n" + traceback.format_exc())
-
-	_BACKFILL_TITLE = "Color Flow: Backfill timeline into font…"
-
-	@objc.python_method
-	def _install_backfill_menu(self) -> None:
-		# An on-demand "record the timeline into userData now" action, so users can
-		# populate the in-font history without waiting for (or relying on) a save.
-		self._backfillMenuItem = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-			self._BACKFILL_TITLE, self.backfillTimeline_, "")
-		self._backfillMenuItem.setTarget_(self)
-		barItem = Glyphs.menu[EDIT_MENU]
-		submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
-		if submenu is not None:
-			for item in list(submenu.itemArray()):
-				if item.title() == self._BACKFILL_TITLE:
-					submenu.removeItem_(item)
-			submenu.addItem_(self._backfillMenuItem)
-		else:
-			barItem.append(self._backfillMenuItem)
-
-	@objc.python_method
-	def _teardown_backfill_menu(self) -> None:
-		try:
-			barItem = Glyphs.menu[EDIT_MENU]
-			submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
-			if submenu is not None:
-				for item in list(submenu.itemArray()):
-					if item.title() == self._BACKFILL_TITLE:
-						submenu.removeItem_(item)
-		except Exception:
-			pass
-
-	def backfillTimeline_(self, sender) -> None:
-		try:
-			font = Glyphs.font
-			if font is None:
-				Message("Open a font first.", title="Color Flow")
-				return
-			import colorflow_dashboard
-			snapshot = colorflow_dashboard.build_master_glyph_colors(font)
-			colorflow_dashboard.record_history(font, snapshot, datetime.now())
-			imported = 0
-			try:
-				imported = colorflow_dashboard.backfill_from_git(font)
-			except Exception:
-				imported = 0
-			entries = len(colorflow_dashboard.load_history(font))
-			extra = ""
-			if imported:
-				extra = f" (imported {imported} commit{'' if imported == 1 else 's'} from git history)"
-			tail = ("Save the font to keep it." if getattr(font, "filepath", None)
-				else "Save the font (give it a file) to keep it.")
-			entry_word = "snapshot" if entries == 1 else "snapshots"
-			print(f"Color Flow: backfilled timeline into userData — {entries} {entry_word}{extra}.")
-			Message(
-				f"Color Flow wrote the timeline into this font: {entries} {entry_word} of history{extra}.\n\n{tail}",
-				title="Color Flow")
-		except Exception:
-			import traceback
-			print("Color Flow [backfill] error:\n" + traceback.format_exc())
+			print("Color Flow [settings changed] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _rainbow_conflict_check(self) -> None:
@@ -1727,16 +1994,14 @@ class ColorFlow(PalettePlugin):
 
 	def validateMenuItem_(self, menuItem) -> bool:
 		# This validates EVERY menu item targeting the plugin (Rainbow toggle,
-		# settings, backfill, context-menu entries) — only the Rainbow toggle
-		# carries an on/off checkmark, so branch on the action selector.
+		# context-menu entries) — only the Rainbow toggle carries an on/off
+		# checkmark, so branch on the action selector.
 		try:
 			action = str(menuItem.action()) if menuItem.action() else ""
 		except Exception:
 			action = ""
 		font = Glyphs.font
 		if action != "toggleRainbow:":
-			if action == "openSettings:":
-				return True  # settings popover works without a font
 			return font is not None
 		if font is None:
 			menuItem.setState_(NSOffState)
@@ -1985,11 +2250,9 @@ class ColorFlow(PalettePlugin):
 		self._rowChecks[color] = checkbox
 
 	# A transparent, full-width overlay laid over each row (above the bar, label
-	# and count) so a DOUBLE-click anywhere on the row opens that step's glyphs
-	# in a new Edit tab and a drag reorders it. The label/count underneath stay
-	# visible. The two recognizers coexist: the pan only fires on movement, the
-	# click only on two stationary clicks, and the _lastDragTime guard swallows
-	# any end-of-drag click that slips through.
+	# and count) so a DOUBLE-click anywhere on the row opens that step's glyphs in a
+	# new Edit tab. (Drag-to-reorder moved to the Settings pane; the palette row now
+	# only hosts the open-tab double-click + a pointer-cursor tracking area.)
 	@objc.python_method
 	def _attach_row_overlay(self, color, yPos) -> None:
 		overlay = Group((0, yPos - self.shift - 1, self.width, 19))
@@ -2003,11 +2266,6 @@ class ColorFlow(PalettePlugin):
 		except Exception:
 			pass
 		try:
-			pan = NSPanGestureRecognizer.alloc().initWithTarget_action_(self, "colorDragged:")
-			view.addGestureRecognizer_(pan)
-		except Exception:
-			pass
-		try:
 			area = AppKit.NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
 				view.bounds(),
 				AppKit.NSTrackingCursorUpdate | AppKit.NSTrackingActiveInKeyWindow,
@@ -2017,7 +2275,7 @@ class ColorFlow(PalettePlugin):
 			pass
 
 	# Resolve which colour-row a gesture recognizer is attached to (its view is
-	# the row's checkbox NSButton).
+	# the row's overlay / checkbox NSButton).
 	@objc.python_method
 	def _color_for_recognizer(self, recognizer) -> str | None:
 		view = recognizer.view()
@@ -2031,199 +2289,6 @@ class ColorFlow(PalettePlugin):
 			if self._ns_button(checkbox) == view:
 				return color
 		return None
-
-	# Drag a row to reorder the colours: the dragged colour is dropped onto the
-	# row currently under the pointer (cursor-position targeting, so it always
-	# follows the mouse regardless of the view's coordinate flip). A grabbing-hand
-	# cursor shows while dragging. Reorder + persist on release.
-	def colorDragged_(self, recognizer) -> None:
-		try:
-			state = recognizer.state()
-			if state == NSGestureRecognizerStateBegan:
-				self._push_drag_cursor()
-				self._begin_drag_feedback(self._color_for_recognizer(recognizer))
-				return
-			if state == NSGestureRecognizerStateChanged:
-				self._lastDragTime = datetime.now()  # suppress the end-of-drag toggle
-				try:
-					NSCursor.closedHandCursor().set()
-				except Exception:
-					pass
-				color = self._color_for_recognizer(recognizer)
-				dst = self._drop_index(recognizer)
-				if color is not None and dst is not None:
-					self._update_drop_line(color, dst)
-				return
-			# Ended / Cancelled / Failed (state >= Ended): restore cursor + clear feedback.
-			self._pop_drag_cursor()
-			self._clear_drag_feedback()
-			if state != NSGestureRecognizerStateEnded:
-				return
-			color = self._color_for_recognizer(recognizer)
-			if color is None:
-				return
-			dst = self._drop_index(recognizer)
-			if dst is not None:
-				self._reorder_color_to(color, dst)
-		except Exception:
-			import traceback
-			self._pop_drag_cursor()
-			self._clear_drag_feedback()
-			print("Color Flow [drag] error:\n" + traceback.format_exc())
-
-	# The visible-row index under the pointer right now (flip-safe).
-	@objc.python_method
-	def _drop_index(self, recognizer) -> int | None:
-		frameView = self.paletteView.frame.getNSView()
-		point = recognizer.locationInView_(frameView)
-		y = point.y
-		try:
-			if not frameView.isFlipped():
-				y = frameView.bounds().size.height - y
-		except Exception:
-			pass
-		return self._row_index_at_point(y)
-
-	# Top y (flipped coords) of a visible row band, matching the colour-bar offset.
-	@objc.python_method
-	def _row_top(self, index) -> float | None:
-		visible = list(self.meaning.keys())
-		if not (0 <= index < len(visible)):
-			return None
-		checkbox = self._rowChecks.get(visible[index])
-		if checkbox is None:
-			return None
-		try:
-			return checkbox.getPosSize()[1] - 3
-		except Exception:
-			return None
-
-	# Live drag highlight: tint the dragged row blue + show a blue insertion line.
-	@objc.python_method
-	def _begin_drag_feedback(self, color) -> None:
-		self._clear_drag_feedback()
-		if color is None:
-			return
-		visible = list(self.meaning.keys())
-		key = str(color)
-		if key not in visible:
-			return
-		top = self._row_top(visible.index(key))
-		if top is None:
-			return
-		tint = AppKit.NSColor.colorWithRed_green_blue_alpha_(0.16, 0.5, 0.96, 0.22)
-		line = AppKit.NSColor.colorWithRed_green_blue_alpha_(0.13, 0.45, 0.96, 1.0)
-		self.paletteView.frame.dragHighlight = Box((0, top, self.width, 19), fillColor=tint, cornerRadius=0, borderWidth=0)
-		self.paletteView.frame.dropLine = Box((0, top, self.width, 2), fillColor=line, cornerRadius=0, borderWidth=0)
-
-	# Move the insertion line to the slot the dragged colour would drop into.
-	@objc.python_method
-	def _update_drop_line(self, color, dst) -> None:
-		if not hasattr(self.paletteView.frame, "dropLine"):
-			return
-		visible = list(self.meaning.keys())
-		key = str(color)
-		if key not in visible:
-			return
-		src = visible.index(key)
-		top = self._row_top(dst)
-		if top is None:
-			return
-		lineY = top + 19 if dst > src else top
-		try:
-			self.paletteView.frame.dropLine.setPosSize((0, lineY, self.width, 2))
-		except Exception:
-			pass
-
-	@objc.python_method
-	def _clear_drag_feedback(self) -> None:
-		for attr in ("dragHighlight", "dropLine"):
-			if hasattr(self.paletteView.frame, attr):
-				try:
-					delattr(self.paletteView.frame, attr)
-				except Exception:
-					pass
-
-	# Grabbing-hand cursor while dragging (push once, pop once — flag-balanced).
-	@objc.python_method
-	def _push_drag_cursor(self) -> None:
-		if getattr(self, "_cursorPushed", False):
-			return
-		try:
-			NSCursor.closedHandCursor().push()
-			self._cursorPushed = True
-		except Exception:
-			pass
-
-	@objc.python_method
-	def _pop_drag_cursor(self) -> None:
-		if not getattr(self, "_cursorPushed", False):
-			return
-		try:
-			NSCursor.pop()
-		except Exception:
-			pass
-		self._cursorPushed = False
-
-	# Which visible row sits under a y-coordinate (in the frame view's flipped
-	# coords, top-down): the row whose checkbox vertical centre is nearest.
-	@objc.python_method
-	def _row_index_at_point(self, y) -> int | None:
-		visible = list(self.meaning.keys())
-		bestIndex = None
-		bestDist = None
-		for index, key in enumerate(visible):
-			checkbox = self._rowChecks.get(key)
-			if checkbox is None:
-				continue
-			try:
-				_, top, _, height = checkbox.getPosSize()
-			except Exception:
-				continue
-			center = top + (height / 2.0)
-			dist = abs(center - y)
-			if bestDist is None or dist < bestDist:
-				bestIndex, bestDist = index, dist
-		return bestIndex
-
-	# Move `color` to absolute position `dst` among the visible colours; persist.
-	@objc.python_method
-	def _reorder_color_to(self, color, dst) -> None:
-		visible = list(self.meaning.keys())
-		key = str(color)
-		if key not in visible:
-			return
-		src = visible.index(key)
-		dst = max(0, min(len(visible) - 1, dst))
-		if dst == src:
-			return
-		visible.insert(dst, visible.pop(src))
-		self._write_order(visible)
-		self.reload_after_settings()
-
-	# Write colorNames.txt with the visible colours in `new_order`, preserving
-	# each colour's label + the hidden colours.
-	@objc.python_method
-	def _write_order(self, new_order) -> None:
-		fontDir = None
-		font = Glyphs.font
-		if font is not None and font.filepath:
-			fontDir = os.path.dirname(font.filepath)
-		path = colornames.resolve_key_file(fontDir)
-		text = colornames.read_color_names(path) or colornames.DEFAULT_COLOR_NAMES
-		rows, noneLabel = colornames.parse_settings(text)
-		info = {index: (label, visible) for index, label, visible in rows}
-		newRows = []
-		seen = set()
-		for key in new_order:
-			index = int(key)
-			label = info.get(index, ("", True))[0]
-			newRows.append((index, label, True))
-			seen.add(index)
-		for index, label, visible in rows:
-			if index not in seen:
-				newRows.append((index, label, visible))
-		colornames.write_color_names(path, colornames.render_settings(newRows, noneLabel))
 
 	# Update Palette UI (original look; checkbox state + counts derived from colour).
 	@objc.python_method
@@ -2367,11 +2432,6 @@ class ColorFlow(PalettePlugin):
 
 	def rowDoubleClicked_(self, sender) -> None:
 		try:
-			# End-of-drag clicks must never read as an open request — same
-			# _lastDragTime suppression guard as the drag recognizer writes.
-			lastDrag = getattr(self, "_lastDragTime", None)
-			if lastDrag is not None and (datetime.now() - lastDrag).total_seconds() < 0.25:
-				return
 			color = self._color_for_recognizer(sender)
 			if color is None:
 				return
@@ -2437,6 +2497,15 @@ class ColorFlow(PalettePlugin):
 			import traceback
 			print("Color Flow [header eye] error:\n" + traceback.format_exc())
 
+	def openDashboard_(self, sender) -> None:
+		# Report header button: same flow the old popover's report button used —
+		# the loader sheet that builds the report and then offers Open / Save.
+		try:
+			self._popover_dashboard(sender)
+		except Exception:
+			import traceback
+			print("Color Flow [header report] error:\n" + traceback.format_exc())
+
 	@objc.python_method
 	def _is_collapsed(self) -> bool:
 		try:
@@ -2457,12 +2526,12 @@ class ColorFlow(PalettePlugin):
 		try:
 			collapsed = self._is_collapsed()
 			bar.setHidden_(not collapsed)
+			report = getattr(self, "_titleReport", None)
+			if report is not None:
+				report.setHidden_(collapsed)
 			eye = getattr(self, "_titleEye", None)
 			if eye is not None:
 				eye.setHidden_(collapsed)
-			gear = getattr(self, "_titleGear", None)
-			if gear is not None:
-				gear.setHidden_(collapsed)
 		except Exception:
 			pass
 
@@ -2530,8 +2599,8 @@ class ColorFlow(PalettePlugin):
 			pad = 8.0
 			gap = 4.0
 			ctrlY = (bounds.size.height - btn) / 2.0
-			gearX = bounds.size.width - pad - btn
-			eyeX = gearX - gap - btn
+			eyeX = bounds.size.width - pad - btn
+			reportX = eyeX - gap - btn
 			barWidth, barHeight = 84.0, 6.0
 			barX = bounds.size.width - pad - barWidth
 			barY = (bounds.size.height - barHeight) / 2.0
@@ -2546,6 +2615,24 @@ class ColorFlow(PalettePlugin):
 				pass
 			header.addSubview_(bar)
 			self._titleBar = bar
+			report = AppKit.NSButton.alloc().initWithFrame_(((reportX, ctrlY), (btn, btn)))
+			report.setBordered_(False)
+			report.setAutoresizingMask_(AppKit.NSViewMinXMargin)
+			report.setTarget_(self)
+			report.setAction_("openDashboard:")
+			report.setImageScaling_(AppKit.NSImageScaleProportionallyDown)
+			try:
+				reportImg = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_("chart.bar.doc.horizontal", None)
+				if reportImg is None:
+					reportImg = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_("doc.text", None)
+				if reportImg is not None:
+					report.setImage_(reportImg)
+				else:
+					report.setTitle_("\U0001F4CA")
+			except Exception:
+				pass
+			header.addSubview_(report)
+			self._titleReport = report
 			eye = AppKit.NSButton.alloc().initWithFrame_(((eyeX, ctrlY), (btn, btn)))
 			eye.setBordered_(False)
 			eye.setAutoresizingMask_(AppKit.NSViewMinXMargin)
@@ -2562,22 +2649,6 @@ class ColorFlow(PalettePlugin):
 				pass
 			header.addSubview_(eye)
 			self._titleEye = eye
-			gear = AppKit.NSButton.alloc().initWithFrame_(((gearX, ctrlY), (btn, btn)))
-			gear.setBordered_(False)
-			gear.setAutoresizingMask_(AppKit.NSViewMinXMargin)
-			gear.setTarget_(self)
-			gear.setAction_("openSettings:")
-			gear.setImageScaling_(AppKit.NSImageScaleProportionallyDown)
-			try:
-				gearImg = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_("gearshape", None)
-				if gearImg is not None:
-					gear.setImage_(gearImg)
-				else:
-					gear.setTitle_("\u2699")
-			except Exception:
-				pass
-			header.addSubview_(gear)
-			self._titleGear = gear
 			self._sync_header()
 		except Exception:
 			import traceback
@@ -2736,8 +2807,6 @@ class ColorFlow(PalettePlugin):
 			pass
 		# Remove the Rainbow Font View menu item this instance added.
 		self._teardown_rainbow_menu()
-		self._teardown_settings_menu()
-		self._teardown_backfill_menu()
 		# Remove the Cocoa save-notification observers.
 		try:
 			from Foundation import NSNotificationCenter

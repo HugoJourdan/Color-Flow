@@ -63,16 +63,6 @@ def test_validate_menu_item_branches_on_action_selector() -> None:
     assert branch < first_set_state
 
 
-def test_validate_menu_item_keeps_settings_enabled_without_font() -> None:
-    body = _validate_menu_item_body()
-    settings_branch = body.index('"openSettings:"')
-    settings_tail = body[settings_branch:body.index("\n", body.index("return", settings_branch))]
-    assert "return True" in settings_tail
-    # Settings is enabled unconditionally — no setState_ between the action
-    # check and its return.
-    assert "setState_" not in settings_tail
-
-
 def test_validate_menu_item_rainbow_disabled_without_font() -> None:
     body = _validate_menu_item_body()
     # Original semantics preserved for the Rainbow toggle: with no font the
@@ -97,24 +87,34 @@ def test_double_click_row_opens_step_tab() -> None:
     assert "_color_for_recognizer" in body
 
 
-def test_double_click_wired_with_two_clicks_alongside_pan() -> None:
+def test_row_overlay_has_open_tab_click_only_no_drag() -> None:
     body = _method_body("_attach_row_overlay")
-    # The overlay carries BOTH recognizers: a two-click NSClickGestureRecognizer
-    # for open-tab and the pan recognizer for drag-reorder.
+    # The overlay keeps the two-click open-tab recognizer; the drag-reorder pan was
+    # removed (reordering moved to the Settings pane).
     assert '"rowDoubleClicked:"' in body
     assert "setNumberOfClicksRequired_(2)" in body
-    assert '"colorDragged:"' in body
-    assert "setNumberOfClicksRequired_(1)" not in body
+    assert '"colorDragged:"' not in body
+    assert "NSPanGestureRecognizer" not in body
 
 
-def test_double_click_keeps_drag_suppression_guard() -> None:
-    body = _method_body("rowDoubleClicked_")
-    # End-of-drag clicks must still be swallowed by the _lastDragTime guard
-    # BEFORE any tab opens.
-    assert "_lastDragTime" in body
-    guard = body.index("_lastDragTime")
-    open_tab = body.index("_open_step_tab")
-    assert guard < open_tab
+def test_palette_drag_reorder_machinery_removed() -> None:
+    # All the palette drag-reorder methods + their helpers are gone.
+    for name in (
+        "def colorDragged_(",
+        "def _reorder_color_to(",
+        "def _write_order(",
+        "def _drop_index(",
+        "def _begin_drag_feedback(",
+        "def _update_drop_line(",
+        "def _clear_drag_feedback(",
+        "def _push_drag_cursor(",
+        "def _pop_drag_cursor(",
+        "def _row_index_at_point(",
+        "def _row_top(",
+    ):
+        assert name not in PLUGIN_SOURCE, name
+    # The double-click handler no longer needs the end-of-drag suppression guard.
+    assert "_lastDragTime" not in PLUGIN_SOURCE
 
 
 def test_count_badge_is_passive() -> None:
@@ -146,53 +146,244 @@ def test_focus_mode_machinery_removed() -> None:
     assert '"focus"' not in PLUGIN_SOURCE
 
 
-def test_action_popover_has_store_labels_checkbox() -> None:
-    body = _method_body("Open_Action_Popover")
-    # Checked iff the font already carries its labels in userData; disabled
-    # when no font is open.
-    assert "popover.storeInFont = CheckBox" in body
-    assert "value=colornames.font_labels_text(Glyphs.font) is not None" in body
-    assert "callback=self._popover_store_in_font" in body
-    assert "popover.storeInFont.enable(False)" in body
+# --------------------------------------------------------------------------- #
+# Settings PANE migration (Glyphs > Settings > Color Flow)
+# --------------------------------------------------------------------------- #
 
 
-def test_action_popover_height_fits_settings_rows() -> None:
-    body = _method_body("Open_Action_Popover")
-    # 590 -> 518: the retired settings rows (two checkboxes + one button) below
-    # the legend were removed, leaving only the store-in-font checkbox.
-    assert "Popover((220, 518)" in body
-    assert "Popover((220, 546)" not in body
-    assert "Popover((220, 568)" not in body
-    assert "Popover((220, 590)" not in body
-    assert "Popover((220, 500)" not in body
+def test_action_popover_builder_is_gone() -> None:
+    # The label/colour/store-in-font controls moved to the Settings pane, so the
+    # per-palette action popover builder + its anchor helper no longer exist.
+    assert "def Open_Action_Popover(" not in PLUGIN_SOURCE
+    assert "def _popover_anchor_view(" not in PLUGIN_SOURCE
+    # The report flow (its own helper) is SEPARATE and stays.
+    assert "def _popover_dashboard(" in PLUGIN_SOURCE
 
 
-def test_store_labels_handler_mirrors_settings_panel_save() -> None:
-    body = _method_body("_popover_store_in_font")
-    # Tick: write the effective label text into the font's userData (same
-    # resolution as settings_panel._save: in-font text wins, then key file).
-    assert "colornames.pick_settings_text(" in body
-    assert "font.userData[colornames.FONT_LABELS_KEY] = text" in body
-    # Untick: clear the key, guarded like settings_panel was.
-    assert "del font.userData[colornames.FONT_LABELS_KEY]" in body
-    assert "is not None" in body
-    # No font -> no-op, and the palette rebuilds from the effective text.
-    assert "if font is None:" in body
+def test_settings_pane_registered_once_via_app_delegate() -> None:
+    body = _module_function_body("_register_preferences_pane")
+    # The pane is added through the verified GSAppDelegateProtocol API...
+    assert "addViewToPreferences_(view_controller)" in body
+    # ...exactly once per app session, behind a module-level guard.
+    assert "if _PREF_PANE_ADDED:" in body
+    assert "return" in body
+    assert "global _PREF_PANE_ADDED" in body
+    assert "_PREF_PANE_ADDED = True" in body
+    # Module-level guard flag + retained VC reference so AppKit can't deallocate it.
+    assert "_PREF_PANE_ADDED = False" in PLUGIN_SOURCE
+    assert "_PREF_PANE_VC = view_controller" in body
+
+
+def test_settings_pane_vc_title_is_color_flow() -> None:
+    # Verified GlyphsCore mechanism: -addViewController: makes the Settings tab identifier
+    # = vc.representedObject and the label = vc.title. So both title and representedObject
+    # are "Color Flow" (the string showMainPreferencesWithIdentifier: matches).
+    assert "class ColorFlowPreferencesController(AppKit.NSViewController):" in PLUGIN_SOURCE
+    assert 'COLORFLOW_PREF_IDENTIFIER = "Color Flow"' in PLUGIN_SOURCE
+    reg = _module_function_body("_register_preferences_pane")
+    assert "view_controller.setTitle_(COLORFLOW_PREF_IDENTIFIER)" in reg
+    assert "view_controller.setRepresentedObject_(COLORFLOW_PREF_IDENTIFIER)" in reg
+    init_body = PLUGIN_SOURCE[
+        PLUGIN_SOURCE.index("def initWithSettingsView_(") :
+        PLUGIN_SOURCE.index("def loadView(")
+    ]
+    assert "self.setTitle_(COLORFLOW_PREF_IDENTIFIER)" in init_body
+    assert "self.setRepresentedObject_(COLORFLOW_PREF_IDENTIFIER)" in init_body
+    # representedObject must be the identifier STRING, never an NSImage (that breaks the jump).
+    assert "setRepresentedObject_(icon)" not in PLUGIN_SOURCE
+
+
+def test_start_registers_pane_and_observes_broadcast() -> None:
+    body = _palette_start_body()
+    # Registration is at start(), guarded, so it can never break plugin load.
+    reg = body.index("_register_preferences_pane()")
+    guard_open = body.rindex("try:", 0, reg)
+    guard_close = body.index("except Exception:", reg)
+    assert guard_open < reg < guard_close
+    # Each palette observes the broadcast so Settings-pane edits update it live.
+    assert 'self, "colorFlowSettingsChanged:", COLORFLOW_SETTINGS_CHANGED, None' in body
+
+
+def test_settings_changed_selector_reloads_palette() -> None:
+    body = _method_body("colorFlowSettingsChanged_")
+    # The observer rebuilds this palette from the freshly-written settings.
     assert "reload_after_settings" in body
 
 
-def test_settings_popover_anchor_falls_back_when_collapsed() -> None:
-    # The Edit-menu item passes an NSMenuItem (no view) and a collapsed palette
-    # leaves self.dialog hidden — the anchor helper must skip unusable views and
-    # fall back to the key/main window, returning None (graceful bail) last.
-    body = _method_body("_popover_anchor_view")
-    assert "keyWindow" in body
-    assert "mainWindow" in body
-    assert "isHiddenOrHasHiddenAncestor" in body
-    assert "return None" in body
-    popover_body = _method_body("Open_Action_Popover")
-    assert "self._popover_anchor_view(sender)" in popover_body
-    assert "if button is None" in popover_body
+def test_settings_entry_points_removed() -> None:
+    # The settings gear and the Edit-menu "Color Flow settings…" / "Backfill timeline"
+    # items are gone; the pane is reached only via Glyphs > Settings now.
+    assert "def openSettings_(" not in PLUGIN_SOURCE
+    assert "def _install_settings_menu(" not in PLUGIN_SOURCE
+    assert '"openSettings:"' not in PLUGIN_SOURCE
+    assert "def backfillTimeline_(" not in PLUGIN_SOURCE
+    assert "def _install_backfill_menu(" not in PLUGIN_SOURCE
+    assert "_BACKFILL_TITLE" not in PLUGIN_SOURCE
+    assert "Open_Action_Popover" not in PLUGIN_SOURCE
+    # The pane is still registered once at start() and reachable; the opener helper
+    # (showMainPreferencesWithIdentifier:) remains available for any future entry point.
+    opener = _module_function_body("_open_preferences_pane")
+    assert "showMainPreferencesWithIdentifier_(COLORFLOW_PREF_IDENTIFIER)" in opener
+
+
+def test_settings_pane_routes_through_shared_helpers_and_broadcasts() -> None:
+    # The pane edits via the pure helpers and broadcasts to open palettes — it
+    # never reaches into a single palette instance.
+    colors = _module_function_body("_apply_label_colors")
+    assert "labelcolors.write_label_colors(colors)" in colors
+    assert "_broadcast_settings_changed()" in colors
+    names = _module_function_body("_apply_label_names")
+    assert "colornames.render_settings(" in names
+    assert "_broadcast_settings_changed()" in names
+    broadcast = _module_function_body("_broadcast_settings_changed")
+    assert "postNotificationName_object_(" in broadcast
+    assert "COLORFLOW_SETTINGS_CHANGED" in broadcast
+
+
+def test_store_labels_and_profile_controls_removed_from_pane() -> None:
+    # The store-in-font checkbox and the import/export/reset icon buttons were
+    # removed from the pane, along with their handlers + now-orphaned helpers.
+    assert "group.storeInFont" not in PLUGIN_SOURCE
+    assert "def _store_changed(" not in PLUGIN_SOURCE
+    assert "def _apply_store_in_font(" not in PLUGIN_SOURCE
+    assert "group.lcImport" not in PLUGIN_SOURCE
+    assert "group.lcExport" not in PLUGIN_SOURCE
+    assert "group.lcReset" not in PLUGIN_SOURCE
+    assert "def _import_profile(" not in PLUGIN_SOURCE
+    assert "def _export_profile(" not in PLUGIN_SOURCE
+    assert "import colorflow_profile" not in PLUGIN_SOURCE
+
+
+def test_settings_pane_build_order_labels_then_font_glyph_order() -> None:
+    build = PLUGIN_SOURCE[
+        PLUGIN_SOURCE.index("def _build(self) -> None:") :
+        PLUGIN_SOURCE.index("def _legend_text(")
+    ]
+    # Top-to-bottom: Labels & Colours header, the combined list, legend, then Font Glyph Order.
+    labels = build.index('"Labels & Colours"')
+    legend = build.index("group.legend = TextBox")
+    fgo = build.index('"Font Glyph Order"')
+    assert labels < legend < fgo
+    # Narrower pane (was 460) and no negative-coordinate controls in the pane build.
+    assert "WIDTH = 230" in PLUGIN_SOURCE
+
+
+def test_settings_panel_module_deleted() -> None:
+    # The dead settings_panel.py module is gone.
+    assert not (RESOURCES / "settings_panel.py").exists()
+
+
+# --------------------------------------------------------------------------- #
+# Combined Labels & Colours control: ONE List2 (colour well + name, drag visible)
+# --------------------------------------------------------------------------- #
+
+
+def test_settings_pane_has_single_combined_slot_list() -> None:
+    build = PLUGIN_SOURCE[
+        PLUGIN_SOURCE.index("def _build(self) -> None:") :
+        PLUGIN_SOURCE.index("def _legend_text(")
+    ]
+    # ONE List2 holds all label slots: a colour-well column + an editable name column.
+    assert "group.lcList = List2(" in build
+    assert "self._slot_list_items(font)" in build
+    assert "cellClass=ColorWellList2Cell" in build
+    assert "cellClass=EditTextList2Cell" in build
+    # Both columns are editable so any slot can be recoloured / renamed.
+    assert build.count("editable=True") >= 2
+    # Edits route through one combined handler; drag-reorder + self-drop are wired.
+    assert "editCallback=self._slot_edited" in build
+    assert "dragCandidateCallback=self._slot_drag_candidate" in build
+    assert "makeDragDataCallback=self._slot_make_drag_data" in build
+    assert "performDropCallback=self._slot_perform_drop" in build
+
+
+def test_old_separate_order_list_removed() -> None:
+    # The redundant standalone "Order (drag to reorder)" section is gone: its label,
+    # its List, and the now-unused per-row drag/drop handlers must not survive.
+    assert "Order (drag to reorder)" not in PLUGIN_SOURCE
+    assert "group.orderList" not in PLUGIN_SOURCE
+    assert "group.orderLabel" not in PLUGIN_SOURCE
+    assert "def _order_drag(" not in PLUGIN_SOURCE
+    assert "def _order_drop(" not in PLUGIN_SOURCE
+    assert "def _order_list_items(" not in PLUGIN_SOURCE
+    # The old separate 12-row well/field editor is gone too (merged into the list).
+    assert "group.lcWell" not in PLUGIN_SOURCE
+    assert "group.lcField" not in PLUGIN_SOURCE
+
+
+def test_combined_list_covers_all_twelve_slots() -> None:
+    body = _method_body("_slot_list_items")
+    # The combined list is built from ALL 12 label slots (visible first, hidden pinned below).
+    assert "labelcolors.read_label_colors()" in body
+    assert "colornames.parse_settings(self._effective_label_text(font))" in body
+    assert "if visible" in body and "if not visible" in body
+    assert "visible_rows + hidden_rows" in body
+    assert 'dict(slot=int(index), color=color, name=label)' in body
+
+
+def test_only_visible_rows_are_draggable() -> None:
+    candidate = _method_body("_slot_drag_candidate")
+    # A drag is allowed only when every picked row is VISIBLE (named); hidden rows are fixed.
+    assert "self._slot_is_visible(self._slot_items[int(i)])" in candidate
+    visible = _method_body("_slot_is_visible")
+    assert 'str(item.get("name", "")).strip()' in visible
+
+
+def test_slot_drop_persists_via_shared_helper() -> None:
+    body = _method_body("_slot_perform_drop")
+    # The drop builds the new VISIBLE order and routes it through the shared order helper
+    # (which writes colorNames + broadcasts); hidden rows stay pinned via reorder_visible_rows.
+    assert 'new_order = [item["slot"] for item in new_items if self._slot_is_visible(item)]' in body
+    assert "_apply_color_order(Glyphs.font, new_order)" in body
+    helper = _module_function_body("_apply_color_order")
+    assert "colornames.reorder_visible_rows(rows, new_visible_order)" in helper
+    assert "_broadcast_settings_changed()" in helper
+
+
+def test_slot_edit_persists_colours_and_names_with_broadcast() -> None:
+    body = _method_body("_slot_edited")
+    # Editing a well or a name writes BOTH colours and names (each broadcasts).
+    assert "_apply_label_colors(" in body
+    assert "_apply_label_names(Glyphs.font, labels_by_index)" in body
+    colors_helper = _module_function_body("_apply_label_colors")
+    assert "_broadcast_settings_changed()" in colors_helper
+    names_helper = _module_function_body("_apply_label_names")
+    assert "_broadcast_settings_changed()" in names_helper
+
+
+# --------------------------------------------------------------------------- #
+# Swap Option color routing — swizzle install
+# --------------------------------------------------------------------------- #
+
+
+def test_routing_hook_replaces_existing_method_via_runtime() -> None:
+    body = _module_function_body("_install_color_routing_hook")
+    # setColorIndex: already exists on GSFontViewController; classAddMethods/Category only
+    # ADD new selectors, so our impl is added under a PRIVATE selector and its IMP is then
+    # copied onto setColorIndex: via the Objective-C runtime.
+    assert 'objc.lookUpClass("GSFontViewController")' in body
+    assert 'selector=b"cf_swapSetColorIndex:"' in body
+    assert "objc.classAddMethods(font_view_controller, [private])" in body
+    assert '_runtime_copy_imp("GSFontViewController", b"cf_swapSetColorIndex:"' in body
+    assert 'signature=b"v@:C"' in body
+    # Idempotent + guarded.
+    assert "if _CF_ROUTING_INSTALLED:" in body
+    assert "_CF_ROUTING_INSTALLED = True" in body
+    # The runtime copy uses method_setImplementation (the verified override path).
+    copier = _module_function_body("_runtime_copy_imp")
+    assert "method_setImplementation" in copier
+    assert "objc_getClass" in copier
+
+
+def test_routing_replacement_reads_swap_default_at_call_time() -> None:
+    body = _method_body("_cf_setColorIndex_")
+    # Reads SWAP_KEY each call (no re-swizzle on toggle) and uses the pure decision module.
+    assert "Glyphs.defaults[SWAP_KEY]" in body
+    assert "colorflow_routing.should_apply_swap(event_type)" in body
+    assert "colorflow_routing.resolve_color_target(option, swap)" in body
+    # Routes to layer.colorIndex or glyph.colorIndex.
+    assert "layer.colorIndex = color_index" in body
+    assert "glyph.colorIndex = color_index" in body
 
 
 # --------------------------------------------------------------------------- #
@@ -276,11 +467,10 @@ def test_shortcut_jump_mirrors_generated_script() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_action_popover_has_no_exporting_only_checkbox() -> None:
+def test_no_exporting_only_checkbox_anywhere() -> None:
     # The exclusion is always on — no opt-in checkbox, no pref key anywhere.
-    body = _method_body("Open_Action_Popover")
-    assert "Count exporting glyphs only" not in body
-    assert "popover.exporting" not in body
+    assert "Count exporting glyphs only" not in PLUGIN_SOURCE
+    assert "popover.exporting" not in PLUGIN_SOURCE
     assert "ColorFlow-Exporting" not in PLUGIN_SOURCE
     assert "_popover_exporting" not in PLUGIN_SOURCE
     assert "def _exporting" not in PLUGIN_SOURCE
@@ -326,3 +516,38 @@ def test_palette_bar_denominator_excludes_non_exporting() -> None:
     title = _method_body("_update_title_bar")
     assert "self._excluded_glyph_names()" in title
     assert "colornames.exclude_named_colors(named_colors, excluded)" in title
+
+
+# --------------------------------------------------------------------------- #
+# Section-header buttons: report (new) + eye  (the settings gear was removed)
+# --------------------------------------------------------------------------- #
+
+
+def test_header_has_report_and_eye_no_gear() -> None:
+    body = _method_body("_inject_title_bar")
+    # Two borderless buttons laid out report -> eye, right-aligned (eye rightmost).
+    assert "eyeX = bounds.size.width - pad - btn" in body
+    assert "reportX = eyeX - gap - btn" in body
+    assert 'report.setAction_("openDashboard:")' in body
+    assert 'eye.setAction_("headerEyeClicked:")' in body
+    assert "self._titleReport = report" in body
+    assert "self._titleEye = eye" in body
+    # The settings gear is gone.
+    assert "self._titleGear" not in PLUGIN_SOURCE
+    assert 'setAction_("openSettings:")' not in body
+
+
+def test_report_button_triggers_report_flow() -> None:
+    body = _method_body("openDashboard_")
+    # The report header button drives the same loader-sheet report flow the old
+    # popover button used.
+    assert "self._popover_dashboard(sender)" in body
+
+
+def test_sync_header_hides_report_and_eye_together() -> None:
+    body = _method_body("_sync_header")
+    # Collapsing the palette hides the report button alongside the eye.
+    assert "_titleReport" in body
+    assert "report.setHidden_(collapsed)" in body
+    assert "eye.setHidden_(collapsed)" in body
+    assert "gear.setHidden_(collapsed)" not in body
