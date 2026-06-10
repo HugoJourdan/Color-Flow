@@ -636,8 +636,10 @@ def _apply_label_colors(colors: list) -> None:
 
 
 def _apply_label_names(font, labels_by_index: dict) -> None:
-	"""Rewrite colorNames.txt from the edited name fields (empty = hidden), keep the
-	in-font copy in sync when this font stores its labels in-file, then broadcast."""
+	"""Rewrite colorNames.txt from the edited name fields, PRESERVING each slot's current
+	visibility flag (visibility is now the eye/checkbox's job — renaming never shows/hides a
+	slot), keep the in-font copy in sync when this font stores its labels in-file, then
+	broadcast."""
 	path = colornames.get_key_file(_font_dir_for(font))
 	text = colornames.pick_settings_text(
 		colornames.font_labels_text(font), colornames.read_color_names(path))
@@ -645,8 +647,7 @@ def _apply_label_names(font, labels_by_index: dict) -> None:
 	new_rows = []
 	for index, label, visible in rows:
 		if index in labels_by_index:
-			new_label = labels_by_index[index].strip()
-			new_rows.append((index, new_label, bool(new_label)))
+			new_rows.append((index, labels_by_index[index].strip(), visible))
 		else:
 			new_rows.append((index, label, visible))
 	new_text = colornames.render_settings(new_rows, none_label)
@@ -666,6 +667,24 @@ def _apply_color_order(font, new_visible_order: list[int]) -> None:
 	rows, none_label = colornames.parse_settings(text)
 	new_rows = colornames.reorder_visible_rows(rows, new_visible_order)
 	new_text = colornames.render_settings(new_rows, none_label)
+	colornames.write_color_names(path, new_text)
+	if font is not None and colornames.font_labels_text(font) is not None:
+		font.userData[colornames.FONT_LABELS_KEY] = new_text
+	_broadcast_settings_changed()
+
+
+def _apply_label_visibility(font, visibility_by_index: dict) -> None:
+	"""Persist each slot's explicit show/hide flag to colorNames.txt (and the in-font copy
+	when this font stores its labels in-file) WITHOUT touching its label or colour order,
+	then broadcast so every palette rebuilds. A named slot can therefore be hidden and keep
+	its name. The flip math lives in the pure, unit-tested colornames.set_label_visibility."""
+	path = colornames.get_key_file(_font_dir_for(font))
+	text = colornames.pick_settings_text(
+		colornames.font_labels_text(font), colornames.read_color_names(path))
+	rows, none_label = colornames.parse_settings(text)
+	for index, visible in visibility_by_index.items():
+		rows = colornames.set_label_visibility(rows, int(index), bool(visible))
+	new_text = colornames.render_settings(rows, none_label)
 	colornames.write_color_names(path, new_text)
 	if font is not None and colornames.font_labels_text(font) is not None:
 		font.userData[colornames.FONT_LABELS_KEY] = new_text
@@ -790,17 +809,22 @@ class ColorFlowSettingsView:
 
 		group.lcLabel = TextBox((margin, lc_label_y, inner, 18), "Labels & Colours")
 
-		# ONE combined control: a List2 of all 12 label slots. Each row carries a colour
-		# well (recolour any slot) and an editable name (rename / show / hide any slot).
-		# Visible (named) rows are draggable to reorder the workflow sequence; hidden
-		# (blank-name) rows are pinned below and are NOT draggable. The drop persists via
-		# the shared _apply_color_order -> colornames.reorder_visible_rows path and broadcasts.
+		# ONE combined control: a List2 of all 12 label slots. Each row carries an EYE
+		# checkbox (show/hide the slot), a colour well (recolour) and an editable name
+		# (rename). Shown rows are draggable to reorder the workflow sequence; hidden rows
+		# are pinned below and are NOT draggable. A row can stay NAMED yet hidden. The drop
+		# persists via the shared _apply_color_order -> colornames.reorder_visible_rows path
+		# and broadcasts.
 		drag_type = "dev.colorflow.slotRow"
 		try:
 			group.lcList = List2(
 				(margin, lc_list_y, inner, lc_list_h),
 				self._slot_list_items(font),
 				columnDescriptions=[
+					# Eye/checkbox = "shown". Editable so a click flips visibility (the
+					# bool is written back into the row dict, then editCallback fires).
+					dict(identifier="visible", title="", cellClass=CheckBoxList2Cell,
+						editable=True, width=22),
 					dict(identifier="color", title="", cellClass=ColorWellList2Cell,
 						editable=True, width=44),
 					dict(identifier="name", title="", cellClass=EditTextList2Cell,
@@ -846,11 +870,13 @@ class ColorFlowSettingsView:
 
 	# ------------------------------------------------------------------ slot list
 	def _slot_list_items(self, font) -> list[dict]:
-		"""All 12 label slots as List2 row dicts, VISIBLE (named) first in their current
-		workflow order, then HIDDEN (blank) pinned below. Each dict carries the colour
-		index (``slot``), the live NSColor (``color``) and the editable label (``name``).
-		Also caches the list in ``self._slot_items`` so callbacks can map rows back to
-		colours and recompute the visible order on drag/edit."""
+		"""All 12 label slots as List2 row dicts, VISIBLE (shown) first in their current
+		workflow order, then HIDDEN pinned below. Each dict carries the colour index
+		(``slot``), the live NSColor (``color``), the editable label (``name``) and the
+		explicit show/hide flag (``visible``, from the parsed rows — NOT name-blankness, so
+		a named row can be hidden and keep its name). Also caches the list in
+		``self._slot_items`` so callbacks can map rows back to colours and recompute the
+		visible order on drag/edit."""
 		items: list[dict] = []
 		try:
 			rgba_list = labelcolors.read_label_colors()
@@ -859,7 +885,8 @@ class ColorFlowSettingsView:
 			hidden_rows = [(index, label) for index, label, visible in rows if not visible]
 			for index, label in visible_rows + hidden_rows:
 				color = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(*rgba_list[index])
-				items.append(dict(slot=int(index), color=color, name=label))
+				items.append(dict(slot=int(index), color=color, name=label,
+					visible=any(index == r[0] and r[2] for r in rows)))
 		except Exception:
 			import traceback
 			print("Color Flow [pane slot items] error:\n" + traceback.format_exc())
@@ -869,9 +896,10 @@ class ColorFlowSettingsView:
 
 	@staticmethod
 	def _slot_is_visible(item: dict) -> bool:
-		"""A slot row is VISIBLE (named, draggable, part of the workflow order) when its
-		name field holds non-blank text — matching how colorNames.txt marks visibility."""
-		return bool(str(item.get("name", "")).strip())
+		"""A slot row is VISIBLE (shown, draggable, part of the workflow order) when its
+		EXPLICIT ``visible`` flag is set — the eye/checkbox column, NOT name-blankness. A
+		named row can therefore be unchecked (hidden) and keep its name."""
+		return bool(item.get("visible"))
 
 	def _visible_slot_count(self) -> int:
 		"""Number of leading VISIBLE rows (the draggable block, pinned above the hidden ones)."""
@@ -968,17 +996,20 @@ class ColorFlowSettingsView:
 			print("Color Flow [pane swap routing] error:\n" + traceback.format_exc())
 
 	def _slot_edited(self, sender) -> None:
-		"""Fires after the user edits ANY cell (colour well or name) in the combined list.
-		List2 has already written the new value into the edited row dict, so we read the
-		live state of all 12 rows and persist BOTH the colours and the names (idempotent):
-		_apply_label_colors rewrites the 12 label colours, _apply_label_names rewrites the
-		names (blank = hidden, naming a blank slot makes it visible). Each broadcasts so open
-		palettes refresh live. The combined list keeps its row order until the next reload."""
+		"""Fires after the user edits ANY cell (eye/checkbox, colour well or name) in the
+		combined list. List2 has already written the new value into the edited row dict, so we
+		read the live state of all 12 rows and persist colours, names AND visibility
+		(idempotent): _apply_label_colors rewrites the 12 label colours, _apply_label_names
+		rewrites the names PRESERVING visibility, _apply_label_visibility writes each slot's
+		explicit show/hide flag (a named row can be hidden and keep its name). Each broadcasts
+		so open palettes refresh live. Finally the list is re-set so a toggled row re-pins into
+		the visible block or the hidden block below."""
 		try:
 			items = list(self._slot_items)
 			# Colours, indexed by slot (fall back to the on-disk colour for any missing slot).
 			colors_by_slot = dict(zip(range(12), labelcolors.read_label_colors()))
 			labels_by_index: dict[int, str] = {}
+			visibility_by_index: dict[int, bool] = {}
 			for item in items:
 				slot = int(item.get("slot", -1))
 				if not 0 <= slot < 12:
@@ -989,8 +1020,17 @@ class ColorFlowSettingsView:
 					colors_by_slot[slot] = (rgb.redComponent(), rgb.greenComponent(),
 						rgb.blueComponent(), rgb.alphaComponent())
 				labels_by_index[slot] = str(item.get("name", ""))
+				visibility_by_index[slot] = bool(item.get("visible"))
 			_apply_label_colors([colors_by_slot[slot] for slot in range(12)])
 			_apply_label_names(Glyphs.font, labels_by_index)
+			_apply_label_visibility(Glyphs.font, visibility_by_index)
+			# Re-pin ONLY when a visibility toggle broke the visible-first partition (a shown
+			# row now trails a hidden one, or vice-versa). A pure name/colour edit leaves the
+			# partition intact, so we skip the re-set to avoid stealing focus mid-type or
+			# reordering rows under the user.
+			shown_flags = [bool(item.get("visible")) for item in items]
+			if self._slot_list is not None and shown_flags != sorted(shown_flags, reverse=True):
+				self._slot_list.set(self._slot_list_items(Glyphs.font))
 		except Exception:
 			import traceback
 			print("Color Flow [pane slot edit] error:\n" + traceback.format_exc())
@@ -1154,13 +1194,6 @@ class ColorFlow(PalettePlugin):
 		self.paletteView = Window((self.width, self.height + 10))
 		self.paletteView.frame = Group((0, 0, self.width, self.height))
 
-		# Eye toggle: enter an inline visibility-edit mode (show every colour; click
-		# a row to stage show/hide; press again to apply + collapse to visible-only).
-		self._eye_mode = False
-		self._eye_rows = None
-		self._eye_none = ""
-		self._eyeRowViews = {}
-
 		# Separator lines + colour tags (depend on the meaning order/visibility).
 		# Per-row widgets (label / bar / count) are built by Update_Plugin_UI.
 		self._rowChecks = {}
@@ -1175,8 +1208,8 @@ class ColorFlow(PalettePlugin):
 		self.dialog = self.paletteView.frame.getNSView()
 
 		# Drive the palette height with an animatable height constraint so growing /
-		# shrinking (e.g. entering/leaving eye mode) slides instead of snapping.
-		# Glyphs pins the view's width + position; we own the height.
+		# shrinking (e.g. when the Settings pane shows/hides a colour) slides instead of
+		# snapping. Glyphs pins the view's width + position; we own the height.
 		try:
 			self.dialog.setTranslatesAutoresizingMaskIntoConstraints_(False)
 			self._heightConstraint = AppKit.NSLayoutConstraint.constraintWithItem_attribute_relatedBy_toItem_attribute_multiplier_constant_(
@@ -1210,7 +1243,7 @@ class ColorFlow(PalettePlugin):
 	def reload_after_settings(self) -> None:
 		self.meaning = self.Load_Meaning()
 		for i in range(12):
-			for suffix in ("line", "colorTag", "", "box", "count", "hl", "click", "eye", "eyeTag", "eyeLine"):
+			for suffix in ("line", "colorTag", "", "box", "count", "hl", "click"):
 				attr = str(i) + suffix
 				if hasattr(self.paletteView.frame, attr):
 					delattr(self.paletteView.frame, attr)
@@ -2276,7 +2309,7 @@ class ColorFlow(PalettePlugin):
 					delattr(self.paletteView.frame, attr)
 			self._metaAttrs = []
 			self._bodyAttrs = []
-			if not self.font or not self.meaning or getattr(self, "_eye_mode", False):
+			if not self.font or not self.meaning:
 				return
 			self._rowChecks = {}
 			self._rowOverlays = {}
@@ -2467,13 +2500,6 @@ class ColorFlow(PalettePlugin):
 			pass
 		setattr(self.paletteView.frame, str(color)+"count", textbox)
 
-	def headerEyeClicked_(self, sender) -> None:
-		try:
-			self._toggle_eye_mode(sender)
-		except Exception:
-			import traceback
-			print("Color Flow [header eye] error:\n" + traceback.format_exc())
-
 	def openDashboard_(self, sender) -> None:
 		# Report header button: same flow the old popover's report button used —
 		# the loader sheet that builds the report and then offers Open / Save.
@@ -2506,9 +2532,6 @@ class ColorFlow(PalettePlugin):
 			report = getattr(self, "_titleReport", None)
 			if report is not None:
 				report.setHidden_(collapsed)
-			eye = getattr(self, "_titleEye", None)
-			if eye is not None:
-				eye.setHidden_(collapsed)
 		except Exception:
 			pass
 
@@ -2574,10 +2597,9 @@ class ColorFlow(PalettePlugin):
 			bounds = header.bounds()
 			btn = 14.0
 			pad = 8.0
-			gap = 4.0
 			ctrlY = (bounds.size.height - btn) / 2.0
-			eyeX = bounds.size.width - pad - btn
-			reportX = eyeX - gap - btn
+			# Eye button removed (visibility now lives in Settings); report is rightmost.
+			reportX = bounds.size.width - pad - btn
 			barWidth, barHeight = 84.0, 6.0
 			barX = bounds.size.width - pad - barWidth
 			barY = (bounds.size.height - barHeight) / 2.0
@@ -2610,22 +2632,6 @@ class ColorFlow(PalettePlugin):
 				pass
 			header.addSubview_(report)
 			self._titleReport = report
-			eye = AppKit.NSButton.alloc().initWithFrame_(((eyeX, ctrlY), (btn, btn)))
-			eye.setBordered_(False)
-			eye.setAutoresizingMask_(AppKit.NSViewMinXMargin)
-			eye.setTarget_(self)
-			eye.setAction_("headerEyeClicked:")
-			eye.setImageScaling_(AppKit.NSImageScaleProportionallyDown)
-			try:
-				eyeImg = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_("eye", None)
-				if eyeImg is not None:
-					eye.setImage_(eyeImg)
-				else:
-					eye.setTitle_("\U0001F441")
-			except Exception:
-				pass
-			header.addSubview_(eye)
-			self._titleEye = eye
 			self._sync_header()
 		except Exception:
 			import traceback
@@ -2797,29 +2803,12 @@ class ColorFlow(PalettePlugin):
 		"""Please leave this method unchanged"""
 		return __file__
 
-	# ------------------------------------------------------------------ eye visibility mode
-
-	# ObjC selector: a single click on a colour row in eye mode toggles whether
-	# that colour is staged visible or hidden.
-	def eyeRowClicked_(self, sender) -> None:
-		try:
-			view = sender.view()
-			for key, label in getattr(self, "_eyeRowViews", {}).items():
-				if label._nsObject == view:
-					index = int(key)
-					for row in (self._eye_rows or []):
-						if row[0] == index:
-							row[2] = not row[2]
-							break
-					self._build_eye_mode_ui()
-					return
-		except Exception:
-			import traceback
-			print("Color Flow [eye click] error:\n" + traceback.format_exc())
+	# ------------------------------------------------------------------ palette height
 
 	# Animate the palette height via the height constraint's animator proxy (the
 	# technique the Glyphs team documents for smooth palette resizing). Falls back
-	# to a direct, un-animated resize if the constraint could not be created.
+	# to a direct, un-animated resize if the constraint could not be created. Driven
+	# by reload_after_settings when a Settings-pane edit changes the visible count.
 	@objc.python_method
 	def _set_palette_height(self, height, animated=True) -> None:
 		self.height = height
@@ -2838,108 +2827,4 @@ class ColorFlow(PalettePlugin):
 			AppKit.NSAnimationContext.endGrouping()
 		else:
 			constraint.setConstant_(height)
-
-	@objc.python_method
-	def _toggle_eye_mode(self, sender) -> None:
-		try:
-			if self._eye_mode:
-				self._exit_eye_mode()
-			else:
-				self._enter_eye_mode()
-		except Exception:
-			import traceback
-			print("Color Flow [eye toggle] error:\n" + traceback.format_exc())
-
-	@objc.python_method
-	def _set_eye_button(self, on) -> None:
-		try:
-			name = "eye.slash" if on else "eye"
-			image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, None)
-			nsbutton = getattr(self, "_titleEye", None)
-			if nsbutton is None:
-				return
-			nsbutton.setBordered_(False)
-			if image is not None:
-				nsbutton.setImage_(image)
-				nsbutton.setTitle_("")
-			else:
-				nsbutton.setTitle_("🙈" if on else "👁")
-		except Exception:
-			pass
-
-	@objc.python_method
-	def _eye_key_path(self) -> str:
-		font = Glyphs.font
-		fontDir = os.path.dirname(font.filepath) if (font is not None and font.filepath) else None
-		return colornames.resolve_key_file(fontDir)
-
-	@objc.python_method
-	def _enter_eye_mode(self) -> None:
-		path = self._eye_key_path()
-		text = colornames.read_color_names(path) or colornames.DEFAULT_COLOR_NAMES
-		rows, none_label = colornames.parse_settings(text)
-		self._eye_rows = [[index, label, visible] for index, label, visible in rows]
-		self._eye_none = none_label
-		self._eye_mode = True
-		self._set_eye_button(True)
-		self.height = 19 * len(self._eye_rows) + 4
-		try:
-			self._set_palette_height(self.height, animated=True)
-		except Exception:
-			pass
-		self._build_eye_mode_ui()
-
-	@objc.python_method
-	def _exit_eye_mode(self) -> None:
-		self._eye_mode = False
-		self._set_eye_button(False)
-		rows = [(index, label, visible) for index, label, visible in (self._eye_rows or [])]
-		if rows:
-			path = self._eye_key_path()
-			colornames.write_color_names(path, colornames.render_settings(rows, self._eye_none))
-		self._teardown_eye_rows()
-		self.reload_after_settings()
-
-	@objc.python_method
-	def _teardown_eye_rows(self) -> None:
-		for index in range(12):
-			for suffix in ("eye", "eyeTag", "eyeLine"):
-				attr = str(index) + suffix
-				if hasattr(self.paletteView.frame, attr):
-					delattr(self.paletteView.frame, attr)
-		self._eyeRowViews = {}
-
-	# Render every colour (visible + hidden) as a click-to-toggle row; hidden rows
-	# are dimmed. A 1-click gesture per label flips its staged visibility.
-	@objc.python_method
-	def _build_eye_mode_ui(self) -> None:
-		for index in range(12):
-			for suffix in ("", "box", "count", "hl", "colorTag", "line", "eye", "eyeTag", "eyeLine"):
-				attr = str(index) + suffix
-				if hasattr(self.paletteView.frame, attr):
-					delattr(self.paletteView.frame, attr)
-		self._eyeRowViews = {}
-		yPos = 13
-		for index, label, visible in (self._eye_rows or []):
-			key = str(index)
-			rgb = self.colorKeys.get(key, (0.5, 0.5, 0.5, 0.5))
-			alpha = 0.5 if visible else 0.12
-			setattr(self.paletteView.frame, key+"eyeTag", Box((0, yPos-self.shift-1, 6, 19), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], alpha), cornerRadius=0, borderWidth=0))
-			setattr(self.paletteView.frame, key+"eyeLine", HorizontalLine((0, yPos-self.shift-1, 0, 1)))
-			shown = label or colornames.DEFAULT_LABELS.get(index, key)
-			textbox = TextBox((12, yPos-self.shift+2, -10, 20), shown, sizeStyle='small')
-			setattr(self.paletteView.frame, key+"eye", textbox)
-			try:
-				field = textbox.getNSTextField()
-				field.setTextColor_(AppKit.NSColor.labelColor() if visible else AppKit.NSColor.tertiaryLabelColor())
-			except Exception:
-				pass
-			self._eyeRowViews[key] = textbox
-			try:
-				recognizer = NSClickGestureRecognizer.alloc().initWithTarget_action_(self, "eyeRowClicked:")
-				recognizer.setNumberOfClicksRequired_(1)
-				textbox._nsObject.addGestureRecognizer_(recognizer)
-			except Exception:
-				pass
-			yPos += 19
 

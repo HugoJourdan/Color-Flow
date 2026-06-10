@@ -671,3 +671,55 @@ def test_reorder_visible_rows_roundtrips_through_render_and_parse() -> None:
     out = cc.render_settings(reordered, none_label)
     again, _ = cc.parse_settings(out)
     assert [index for index, _l, vis in again if vis] == new_order
+
+
+# --------------------------------------------------------------------------- #
+# set_label_visibility — the Settings-pane eye/checkbox toggle (explicit flag)
+# --------------------------------------------------------------------------- #
+
+
+def test_set_label_visibility_flips_only_the_target_flag() -> None:
+    rows = [(0, "Red", True), (1, "Orange", True), (9, "Mag", False)]
+    out = cc.set_label_visibility(rows, 1, False)
+    # Only slot 1's flag changed; labels + colour order untouched.
+    assert out == [(0, "Red", True), (1, "Orange", False), (9, "Mag", False)]
+    # Pure: original rows are not mutated.
+    assert rows == [(0, "Red", True), (1, "Orange", True), (9, "Mag", False)]
+
+
+def test_set_label_visibility_preserves_label_when_hiding() -> None:
+    rows = [(3, "Export", True)]
+    hidden = cc.set_label_visibility(rows, 3, False)
+    assert hidden == [(3, "Export", False)]  # name kept, just hidden
+
+
+def test_set_label_visibility_unknown_index_is_noop_copy() -> None:
+    rows = [(0, "Red", True)]
+    out = cc.set_label_visibility(rows, 7, False)
+    assert out == rows and out is not rows
+
+
+def test_named_but_hidden_row_round_trips_through_render_and_parse() -> None:
+    # A NAMED slot can be hidden and still keep its name across a save/load cycle.
+    rows = [(0, "Drawing", True), (3, "Export", True)]
+    hidden = cc.set_label_visibility(rows, 3, False)
+    text = cc.render_settings(hidden, none_label="None")
+    # Hidden-but-named slot is serialised as a #commented name=label line (slot 3 = yellow).
+    assert "#yellow=Export" in text
+    again, none_label = cc.parse_settings(text)
+    assert none_label == "None"
+    by_index = {index: (label, visible) for index, label, visible in again}
+    assert by_index[3] == ("Export", False)  # name kept, visible False
+    assert by_index[0] == ("Drawing", True)
+
+
+def test_toggling_visibility_back_restores_shown_state() -> None:
+    rows = [(3, "Export", True)]
+    hidden = cc.set_label_visibility(rows, 3, False)
+    shown_again = cc.set_label_visibility(hidden, 3, True)
+    assert shown_again == [(3, "Export", True)]
+    # And it survives a serialise / parse round trip as a plain visible line.
+    text = cc.render_settings(shown_again, none_label="")
+    again, _ = cc.parse_settings(text)
+    by_index = {index: (label, visible) for index, label, visible in again}
+    assert by_index[3] == ("Export", True)

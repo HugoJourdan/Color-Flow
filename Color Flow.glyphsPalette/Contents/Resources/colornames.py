@@ -574,6 +574,20 @@ def reorder_visible_rows(
     return ordered + hidden_rows
 
 
+def set_label_visibility(
+    rows: list[tuple[int, str, bool]], index: int, visible: bool
+) -> list[tuple[int, str, bool]]:
+    """Return a NEW rows list with the slot ``index``'s ``visible`` flag set.
+
+    Pure: the slot's label (and the colour-order of every row) is left untouched —
+    only its visibility changes. A colour can therefore stay NAMED yet HIDDEN. If
+    ``index`` is not present the rows are returned unchanged (copied)."""
+    return [
+        (row_index, label, visible if row_index == index else row_visible)
+        for row_index, label, row_visible in rows
+    ]
+
+
 def render_key_file(meaning: dict[int, str], order: list[int]) -> str:
     """Serialise an int-keyed meaning/order mapping back to colorNames.txt text,
     preserving order (used to persist inline label edits)."""

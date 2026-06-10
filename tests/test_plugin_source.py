@@ -286,13 +286,21 @@ def test_settings_pane_has_single_combined_slot_list() -> None:
         PLUGIN_SOURCE.index("def _build(self) -> None:") :
         PLUGIN_SOURCE.index("def _slot_list_items(")
     ]
-    # ONE List2 holds all label slots: a colour-well column + an editable name column.
+    # ONE List2 holds all label slots: an eye/visible checkbox + a colour-well column
+    # + an editable name column (eye/checkbox FIRST so it reads left-to-right).
     assert "group.lcList = List2(" in build
     assert "self._slot_list_items(font)" in build
+    assert 'identifier="visible"' in build
+    assert "cellClass=CheckBoxList2Cell" in build
     assert "cellClass=ColorWellList2Cell" in build
     assert "cellClass=EditTextList2Cell" in build
-    # Both columns are editable so any slot can be recoloured / renamed.
-    assert build.count("editable=True") >= 2
+    # The visible checkbox column comes BEFORE the colour well.
+    assert build.index('identifier="visible"') < build.index('identifier="color"')
+    # All three columns are editable so any slot can be shown/hidden, recoloured, renamed.
+    assert build.count("editable=True") >= 3
+    # WIDTH stays 161; the checkbox column is narrow (22) and the colour well is 44.
+    assert "WIDTH = 161" in PLUGIN_SOURCE
+    assert "width=22" in build
     # Edits route through one combined handler; drag-reorder + self-drop are wired.
     assert "editCallback=self._slot_edited" in build
     assert "dragCandidateCallback=self._slot_drag_candidate" in build
@@ -321,15 +329,19 @@ def test_combined_list_covers_all_twelve_slots() -> None:
     assert "colornames.parse_settings(self._effective_label_text(font))" in body
     assert "if visible" in body and "if not visible" in body
     assert "visible_rows + hidden_rows" in body
-    assert 'dict(slot=int(index), color=color, name=label)' in body
+    # Each row carries its EXPLICIT visibility flag from the parsed rows (not name-blankness).
+    assert "dict(slot=int(index), color=color, name=label," in body
+    assert "visible=any(index == r[0] and r[2] for r in rows)" in body
 
 
 def test_only_visible_rows_are_draggable() -> None:
     candidate = _method_body("_slot_drag_candidate")
-    # A drag is allowed only when every picked row is VISIBLE (named); hidden rows are fixed.
+    # A drag is allowed only when every picked row is VISIBLE (shown); hidden rows are fixed.
     assert "self._slot_is_visible(self._slot_items[int(i)])" in candidate
     visible = _method_body("_slot_is_visible")
-    assert 'str(item.get("name", "")).strip()' in visible
+    # Visibility is the EXPLICIT flag now (the eye/checkbox), NOT name-blankness.
+    assert 'bool(item.get("visible"))' in visible
+    assert 'str(item.get("name", "")).strip()' not in visible
 
 
 def test_slot_drop_persists_via_shared_helper() -> None:
@@ -343,15 +355,39 @@ def test_slot_drop_persists_via_shared_helper() -> None:
     assert "_broadcast_settings_changed()" in helper
 
 
-def test_slot_edit_persists_colours_and_names_with_broadcast() -> None:
+def test_slot_edit_persists_colours_names_and_visibility_with_broadcast() -> None:
     body = _method_body("_slot_edited")
-    # Editing a well or a name writes BOTH colours and names (each broadcasts).
+    # Editing a well / name / eye checkbox writes colours, names AND visibility (each
+    # broadcasts), then re-sets the list so a toggled row re-pins.
     assert "_apply_label_colors(" in body
     assert "_apply_label_names(Glyphs.font, labels_by_index)" in body
+    assert "_apply_label_visibility(Glyphs.font, visibility_by_index)" in body
+    assert 'visibility_by_index[slot] = bool(item.get("visible"))' in body
+    # A visibility flip re-pins the list (only when the visible-first partition broke).
+    assert "self._slot_list.set(self._slot_list_items(Glyphs.font))" in body
+    assert "sorted(shown_flags, reverse=True)" in body
     colors_helper = _module_function_body("_apply_label_colors")
     assert "_broadcast_settings_changed()" in colors_helper
     names_helper = _module_function_body("_apply_label_names")
     assert "_broadcast_settings_changed()" in names_helper
+
+
+def test_visibility_persists_via_set_label_visibility_and_broadcast() -> None:
+    # The eye/checkbox routes through a shared helper that writes colorNames.txt via
+    # render_settings (keeping the name) + the in-font copy + broadcasts.
+    helper = _module_function_body("_apply_label_visibility")
+    assert "colornames.set_label_visibility(rows, int(index), bool(visible))" in helper
+    assert "colornames.render_settings(rows, none_label)" in helper
+    assert "font.userData[colornames.FONT_LABELS_KEY] = new_text" in helper
+    assert "_broadcast_settings_changed()" in helper
+
+
+def test_renaming_preserves_visibility() -> None:
+    # _apply_label_names must NOT derive visibility from name-blankness anymore — it
+    # keeps each slot's existing visible flag so a rename never shows/hides a slot.
+    helper = _module_function_body("_apply_label_names")
+    assert "new_rows.append((index, labels_by_index[index].strip(), visible))" in helper
+    assert "bool(new_label)" not in helper
 
 
 # --------------------------------------------------------------------------- #
@@ -522,22 +558,25 @@ def test_palette_bar_denominator_excludes_non_exporting() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Section-header buttons: report (new) + eye  (the settings gear was removed)
+# Section-header buttons: report ONLY (gear AND eye removed — visibility moved
+# to the Settings pane)
 # --------------------------------------------------------------------------- #
 
 
-def test_header_has_report_and_eye_no_gear() -> None:
+def test_header_has_report_only_no_gear_no_eye() -> None:
     body = _method_body("_inject_title_bar")
-    # Two borderless buttons laid out report -> eye, right-aligned (eye rightmost).
-    assert "eyeX = bounds.size.width - pad - btn" in body
-    assert "reportX = eyeX - gap - btn" in body
+    # The report button is the rightmost (and only) header button now.
+    assert "reportX = bounds.size.width - pad - btn" in body
     assert 'report.setAction_("openDashboard:")' in body
-    assert 'eye.setAction_("headerEyeClicked:")' in body
     assert "self._titleReport = report" in body
-    assert "self._titleEye = eye" in body
     # The settings gear is gone.
     assert "self._titleGear" not in PLUGIN_SOURCE
     assert 'setAction_("openSettings:")' not in body
+    # The eye button is gone (visibility now lives in the Settings pane).
+    assert "self._titleEye" not in PLUGIN_SOURCE
+    assert "headerEyeClicked" not in PLUGIN_SOURCE
+    assert "eyeX" not in body
+    assert 'setAction_("headerEyeClicked:")' not in body
 
 
 def test_report_button_triggers_report_flow() -> None:
@@ -547,10 +586,30 @@ def test_report_button_triggers_report_flow() -> None:
     assert "self._popover_dashboard(sender)" in body
 
 
-def test_sync_header_hides_report_and_eye_together() -> None:
+def test_sync_header_hides_report_no_eye() -> None:
     body = _method_body("_sync_header")
-    # Collapsing the palette hides the report button alongside the eye.
+    # Collapsing the palette hides the report button; there is no eye to hide.
     assert "_titleReport" in body
     assert "report.setHidden_(collapsed)" in body
-    assert "eye.setHidden_(collapsed)" in body
+    assert "eye.setHidden_(collapsed)" not in body
     assert "gear.setHidden_(collapsed)" not in body
+
+
+def test_palette_eye_visibility_mode_fully_removed() -> None:
+    # The inline palette "eye" visibility-edit mode is gone end-to-end: no state,
+    # no toggle/build/teardown helpers, no per-row click handler.
+    for symbol in (
+        "_eye_mode",
+        "_eye_rows",
+        "_eye_none",
+        "_eyeRowViews",
+        "_toggle_eye_mode",
+        "_enter_eye_mode",
+        "_exit_eye_mode",
+        "_teardown_eye_rows",
+        "_build_eye_mode_ui",
+        "_set_eye_button",
+        "_eye_key_path",
+        "eyeRowClicked",
+    ):
+        assert symbol not in PLUGIN_SOURCE, symbol
