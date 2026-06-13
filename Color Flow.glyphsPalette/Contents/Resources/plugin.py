@@ -1305,6 +1305,9 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def settings(self) -> None:
+		from license_config import CONFIG
+		from _colorflow_lic import bootstrap
+		self._ent = bootstrap.start(CONFIG)
 		self.name = 'Color Flow'
 		self.init = False
 		self.colorKeys = {
@@ -2832,6 +2835,11 @@ class ColorFlow(PalettePlugin):
 	# UPDATEINTERFACE handler: cheap dirty-check on selection + layer colours.
 	@objc.python_method
 	def update(self, sender) -> None:
+		ent = getattr(self, "_ent", None)
+		if ent is not None and ent.blocked:
+			ent.nag()
+			self._showLockPanel_()
+			return
 		if self._windowController:
 			self.font = self._windowController.documentFont()
 		if not self.font:
@@ -2869,6 +2877,26 @@ class ColorFlow(PalettePlugin):
 		# recompute. (Nothing else invalidates them now the palette is display-only.)
 		self._invalidate_counts(masterId)
 		self.Update_Plugin_UI()
+
+	@objc.python_method
+	def _showLockPanel_(self) -> None:
+		# Replace the palette content with a one-button lock view. Idempotent:
+		# update() fires on every UPDATEINTERFACE, so build only once.
+		if getattr(self, "_lockShown", False):
+			return
+		try:
+			import vanilla
+			from license_config import CONFIG
+			from _colorflow_lic import bootstrap
+			group = self.paletteView.frame
+			group.lock = vanilla.TextBox((10, 10, -10, 40),
+				f"{CONFIG.product} trial ended.\nEnter a license to continue.")
+			group.unlock = vanilla.Button((10, 58, -10, 22), "Enter license…",
+				callback=lambda sender: bootstrap.show_license_ui(CONFIG))
+			self._lockShown = True
+		except Exception:
+			import traceback
+			print(traceback.format_exc())
 
 	########################################################################################################
 	#																									   #
