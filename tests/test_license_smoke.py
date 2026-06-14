@@ -16,8 +16,8 @@ class FakeDefaults:
 
 
 def test_config_loads_and_starts_trial():
-    from license_config import CONFIG
-    from _colorflow_lic import bootstrap, _licensing
+    from _colorflow_lic import _licensing, bootstrap
+    from _colorflow_lic_config import CONFIG
     _licensing._reset_for_testing()
     gate = bootstrap.start(
         CONFIG, defaults=FakeDefaults(),
