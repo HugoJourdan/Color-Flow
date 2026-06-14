@@ -3105,6 +3105,7 @@ class ColorFlow(PalettePlugin):
 				pass
 		return blocked
 
+	@objc.python_method
 	def update(self, sender) -> None:
 		ent = getattr(self, "_ent", None)
 		if ent is not None and ent.blocked:
