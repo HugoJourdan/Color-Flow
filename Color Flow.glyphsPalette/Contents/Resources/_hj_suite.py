@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import contextlib
 
-__version__ = 1
+__version__ = 2
 
 try:
     import objc
@@ -37,34 +37,54 @@ _BUILTIN_OBJC = {
 # Shared advisory-lock key. Identical to the sentinel shipped in the 2026-06-14
 # fixes so a not-yet-migrated Argus/DA still interoperates.
 _ANCHOR_LOCK_KEY = "com.hugojourdan.suite.proportionFixInProgress"
+# One-shot "a fix just completed -> recompute linked anchors against the new
+# geometry" signal, raised by end() and consumed exactly once by the reverter.
+_ANCHOR_RECOMPUTE_KEY = "com.hugojourdan.suite.proportionFixRecomputePending"
 
 
 class _AnchorLock:
     """Per-font advisory lock backed by font.tempData (in-memory, not saved).
 
     A writer (Argus, mid anchor-fix) calls begin()/end(); a reverter (DA) skips
-    its auto-revert while active(). Best-effort and null-safe.
+    its auto-revert while active(). On end() a one-shot "recompute pending"
+    signal is raised: the next consume_recompute(font) returns True exactly once,
+    telling the reverter (DA) to re-derive the linked anchors from the now-fixed
+    geometry this pass, instead of preserving the fix's anchor write as a manual
+    edit. Robust to a fast begin->end that straddles no interface tick. Best-
+    effort and null-safe.
     """
 
     def begin(self, font: object) -> None:
-        self._set(font, True)
+        self._set(_ANCHOR_LOCK_KEY, font, True)
 
     def end(self, font: object) -> None:
-        self._set(font, False)
+        self._set(_ANCHOR_LOCK_KEY, font, False)
+        self._set(_ANCHOR_RECOMPUTE_KEY, font, True)
 
     def active(self, font: object) -> bool:
+        return self._get(_ANCHOR_LOCK_KEY, font)
+
+    def consume_recompute(self, font: object) -> bool:
+        """True exactly once after each end(): a fix just finished, so the
+        reverter should recompute linked anchors from geometry this pass."""
+        if not self._get(_ANCHOR_RECOMPUTE_KEY, font):
+            return False
+        self._set(_ANCHOR_RECOMPUTE_KEY, font, False)
+        return True
+
+    def _get(self, key: str, font: object) -> bool:
         if font is None:
             return False
         try:
-            return bool(font.tempData[_ANCHOR_LOCK_KEY])  # type: ignore[union-attr]
+            return bool(font.tempData[key])  # type: ignore[union-attr]
         except Exception:
             return False
 
-    def _set(self, font: object, value: bool) -> None:
+    def _set(self, key: str, font: object, value: bool) -> None:
         if font is None:
             return
         with contextlib.suppress(Exception):
-            font.tempData[_ANCHOR_LOCK_KEY] = bool(value)  # type: ignore[union-attr]
+            font.tempData[key] = bool(value)  # type: ignore[union-attr]
 
 
 class _Registry:
