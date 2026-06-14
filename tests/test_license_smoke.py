@@ -24,4 +24,4 @@ def test_config_loads_and_starts_trial():
         transport=lambda *a: {"status": 200, "body": {}},
     )
     assert gate.kind == "trial" and not gate.blocked
-    assert CONFIG.defaults_prefix == 'com.hugojourdan.ColorFlow'
+    assert CONFIG.defaults_prefix == 'com.HugoJourdan.ColorFlow'
