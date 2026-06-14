@@ -2,7 +2,7 @@
 name = "color-flow-dev"
 version = "0.0.0"
 description = "Dev tooling and tests for the Color Flow Glyphs plugin (not shipped in the .glyphsPalette bundle)."
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-xdist>=3", "pytest-cov>=5", "ruff>=0.6", "pyright>=1.1.380"]
@@ -27,7 +27,7 @@ show_missing = true
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py311"
 # The plugin source lives inside the .glyphsPalette bundle (a space-containing
 # dir); list it explicitly alongside the tests.
 extend-include = ["Color Flow.glyphsPalette/Contents/Resources/*.py"]
@@ -53,4 +53,4 @@ extraPaths = ["Color Flow.glyphsPalette/Contents/Resources"]
 # GlyphsApp / AppKit only exist inside Glyphs; the imports are guarded at runtime.
 reportMissingImports = false
 reportMissingModuleSource = false
-pythonVersion = "3.9"
+pythonVersion = "3.11"
