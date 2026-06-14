@@ -312,6 +312,14 @@ SWAP_KEY = "com.hugojourdan.ColorFlow-SwapColorRouting"
 # a per-window palette instance that may be deallocated when its window closes.
 _SHORTCUT_HANDLER = None
 
+# Strong module-level reference to the singleton target for the Rainbow File-menu
+# item. The shared File menu holds ONE item, and Glyphs builds one palette instance
+# per document window — targeting a per-window instance means closing that window
+# leaves the other windows' menu entry pointing at a deallocated target (or removes
+# it entirely on that instance's __del__). So the item is installed ONCE per session
+# (module-level guard) targeting this retained singleton, which acts on Glyphs.font.
+_RAINBOW_MENU_HANDLER = None
+
 # Shared bootstrap entitlement (Gate). The native "Jump to next" shortcut fires
 # the module-level handler, which has no palette instance, so the licence gate is
 # consulted here. settings()/_onLicenseChanged publish the live Gate so the
@@ -462,6 +470,85 @@ def _register_native_shortcuts() -> None:
 	)
 
 
+_RAINBOW_MENU_TITLE = "Color Flow: Font Glyph Order"
+
+
+class ColorFlowRainbowMenuHandler(NSObject):
+	"""Long-lived target for the Rainbow File-menu item (one per session).
+
+	The shared File menu holds a single item; targeting a per-window palette
+	instance breaks once that window closes (dead target or removed entry for the
+	other open windows). This singleton acts on ``Glyphs.font`` and owns its own
+	``FontViewGrouping`` so the toggle works regardless of which window is frontmost.
+	"""
+
+	def init(self) -> Any:
+		self = objc.super(ColorFlowRainbowMenuHandler, self).init()
+		if self is None:
+			return None
+		try:
+			self._fontview = fontview.FontViewGrouping()
+		except Exception:
+			self._fontview = None
+		return self
+
+	def validateMenuItem_(self, menuItem) -> bool:
+		# Reflect the current font's grouping state as the checkmark.
+		font = Glyphs.font
+		if font is None or self._fontview is None:
+			menuItem.setState_(NSOffState)
+			return font is not None
+		try:
+			menuItem.setState_(NSOnState if self._fontview.is_enabled(font) else NSOffState)
+		except Exception:
+			menuItem.setState_(NSOffState)
+		return True
+
+	def toggleRainbow_(self, sender) -> None:
+		# Gate via the shared session entitlement (same path the native shortcut uses).
+		if _shared_gate_blocked():
+			return
+		font = Glyphs.font
+		if font is None or self._fontview is None:
+			return
+		try:
+			self._fontview.toggle(font)
+		except Exception:
+			import traceback
+			print("Color Flow [Rainbow toggle] error:\n" + traceback.format_exc())
+
+
+def _install_rainbow_menu() -> None:
+	"""Add the Rainbow File-menu item once per session, targeting a retained singleton.
+
+	Glyphs builds one palette instance per document window; registering the item
+	per instance means the last window wins and closing it strands the others. The
+	module-level ``_RAINBOW_MENU_HANDLER`` guard ensures the item is created exactly
+	once and outlives any individual window. Removes any stale copy (e.g. from a
+	previous load of this module) before adding.
+	"""
+	global _RAINBOW_MENU_HANDLER
+	if _RAINBOW_MENU_HANDLER is not None:
+		return
+	title = _RAINBOW_MENU_TITLE
+	# Mark installed BEFORE wiring the menu: a partial failure must not let the next
+	# window re-attempt (it would only fail again, and could stack a second item).
+	handler = ColorFlowRainbowMenuHandler.alloc().init()
+	_RAINBOW_MENU_HANDLER = handler
+	menu_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+		title, "toggleRainbow:", "")
+	menu_item.setTarget_(handler)
+	bar_item = Glyphs.menu[FILE_MENU]
+	submenu = bar_item.submenu() if hasattr(bar_item, "submenu") else None
+	if submenu is not None:
+		for item in list(submenu.itemArray()):
+			if item.title() == title:
+				submenu.removeItem_(item)
+		submenu.addItem_(menu_item)
+	else:
+		bar_item.append(menu_item)
+
+
 ########################################################################################################
 #																									   #
 #	SWAP OPTION COLOR ROUTING (swizzle of -[GSFontViewController setColorIndex:])				   #
@@ -526,6 +613,24 @@ def _cf_setColorIndex_(self, color_index) -> None:
 				font.disableUpdateInterface()
 			except Exception:
 				font = None  # don't try to re-enable something we couldn't disable
+		# Coalesce the per-layer/per-glyph colorIndex assignments into ONE undo step,
+		# so Cmd-Z after a multi-glyph swatch click reverts the whole batch in one go
+		# (the stock IMP we replaced did its own single-step registration; this restores
+		# that grouping). Best-effort + null-safe: any missing undoManager just skips
+		# grouping and the mutation still applies. End the group symmetrically in finally.
+		undo_manager = None
+		if font is not None:
+			try:
+				get_undo = getattr(font, "undoManager", None)
+				undo_manager = get_undo() if callable(get_undo) else None
+			except Exception:
+				undo_manager = None
+		if undo_manager is not None:
+			try:
+				undo_manager.beginUndoGrouping()
+				undo_manager.setActionName_("Set Color")
+			except Exception:
+				undo_manager = None  # don't end a group we never began
 		try:
 			for layer in layers:
 				if target == "layer":
@@ -535,6 +640,11 @@ def _cf_setColorIndex_(self, color_index) -> None:
 					if glyph is not None:
 						glyph.colorIndex = color_index
 		finally:
+			if undo_manager is not None:
+				try:
+					undo_manager.endUndoGrouping()
+				except Exception:
+					pass
 			if font is not None:
 				try:
 					font.enableUpdateInterface()
@@ -1638,7 +1748,7 @@ class ColorFlow(PalettePlugin):
 		self._pendingFont = None
 		self._strippedForSave = False
 		try:
-			self._install_rainbow_menu()
+			_install_rainbow_menu()
 			self._rainbow_conflict_check()
 		except Exception:
 			import traceback
@@ -2265,36 +2375,6 @@ class ColorFlow(PalettePlugin):
 			pass
 		self._reportPanel = None
 
-	@objc.python_method
-	def _install_rainbow_menu(self) -> None:
-		# Add a File-menu toggle, removing any stale copy from a previous load.
-		title = self._rainbow_menu_title()
-		self._rainbowMenuItem = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-			title, self.toggleRainbow_, "")
-		self._rainbowMenuItem.setTarget_(self)
-		barItem = Glyphs.menu[FILE_MENU]
-		submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
-		if submenu is not None:
-			for item in list(submenu.itemArray()):
-				if item.title() == title:
-					submenu.removeItem_(item)
-			submenu.addItem_(self._rainbowMenuItem)
-		else:
-			barItem.append(self._rainbowMenuItem)
-
-	@objc.python_method
-	def _teardown_rainbow_menu(self) -> None:
-		try:
-			title = self._rainbow_menu_title()
-			barItem = Glyphs.menu[FILE_MENU]
-			submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
-			if submenu is not None:
-				for item in list(submenu.itemArray()):
-					if item.title() == title:
-						submenu.removeItem_(item)
-		except Exception:
-			pass
-
 	def colorFlowSettingsChanged_(self, notification) -> None:
 		# Posted by the global Settings pane after any edit; rebuild this palette live.
 		try:
@@ -2372,6 +2452,20 @@ class ColorFlow(PalettePlugin):
 		# Glyphs posts this (GSDocumentWasSavedSuccessfully) after a successful save —
 		# the only save hook it offers.
 		document = notification.object()
+		# Scope to THIS palette's own document. The observer is registered with
+		# object=None (Glyphs needs the notification before its window controller
+		# resolves), and Glyphs builds one ColorFlow instance per window — so every
+		# instance is told about every document's save. Ignore saves that aren't this
+		# instance's, so only the owning palette records/re-saves its timeline.
+		# Best-effort + null-safe: if we can't resolve our own document, fall through
+		# (don't drop the notification) so behaviour degrades to the prior all-instances
+		# path rather than silently doing nothing.
+		try:
+			own_document = self._windowController.document() if self._windowController is not None else None
+		except Exception:
+			own_document = None
+		if own_document is not None and document is not None and document != own_document:
+			return
 		# Re-entrancy guard: this fire is our OWN follow-up save (below), made only to
 		# flush the just-written userData to disk. Don't record or re-save again.
 		if getattr(self, "_resaving", False):
@@ -3049,6 +3143,30 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [title bar] error:\n" + traceback.format_exc())
 
 	@objc.python_method
+	def _teardown_title_bar(self) -> None:
+		# Remove the subviews _inject_title_bar added into the long-lived, window-owned
+		# section header. The header outlives this palette instance, so without this they
+		# orphan and stack across reloads (the reinjection guard at _inject_title_bar
+		# lives on the NEW instance, so a reload would inject a second control set over the
+		# stale orphans whose buttons still target a dead instance). Null-safe + idempotent:
+		# guards each attr and tolerates a double teardown / partial init.
+		for attr in ("_titleBar", "_titleReport", "_titleBuy", "_titleLock"):
+			view = getattr(self, attr, None)
+			if view is not None:
+				try:
+					view.removeFromSuperview()
+				except Exception:
+					pass
+			setattr(self, attr, None)
+		field = getattr(self, "_titleField", None)
+		if field is not None:
+			try:
+				field.setAlphaValue_(1.0)
+			except Exception:
+				pass
+		self._titleField = None
+
+	@objc.python_method
 	def _update_title_bar(self) -> None:
 		bar = getattr(self, "_titleBar", None)
 		if bar is None or not self.font or not self.meaning:
@@ -3314,8 +3432,16 @@ class ColorFlow(PalettePlugin):
 			Glyphs.removeCallback(self.contextMenuHandler)
 		except Exception:
 			pass
-		# Remove the Rainbow Font View menu item this instance added.
-		self._teardown_rainbow_menu()
+		# NOTE: the Rainbow File-menu item is now installed ONCE per session against a
+		# retained module-level singleton (_RAINBOW_MENU_HANDLER), so it deliberately
+		# OUTLIVES this instance — closing one window must not strip the entry the other
+		# open windows still use. Hence no per-instance menu teardown here.
+		# Remove the section-header subviews this instance injected into the long-lived,
+		# window-owned header (else they orphan + stack dead-target controls on reload).
+		try:
+			self._teardown_title_bar()
+		except Exception:
+			pass
 		# Remove the Cocoa save-notification observers.
 		try:
 			from Foundation import NSNotificationCenter
