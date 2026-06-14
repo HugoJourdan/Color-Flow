@@ -5,6 +5,6 @@ from _colorflow_lic.bootstrap import LicenseConfig
 
 CONFIG = LicenseConfig(
     product='Color Flow',
-    defaults_prefix='com.HugoJourdan.ColorFlow',
+    defaults_prefix='com.hugojourdan.ColorFlow',
     buy_url='https://hugojourdan.lemonsqueezy.com/checkout/buy/609c199f-4fb3-4d7a-acc9-cfb879be1734',
 )
