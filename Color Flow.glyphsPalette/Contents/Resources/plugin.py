@@ -116,6 +116,9 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 	def _saturate(self, rgba: tuple, factor: float) -> tuple:
 		import colorsys
 		hue, sat, val = colorsys.rgb_to_hsv(rgba[0], rgba[1], rgba[2])
+		# Vivid AND bright: lift value toward full so each hue reads luminous (the loader
+		# rainbow should glow, not sit muted).
+		val = min(1.0, val * 1.15 + 0.12)
 		red, green, blue = colorsys.hsv_to_rgb(hue, min(1.0, sat * factor), val)
 		return (red, green, blue, rgba[3] if len(rgba) > 3 else 1.0)
 
@@ -144,7 +147,8 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 			controls = Quartz.CIFilter.filterWithName_("CIColorControls")
 			if controls is not None:
 				controls.setValue_forKey_(output, "inputImage")
-				controls.setValue_forKey_(1.5, "inputSaturation")
+				controls.setValue_forKey_(1.7, "inputSaturation")   # blur dulls hues -> re-vivify
+				controls.setValue_forKey_(0.12, "inputBrightness")  # lift so the halo reads as light
 				boosted = controls.valueForKey_("outputImage")
 				if boosted is not None:
 					output = boosted
@@ -209,37 +213,42 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 		bounds = self.bounds()
 		width = bounds.size.width
 		height = bounds.size.height
-		bar_h = 16.0 / 1.5   # thinner bar
-		bar_y = height - bar_h
+		bar_h = 7.0    # thin bar; the % label now sits to its RIGHT (was below)
+		pct_w = 46.0   # right-hand column reserved for the percentage label
+		gap = 10.0     # space between the bar and the % label
+		bar_w = max(10.0, width - pct_w - gap)
+		bar_y = (height - bar_h) / 2.0   # vertically centre the bar in the view
 		radius = bar_h / 2.0
-		bar_rect = AppKit.NSMakeRect(0.0, bar_y, width, bar_h)
-		filled = prog * width
-		# Build (and cache once per size) the soft, saturated, Gaussian-blurred rainbow
-		# fill — both the glow and the bar itself draw from it.
+		bar_rect = AppKit.NSMakeRect(0.0, bar_y, bar_w, bar_h)
+		filled = prog * bar_w
+		# Build (and cache once per size) the blurred + brightened rainbow used for
+		# fill — the glow halo; the bar draws the crisp gradient.
 		nscolors = [
 			AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(rgba[0], rgba[1], rgba[2], 1.0)
 			for rgba in colors
 		]
 		blend = AppKit.NSGradient.alloc().initWithColors_(nscolors) if len(nscolors) >= 2 else None
-		key = (int(round(width)), int(round(bar_h)))
+		key = (int(round(bar_w)), int(round(bar_h)))
 		if blend is not None and getattr(self, "_fillKey", None) != key:
-			self._fillImage = self._blurred_fill(blend, width, bar_h, bar_h * 1.2)
+			self._fillImage = self._blurred_fill(blend, bar_w, bar_h, bar_h * 1.6)
 			self._fillKey = key
 		fill_image = getattr(self, "_fillImage", None)
-		# Coloured glow: the blurred fill drawn a little larger + faint BEHIND the track,
-		# CLIPPED to a rounded pill so it reads as a soft halo hugging the bar — not a
+		# Soft colour glow that HUGS the rounded bar: a shadow bloom cast by the filled pill,
+		# drawn behind the track and then covered by it — not a
 		# rectangular ghost peeking out behind the rounded track (the "second bar").
-		if colors and prog > 0.0 and fill_image is not None:
-			grow = bar_h * 0.4
-			glow_rect = AppKit.NSMakeRect(-grow, bar_y - grow, filled + grow * 2.0, bar_h + grow * 2.0)
-			src_rect = AppKit.NSMakeRect(0.0, 0.0, max(filled, 1.0), bar_h)
-			glow_radius = (bar_h + grow * 2.0) / 2.0
+		if colors and prog > 0.0:
+			mid = colors[len(colors) // 2]
 			context = AppKit.NSGraphicsContext.currentContext()
 			context.saveGraphicsState()
-			AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
-				glow_rect, glow_radius, glow_radius).addClip()
-			fill_image.drawInRect_fromRect_operation_fraction_(
-				glow_rect, src_rect, AppKit.NSCompositingOperationSourceOver, 0.5)
+			glow = AppKit.NSShadow.alloc().init()
+			glow.setShadowColor_(AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(mid[0], mid[1], mid[2], 0.55))
+			glow.setShadowBlurRadius_(bar_h * 0.9)   # fits the now-shorter loader view without clipping
+			glow.setShadowOffset_(AppKit.NSMakeSize(0.0, 0.0))
+			glow.set()
+			pill = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+				AppKit.NSMakeRect(0.0, bar_y, filled, bar_h), radius, radius)
+			AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(mid[0], mid[1], mid[2], 1.0).set()
+			pill.fill()
 			context.restoreGraphicsState()
 		track = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(bar_rect, radius, radius)
 		AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(0.137, 0.149, 0.180, 1.0).set()
@@ -251,7 +260,7 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 			# reveal the fill only up to the filled fraction (colours stay anchored)
 			AppKit.NSBezierPath.bezierPathWithRect_(
 				AppKit.NSMakeRect(0.0, bar_y, filled, bar_h)).addClip()
-			if fill_image is not None:
+			if blend is None and fill_image is not None:
 				fill_image.drawInRect_fromRect_operation_fraction_(
 					bar_rect, AppKit.NSZeroRect, AppKit.NSCompositingOperationSourceOver, 1.0)
 			elif blend is not None:
@@ -259,14 +268,14 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 			elif nscolors:
 				nscolors[0].set()
 				AppKit.NSRectFill(AppKit.NSMakeRect(0.0, bar_y, filled, bar_h))
-			top = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(1.0, 1.0, 1.0, 0.22)
+			top = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(1.0, 1.0, 1.0, 0.30)
 			bottom = AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(0.0, 0.0, 0.0, 0.16)
 			sheen = AppKit.NSGradient.alloc().initWithStartingColor_endingColor_(top, bottom)
 			if sheen is not None:
 				sheen.drawInRect_angle_(bar_rect, -90.0)
 			context.restoreGraphicsState()
 		paragraph = AppKit.NSMutableParagraphStyle.alloc().init()
-		paragraph.setAlignment_(AppKit.NSTextAlignmentCenter)
+		paragraph.setAlignment_(AppKit.NSTextAlignmentRight)
 		attributes = {
 			AppKit.NSForegroundColorAttributeName: AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(0.60, 0.63, 0.67, 1.0),
 			AppKit.NSFontAttributeName: AppKit.NSFont.systemFontOfSize_(11.0),
@@ -274,7 +283,9 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 		}
 		label = AppKit.NSAttributedString.alloc().initWithString_attributes_(
 			f"{int(round(prog * 100))}%", attributes)
-		label.drawInRect_(AppKit.NSMakeRect(0.0, 0.0, width, bar_y - 2.0))
+		# % sits to the RIGHT of the bar, vertically centred on it (was below the bar).
+		text_h = label.size().height
+		label.drawInRect_(AppKit.NSMakeRect(bar_w + gap, (height - text_h) / 2.0, pct_w, text_h))
 
 
 ########################################################################################################
@@ -301,6 +312,61 @@ SWAP_KEY = "com.hugojourdan.ColorFlow-SwapColorRouting"
 # a per-window palette instance that may be deallocated when its window closes.
 _SHORTCUT_HANDLER = None
 
+# Shared bootstrap entitlement (Gate). The native "Jump to next" shortcut fires
+# the module-level handler, which has no palette instance, so the licence gate is
+# consulted here. settings()/_onLicenseChanged publish the live Gate so the
+# shortcut blocks (and nags once) exactly like the in-palette features.
+_SHARED_ENT = None
+
+
+def _shared_gate_blocked() -> bool:
+	"""True when the shared licence entitlement is blocked; nags once if so."""
+	ent = _SHARED_ENT
+	blocked = bool(ent and getattr(ent, "blocked", False))
+	if blocked:
+		try:
+			ent.nag()
+		except Exception:
+			pass
+	return blocked
+
+
+# NSUserDefaults keys are CASE-SENSITIVE. The licence used to store its trial /
+# license payloads under the mis-cased prefix "com.hugojourdan.ColorFlow" while
+# the bundle's real CFBundleIdentifier is "com.HugoJourdan.ColorFlow". The config
+# now uses the correct (CFBundleIdentifier) casing, so existing installs would be
+# orphaned from their already-stored trial/license. This one-time, idempotent copy
+# forwards the old keys to the new ones on launch (old keys are left untouched).
+_LICENSE_OLD_PREFIX = "com.hugojourdan.ColorFlow"
+_LICENSE_NEW_PREFIX = "com.HugoJourdan.ColorFlow"
+# Every defaults suffix the licence backend reads/writes (see _colorflow_lic/
+# bootstrap.py::_wire). Keep in sync if the backend grows new keys.
+_LICENSE_KEY_SUFFIXES = (".trial", ".license")
+
+
+def _migrate_license_defaults_prefix() -> None:
+	"""Copy mis-cased licence defaults to the CFBundleIdentifier-cased prefix.
+
+	Runs every launch; safe + idempotent: a key is copied only when the new-prefix
+	key is ABSENT and the old-prefix key is PRESENT. Never deletes the old key.
+	"""
+	try:
+		from GlyphsApp import Glyphs
+	except Exception:
+		return
+	for suffix in _LICENSE_KEY_SUFFIXES:
+		old_key = _LICENSE_OLD_PREFIX + suffix
+		new_key = _LICENSE_NEW_PREFIX + suffix
+		try:
+			if Glyphs.defaults[new_key] is not None:
+				continue
+			old_value = Glyphs.defaults[old_key]
+			if old_value is not None:
+				Glyphs.defaults[new_key] = old_value
+		except Exception:
+			# A single bad key must never break plugin load.
+			continue
+
 
 def _shortcut_font_dir(font) -> str | None:
 	return os.path.dirname(font.filepath) if font.filepath else None
@@ -313,6 +379,8 @@ def _jump_to_next_unfinished() -> None:
 	(tools/generate_shortcuts.py, JUMP_TAIL) via the shared colornav module, so
 	"next" and "unfinished" mean the same thing in both halves.
 	"""
+	if _shared_gate_blocked():
+		return
 	font = Glyphs.font
 	if font is None:
 		Message("Open a font first.", title="Color Flow")
@@ -715,6 +783,21 @@ def _reset_colors_and_order(font) -> None:
 	_broadcast_settings_changed()
 
 
+def _poke_default_sort(font) -> None:
+	"""Nudge Glyphs to refresh the Font View to the default glyph order. Toggling
+	``storeSortName`` True then False on a glyph triggers a re-sort without persisting
+	any custom sort name (the Macro-panel idiom ``font.glyphs[0].storeSortName = True/False``)."""
+	try:
+		if font is None or len(font.glyphs) == 0:
+			return
+		glyph = font.glyphs[0]
+		glyph.storeSortName = True
+		glyph.storeSortName = False
+	except Exception:
+		import traceback
+		print("Color Flow [default sort poke] error:\n" + traceback.format_exc())
+
+
 def _apply_rainbow_source(font, segment: int) -> None:
 	"""Mirror the popover's Default/Layer/Glyph segmented control: 0 disables Font Glyph
 	Order grouping, 1 = Layer colour, 2 = Glyph colour. Best-effort; broadcasts."""
@@ -725,6 +808,8 @@ def _apply_rainbow_source(font, segment: int) -> None:
 		if segment == 0:
 			if grouping.is_enabled(font):
 				grouping.disable(font)
+			# Default order restored — poke Glyphs to re-sort the Font View to it.
+			_poke_default_sort(font)
 		else:
 			grouping.set_mode(font, "Layer" if segment == 1 else "Glyph")
 			if not grouping.is_enabled(font):
@@ -794,7 +879,7 @@ class ColorFlowSettingsView:
 	Held module-globally (not per palette instance) because the pane is GLOBAL: it is added
 	to Glyphs > Settings once per session and shared across all document windows."""
 
-	WIDTH = 460          # base width; the view + controls stretch to fill the Settings tab
+	WIDTH = 340          # base width; the view + controls stretch to fill the Settings tab
 	MARGIN = 12          # slim margins so the controls take the full pane width
 
 	def __init__(self) -> None:
@@ -803,8 +888,9 @@ class ColorFlowSettingsView:
 		# map an edited/dragged row back to its colour index.
 		self._slot_list = None
 		self._slot_items: list[dict] = []
-		self._segment = None
+		self._color_order = None
 		self._swap_checkbox = None
+		self._license_btn = None
 		self._height = 0
 		self._build()
 
@@ -847,22 +933,23 @@ class ColorFlowSettingsView:
 		inner = self.WIDTH - 2 * margin
 
 		# Color Labels (title + reload-reset icon, help line, combined editor) ---
-		lc_label_y = 16
+		lc_label_y = 12
 		# One help line under the title explaining how to edit a row.
-		lc_help_y = lc_label_y + 22
-		lc_help_h = 30
+		lc_help_y = lc_label_y + 20
+		lc_help_h = 36
 		lc_list_y = lc_help_y + lc_help_h + 6
 		# 12 rows; List2 row height is ~24pt on modern macOS, plus a little chrome.
 		lc_list_h = 12 * 26 + 8
 		# Font Glyph Order (below the list — reset is now the title's reload icon) ---
-		fgo_sep_y = lc_list_y + lc_list_h + 12
-		fgo_label_y = fgo_sep_y + 12
-		fgo_seg_y = fgo_label_y + 22
+		fgo_sep_y = lc_list_y + lc_list_h + 10
+		fgo_label_y = fgo_sep_y + 10
+		fgo_seg_y = fgo_label_y + 20
 		# Behaviour (below Font Glyph Order) ------------------------------------
-		beh_sep_y = fgo_seg_y + 24 + 12
-		beh_label_y = beh_sep_y + 12
-		beh_check_y = beh_label_y + 22
-		height = beh_check_y + 22 + margin
+		beh_sep_y = fgo_seg_y + 24 + 10
+		beh_label_y = beh_sep_y + 10
+		beh_check_y = beh_label_y + 20
+		beh_lic_y = beh_check_y + 24
+		height = beh_lic_y + 22 + margin
 		self._height = height
 
 		self.group = Group((0, 0, self.WIDTH, height))
@@ -895,8 +982,8 @@ class ColorFlowSettingsView:
 
 		# Help line: how to edit a row. Renaming is a double-click (not obvious), so spell it out.
 		group.lcHelp = TextBox((margin, lc_help_y, inner, lc_help_h),
-			"Double-click a name to rename it. Click the swatch to recolour, the eye to "
-			"show or hide, and drag shown rows to reorder.",
+			"Double-click a name to rename it. Click the swatch to recolour, the "
+			"eye to hide, and drag to reorder.",
 			sizeStyle="small")
 
 		# ONE combined control: a List2 of all 12 label slots. Each row carries an EYE
@@ -944,11 +1031,12 @@ class ColorFlowSettingsView:
 		# Font Glyph Order (bottom) ---------------------------------------------
 		group.fgoSep = HorizontalLine((margin, fgo_sep_y, inner, 1))
 		group.fgoLabel = TextBox((margin, fgo_label_y, inner, 18), "Font Glyph Order")
-		group.rainbow = SegmentedButton((margin, fgo_seg_y, inner, 24),
-			[dict(title="Default"), dict(title="Layer"), dict(title="Glyph")],
-			callback=self._rainbow_changed)
-		group.rainbow.set(_rainbow_segment_for_font(font))
-		self._segment = group.rainbow
+		# Single checkbox: ON = Layer colour glyph order, OFF = Default font order.
+		group.colorOrder = CheckBox((margin, fgo_seg_y, inner, 18),
+			"Color Glyph Order",
+			value=bool(_rainbow_segment_for_font(font)),
+			callback=self._color_order_changed)
+		self._color_order = group.colorOrder
 
 		# Behaviour (bottom) ----------------------------------------------------
 		group.behSep = HorizontalLine((margin, beh_sep_y, inner, 1))
@@ -959,11 +1047,16 @@ class ColorFlowSettingsView:
 			callback=self._swap_routing_changed)
 		self._swap_checkbox = group.swapRouting
 
+		# License recovery button — always-enabled, opens the license sheet.
+		group.licenseBtn = Button((margin, beh_lic_y, inner, 22), "License…",
+			callback=lambda sender: __import__("_colorflow_lic", fromlist=["bootstrap"]).bootstrap.show_license_ui(__import__("_colorflow_lic_config").CONFIG))
+		self._license_btn = group.licenseBtn
+
 		# Make the full-width controls grow with the Settings tab. Each is pinned to the top,
 		# width flexible. The title + its reload-reset icon keep a fixed width/position
 		# (top-left), so the icon stays next to the title rather than drifting right.
-		for _name in ("lcHelp", "lcList", "fgoSep", "fgoLabel", "rainbow",
-				"behSep", "behLabel", "swapRouting"):
+		for _name in ("lcHelp", "lcList", "fgoSep", "fgoLabel", "colorOrder",
+				"behSep", "behLabel", "swapRouting", "licenseBtn"):
 			try:
 				getattr(group, _name).getNSView().setAutoresizingMask_(
 					AppKit.NSViewWidthSizable | AppKit.NSViewMinYMargin)
@@ -974,6 +1067,8 @@ class ColorFlowSettingsView:
 				getattr(group, _name).getNSView().setAutoresizingMask_(AppKit.NSViewMinYMargin)
 			except Exception:
 				pass
+		# Fade hidden rows so they read as inactive.
+		self._dim_hidden_rows()
 
 	# ------------------------------------------------------------------ slot list
 	def _slot_list_items(self, font) -> list[dict]:
@@ -1011,6 +1106,22 @@ class ColorFlowSettingsView:
 	def _visible_slot_count(self) -> int:
 		"""Number of leading VISIBLE rows (the draggable block, pinned above the hidden ones)."""
 		return sum(1 for item in self._slot_items if self._slot_is_visible(item))
+
+	def _dim_hidden_rows(self) -> None:
+		"""Fade hidden (unchecked) slot rows so they read as inactive. Row index maps to
+		self._slot_items (visible first, hidden pinned below); makeIfNecessary forces each row
+		view to exist so the dim holds right after a reload. Best-effort/guarded."""
+		if self._slot_list is None:
+			return
+		try:
+			table = self._slot_list.getNSTableView()
+			for row, item in enumerate(self._slot_items):
+				row_view = table.rowViewAtRow_makeIfNecessary_(row, True)
+				if row_view is not None:
+					row_view.setAlphaValue_(1.0 if self._slot_is_visible(item) else 0.4)
+		except Exception:
+			import traceback
+			print("Color Flow [dim hidden rows] error:\n" + traceback.format_exc())
 
 	def _slot_drag_candidate(self, indexes) -> bool:
 		"""Allow a drag only when every picked row is VISIBLE (named). Hidden rows are fixed."""
@@ -1061,6 +1172,7 @@ class ColorFlowSettingsView:
 			self._slot_items = new_items
 			if self._slot_list is not None:
 				self._slot_list.set(new_items)
+				self._dim_hidden_rows()
 			new_order = [item["slot"] for item in new_items if self._slot_is_visible(item)]
 			_apply_color_order(Glyphs.font, new_order)
 			return True
@@ -1076,8 +1188,9 @@ class ColorFlowSettingsView:
 			font = Glyphs.font
 			if self._slot_list is not None:
 				self._slot_list.set(self._slot_list_items(font))
-			if self._segment is not None:
-				self._segment.set(_rainbow_segment_for_font(font))
+				self._dim_hidden_rows()
+			if self._color_order is not None:
+				self._color_order.set(bool(_rainbow_segment_for_font(font)))
 			if self._swap_checkbox is not None:
 				self._swap_checkbox.set(bool(Glyphs.defaults[SWAP_KEY]))
 		except Exception:
@@ -1085,9 +1198,10 @@ class ColorFlowSettingsView:
 			print("Color Flow [pane reload] error:\n" + traceback.format_exc())
 
 	# ------------------------------------------------------------------ callbacks
-	def _rainbow_changed(self, sender) -> None:
+	def _color_order_changed(self, sender) -> None:
 		try:
-			_apply_rainbow_source(Glyphs.font, sender.get())
+			# Checkbox ON = Layer colour order, OFF = Default (restores order + pokes re-sort).
+			_apply_rainbow_source(Glyphs.font, 1 if sender.get() else 0)
 		except Exception:
 			import traceback
 			print("Color Flow [pane rainbow] error:\n" + traceback.format_exc())
@@ -1183,6 +1297,7 @@ class ColorFlowSettingsView:
 				# so we skip the re-set to avoid stealing focus mid-type.)
 				if self._slot_list is not None:
 					self._slot_list.set(self._slot_list_items(font))
+				self._dim_hidden_rows()
 		except Exception:
 			import traceback
 			print("Color Flow [pane slot edit] error:\n" + traceback.format_exc())
@@ -1212,11 +1327,28 @@ class ColorFlowPreferencesController(AppKit.NSViewController):
 			self.setRepresentedObject_(COLORFLOW_PREF_IDENTIFIER)
 		except Exception:
 			pass
+		# Declare how big this pane wants to be. Glyphs' Settings window switches panes inside
+		# an NSTabView (item.view = vc.view); a pane-switching prefs window sizes the content
+		# area to the selected controller's preferredContentSize. NSTabView stretches our view's
+		# FRAME to fill, so the frame can't carry the request — preferredContentSize can, and the
+		# window (sidebar + pane) shrinks to fit. Set here AND in loadView so it's present
+		# whenever Glyphs queries.
+		self._apply_preferred_size()
 		return self
+
+	@objc.python_method
+	def _apply_preferred_size(self) -> None:
+		try:
+			view = self._settingsView
+			size = AppKit.NSMakeSize(float(view.WIDTH), float(getattr(view, "_height", 0) or view.WIDTH))
+			self.setPreferredContentSize_(size)
+		except Exception:
+			pass
 
 	def loadView(self) -> None:
 		try:
 			self.setView_(self._settingsView.view)
+			self._apply_preferred_size()
 		except Exception:
 			import traceback
 			print("Color Flow [pref loadView] error:\n" + traceback.format_exc())
@@ -1291,8 +1423,66 @@ def _open_preferences_pane() -> None:
 			continue
 
 
+# Borderless layer-backed button with a hover effect — brightens its fill while
+# the mouse is inside. Guarded with lookUpClass so a plugin reload doesn't
+# re-register the ObjC class name.
+try:
+	_CFBuyButton = objc.lookUpClass("CFBuyButton")
+except objc.error:
+
+	class CFBuyButton(AppKit.NSButton):
+		def initWithFrame_(self, frame):
+			self = objc.super(CFBuyButton, self).initWithFrame_(frame)
+			if self is not None:
+				self._normalBG = None
+				self._hoverBG = None
+				self._trackingArea = None
+			return self
+
+		@objc.python_method
+		def configureBG(self, normal_cg, hover_cg) -> None:
+			self._normalBG = normal_cg
+			self._hoverBG = hover_cg
+			if self.layer() is not None and normal_cg is not None:
+				self.layer().setBackgroundColor_(normal_cg)
+
+		def updateTrackingAreas(self):
+			objc.super(CFBuyButton, self).updateTrackingAreas()
+			existing = getattr(self, "_trackingArea", None)
+			if existing is not None:
+				self.removeTrackingArea_(existing)
+			opts = (
+				AppKit.NSTrackingMouseEnteredAndExited
+				| AppKit.NSTrackingActiveAlways
+				| AppKit.NSTrackingInVisibleRect
+			)
+			self._trackingArea = AppKit.NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
+				self.bounds(), opts, self, None)
+			self.addTrackingArea_(self._trackingArea)
+
+		def resetCursorRects(self):
+			# Canonical: AppKit shows the hand over the button's bounds + restores it.
+			self.addCursorRect_cursor_(self.bounds(), AppKit.NSCursor.pointingHandCursor())
+
+		def mouseEntered_(self, event):
+			AppKit.NSCursor.pointingHandCursor().set()
+			if self.layer() is not None and getattr(self, "_hoverBG", None) is not None:
+				self.layer().setBackgroundColor_(self._hoverBG)
+
+		def mouseExited_(self, event):
+			AppKit.NSCursor.arrowCursor().set()
+			if self.layer() is not None and getattr(self, "_normalBG", None) is not None:
+				self.layer().setBackgroundColor_(self._normalBG)
+
+	_CFBuyButton = CFBuyButton
+
 
 class ColorFlow(PalettePlugin):
+
+	# Body height in the license-blocked state. Not 0 — a literal-0 body strips the
+	# padding Glyphs keeps under a collapsed section header, making the band read
+	# shorter than sibling sections. Tune ±2 in Glyphs until it matches.
+	_BLOCKED_BODY_HEIGHT = 14
 
 
 	########################################################################################################
@@ -1305,9 +1495,16 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def settings(self) -> None:
-		from license_config import CONFIG
+		from _colorflow_lic_config import CONFIG
 		from _colorflow_lic import bootstrap
+		# One-time, idempotent forward of mis-cased licence defaults to the
+		# CFBundleIdentifier casing. Must run BEFORE bootstrap.start reads them.
+		_migrate_license_defaults_prefix()
 		self._ent = bootstrap.start(CONFIG)
+		# Publish the live Gate so the module-level "Jump to next" shortcut handler
+		# (no palette instance) can consult the same licence state.
+		global _SHARED_ENT
+		_SHARED_ENT = self._ent
 		self.name = 'Color Flow'
 		self.init = False
 		self.colorKeys = {
@@ -1342,9 +1539,7 @@ class ColorFlow(PalettePlugin):
 		self.rectHeight = 10
 		self.lineSpacing = 20
 		self.shift = 10
-		self.barWidth = self.width+6
 		self.height = 19 * len([x for x in self.meaning.values() if x]) + 4
-		self.xPos = 0  # progress bar flush to the left edge (no margin)
 
 		self.paletteView = Window((self.width, self.height + 10))
 		self.paletteView.frame = Group((0, 0, self.width, self.height))
@@ -1533,6 +1728,8 @@ class ColorFlow(PalettePlugin):
 		# Build a "Color Flow" smart-filter group (one filter per visible step +
 		# None) and merge it into the font's Filters parameter. Filters match the
 		# GLYPH colour — Glyphs has no per-master layer-colour predicate.
+		if self._gate():
+			return
 		try:
 			font = Glyphs.font
 			if font is None:
@@ -1564,45 +1761,35 @@ class ColorFlow(PalettePlugin):
 	# (so the sheet has painted) and dismiss the sheet when it opens.
 	@objc.python_method
 	def _present_report_sheet(self) -> None:
+		# Single choke point for the report/dashboard (openDashboard_ ->
+		# _popover_dashboard -> here, and the header button). Gate here so a blocked
+		# licence cannot generate a report by any path.
+		if self._gate():
+			return
 		try:
 			parent = self.dialog.window() if self.dialog is not None else None
 			if parent is None:
 				self.Open_Color_Font_Dashboard(None)
 				return
-			rect = AppKit.NSMakeRect(0, 0, 256, 84)
+			rect = AppKit.NSMakeRect(0, 0, 256, 54)   # compact, with a little breathing room top/bottom
 			panel = AppKit.NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
 				rect, AppKit.NSWindowStyleMaskTitled, AppKit.NSBackingStoreBuffered, False)
 			panel.setTitle_("Color Flow")
 			content = panel.contentView()
 			label = AppKit.NSTextField.labelWithString_("Generating Color Flow report\u2026")
-			label.setFrame_(AppKit.NSMakeRect(16, 52, 224, 16))
+			label.setFrame_(AppKit.NSMakeRect(16, 30, 224, 16))
 			content.addSubview_(label)
-			loader = _ColorFlowLoaderBar.alloc().initWithFrame_(AppKit.NSMakeRect(16, 16, 224, 30))
+			loader = _ColorFlowLoaderBar.alloc().initWithFrame_(AppKit.NSMakeRect(16, 5, 224, 22))
 			loader.configure(labelcolors.read_label_colors())
 			content.addSubview_(loader)
-			# Open / Save buttons, hidden until the build finishes — they replace the
-			# loader so the report is no longer opened automatically.
-			open_btn = AppKit.NSButton.buttonWithTitle_target_action_("Open", self, "openReport:")
-			open_btn.setFrame_(AppKit.NSMakeRect(54, 18, 70, 24))
-			open_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
-			open_btn.setKeyEquivalent_("\r")   # Open = default button (Return)
-			open_btn.setHidden_(True)
-			content.addSubview_(open_btn)
-			save_btn = AppKit.NSButton.buttonWithTitle_target_action_("Save", self, "saveReport:")
-			save_btn.setFrame_(AppKit.NSMakeRect(132, 18, 70, 24))
-			save_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
-			save_btn.setHidden_(True)
-			content.addSubview_(save_btn)
 			self._reportLoader = loader
 			self._reportPanel = panel
 			self._reportLabel = label
-			self._openBtn = open_btn
-			self._saveBtn = save_btn
 			self._reportPath = None
 			parent.beginSheet_completionHandler_(panel, None)
 			# Let the sheet paint once, then build on the next run-loop hop. The build
 			# drives the bar with REAL progress (set_progress + run-loop pumping); when it
-			# finishes we reveal Open / Save instead of auto-opening the report.
+			# finishes the report opens automatically and the sheet closes.
 			self.performSelector_withObject_afterDelay_("runReportGeneration:", None, 0.08)
 		except Exception:
 			import traceback
@@ -1628,47 +1815,30 @@ class ColorFlow(PalettePlugin):
 					pass
 			self._reportPath = path
 			# Build is done and the main thread is free again: let the bar visibly reach
-			# 100% (a few timer ticks), then reveal the Open / Save buttons.
-			self.performSelector_withObject_afterDelay_("showReportActions:", None, 0.3)
+			# 100% (a few timer ticks), then open the report and close the sheet.
+			self.performSelector_withObject_afterDelay_("finishReportSheet:", None, 0.3)
 
-	def showReportActions_(self, sender) -> None:
-		self._show_report_actions()
+	def finishReportSheet_(self, sender) -> None:
+		self._finish_report_sheet()
 
 	@objc.python_method
-	def _show_report_actions(self) -> None:
-		# Build finished: stop + hide the loader, swap the label, and reveal Open / Save.
-		# If nothing was produced, just close the sheet.
+	def _finish_report_sheet(self) -> None:
+		# Build finished: stop the loader, close the sheet, then ALWAYS open the report
+		# (no Open/Save prompt).
 		loader = getattr(self, "_reportLoader", None)
 		if loader is not None:
 			try:
 				loader.stop()
 			except Exception:
 				pass
-			loader.setHidden_(True)
 		path = getattr(self, "_reportPath", None)
-		if path is None:
-			self._dismiss_report_sheet()
-			return
-		label = getattr(self, "_reportLabel", None)
-		if label is not None:
-			label.setStringValue_("Color Flow report ready")
-		for button in (getattr(self, "_openBtn", None), getattr(self, "_saveBtn", None)):
-			if button is not None:
-				button.setHidden_(False)
-
-	def openReport_(self, sender) -> None:
-		path = getattr(self, "_reportPath", None)
+		self._dismiss_report_sheet()
 		if path is not None:
 			try:
 				webbrowser.open(path.as_uri())
 			except Exception:
 				import traceback
 				print("Color Flow [open report] error:\n" + traceback.format_exc())
-		self._dismiss_report_sheet()
-
-	def saveReport_(self, sender) -> None:
-		self._save_report_path(getattr(self, "_reportPath", None))
-		self._dismiss_report_sheet()
 
 	@objc.python_method
 	def _save_report_path(self, path) -> None:
@@ -1965,7 +2135,9 @@ class ColorFlow(PalettePlugin):
 	def _tutorial_set_dot(self, button, filled: bool) -> None:
 		glyph = "\u25CF" if filled else "\u25CB"     # \u25CF filled / \u25CB hollow
 		try:
-			color = (AppKit.NSColor.controlAccentColor() if filled
+			# Color Flow brand accent (#9f75ff) for the filled tutorial dot, not the
+			# system accent, so the onboarding matches the report's purple.
+			color = (AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(0.624, 0.459, 1.0, 1.0) if filled
 				else AppKit.NSColor.tertiaryLabelColor())
 			attrs = {
 				AppKit.NSForegroundColorAttributeName: color,
@@ -2178,6 +2350,8 @@ class ColorFlow(PalettePlugin):
 		return True
 
 	def toggleRainbow_(self, sender) -> None:
+		if self._gate():
+			return
 		self.Toggle_Rainbow(sender)
 
 	def rainbowDebouncedRebuild_(self, sender) -> None:
@@ -2321,6 +2495,8 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def Toggle_Rainbow(self, sender) -> None:
+		if self._gate():
+			return
 		font = Glyphs.font
 		if font is None:
 			return
@@ -2471,16 +2647,10 @@ class ColorFlow(PalettePlugin):
 			yPos = 13
 			masterId = self.font.selectedFontMaster.id
 			counts = self._counts(masterId)
-			# Non-exporting glyphs never count: the bar denominator shrinks with
-			# the counts. Counts are the exact census, so each row's bar fills
-			# with the layers sitting EXACTLY on that step — a fully finished
-			# exporting set reads as a full bar on the final step, empty elsewhere.
-			glyphCount = len(self.font.glyphs) - len(self._excluded_glyph_names())
 			order = list(self.meaning.keys())
 
 			selectedLayers = self.font.selectedLayers or []
 			selStates = [self._layer_state(layer, order) for layer in selectedLayers]
-			firstColor = selectedLayers[0].color if selectedLayers else None
 
 			for color, meaning in self.meaning.items():
 				for suffix in ("", "box", "count", "hl", "click"):
@@ -2490,19 +2660,12 @@ class ColorFlow(PalettePlugin):
 				if not meaning:
 					continue
 				count = counts[color] if color in counts else 0
-				barWidth = (self.barWidth / glyphCount * count) if glyphCount else 0
 
 				if selectedLayers:
 					check = all(state.get(color, False) for state in selStates)
 					if check:
 						rgb = self.colorKeys[str(color)]
 						setattr(self.paletteView.frame, str(color)+"hl", Box((0, yPos-self.shift-1, self.width, 19), fillColor=AppKit.NSColor.colorWithRed_green_blue_alpha_(rgb[0], rgb[1], rgb[2], 0.16), cornerRadius=0, borderWidth=0))
-					if barWidth:
-						if check and firstColor == int(color):
-							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
-						else:
-							fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.06)
-						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
 					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
 					self._register_row_checkbox(checkbox, color)
@@ -2510,9 +2673,6 @@ class ColorFlow(PalettePlugin):
 					self._attach_row_overlay(color, yPos)
 					yPos += 19
 				else:
-					if barWidth:
-						fill = AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])
-						setattr(self.paletteView.frame, str(color)+"box", Box((self.xPos, yPos-self.shift-1, barWidth+0.01, 19), fillColor=fill, cornerRadius=0, borderWidth=0))
 					checkbox = TextBox((12, yPos-self.shift+2, -10, 20), meaning, sizeStyle='small')
 					setattr(self.paletteView.frame, str(color), checkbox)
 					self._register_row_checkbox(checkbox, color)
@@ -2560,6 +2720,8 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow [context menu] error:\n" + traceback.format_exc())
 
 	def setStepFromMenu_(self, sender) -> None:
+		if self._gate():
+			return
 		try:
 			raw = sender.representedObject()
 			self._apply_step_to_selection(None if raw == "none" else int(raw))
@@ -2658,6 +2820,8 @@ class ColorFlow(PalettePlugin):
 	def openDashboard_(self, sender) -> None:
 		# Report header button: same flow the old popover's report button used —
 		# the loader sheet that builds the report and then offers Open / Save.
+		if self._gate():
+			return
 		try:
 			self._popover_dashboard(sender)
 		except Exception:
@@ -2683,10 +2847,25 @@ class ColorFlow(PalettePlugin):
 			return
 		try:
 			collapsed = self._is_collapsed()
-			bar.setHidden_(not collapsed)
+			blocked = bool(getattr(getattr(self, "_ent", None), "blocked", False))
+			# Colour bar: only in the collapsed header AND not blocked.
+			bar.setHidden_(not collapsed or blocked)
 			report = getattr(self, "_titleReport", None)
+			buy = getattr(self, "_titleBuy", None)
 			if report is not None:
-				report.setHidden_(collapsed)
+				# Report: only when expanded and not blocked.
+				report.setHidden_(collapsed or blocked)
+			if buy is not None:
+				# Buy: whenever blocked — the only affordance while gated, and the
+				# palette body is collapsed, so it must not depend on collapse state.
+				buy.setHidden_(not blocked)
+			lock = getattr(self, "_titleLock", None)
+			if lock is not None:
+				lock.setHidden_(not blocked)
+			title_field = getattr(self, "_titleField", None)
+			if title_field is not None:
+				# Dim the plugin name to signal the disabled (trial-expired) state.
+				title_field.setAlphaValue_(0.25 if blocked else 1.0)
 		except Exception:
 			pass
 
@@ -2755,7 +2934,7 @@ class ColorFlow(PalettePlugin):
 			ctrlY = (bounds.size.height - btn) / 2.0
 			# Eye button removed (visibility now lives in Settings); report is rightmost.
 			reportX = bounds.size.width - pad - btn
-			barWidth, barHeight = 84.0, 6.0
+			barWidth, barHeight = 75.6, 6.0   # 10% narrower than 84 (right edge unchanged)
 			barX = bounds.size.width - pad - barWidth
 			barY = (bounds.size.height - barHeight) / 2.0
 			bar = AppKit.NSView.alloc().initWithFrame_(((barX, barY), (barWidth, barHeight)))
@@ -2776,10 +2955,22 @@ class ColorFlow(PalettePlugin):
 			report.setAction_("openDashboard:")
 			report.setImageScaling_(AppKit.NSImageScaleProportionallyDown)
 			try:
-				reportImg = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_("chart.bar.doc.horizontal", None)
+				reportImg = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_("list.clipboard.fill", None)
 				if reportImg is None:
 					reportImg = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_("doc.text", None)
 				if reportImg is not None:
+					# Render the list.clipboard.fill symbol at SEMIBOLD WEIGHT (Hugo's pick) so it reads heavier than
+					# the default regular. Symbol weight needs a point size; tie it to the 14pt button.
+					try:
+						weight = getattr(AppKit, "NSFontWeightSemibold", 0.3)
+						scale = getattr(AppKit, "NSImageSymbolScaleMedium", 2)
+						cfg = AppKit.NSImageSymbolConfiguration.configurationWithPointSize_weight_scale_(
+							float(btn) * 0.66, weight, scale)
+						configured = reportImg.imageWithSymbolConfiguration_(cfg)
+						if configured is not None:
+							reportImg = configured
+					except Exception:
+						pass
 					report.setImage_(reportImg)
 				else:
 					report.setTitle_("\U0001F4CA")
@@ -2787,6 +2978,71 @@ class ColorFlow(PalettePlugin):
 				pass
 			header.addSubview_(report)
 			self._titleReport = report
+			# Buy button — an orange pill (filled, rounded, white text) so it clearly
+			# reads as a button. Right-aligned in the header, shown only while blocked
+			# (replaces the report button + colour bar).
+			# Original 80×16 pill, narrowed in steps to 38 wide (64 -> 48 -> 38).
+			buyW, buyH = 38.0, 13.0
+			buyX = bounds.size.width - pad - buyW
+			buyY = (bounds.size.height - buyH) / 2.0
+			buy = _CFBuyButton.alloc().initWithFrame_(((buyX, buyY), (buyW, buyH)))
+			buy.setBordered_(False)
+			buy.setAutoresizingMask_(AppKit.NSViewMinXMargin)
+			buy.setTarget_(self)
+			buy.setAction_("buyLicense:")
+			buy.setWantsLayer_(True)
+			buyText = AppKit.NSColor.colorWithRed_green_blue_alpha_(0.91, 0.61, 0.24, 1.0)  # bright amber-orange
+			try:
+				# Solid dark-amber capsule + bright orange label; brightens on hover.
+				buy.layer().setCornerRadius_(buyH / 2.0)
+				buy.layer().setMasksToBounds_(True)
+				buy.configureBG(
+					AppKit.NSColor.colorWithRed_green_blue_alpha_(0.42, 0.31, 0.13, 1.0).CGColor(),
+					AppKit.NSColor.colorWithRed_green_blue_alpha_(0.51, 0.38, 0.16, 1.0).CGColor())
+			except Exception:
+				pass
+			try:
+				attrs = {
+					AppKit.NSForegroundColorAttributeName: buyText,
+					AppKit.NSFontAttributeName: AppKit.NSFont.systemFontOfSize_weight_(
+						10, getattr(AppKit, "NSFontWeightMedium", 0.23)),
+				}
+				buy.setAttributedTitle_(
+					AppKit.NSAttributedString.alloc().initWithString_attributes_("Buy", attrs))
+			except Exception:
+				buy.setTitle_("Buy")
+			buy.setHidden_(True)
+			header.addSubview_(buy)
+			self._titleBuy = buy
+			# Lock glyph after the plugin name; the name is dimmed when disabled.
+			self._titleField = field
+			try:
+				fr = field.frame()
+				try:
+					text_w = field.attributedStringValue().size().width
+				except Exception:
+					text_w = 70.0
+				try:
+					title_pt = field.font().pointSize()
+				except Exception:
+					title_pt = 11.0
+				lockX = fr.origin.x + text_w + 5.0
+				# Match the plugin-name field's exact vertical box + point size so the
+				# lock glyph centers on the same baseline as the name.
+				lock = AppKit.NSTextField.alloc().initWithFrame_(((lockX, fr.origin.y), (18.0, fr.size.height)))
+				lock.setEditable_(False)
+				lock.setSelectable_(False)
+				lock.setBordered_(False)
+				lock.setDrawsBackground_(False)
+				lock.setAutoresizingMask_(AppKit.NSViewMaxXMargin)
+				lock.setFont_(AppKit.NSFont.systemFontOfSize_(title_pt))
+				lock.setTextColor_(AppKit.NSColor.secondaryLabelColor())
+				lock.setStringValue_("􀎡")  # SF Symbol lock (renders in the system font)
+				lock.setHidden_(True)
+				header.addSubview_(lock)
+				self._titleLock = lock
+			except Exception:
+				pass
 			self._sync_header()
 		except Exception:
 			import traceback
@@ -2834,12 +3090,27 @@ class ColorFlow(PalettePlugin):
 
 	# UPDATEINTERFACE handler: cheap dirty-check on selection + layer colours.
 	@objc.python_method
+	@objc.python_method
+	def _gate(self) -> bool:
+		# True when the licence is blocked (trial expired / unlicensed). Nags once
+		# per session via the bootstrap Gate, then returns True so callers early-out.
+		# Wire every guarded feature through this so a blocked palette is inert, not
+		# just visually collapsed.
+		ent = getattr(self, "_ent", None)
+		blocked = bool(ent and getattr(ent, "blocked", False))
+		if blocked:
+			try:
+				ent.nag()
+			except Exception:
+				pass
+		return blocked
+
 	def update(self, sender) -> None:
 		ent = getattr(self, "_ent", None)
 		if ent is not None and ent.blocked:
-			ent.nag()
-			self._showLockPanel_()
+			self._showBlockedState_()
 			return
+		self._clearBlockedState_()
 		if self._windowController:
 			self.font = self._windowController.documentFont()
 		if not self.font:
@@ -2879,24 +3150,98 @@ class ColorFlow(PalettePlugin):
 		self.Update_Plugin_UI()
 
 	@objc.python_method
-	def _showLockPanel_(self) -> None:
-		# Replace the palette content with a one-button lock view. Idempotent:
-		# update() fires on every UPDATEINTERFACE, so build only once.
-		if getattr(self, "_lockShown", False):
+	def _showBlockedState_(self) -> None:
+		# Block the palette from opening: clear the rows and collapse the body to
+		# nothing, leaving only the section header with the orange "Buy Licence →"
+		# button. Idempotent (update() fires on every UPDATEINTERFACE).
+		if getattr(self, "_blockedShown", False):
 			return
 		try:
-			import vanilla
-			from license_config import CONFIG
-			from _colorflow_lic import bootstrap
 			group = self.paletteView.frame
-			group.lock = vanilla.TextBox((10, 10, -10, 40),
-				f"{CONFIG.product} trial ended.\nEnter a license to continue.")
-			group.unlock = vanilla.Button((10, 58, -10, 22), "Enter license…",
-				callback=lambda sender: bootstrap.show_license_ui(CONFIG))
-			self._lockShown = True
+			# Clear per-row widgets (same idiom as Update_Plugin_UI).
+			for attr in getattr(self, "_metaAttrs", []) + getattr(self, "_bodyAttrs", []):
+				if hasattr(group, attr):
+					delattr(group, attr)
+			self._metaAttrs = []
+			self._bodyAttrs = []
+			for color in list(getattr(self, "meaning", {}).keys()):
+				for suffix in ("", "box", "count", "hl", "click"):
+					attr = str(color) + suffix
+					if hasattr(group, attr):
+						delattr(group, attr)
+			if hasattr(group, "_cfLockMsg"):
+				delattr(group, "_cfLockMsg")
+			self._blockedShown = True
+			# Not 0: a literal-0 body strips the padding Glyphs keeps under a collapsed
+			# section header, so the band reads shorter than sibling sections. Leave a
+			# sliver matching the natural collapsed height. Tune ±2 in Glyphs to match.
+			self._set_palette_height(self._BLOCKED_BODY_HEIGHT, animated=False)
+			self._sync_header()
 		except Exception:
 			import traceback
-			print(traceback.format_exc())
+			print("Color Flow [blocked state] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _clearBlockedState_(self) -> None:
+		# Restore the palette body after the block lifts so normal rows rebuild.
+		# Idempotent.
+		if not getattr(self, "_blockedShown", False):
+			return
+		try:
+			group = self.paletteView.frame
+			if hasattr(group, "_cfLockMsg"):
+				delattr(group, "_cfLockMsg")
+			self._blockedShown = False
+			visible = len([x for x in getattr(self, "meaning", {}).values() if x])
+			self._set_palette_height(19 * visible + 4, animated=False)
+			self._sync_header()
+		except Exception:
+			import traceback
+			print("Color Flow [clear blocked] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _onLicenseChanged(self) -> None:
+		try:
+			from _colorflow_lic_config import CONFIG
+			from _colorflow_lic import bootstrap
+			self._ent = bootstrap.start(CONFIG)
+			# Keep the shortcut handler's shared Gate in sync after activation.
+			global _SHARED_ENT
+			_SHARED_ENT = self._ent
+			self._clearBlockedState_()
+			self._update_title_bar()
+			self.update(None)
+		except Exception:
+			import traceback
+			print("Color Flow [license refresh] error:\n" + traceback.format_exc())
+
+	def buyLicense_(self, sender) -> None:
+		# Title-bar affordance shown while blocked: offer Buy (de-branded LS
+		# checkout sheet) OR Enter Key (activation sheet). The Enter-Key path
+		# refreshes entitlement live via _onLicenseChanged so the palette
+		# unlocks without a Glyphs reload.
+		try:
+			from _colorflow_lic_config import CONFIG
+			from _colorflow_lic import bootstrap
+			from AppKit import (
+				NSAlert,
+				NSAlertFirstButtonReturn,
+				NSAlertSecondButtonReturn,
+			)
+			alert = NSAlert.alloc().init()
+			alert.setMessageText_("Color Flow")
+			alert.setInformativeText_("Buy a license, or enter a key you already have.")
+			alert.addButtonWithTitle_("Buy License")
+			alert.addButtonWithTitle_("Enter Key…")
+			alert.addButtonWithTitle_("Cancel")
+			response = alert.runModal()
+			if response == NSAlertFirstButtonReturn:
+				bootstrap.show_buy_sheet(CONFIG)
+			elif response == NSAlertSecondButtonReturn:
+				bootstrap.show_license_ui(CONFIG, on_activated=self._onLicenseChanged)
+		except Exception:
+			import traceback
+			print("Color Flow [buy] error:\n" + traceback.format_exc())
 
 	########################################################################################################
 	#																									   #
