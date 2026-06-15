@@ -1269,9 +1269,9 @@ def _counting_extractor(monkeypatch) -> list[int]:
     real = db.glyphsvg.layer_outline_em
     calls = [0]
 
-    def counted(layer: object, em_height: float) -> dict:
+    def counted(*args: object, **kwargs: object) -> dict:
         calls[0] += 1
-        return real(layer, em_height)
+        return real(*args, **kwargs)
 
     monkeypatch.setattr(db.glyphsvg, "layer_outline_em", counted)
     return calls

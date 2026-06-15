@@ -461,7 +461,8 @@ def _history_paths(font) -> dict:
                 layer = glyph.layers[master_id]
             except Exception:
                 layer = None
-            outline = glyphsvg.layer_outline_em(layer, ems[master_id]) if layer is not None else {}
+            _asc, _desc = ems[master_id]
+            outline = glyphsvg.layer_outline_em(layer, _asc, _desc) if layer is not None else {}
             if outline:
                 out[master_id][name] = outline
                 produced += 1
@@ -751,18 +752,19 @@ def _effective_stamp(font, glyph, master_ids: list) -> float | None:
     return newest
 
 
-def _em_boxes(font) -> dict[str, float]:
-    """``{master_id: em_height}`` — one square cell scale per master (the
-    ascender-to-descender span), so a/A keep their real relative sizes."""
+def _em_boxes(font) -> dict[str, tuple[float, float]]:
+    """``{master_id: (ascender, descender)}`` — the master's vertical metrics, so the
+    cell glyphs share one baseline-aligned square scale (a/A keep relative sizes)."""
     upm = float(getattr(font, "upm", None) or 1000.0)
-    boxes: dict[str, float] = {}
+    boxes: dict[str, tuple[float, float]] = {}
     for master in font.masters:
         ascender = getattr(master, "ascender", None)
         descender = getattr(master, "descender", None)
         ascender = float(ascender) if ascender is not None else upm * 0.75
         descender = float(descender) if descender is not None else -upm * 0.25
-        height = ascender - descender
-        boxes[master.id] = height if height > 0 else upm
+        if ascender - descender <= 0:  # degenerate metrics → fall back to a sane em
+            ascender, descender = upm * 0.75, -upm * 0.25
+        boxes[master.id] = (ascender, descender)
     return boxes
 
 
@@ -770,7 +772,8 @@ def _outline_signature(font) -> list:
     """A signature of the masters' geometry; if it changes (master added/removed,
     metrics or upm edited) the whole outline cache is dropped."""
     upm = round(float(getattr(font, "upm", None) or 1000.0), 3)
-    return [upm] + [[mid, round(em, 3)] for mid, em in _em_boxes(font).items()]
+    return [upm] + [[mid, round(asc, 3), round(desc, 3)]
+                    for mid, (asc, desc) in _em_boxes(font).items()]
 
 
 def _outline_cache_load(font, signature: list) -> dict:
@@ -858,7 +861,8 @@ def _outline_paths(font, glyph_names: list, progress=None) -> dict:
                     layer = glyph.layers[master_id]
                 except Exception:
                     layer = None
-                outline = glyphsvg.layer_outline_em(layer, ems[master_id]) if layer is not None else {}
+                _asc, _desc = ems[master_id]
+                outline = glyphsvg.layer_outline_em(layer, _asc, _desc) if layer is not None else {}
                 if outline:
                     by_master[master_id] = outline
             entries[name] = {"t": stamp, "masters": master_ids, "m": by_master}
