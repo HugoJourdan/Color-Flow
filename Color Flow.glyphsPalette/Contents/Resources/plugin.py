@@ -339,43 +339,6 @@ def _shared_gate_blocked() -> bool:
 	return blocked
 
 
-# NSUserDefaults keys are CASE-SENSITIVE. The licence used to store its trial /
-# license payloads under the mis-cased prefix "com.hugojourdan.ColorFlow" while
-# the bundle's real CFBundleIdentifier is "com.HugoJourdan.ColorFlow". The config
-# now uses the correct (CFBundleIdentifier) casing, so existing installs would be
-# orphaned from their already-stored trial/license. This one-time, idempotent copy
-# forwards the old keys to the new ones on launch (old keys are left untouched).
-_LICENSE_OLD_PREFIX = "com.hugojourdan.ColorFlow"
-_LICENSE_NEW_PREFIX = "com.HugoJourdan.ColorFlow"
-# Every defaults suffix the licence backend reads/writes (see _colorflow_lic/
-# bootstrap.py::_wire). Keep in sync if the backend grows new keys.
-_LICENSE_KEY_SUFFIXES = (".trial", ".license")
-
-
-def _migrate_license_defaults_prefix() -> None:
-	"""Copy mis-cased licence defaults to the CFBundleIdentifier-cased prefix.
-
-	Runs every launch; safe + idempotent: a key is copied only when the new-prefix
-	key is ABSENT and the old-prefix key is PRESENT. Never deletes the old key.
-	"""
-	try:
-		from GlyphsApp import Glyphs
-	except Exception:
-		return
-	for suffix in _LICENSE_KEY_SUFFIXES:
-		old_key = _LICENSE_OLD_PREFIX + suffix
-		new_key = _LICENSE_NEW_PREFIX + suffix
-		try:
-			if Glyphs.defaults[new_key] is not None:
-				continue
-			old_value = Glyphs.defaults[old_key]
-			if old_value is not None:
-				Glyphs.defaults[new_key] = old_value
-		except Exception:
-			# A single bad key must never break plugin load.
-			continue
-
-
 def _shortcut_font_dir(font) -> str | None:
 	return os.path.dirname(font.filepath) if font.filepath else None
 
@@ -1607,9 +1570,6 @@ class ColorFlow(PalettePlugin):
 	def settings(self) -> None:
 		from _colorflow_lic_config import CONFIG
 		from _colorflow_lic import bootstrap
-		# One-time, idempotent forward of mis-cased licence defaults to the
-		# CFBundleIdentifier casing. Must run BEFORE bootstrap.start reads them.
-		_migrate_license_defaults_prefix()
 		self._ent = bootstrap.start(CONFIG)
 		# Publish the live Gate so the module-level "Jump to next" shortcut handler
 		# (no palette instance) can consult the same licence state.
