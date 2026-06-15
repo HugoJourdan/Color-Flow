@@ -95,13 +95,24 @@ def test_layers_outline_empty_when_no_outline() -> None:
     assert glyphsvg.layers_outline([(_NoPath(), 0.0)]) == {}
 
 
-def test_layer_outline_em_uses_shared_box_centred_on_glyph() -> None:
+def test_layer_outline_em_uses_baseline_aligned_box() -> None:
     bezier = _FakeBezier([(0, [(100, 0)]), (1, [(500, 0)]), (1, [(500, 700)]), (3, [])])
-    outline = glyphsvg.layer_outline_em(_FakeLayer(bezier), em_height=1000.0)
+    # ascender 800, descender -200 -> span 1000; top_pad 0.20 -> 200, bot_pad 0.10 -> 100;
+    # box = 1300. x-centre 300 -> box_x 300-650 = -350. baseline-framed: box_y = -(800+200) = -1000.
+    outline = glyphsvg.layer_outline_em(_FakeLayer(bezier), 800.0, -200.0)
     assert outline["d"] == "M100 0L500 0L500 -700Z"
-    # square box of side em_height centred on the glyph's ink in BOTH axes.
-    # x-centre 300 -> 300-500=-200; y-centre 350 -> flipped -350-500=-850
-    assert outline["vb"] == "-200 -850 1000 1000"
+    assert outline["vb"] == "-350 -1000 1300 1300"
+
+
+def test_layer_outline_em_shares_baseline_regardless_of_ink_height() -> None:
+    # Two glyphs of very different ink height get the SAME vertical frame (box_y/box),
+    # so font y=0 (the baseline) lands at the same place in every cell.
+    short = _FakeBezier([(0, [(0, 0)]), (1, [(400, 0)]), (1, [(400, 400)]), (3, [])])
+    tall = _FakeBezier([(0, [(0, 0)]), (1, [(400, 0)]), (1, [(400, 900)]), (3, [])])
+    vb_short = glyphsvg.layer_outline_em(_FakeLayer(short), 800.0, -200.0)["vb"].split()
+    vb_tall = glyphsvg.layer_outline_em(_FakeLayer(tall), 800.0, -200.0)["vb"].split()
+    assert vb_short[1] == vb_tall[1]          # same box_y (vertical frame) -> shared baseline
+    assert vb_short[2:] == vb_tall[2:]        # same box side (uniform scale)
 
 
 def test_layer_outline_em_empty_without_path() -> None:
@@ -109,7 +120,7 @@ def test_layer_outline_em_empty_without_path() -> None:
         drawBezierPath = None
         bezierPath = None
 
-    assert glyphsvg.layer_outline_em(_NoPath(), 1000.0) == {}
+    assert glyphsvg.layer_outline_em(_NoPath(), 800.0, -200.0) == {}
 
 
 class _BadPoint:
@@ -185,11 +196,12 @@ def test_view_box_uses_on_curve_bounds_not_control_points() -> None:
     assert glyphsvg.view_box(elements, pad=40) == "-40 -40 180 80"
 
 
-def test_layer_outline_em_centres_on_on_curve_bounds() -> None:
-    # Control points bulge far off-curve; centring must ignore them.
+def test_layer_outline_em_centres_x_on_on_curve_bounds() -> None:
+    # Control points bulge far off-curve; horizontal centring must ignore them, and
+    # the vertical frame is baseline-based (independent of ink height).
     bezier = _FakeBezier([(0, [(0, 0)]), (1, [(200, 0)]),
                           (2, [(100, 5000), (100, 5000), (200, 400)]), (3, [])])
-    outline = glyphsvg.layer_outline_em(_FakeLayer(bezier), em_height=1000.0)
-    # On-curve xs: 0, 200, 200 -> centre 100; ys: 0, 0, 400 -> centre 200.
-    # box_x = 100 - 500 = -400; box_y = -200 - 500 = -700.
-    assert outline["vb"] == "-400 -700 1000 1000"
+    outline = glyphsvg.layer_outline_em(_FakeLayer(bezier), 800.0, -200.0)
+    # On-curve xs: 0, 200, 200 -> centre 100; box 1300 -> box_x = 100 - 650 = -550.
+    # box_y baseline-framed = -(800+200) = -1000.
+    assert outline["vb"] == "-550 -1000 1300 1300"
