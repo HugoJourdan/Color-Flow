@@ -272,9 +272,47 @@ def test_settings_pane_build_order_labels_then_font_glyph_order() -> None:
     # The inline legend is gone.
     assert "group.legend = TextBox" not in PLUGIN_SOURCE
     assert "def _legend_text(" not in PLUGIN_SOURCE
-    # Pane base width 460; the view + full-width controls stretch to fill the Settings tab.
-    assert "WIDTH = 460" in PLUGIN_SOURCE
+    # Pane base width 340 (narrow); the view + full-width controls stretch to fill the tab.
+    assert "WIDTH = 340" in PLUGIN_SOURCE
     assert "AppKit.NSViewWidthSizable | AppKit.NSViewMinYMargin" in PLUGIN_SOURCE
+
+
+def test_color_glyph_order_is_a_checkbox_not_a_segmented_button() -> None:
+    build = PLUGIN_SOURCE[
+        PLUGIN_SOURCE.index("def _build(self) -> None:") :
+        PLUGIN_SOURCE.index("def _slot_list_items(")
+    ]
+    # Font Glyph Order is now a single CheckBox "Color Glyph Order" (ON = Layer order,
+    # OFF = Default), replacing the old 3-way Default/Layer/Glyph SegmentedButton.
+    assert "SegmentedButton" not in PLUGIN_SOURCE
+    assert "group.colorOrder = CheckBox(" in build
+    assert '"Color Glyph Order"' in build
+    assert "callback=self._color_order_changed" in build
+    # ON -> Layer (segment 1), OFF -> Default (segment 0).
+    cb = _method_body("_color_order_changed")
+    assert "_apply_rainbow_source(Glyphs.font, 1 if sender.get() else 0)" in cb
+
+
+def test_hidden_slot_rows_are_dimmed() -> None:
+    assert "def _dim_hidden_rows(self) -> None:" in PLUGIN_SOURCE
+    body = _method_body("_dim_hidden_rows")
+    # Force each row view to exist, then full alpha for visible / faded for hidden rows.
+    assert "rowViewAtRow_makeIfNecessary_(row, True)" in body
+    assert "setAlphaValue_(1.0 if self._slot_is_visible(item) else 0.4)" in body
+    # Re-applied after the list builds and after every reload/edit/drop.
+    assert PLUGIN_SOURCE.count("self._dim_hidden_rows()") >= 4
+
+
+def test_default_glyph_order_pokes_a_resort_via_store_sort_name() -> None:
+    # Switching to Default restores the font order AND nudges Glyphs to re-sort the Font
+    # View by toggling storeSortName on the first glyph (True then False, no persistence).
+    apply = _module_function_body("_apply_rainbow_source")
+    assert "_poke_default_sort(font)" in apply
+    poke = _module_function_body("_poke_default_sort")
+    assert "glyph.storeSortName = True" in poke
+    assert "glyph.storeSortName = False" in poke
+    # Guarded against an empty font.
+    assert "len(font.glyphs) == 0" in poke
 
 
 def test_settings_panel_module_deleted() -> None:
@@ -601,12 +639,13 @@ def test_counts_cache_single_variant() -> None:
     assert "_SHORTCUT_COUNTS_KEY + masterId] = None" in invalidate
 
 
-def test_palette_bar_denominator_excludes_non_exporting() -> None:
+def test_palette_row_has_no_coloured_bar() -> None:
     body = _method_body("Update_Plugin_UI")
-    # Counts AND the bar denominator shrink together, so a fully finished
-    # exporting set reads as a full bar on the final step (counts are the
-    # exact census, so the other rows stay empty).
-    assert "len(self.font.glyphs) - len(self._excluded_glyph_names())" in body
+    # The per-row coloured progress bar was removed (it sat over the label text). The
+    # colour cue is now the 6px colorTag strip + the count number, so no "box" Box and
+    # no bar denominator remain in the row builder.
+    assert '+"box"' not in body and "barWidth" not in body
+    # the non-exporting exclusion still drives the title-bar census
     title = _method_body("_update_title_bar")
     assert "self._excluded_glyph_names()" in title
     assert "colornames.exclude_named_colors(named_colors, excluded)" in title
