@@ -82,7 +82,7 @@ def build_html(model: dict) -> str:
 DASHBOARD_CSS = """
 :root{
   --bg:#0a0b0e;--surface:#0e1014;--surface-2:#101217;--border:#1c1f26;--border-2:#23262e;
-  --text:#e6e8ec;--muted:#9aa0ab;--muted-2:#6b7280;--accent:#6e7bff;--ok:#3fb950;
+  --text:#e6e8ec;--muted:#9aa0ab;--muted-2:#6b7280;--accent:#9f75ff;--ok:#3fb950;
   --track:#15171c;--swatch-outline:rgba(255,255,255,.10);--glyph-ink:var(--text);
   --tl-dot:#ffffff;--tl-vgrid:rgba(255,255,255,.10);
   --c-none-a:#0e1116;--c-none-b:#3a3f4a;
@@ -95,7 +95,7 @@ DASHBOARD_CSS = """
 }
 html[data-theme=light]{
   --bg:#f6f7f9;--surface:#ffffff;--surface-2:#f1f3f6;--border:#e3e6ea;--border-2:#d6dae0;
-  --text:#15171c;--muted:#5b6270;--muted-2:#8b919c;--accent:#5b62ff;--ok:#1a7f37;
+  --text:#15171c;--muted:#5b6270;--muted-2:#8b919c;--accent:#9f75ff;--ok:#1a7f37;
   --track:#eceef2;--swatch-outline:rgba(20,24,33,.18);
   --tl-dot:var(--text);--tl-vgrid:rgba(20,24,33,.10);
   --c-none-a:#dfe3e9;--c-none-b:#aab2bf;color-scheme:light;
@@ -106,7 +106,7 @@ html,body{margin:0}
 body{background:var(--bg);color:var(--text);font:var(--fs-base)/1.5 "JetBrains Mono",monospace;
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;opacity:0}
 body.ready{opacity:1;transition:opacity .35s ease}
-@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro{animation:none}.heat,.heat.fading{transition:none;opacity:1}.tl-seed-shimmer .tl-seed-ghost{animation:none}.ov-viz.intro .rdr-poly{animation:none}.funnel.intro .fnl-fill{animation:none}.tl-anim .tl-line{animation:none;stroke-dasharray:none;stroke-dashoffset:0}.tl-anim .tl-band,.tl-anim .tl-area,.tl-anim .tl-dot{animation:none;opacity:1}.tl-spark-anim polyline{animation:none;stroke-dasharray:none;stroke-dashoffset:0}.cm-differ-panel{transition:none}}
+@media (prefers-reduced-motion:reduce){body,body.ready{opacity:1;transition:none}.cell{transition:none}.seg.intro{animation:none}.heat,.heat.fading{transition:none;opacity:1}.tl-seed-shimmer .tl-seed-ghost{animation:none}.ov-viz.intro .rdr-poly{animation:none}.funnel.intro .fnl-fill{animation:none}.tl-anim .tl-line{animation:none;stroke-dasharray:none;stroke-dashoffset:0}.tl-anim .tl-band,.tl-anim .tl-area,.tl-anim .tl-dot{animation:none;opacity:1}.tl-spark-anim polyline{animation:none;stroke-dasharray:none;stroke-dashoffset:0}.tl-anim .tl-spread-med{animation:none;stroke-dasharray:none;stroke-dashoffset:0}.tl-anim .tl-spread-fill,.tl-anim .tl-spread-dot{animation:none;opacity:1}.ov-ring.ov-anim .ov-ring-reveal{animation:none}.lb-fill.intro{animation:none}.segsw-hl{transition:none}.segsw-hl.anim{animation:none}.vnav-fill.anim{animation:none}.cfd-fade{animation:none}.cov-bar.scrub{animation:none}.heat.scrub .cell{animation:none}}
 #cfd-app{max-width:1180px;margin:0 auto;padding:0 20px}
 #cfd-main{display:flex;gap:24px;align-items:flex-start}
 #cfd-tower{position:sticky;top:0;flex:0 0 240px;width:240px}
@@ -129,10 +129,31 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .search input::placeholder{color:var(--muted-2)}
 .search kbd{border:1px solid var(--border-2);border-radius:4px;padding:0 5px;font:var(--fs-xs)/1.4 inherit;color:var(--muted-2)}
 .chip{font-size:var(--fs-xs);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:6px 10px;background:var(--surface-2);color:var(--muted);cursor:pointer}
+.ba-switch{display:inline-flex;align-items:center;gap:6px}
+.ba-seg{font:inherit;font-size:var(--fs-xs);background:var(--surface-2);border:1px solid var(--border-2);color:var(--muted);padding:5px 10px;cursor:pointer}
+.ba-seg:first-of-type{border-radius:var(--r-sm) 0 0 var(--r-sm)}
+.ba-seg:nth-of-type(2){border-radius:0 var(--r-sm) var(--r-sm) 0;border-left:0}
+.ba-seg.on{background:color-mix(in srgb,var(--accent) 58%,#15131c);border-color:color-mix(in srgb,var(--accent) 58%,#15131c);color:#fff}
+.ba-play{font:inherit;font-size:13px;line-height:1;background:var(--surface-2);border:1px solid var(--border-2);color:var(--text);width:26px;height:24px;border-radius:var(--r-sm);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.ba-play.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.vnav{position:relative;display:flex;align-items:center;justify-content:space-between;margin:0 2px 10px;padding:5px 3px}
+.vnav-line{position:absolute;left:5px;right:5px;top:50%;height:2px;margin-top:-1px;background:var(--track);border-radius:2px}
+.vnav-dot{position:relative;width:10px;height:10px;padding:0;border-radius:50%;border:1.5px solid var(--muted-2);background:var(--surface-2);cursor:pointer;transition:transform .12s ease,box-shadow .12s ease}
+.vnav-dot.past{background:var(--accent);border-color:var(--accent)}
+.vnav-dot:hover{transform:scale(1.25)}
+.vnav-dot.on{transform:scale(1.4);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 28%,transparent)}
+.vnav-fill{position:absolute;left:5px;top:50%;width:calc(100% - 10px);height:2px;margin-top:-1px;background:var(--accent);border-radius:2px;transform-origin:left center}
+.vnav-fill.anim{animation:vnavGrow .45s cubic-bezier(.4,0,.2,1)}
+@keyframes vnavGrow{from{transform:scaleX(var(--vnav-from,0))}to{transform:scaleX(var(--vnav-to,1))}}
 .chip:hover{color:var(--text)}
 .chip[aria-pressed=true]{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
 .overall{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin:16px 0}
 .master-overall{margin-top:8px}
+.vnav-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin:16px 0 8px}
+.vnav-card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.vnav-card-ttl{font-size:var(--fs-xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.vnav-card-when{font-size:var(--fs-xs);color:var(--muted-2)}
+.vnav-card .vnav{margin-bottom:2px}
 .ov-num{display:flex;align-items:center;justify-content:center;border:0;background:none;padding:0;cursor:pointer}
 .ov-num:hover{filter:brightness(1.1)}
 .ov-num .big{font-size:var(--fs-big);font-weight:650;letter-spacing:-.02em;line-height:1}
@@ -166,6 +187,26 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .legend .lg{display:inline-flex;align-items:center;gap:5px}
 .ov-extra{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:14px;margin-top:16px}
 .ov-extra .ovc-timeline{grid-column:1/-1}
+.ov-extra .ovc-leaderboard{grid-column:1/-1}
+.ovc-leaderboard .ov-card-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:30px;align-content:start}
+.ovc-leaderboard .lb-row+.lb-row{border-top:0}
+.ovc-week .wk-head{display:flex;align-items:baseline;gap:6px 24px;flex-wrap:wrap}
+.wk-stat{display:flex;align-items:baseline;gap:7px}
+.wk-delta{font-size:22px;font-weight:680;font-variant-numeric:tabular-nums}
+.wk-sub{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.wk-meta{margin-top:6px;font-size:var(--fs-xs);color:var(--muted)}
+.ov-extra .ovc-week{grid-column:1/-1}
+.wk-extra{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 28px;margin-top:10px;padding-top:10px;border-top:1px solid var(--track)}
+.wk-row{display:flex;flex-direction:column;gap:3px;min-width:0}
+.wk-k{font-size:var(--fs-2xs);color:var(--muted-2);text-transform:uppercase;letter-spacing:.04em}
+.wk-v{font-size:var(--fs-sm);color:var(--text);display:flex;align-items:center;gap:7px;min-width:0}
+.wk-v b{color:var(--accent);font-weight:650}
+.wk-list{list-style:none;margin:5px 0 0;padding:0;display:flex;flex-direction:column;gap:5px;font-size:var(--fs-sm)}
+.wk-list li{display:flex;align-items:center;gap:7px;color:var(--text);min-width:0}
+.wk-list li>span,.wk-list li{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wk-list li b{margin-left:auto;color:var(--accent);font-weight:650;font-variant-numeric:tabular-nums;flex:none}
+.wk-pct{color:var(--muted);font-weight:500;margin-left:5px;opacity:.6}
+.wk-sw{width:11px;height:11px;border-radius:3px;flex:none;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .ov-cal-tl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:14px;margin-top:14px}
 .ov-cal-solo{margin-top:14px}
 .ovc-calendar .tl-cal-card{margin-top:0;border-top:0;padding-top:0}
@@ -186,22 +227,16 @@ button.ov-card-h{cursor:pointer}
 .ov-exp{font-size:var(--fs-2xs);font-weight:600;color:var(--accent);text-transform:none;letter-spacing:0}
 button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .ov-card-body.scroll{max-height:300px;overflow-y:auto;padding-right:4px}
-.lb-row{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;padding:5px 0;cursor:pointer;color:var(--text);font:inherit;text-align:left}
+.lb-row{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;padding:3px 6px;border-radius:5px;cursor:pointer;color:var(--text);font:inherit;text-align:left}
 .lb-row+.lb-row{border-top:1px solid var(--track)}
-.lb-chip{flex:0 0 40px;height:28px;color:var(--text);opacity:.85}
-.lb-chip svg{display:block;width:100%;height:100%}
-.lb-n{flex:0 0 96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-xs)}
-.ov-card.open .lb-n{flex-basis:170px}
-.lb-bar{flex:1;height:7px;border-radius:4px;background:var(--track);overflow:hidden}
-.lb-bar>span{display:block;height:100%;background:var(--accent);border-radius:4px}
+.ovc-leaderboard .lb-row:nth-child(4n+3),.ovc-leaderboard .lb-row:nth-child(4n+4){background:color-mix(in srgb,var(--text) 5%,transparent)}
+.lb-n{flex:1 1 auto;min-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-xs)}
+.lb-bar{flex:0 0 104px;height:7px;border-radius:4px;background:var(--track);overflow:hidden}
+.lb-bar>span{display:block;height:100%;background:var(--accent);border-radius:4px;transform-origin:left center}
+.lb-fill.intro{animation:segGrow .55s ease backwards;animation-delay:calc(var(--i,0)*45ms)}
 .lb-p{flex:0 0 36px;text-align:right;font-size:var(--fs-xs);color:var(--muted)}
 .lb-row:hover .lb-bar>span{filter:brightness(1.18)}
 .ov-foot{margin-top:9px;font-size:var(--fs-2xs);color:var(--muted-2)}
-.hg-row{display:flex;align-items:center;gap:9px;padding:4px 0}
-.hg-l{flex:0 0 56px;font-size:var(--fs-2xs);color:var(--muted)}
-.hg-bar{flex:1;height:9px;border-radius:4px;background:var(--track);overflow:hidden}
-.hg-bar>span{display:block;height:100%;background:var(--accent);border-radius:4px}
-.hg-n{flex:0 0 26px;text-align:right;font-size:var(--fs-2xs);color:var(--muted)}
 .legend i{width:8px;height:8px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .tabs{display:flex;gap:18px;border-bottom:1px solid var(--border);margin-bottom:6px;overflow-x:auto}
 .tab{font:var(--fs-sm) inherit;background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted-2);padding:8px 0;cursor:pointer;white-space:nowrap}
@@ -224,15 +259,36 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .heat-h{font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .heat-h .ba-toggle{flex:none}
 .heat-h .hint{color:var(--muted-2)}
-.heat-h .hsort{margin-left:auto;display:flex;gap:6px}
+.heat-h .heat-recent{margin-left:auto}
 .heat-h .chip{padding:4px 8px;font-size:var(--fs-2xs)}
+.segsw{position:relative;display:grid;grid-template-columns:repeat(var(--segn,2),1fr);background:var(--track);border-radius:7px;padding:2px}
+.segsw-hl{position:absolute;top:2px;bottom:2px;left:2px;width:calc((100% - 4px)/var(--segn,2));border-radius:5px;background:color-mix(in srgb,var(--accent) 52%,#15131c);box-shadow:0 1px 3px color-mix(in srgb,var(--accent) 16%,transparent);transform:translateX(calc(var(--seg,0)*100%));transition:transform .28s cubic-bezier(.4,0,.2,1)}
+.segsw-hl.anim{animation:segswSlide .28s cubic-bezier(.4,0,.2,1)}
+@keyframes segswSlide{from{transform:translateX(calc(var(--seg-from,0)*100%))}to{transform:translateX(calc(var(--seg-to,0)*100%))}}
+.segsw>button{position:relative;z-index:1;border:0;background:none;color:var(--muted);font:inherit;font-size:var(--fs-2xs);padding:3px 12px;cursor:pointer;white-space:nowrap;transition:color .2s ease}
+.segsw>button[aria-pressed=true]{color:#fff;font-weight:600}
 .focus-clear{border-color:var(--accent);color:var(--text)}
-.heat-pill{display:inline-flex;align-items:center;gap:8px;margin:0 0 10px;padding:5px 10px;font-size:var(--fs-xs);color:var(--muted);background:var(--surface-2);border:1px solid var(--border-2);border-radius:999px}
-.heat-pill .chip{padding:2px 8px;font-size:var(--fs-2xs)}
+/* Global<->Focus master switch: fade ONLY the data panels that change (not the chrome);
+   the disc tower runs its own per-disc focus crossfade. */
+.cfd-fade{animation:cfdFade .3s ease}
+@keyframes cfdFade{from{opacity:0}to{opacity:1}}
+/* Scrub (pick another moment): the category-coverage bars grow + the glyph cells fade in. */
+.cov-bar.scrub{transform-origin:left center;animation:covGrow .42s cubic-bezier(.4,0,.2,1)}
+@keyframes covGrow{from{transform:scaleX(.2);opacity:.35}to{transform:scaleX(1);opacity:1}}
+.heat.scrub .cell{animation:cellPop .42s ease}
+@keyframes cellPop{from{opacity:.18}to{opacity:1}}
 .cat:first-child{margin-top:0}
 .cat-h{font-size:var(--fs-xs);color:var(--muted);margin:14px 0 6px;display:flex;align-items:center;gap:6px}
 .cat-n{color:var(--muted-2)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:3px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--cell-min,40px),1fr));gap:3px}
+/* Tiny cells (<26px): lay the category SECTIONS two-up so the grid fills the width and
+   scrolls less. CSS columns flow blocks down col 1 then col 2; break-inside keeps each
+   .cat block whole (never split across the column gap). */
+.heat.heat-2col .heat-cats{column-count:2;column-gap:24px}
+.heat.heat-2col .cat{margin:0 0 16px;break-inside:avoid;-webkit-column-break-inside:avoid}
+.heat.heat-2col .cat-h{margin-top:0}            /* zero top margins so both column tops align */
+.cell-size{flex:0 0 92px;accent-color:var(--accent);cursor:pointer;height:14px}
+.heat-h .cell-size{margin-left:8px}
 .cell{aspect-ratio:1;border:0;padding:0;border-radius:5px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease,opacity .2s ease}
 .cell.ncnt{opacity:.35}
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}
@@ -252,12 +308,13 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .cov-h{display:flex;align-items:center;gap:12px;margin:10px 0 4px}
 .cov-title{font-size:var(--fs-sm);color:var(--muted)}
 .cov-rows{margin:6px 0 4px}
-.cov-row{display:flex;align-items:center;gap:12px;font-size:var(--fs-xs);padding:9px 0;border-top:1px solid var(--track)}
+.cov-row{display:flex;align-items:center;gap:12px;font-size:var(--fs-xs);padding:5px 0;border-top:1px solid var(--track)}
 .cov-name{width:120px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cov-bar{flex:1;display:flex;height:10px;border-radius:5px;overflow:visible;background:var(--track);min-width:0}
 .cov-bar>span{display:flex;align-items:center;justify-content:center;height:100%;min-width:0}
 .cov-bar>span:first-child{border-radius:5px 0 0 5px}
 .cov-bar>span:last-child{border-radius:0 5px 5px 0}
+.cov-bar>span:first-child:last-child{border-radius:5px}
 .cov-bar .cov-none{background:var(--c-none)}
 .cov-row .num{width:auto;min-width:48px;text-align:right;color:var(--muted)}
 .ov-catcov{margin:16px 0}
@@ -271,7 +328,7 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .scard-name{font-size:13px;font-weight:600;color:#fff;line-height:1.15;text-shadow:0 1px 3px rgba(0,0,0,.6)}
 .scard-gl{width:46%;height:auto;max-height:50%;fill:rgba(255,255,255,.96);filter:drop-shadow(0 1px 4px rgba(0,0,0,.5))}
 .scard-ct{font-size:11px;color:rgba(255,255,255,.82);text-shadow:0 1px 2px rgba(0,0,0,.55)}
-.timeline{margin-top:14px}
+.timeline{margin-top:2px}
 .tl-empty{margin-top:20px}
 .tl-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px}
 .tl-lg{display:inline-flex;align-items:center;gap:5px}
@@ -315,23 +372,36 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-nav-reset{position:absolute;top:-1px;right:0;font:inherit;font-size:var(--fs-xs);color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:1px 7px;cursor:pointer}
 .tl-nav-reset:hover{color:var(--text)}
 .tl-lanes-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 28px}
+.tl-lanes-cat2{grid-template-columns:1fr}
+.tl-lanes-cat2 .tl-lanes{column-count:2;column-gap:28px}
+.tl-lanes-cat2 .tl-lanes>div{break-inside:avoid;-webkit-column-break-inside:avoid}
 @media (max-width:680px){.tl-lanes-grid{grid-template-columns:1fr}}
-.tl-chartbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px}
-.tl-chartbar .tl-legend{margin-bottom:0;flex:1 1 auto}
+.tl-graphcard{margin-bottom:14px}
+.tl-graphcard-h{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
+.tl-chartwrap{position:relative}
+.tl-info-wrap{position:absolute;top:9px;right:9px;z-index:4}
+.tl-info{display:block;width:18px;height:18px;border-radius:50%;border:1px solid var(--border-2);background:var(--surface);color:var(--muted);font:italic 600 11px/1 Georgia,'Times New Roman',serif;cursor:help;padding:0;transition:color .15s ease,border-color .15s ease}
+.tl-info:hover{color:var(--accent);border-color:var(--accent)}
+.tl-info-tip{position:absolute;top:24px;right:0;width:210px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:var(--fs-2xs);line-height:1.45;box-shadow:0 8px 24px rgba(0,0,0,.22);opacity:0;visibility:hidden;transform:translateY(-3px);transition:opacity .14s ease,transform .14s ease,visibility .14s;pointer-events:none;z-index:5}
+.tl-info-wrap:hover .tl-info-tip,.tl-info:focus-visible~.tl-info-tip{opacity:1;visibility:visible;transform:translateY(0)}
+.tl-calpane{margin-top:2px}
 .tl-granbar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .tl-granlabel{font-size:var(--fs-xs);color:var(--muted-2);text-transform:uppercase;letter-spacing:.04em}
 .tl-mode{display:inline-flex;gap:4px;flex:0 0 auto}
 .tl-bucket{margin-left:2px;padding-left:8px;border-left:1px solid var(--border)}
 .tl-mode .tl-mode-btn[aria-pressed=true]{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
-.tl-switch{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:2px}
-.tl-sw-btn{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:var(--fs-xs);color:var(--muted);background:transparent;border:0;border-radius:5px;padding:3px 9px;cursor:pointer;line-height:1}
-.tl-sw-btn:hover{color:var(--text)}
-.tl-sw-btn[aria-pressed=true]{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--text)}
-.tl-sw-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .tl-ico{width:14px;height:14px;display:block;fill:currentColor}
 .tl-spanbar{margin-left:auto}
-.tl-span-btn{padding:3px 8px}
-.tl-band{stroke:none;fill-opacity:.6}
+.segsw.tl-spanbar>button{padding:3px 9px}
+.tl-band{stroke:none;fill-opacity:.4}
+.tl-band-top{fill:none;stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round;opacity:.92}
+.tl-anim .tl-band-top{animation:tlFade .8s ease both}
+.tl-cap{font-size:var(--fs-xs);color:var(--muted);margin:0 0 6px}
+.tl-spread-fill{fill:var(--accent);fill-opacity:.16;stroke:none}
+.tl-spread-med{fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}
+.tl-spread-dot{fill:var(--tl-dot)}
+.tl-anim .tl-spread-med{stroke-dasharray:1;stroke-dashoffset:1;animation:tlDraw 1s cubic-bezier(.4,0,.2,1) forwards}
+.tl-anim .tl-spread-fill,.tl-anim .tl-spread-dot{animation:tlFade .8s ease both}
 .tl-lg-hatch{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px var(--swatch-outline);background:var(--c-none-b)}
 .ov-ring{display:block}
 .ov-ring .ov-ring-track{stroke:var(--track)}
@@ -341,17 +411,20 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .ov-ring-seg.off{opacity:.28}
 .ov-ring-seg.on,.ov-ring-big .ov-ring-seg:hover{opacity:1}
 .ov-ring-t{fill:var(--text);font-size:12.5px;font-weight:600}
-.ov-ring-big .ov-ring-t{font-size:26px;font-weight:650}
-.ov-ringonly{flex-direction:column;align-items:center;justify-content:center;gap:12px}
+.ov-ring-big .ov-ring-t{font-size:18px;font-weight:500}
+@keyframes ovRingSweep{from{stroke-dashoffset:var(--c,1)}to{stroke-dashoffset:0}}
+.ov-ring.ov-anim .ov-ring-reveal{animation:ovRingSweep .85s cubic-bezier(.4,0,.2,1) backwards}
+.ov-ringonly{flex-direction:column;align-items:flex-start;justify-content:center;gap:12px}
 .ov-ringbox{display:flex}
-.ov-ringrow{display:flex;align-items:center;gap:24px;flex-wrap:wrap;justify-content:center}
-.ov-legend{display:flex;flex-direction:column;gap:2px;min-width:150px}
-.ov-leg-item{display:flex;align-items:center;gap:8px;background:none;border:0;color:var(--text);cursor:pointer;font:inherit;font-size:var(--fs-xs);padding:3px 7px;border-radius:6px;text-align:left;transition:opacity .15s ease,background .15s ease}
+.ov-ringrow{display:flex;align-items:center;gap:40px;flex-wrap:wrap;justify-content:flex-start}
+.ov-legend{display:grid;grid-template-columns:repeat(3,minmax(0,auto));gap:4px 44px}
+.ov-leg-item{display:flex;align-items:center;gap:8px;background:none;border:0;color:var(--text);cursor:pointer;font:inherit;font-size:var(--fs-xs);padding:2px 7px;border-radius:6px;text-align:left;transition:opacity .15s ease,background .15s ease}
+.ov-leg-item:nth-child(6n+4),.ov-leg-item:nth-child(6n+5),.ov-leg-item:nth-child(6n+6){background:color-mix(in srgb,var(--text) 5%,transparent)}
 .ov-leg-item:hover,.ov-leg-item.on{background:var(--surface-2)}
 .ov-leg-item.off{opacity:.4}
 .ov-leg-sw{width:11px;height:11px;border-radius:3px;flex:none;box-shadow:inset 0 0 0 1px var(--swatch-outline)}
 .ov-leg-lab{flex:1;white-space:nowrap}
-.ov-leg-pct{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+.ov-leg-pct{margin-left:auto;padding-left:44px;color:var(--muted);font-variant-numeric:tabular-nums}
 .cfd-modal{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.5)}
 .cfd-modal-box{background:var(--surface);border:1px solid var(--border-2);border-radius:14px;padding:18px 20px;box-shadow:0 18px 60px rgba(0,0,0,.45);max-width:440px;width:calc(100% - 40px)}
 .cfd-modal-h{font-size:var(--fs-base);font-weight:600;margin-bottom:14px}
@@ -367,24 +440,6 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .rg-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
 .rg-ar{color:var(--muted-2)}
 .rg-when{margin-left:auto;color:var(--muted-2)}
-.cm-headline{margin:0 0 8px;font-size:var(--fs-sm);color:var(--text)}
-.cm-headline b{font-size:var(--fs-big-sm)}
-.cm-bar{display:block;width:100%;flex:none;height:7px;margin:0 0 12px}
-.cm-line{margin:0 0 6px;font-size:var(--fs-xs);color:var(--muted)}
-.cm-line b{color:var(--text)}
-.cm-note{color:var(--muted-2)}
-.cm-steps{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:4px;font-size:var(--fs-xs);color:var(--muted)}
-.cm-steps-l{color:var(--muted-2)}
-.cm-step{display:inline-flex;align-items:center;gap:5px;background:none;border:0;color:var(--muted);cursor:pointer;font:inherit;font-size:var(--fs-xs);padding:2px 6px;border-radius:6px;transition:opacity .15s ease,background .15s ease}
-.cm-step:hover,.cm-step.on{background:var(--surface-2)}
-.cm-step.off{opacity:.4}
-.cm-step-n{color:var(--text)}
-.cm-differ-h{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;cursor:pointer;font:inherit;font-size:var(--fs-xs);padding:0;text-align:left}
-.cm-chev{flex:0 0 auto;width:10px;color:var(--muted-2)}
-.cm-differ-panel{display:flex;flex-wrap:wrap;gap:4px;max-height:0;overflow:hidden;transition:max-height .25s ease}
-.cm-differ-panel.open{max-height:160px;overflow-y:auto;margin:0 0 8px;padding:2px 0}
-.cm-dg{background:var(--surface-2);border:1px solid var(--border-2);color:var(--text);cursor:pointer;font:inherit;font-size:var(--fs-xs);padding:2px 8px;border-radius:999px;transition:background .15s ease}
-.cm-dg:hover{background:var(--border)}
 .rg-m{margin-left:8px;font-size:var(--fs-xs);color:var(--muted-2)}
 .ov-pct{border:0;background:none;font:inherit;font-weight:700;color:var(--text);cursor:pointer;padding:0;vertical-align:baseline}
 .ov-pct:hover{text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
@@ -460,6 +515,10 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 .tl-mcal-title{font-size:var(--fs-sm);font-weight:600;color:var(--text);min-width:150px;text-align:center}
 .tl-mcal-prev,.tl-mcal-next{padding:1px 10px;line-height:1.2;font-size:var(--fs-sm)}
 .tl-mcal-grid{display:grid;grid-template-columns:repeat(7,28px);gap:5px;justify-content:center}
+/* In the Timeline calendar pane, stretch the month grid to the full available width
+   (square cells grow with it); the compact Overview mini-calendar keeps its 28px cells. */
+.tl-calpane .tl-mcal-grid{grid-template-columns:repeat(7,minmax(0,1fr));justify-content:stretch}
+.tl-calpane .tl-mcal-d{aspect-ratio:2/1}            /* half-height day cells (calendar 2x shorter) */
 .tl-mcal-dow{text-align:center;font-size:var(--fs-2xs);color:var(--muted-2);padding-bottom:2px}
 .tl-mcal-d{aspect-ratio:1;display:flex;align-items:flex-start;justify-content:flex-end;border-radius:5px;padding:2px 4px;font-size:var(--fs-2xs);color:var(--muted-2);background:transparent}
 .tl-mcal-inrange{background:color-mix(in srgb,var(--text) 5%,transparent)}
@@ -521,11 +580,13 @@ DASHBOARD_JS = r"""
   var prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
   var state = {
     master: null,                          // no master selected -> global overview
-    view: "tabs", before: false, sort: "workflow",
+    view: "tabs", before: false, baPlaying: false, sort: "workflow",
     focus: null,
     ovExpand: {},                          // which Overview cards are expanded
-    cmDifferOpen: false,                   // cross-master "differ" drill-down disclosure
     heatSort: "category",                  // focus-mode glyph grid: "category" | "color"
+    heatRecent: false,                     // focus-mode glyph grid: show only glyphs modified in the last 7 days
+    cellSize: 40,                          // glyph-grid cell min size in px (slider-controlled, 28..96)
+    tlPane: "graph",                       // Timeline card: "graph" (chart) | "calendar" (activity calendar)
     funnelOpen: false,                     // per-step funnel: collapsed by default, toggled by the % ring/number
     tlCatOpen: {},                         // Timeline Time-Machine category blocks expanded? (closed by default)
     ocOpen: {},                            // Timeline "Shape changes" day blocks expanded? (closed by default)
@@ -597,8 +658,15 @@ DASHBOARD_JS = r"""
   // The colour bar runs its fill animation once, on the first paint only — not on
   // master switches or any later re-render.
   var barsAnim = false, introPlayed = false;
+  var scrubAnim = false;                        // a moment was just picked (scrub): animate the bars/cells/lines that follow it
+  var lastRenderMaster = "__cfd_init__";              // last-rendered state.master, to fade cards+discs on a Global<->Focus switch
+  var sparkPrev = {};                           // last-rendered lane sparkline points per key, so the line can morph on scrub
   var tlChartShouldAnim = false;                // draw-in the timeline chart once when entering the Timeline
   var laneSparkShouldAnim = false;              // draw-in the lane sparklines when the focused master switches
+  var vnavShouldAnim = false;                   // draw the version-nav progress line once when a node is clicked
+  var vnavPrevFrac = 0;                          // fill fraction shown BEFORE the click, so the line grows/shrinks from the old node end (not from the start)
+  var segswPrev = {};                            // last --seg index per .segsw switch key, so a click can morph the pill from old->new
+  var segswAnimKey = null;                       // which switch to slide-animate on the next render (set on click, guarded by prev!==seg)
   var laneNumCache = {};                        // last-shown lane % per lane key, for count-up tweening
   var vizIntroPlayed = false;                   // colour-spread radar build-animates once
 
@@ -778,13 +846,13 @@ DASHBOARD_JS = r"""
     return '<header class="hd">'+fam
       + '<span class="sp"></span>'
       + streakBadge()
+      + '<button type="button" id="cfd-export" class="icon" aria-label="Export report" title="Export the report as PDF, CSV or JSON">􀈂</button>'
       + '<button type="button" id="cfd-theme" class="icon" aria-label="Toggle light or dark theme">◐</button></header>';
   }
   function toolbar(){
     return '<div class="tb">'
       + '<button type="button" id="cfd-overview" class="chip" aria-pressed="true" title="Back to the overview">⌂ Overview</button>'
-      + '<button type="button" id="cfd-timeline" class="chip" aria-pressed="false">📈 Timeline</button>'
-      + '<button type="button" id="cfd-export" class="chip" style="margin-left:auto" title="Export the report as PDF, CSV or JSON">⤓ Export Report</button></div>';
+      + '<button type="button" id="cfd-timeline" class="chip" aria-pressed="false">📈 Timeline</button></div>';
   }
   // ----- Graded step progress -----------------------------------------------
   // Each colour is a workflow step ranked by the Palette order; a glyph sitting
@@ -815,6 +883,12 @@ DASHBOARD_JS = r"""
     return s / total * 100;
   }
   function gradedOverallPct(){ var s=0, tot=0; H.masters.forEach(function(m){ s+=gradedSum(m); tot+=countedTotal(); }); return tot? Math.round(s/tot*100):0; }
+  // Overall graded % AT a past snapshot date (avg of per-master gradedPctAt — countedTotal
+  // is master-independent, so this matches gradedOverallPct's weighting).
+  function gradedOverallPctAt(date){
+    if (!H.masters.length) return 0;
+    var s = 0; H.masters.forEach(function(m){ s += gradedPctAt(m.id, date); }); return Math.round(s / H.masters.length);
+  }
   function masterStarted(m){ return (uncoloredFor(m)||0) < countedTotal(); }   // any counted colour set at all
   // A donut. With `segs` ({key,frac,label} colour shares) it tiles the ring with the
   // palette colours — each arc proportional to its share of the font, the uncoloured
@@ -823,8 +897,10 @@ DASHBOARD_JS = r"""
   // hero ring. The centre always reads the completion %. No segs -> a single progress arc.
   function ring(p, segs, opts){
     opts = opts || {};
-    var big = !!opts.big, select = !!opts.select;
-    var sz = big ? 132 : 52, cc = sz/2, sw = big ? 14 : 5, r = cc - sw/2 - 2, c = 2*Math.PI*r;
+    var big = !!opts.big, select = !!opts.select, anim = !!opts.anim;
+    // big ring sized 78 (5% up from 74) with a proportionally thin stroke; the % text keeps a
+    // fixed 18px (the viewBox tracks sz, so 1 user-unit = 1px regardless of size).
+    var sz = big ? 78 : 52, cc = sz/2, sw = big ? 10 : 5, r = cc - sw/2 - 2, c = 2*Math.PI*r;
     var arcs = "";
     if (segs && segs.length){
       var acc = 0;
@@ -843,10 +919,19 @@ DASHBOARD_JS = r"""
       var offp = c*(1-Math.max(0,Math.min(100,p))/100);
       arcs = '<circle class="ov-ring-arc" cx="'+cc+'" cy="'+cc+'" r="'+r+'" fill="none" stroke-width="'+sw+'" stroke-linecap="round" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+offp.toFixed(1)+'" transform="rotate(-90 '+cc+' '+cc+')"/>';
     }
-    return '<svg class="ov-ring'+(big?" ov-ring-big":"")+'" width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'" role="progressbar" aria-valuenow="'+p+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+p+'% complete">'
+    // anim: one global progression sweep — a single full-ring mask arc whose dashoffset
+    // animates C->0, revealing the whole (multi-colour) ring as ONE motion, not per segment.
+    var defs = "", body = arcs;
+    if (anim){
+      defs = '<defs><mask id="ovRingReveal" maskUnits="userSpaceOnUse" x="0" y="0" width="'+sz+'" height="'+sz+'">'
+        + '<circle class="ov-ring-reveal" style="--c:'+c.toFixed(1)+'" cx="'+cc+'" cy="'+cc+'" r="'+r+'" fill="none" stroke="#fff" stroke-width="'+(sw+2)+'" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="0" transform="rotate(-90 '+cc+' '+cc+')"/></mask></defs>';
+      body = '<g mask="url(#ovRingReveal)">'+arcs+'</g>';
+    }
+    return '<svg class="ov-ring'+(big?" ov-ring-big":"")+(anim?" ov-anim":"")+'" width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'" role="progressbar" aria-valuenow="'+p+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+p+'% complete">'
+      + defs
       + '<circle class="ov-ring-track" cx="'+cc+'" cy="'+cc+'" r="'+r+'" fill="none" stroke-width="'+sw+'"/>'
-      + arcs
-      + '<text class="ov-ring-t" x="'+cc+'" y="'+(cc+0.5)+'" text-anchor="middle" dominant-baseline="central">'+p+'%</text></svg>';
+      + body
+      + '<text class="ov-ring-t" data-to="'+p+'" x="'+cc+'" y="'+(cc+0.5)+'" text-anchor="middle" dominant-baseline="central">'+p+'%</text></svg>';
   }
   // ----- Workflow funnel: cumulative "reached step k or beyond" as descending bars.
   // Replaces the flat text legend with the SAME cumulative metric drawn so a nearly
@@ -887,35 +972,92 @@ DASHBOARD_JS = r"""
         + '<i class="ov-leg-sw" style="background:var('+varFor(key)+')"></i>'
         + '<span class="ov-leg-lab">'+esc(label)+'</span><span class="ov-leg-pct">'+p+'%</span></button>';
     }
-    var legend = H.steps.map(function(s){ return legItem(s.key, s.label, ex.dist[String(s.key)]||0); }).join("")
-      + legItem(-1, H.noneLabel, ex.none||0);
+    // 3-column grid of the 12 colour labels; "None" is intentionally omitted here.
+    var legend = H.steps.map(function(s){ return legItem(s.key, s.label, ex.dist[String(s.key)]||0); }).join("");
     return '<section class="overall ov-ringonly" aria-label="Overall completion — click a colour to focus its glyphs">'
-      + '<div class="ov-ringrow"><div class="ov-ringbox">'+ring(compP, ringSegs, {big:true, select:true})+'</div>'
+      + '<div class="ov-ringrow"><div class="ov-ringbox">'+ring(compP, ringSegs, {big:true, select:true, anim:barsAnim||scrubAnim})+'</div>'
       + '<div class="ov-legend" role="group" aria-label="Colour labels">'+legend+'</div></div>'
       + '</section>';
   }
 
+  // Version navigator: a line of clickable dots (one per saved snapshot) above the master's
+  // colour-distribution bar, so you can scrub THIS master back through its saved versions.
+  // Reuses the Time-Machine scrub (scrubSet/state.tlScrub); the bar, %, heatmap, discs and
+  // lanes all follow the picked moment. Hidden when there are <2 versions to move between.
+  function versionNav(){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (dates.length < 2) return "";
+    var cur = scrubIndex();
+    var dots = dates.map(function(d, i){
+      var cls = "vnav-dot" + (i<=cur?" past":"") + (i===cur?" on":"");
+      return '<button type="button" class="'+cls+'" data-vnav="'+i+'" title="'+esc(d+(i===cur?" · showing":""))
+        + '" aria-label="'+esc("Version "+(i+1)+" of "+dates.length+", "+d)+'"'+(i===cur?' aria-current="true"':'')+'></button>';
+    }).join("");
+    // A coloured progress line drawn from the first node to the current one. The fill spans
+    // the whole track and is clipped with transform:scaleX(frac); when a node is clicked it
+    // animates from the PREVIOUS fraction to the new one, so the line grows/shrinks from the
+    // old node end (not redrawing from the start). transform-origin:left keeps node 0 fixed.
+    var frac = dates.length > 1 ? cur/(dates.length-1) : 0;
+    var animCls = vnavShouldAnim ? " anim" : ""; vnavShouldAnim = false;
+    var fromFrac = vnavPrevFrac; vnavPrevFrac = frac;
+    return '<div class="vnav" role="group" aria-label="Navigate saved versions">'
+      + '<span class="vnav-line"></span>'
+      + '<span class="vnav-fill'+animCls+'" style="--vnav-from:'+fromFrac.toFixed(4)+';--vnav-to:'+frac.toFixed(4)+';transform:scaleX('+frac.toFixed(4)+')" aria-hidden="true"></span>'
+      + dots+'</div>';
+  }
+
+  // The version timeline lifted into its OWN card, shown ABOVE the master's progress card.
+  // Returns "" when there are <2 versions (versionNav self-gates), so no empty card appears.
+  function versionCard(){
+    var nav = versionNav();
+    if (!nav) return "";
+    var dates = (H.trend && H.trend.dates) || [];
+    var cur = scrubIndex();
+    var when = (cur >= 0 && dates[cur]) ? dateLabel(dates[cur]) : "";
+    return '<section class="vnav-card" aria-label="Saved versions">'
+      + '<div class="vnav-card-h"><span class="vnav-card-ttl">Versions</span>'
+      + (when ? '<span class="vnav-card-when">'+esc(when)+'</span>' : '')
+      + '</div>' + nav + '</section>';
+  }
   // The selected master rendered like the overall card (ring + stacked bar +
   // legend), but scoped to this one master instead of the whole font.
   function masterOverall(m){
     var total = countedTotal();
-    var started = total - uncoloredFor(m);
+    var dates = (H.trend && H.trend.dates) || [];
+    var scrubbing = (state.tlScrub != null) && dates.length > 1;
+    var dist = {}, none = 0, started, headPct, cumFor;
+    if (scrubbing){
+      // Reconstruct this master's colour distribution AT the navigated version (stateAt),
+      // so the bar + % + funnel reflect the picked snapshot, not today.
+      var date = dates[scrubIndex()], snap = stateAt(m.id, date), nm, sk;
+      for (nm in snap){ if (!isCounted(nm)) continue; var k = snap[nm]; sk = String(k);
+        if (k!==-1 && H.order.indexOf(sk)!==-1) dist[sk] = (dist[sk]||0) + 1; }
+      var colored = 0; for (sk in dist){ colored += dist[sk]; }
+      none = Math.max(0, total - colored); started = colored;
+      headPct = Math.round(gradedPctAt(m.id, date));
+      var cum = {}, order = H.order || [], run = 0;
+      for (var j = order.length-1; j >= 0; j--){ run += dist[order[j]] || 0; cum[order[j]] = run; }
+      cumFor = function(kk){ return kk===-1 ? none : (cum[kk] || 0); };
+    } else {
+      // exclusive current-colour tally drives the makeup bar (exclusion-aware).
+      var set = countedSet(), names = H.glyphNames || [];
+      (m.keys||[]).forEach(function(k, i){ if (set && !set[names[i]]) return; var s2=String(k);
+        if (k===-1 || H.order.indexOf(s2)===-1) none++; else dist[s2]=(dist[s2]||0)+1; });
+      started = total - uncoloredFor(m); headPct = gradedMasterPct(m);
+      cumFor = function(kk){ return countFor(m,kk)||0; };
+    }
     var startP = pct(started,total);
-    // exclusive current-colour tally drives the makeup bar (exclusion-aware).
-    var set=countedSet(), names=H.glyphNames||[];
-    var dist={}, none=0;
-    (m.keys||[]).forEach(function(k, i){ if (set && !set[names[i]]) return; var sk=String(k); if (k===-1 || H.order.indexOf(sk)===-1) none++; else dist[sk]=(dist[sk]||0)+1; });
     // one clear progress number; the started count is in the tooltip. The number is also
     // the funnel toggle (click to show/hide progress by step).
     var head = '<span class="ov-name">'+esc(m.name)+'</span>'
-      + '<button type="button" class="ov-pct" data-funnel="1" aria-expanded="'+(state.funnelOpen!==false)+'" title="'+started+'/'+total+' glyphs started ('+startP+'%) · click for progress by step">'+gradedMasterPct(m)+'% complete</button>';
+      + '<button type="button" class="ov-pct" data-funnel="1" aria-expanded="'+(state.funnelOpen!==false)+'" title="'+started+'/'+total+' glyphs started ('+startP+'%) · click for progress by step">'+headPct+'% complete</button>';
     var segParts = H.steps.map(function(s,i){
       return segSpan(s.key, pct(dist[String(s.key)]||0, total), s.label, i);
     }).join("") + segSpan(-1, pct(none, total), H.noneLabel, H.steps.length);
     return '<section class="overall master-overall" aria-label="'+esc(m.name+" totals")+'">'
       + '<div class="ov-main"><div class="ov-head">'+head+'</div>'
       + '<div class="seg'+(barsAnim?" intro":"")+'" role="img" aria-label="'+esc(m.name+" colour distribution")+'">'+segParts+'</div>'
-      + funnelHTML(function(k){ return countFor(m,k)||0; }, total)+'</div></section>';
+      + funnelHTML(cumFor, total)+'</div></section>';
   }
   function heatmap(m){
     var cats = H.categories || [];
@@ -925,10 +1067,13 @@ DASHBOARD_JS = r"""
     // read, so all the scrub-aware surfaces agree. stateAt already normalises
     // hidden keys to -1; a glyph with no event by that date reads as uncoloured
     // (exactly like the discs' countsOf).
-    var scrubISO = null, scrubSnap = null;
+    var scrubISO = null, scrubSnap = null, scrubPrevSnap = null;
     if (state.tlScrub != null){
-      var sdates = (H.trend && H.trend.dates) || [], sdate = sdates[scrubIndex()];
-      if (sdate != null){ scrubISO = sdate; scrubSnap = stateAt(m.id, sdate); }
+      var sdates = (H.trend && H.trend.dates) || [], si = scrubIndex(), sdate = sdates[si];
+      if (sdate != null){ scrubISO = sdate; scrubSnap = stateAt(m.id, sdate);
+        // the snapshot BEFORE the picked day, so Before/After can diff ANY picked moment vs
+        // the day before it (not only the latest run).
+        if (si > 0){ scrubPrevSnap = stateAt(m.id, sdates[si-1]); } }
     }
     var items = [];
     for (var i=0;i<H.glyphNames.length;i++){
@@ -945,17 +1090,47 @@ DASHBOARD_JS = r"""
     // When a colour is focused, show ONLY its glyphs; the grid recomposes (packed).
     // Otherwise every glyph (no cap); letterforms come from H.paths.
     var shown = (state.focus===null) ? items : items.filter(matchesFocus);
+    var jidx = (H.journeyIndex && H.journeyIndex[m.id]) || {};
     var paths = (H.paths && H.paths[m.id]) || {};
-    var ch = (H.changes && H.changes[m.id]) || {};
+    // The changeset that drives Before/After + the "Recently modified" filter: glyphName ->
+    // [previousKey]. Scrubbed to a past day -> the diff vs the PREVIOUS snapshot date, so any
+    // picked moment compares with the day before it. Not scrubbed -> "since the last run"
+    // (H.changes, with a history-derived fallback).
+    var ch = {};
+    if (scrubSnap){
+      if (scrubPrevSnap){
+        var seenG = {};
+        for (var gp in scrubPrevSnap){ seenG[gp] = 1; }
+        for (var gc in scrubSnap){ seenG[gc] = 1; }
+        for (var gname in seenG){
+          var bKey = (scrubPrevSnap[gname] != null) ? scrubPrevSnap[gname] : -1;
+          var aKey = (scrubSnap[gname] != null) ? scrubSnap[gname] : -1;
+          if (String(bKey) !== String(aKey)){ ch[gname] = [bKey]; }
+        }
+      }
+    } else {
+      ch = (H.changes && H.changes[m.id]) || {};
+      // Before/After fallback (#B): with no last-run diff recorded, derive each glyph's
+      // previous colour from its saved history so the switch still appears + works.
+      if (!Object.keys(ch).length){
+        for (var gn in jidx){ var jev = jidx[gn]; if (jev && jev.length >= 2){ var pk = jev[jev.length-2][1], nk = jev[jev.length-1][1]; if (pk !== nk){ ch[gn] = [pk]; } } }
+      }
+    }
+    // "Recently modified" filter (opt-in): keep ONLY the glyphs that actually changed since
+    // the last run — i.e. the ones in the changeset. (The old 7-days-ago baseline matched
+    // every coloured glyph on a freshly-coloured font, so the toggle read as a no-op.)
+    if (state.heatRecent && Object.keys(ch).length){
+      shown = shown.filter(function(it){ return ch[it[0]] != null; });
+    }
     function cellHTML(it){
       var name = it[0], key = it[1], lab = labelFor(key);
       // non-exporting: excluded glyphs stay visible but DIM (.ncnt) with a
       // "not counted" affordance — they never vanish from the grid.
       var dim = !isCounted(name);
       if (dim) lab += " — not counted";
-      // while time-travelling the before/after pair collapses to the historical
-      // colour ("before last run" is meaningless at an arbitrary past moment).
-      var wasKey = (!scrubSnap && ch[name] != null) ? ch[name][0] : key;
+      // "before" = the glyph's previous colour from the active changeset (the last run, or
+      // the PREVIOUS snapshot day while scrubbed); falls back to the current key (no change).
+      var wasKey = (ch[name] != null) ? ch[name][0] : key;
       var nowVar = varFor(key), wasVar = varFor(wasKey);
       var showVar = state.before ? wasVar : nowVar;
       // Fully percent-encode the path (encodeURIComponent → slashes become %2F),
@@ -1000,23 +1175,44 @@ DASHBOARD_JS = r"""
           + '<div class="grid" aria-label="'+esc(c)+'">'+groups[c].map(cellHTML).join("")+'</div></div>';
       }).join("");
     }
-    var empty = items.length===0 ? '<p class="empty">No glyphs.</p>' : "";
-    var toggle = (!scrubSnap && Object.keys(ch).length) ? '<button type="button" class="ba-toggle chip" aria-pressed="'+state.before+'" title="Toggle the cell colours between before and after the last run">'+(state.before?"Before":"After")+'</button>' : '';
+    // Empty when the font has no glyphs, OR when "Recently modified" is on but nothing
+    // changed since the last run (the filter emptied the grid).
+    var empty = (!sections)
+      ? '<p class="empty">'+(state.heatRecent ? "No glyphs changed since the last run." : "No glyphs.")+'</p>'
+      : "";
+    var toggle = (Object.keys(ch).length)
+      ? '<span class="ba-switch" role="group" aria-label="Show cell colours before or after the picked moment">'
+        + '<button type="button" class="ba-seg'+(state.before?" on":"")+'" data-ba="before" aria-pressed="'+state.before+'">Before</button>'
+        + '<button type="button" class="ba-seg'+(!state.before?" on":"")+'" data-ba="after" aria-pressed="'+(!state.before)+'">After</button>'
+        + '<button type="button" class="ba-play'+(state.baPlaying?" on":"")+'" data-baplay="1" aria-pressed="'+(!!state.baPlaying)+'" aria-label="Auto-switch before and after every second" title="Auto-switch before/after every second">'+(state.baPlaying?'􀊗':'􀊕')+'</button>'
+        + '</span>'
+      : '';
     var focusInfo = state.focus!==null
       ? '<button type="button" class="chip focus-clear" data-fclear="1" title="Clear colour focus">Focus: '+esc(labelFor(state.focus))+' ✕</button>'
       : '';
-    // sort control: order the grid by glyph category (default) or by colour.
-    var sortCtl = '<span class="hsort" role="group" aria-label="Sort glyphs">'
-      + '<button type="button" class="chip" data-hsort="category" aria-pressed="'+(state.heatSort!=="color")+'" title="Group glyphs by category">Category</button>'
-      + '<button type="button" class="chip" data-hsort="color" aria-pressed="'+(state.heatSort==="color")+'" title="Group glyphs by colour">By colour</button></span>';
-    // dismissible time-travel pill above the grid: which moment the cells show,
-    // plus a one-click return to the live (today) colours.
-    var pill = scrubISO
-      ? '<div class="heat-pill" role="status">Viewing '+esc(dateLabel(scrubISO))
-        + ' — <button type="button" class="chip" data-scrubclear="1" title="Clear the picked moment and show the current colours">back to today</button></div>'
+    // sort control: a segmented switch with a sliding highlight — group the grid by
+    // glyph category (default) or by colour.
+    var sortCtl = '<span class="segsw hsort" role="group" aria-label="Sort glyphs" style="--seg:'+(state.heatSort==="color"?1:0)+'">'
+      + segHL("hsort", state.heatSort==="color"?1:0)
+      + '<button type="button" data-hsort="category" aria-pressed="'+(state.heatSort!=="color")+'" title="Group glyphs by category">Category</button>'
+      + '<button type="button" data-hsort="color" aria-pressed="'+(state.heatSort==="color")+'" title="Group glyphs by colour">By colour</button></span>';
+    // recently-modified filter: show only glyphs touched in the last 7 days.
+    // Hidden when there is nothing changed to filter to (no changeset).
+    var recentCtl = Object.keys(ch).length
+      ? '<button type="button" class="chip heat-recent'+(state.heatRecent?" on":"")+'" data-heatrecent="1" aria-pressed="'+(!!state.heatRecent)+'" title="Show only glyphs changed since the last run">Recently modified</button>'
       : '';
-    return '<section class="heat"><div class="heat-h">'+focusInfo+toggle+sortCtl+'</div>'+pill
-      + (sections||empty)+'</section>';
+    // glyph-cell size slider: live-resizes the grid cells (drives --cell-min on the section).
+    var cz = state.cellSize || 40;
+    var sizeCtl = '<input type="range" class="cell-size" min="20" max="80" step="2" value="'+cz+'" data-cellsize title="Glyph cell size" aria-label="Glyph cell size">';
+    // (The time-travel scrub pill above the grid was removed; the latest version node /
+    // timeline already returns to the live moment, and scrubSnap still drives the cells.)
+    // Below 26px the cells are too small to scan as one long column -> lay the category
+    // SECTIONS two-up (CSS columns via .heat-2col; each .cat stays whole). The wrapper lets
+    // the column rule target the sections without catching the .heat-h controls.
+    var twoCol = cz < 26;
+    var body = sections ? '<div class="heat-cats">'+sections+'</div>' : empty;
+    return '<section class="heat'+(scrubAnim?" scrub":"")+(twoCol?" heat-2col":"")+'" style="--cell-min:'+cz+'px"><div class="heat-h">'+focusInfo+toggle+recentCtl+sortCtl+sizeCtl+'</div>'
+      + body+'</section>';
   }
   function changes(m){
     var ch = (H.changes && H.changes[m.id]) || {}, names = Object.keys(ch);
@@ -1053,49 +1249,23 @@ DASHBOARD_JS = r"""
     return '<div class="ov-card ovc-'+esc(key)+(open?" open":"")+'">'+head
       + '<div class="ov-card-body'+(open?" scroll":"")+'">'+bodyHtml+'</div></div>';
   }
-  // The master's own "Aa" outline (H.masters[].preview, {d, vb}) as a small chip,
-  // so a Thin row visibly looks thin and a Black row black. Masters whose A/a have
-  // no outline carry no preview ({}); their rows render exactly as before (no chip).
-  function lbChip(pv){
-    if (!pv || !pv.d) return "";
-    return '<span class="lb-chip" aria-hidden="true"><svg viewBox="'+esc(pv.vb)
-      + '" preserveAspectRatio="xMidYMid meet"><path d="'+esc(pv.d)+'" fill="currentColor"/></svg></span>';
-  }
-  function lbRow(r){
+  function lbRow(r, anim, i){
+    // anim (first paint only) grows each bar 0->width with a small per-row cascade.
+    var fillCls = "lb-fill" + (anim ? " intro" : "");
+    var fillStyle = "width:" + r.p + "%" + (anim ? ";--i:" + i : "");
     return '<button type="button" class="lb-row" data-m="'+esc(r.id)+'" title="Focus '+esc(r.name)+'">'
-      + lbChip(r.pv)
       + '<span class="lb-n">'+esc(r.name)+'</span>'
-      + '<span class="lb-bar"><span style="width:'+r.p+'%"></span></span>'
+      + '<span class="lb-bar"><span class="'+fillCls+'" style="'+fillStyle+'"></span></span>'
       + '<span class="lb-p">'+r.p+'%</span></button>';
   }
   // Ranked masters by graded step progress; click a row to focus that master.
-  // Collapsed shows the top 6; expanded scrolls through every master.
+  // Collapsed shows the top 10; expanded scrolls through every master.
   function leaderboard(){
-    var rows = H.masters.map(function(m){ return {id:m.id, name:m.name, p:masterPct(m), any:masterStarted(m), pv:m.preview}; });
+    var rows = H.masters.map(function(m){ return {id:m.id, name:m.name, p:masterPct(m), any:masterStarted(m)}; });
     rows.sort(function(a,b){ return b.p-a.p || (a.name<b.name?-1:1); });
-    var started = rows.filter(function(r){ return r.any; });
-    var open = !!state.ovExpand.leaderboard;
-    var list = open ? rows : (started.length?started:rows).slice(0,6);
-    var bars = list.map(lbRow).join("");
-    var zero = rows.length - started.length;
-    var foot = (!open && zero>0) ? '<div class="ov-foot">'+zero+' master'+(zero===1?"":"s")+' not started</div>' : '';
-    return ovCard("leaderboard", "Furthest along", bars+foot, rows.length>6);
-  }
-  // How many masters fall in each completion band.
-  function histogram(){
-    // a 6-band spread only carries signal for many masters; for a small family the
-    // "Furthest along" leaderboard already shows the spread, so skip it (#cut).
-    if (H.masters.length < 8) return "";
-    var buckets=[{l:"0%",n:0},{l:"1–25%",n:0},{l:"26–50%",n:0},{l:"51–75%",n:0},{l:"76–99%",n:0},{l:"100%",n:0}];
-    H.masters.forEach(function(m){ var p=masterPct(m);
-      var b = !masterStarted(m)?0 : p>=100?5 : p<=25?1 : p<=50?2 : p<=75?3 : 4; buckets[b].n++; });
-    var max=buckets.reduce(function(a,c){return Math.max(a,c.n);},1);
-    var rows=buckets.map(function(b){
-      return '<div class="hg-row"><span class="hg-l">'+b.l+'</span>'
-        + '<span class="hg-bar"><span style="width:'+(b.n/max*100).toFixed(1)+'%"></span></span>'
-        + '<span class="hg-n">'+b.n+'</span></div>';
-    }).join("");
-    return ovCard("histogram", "Masters by completion", rows, false);
+    // Always show every master, fully expanded — no scroll, no "Show all" toggle.
+    var bars = rows.map(function(r, i){ return lbRow(r, barsAnim, i); }).join("");
+    return ovCard("leaderboard", "Furthest along", bars, false);
   }
   // rank within the workflow order; uncoloured/none and off-palette steps rank
   // below every real step so "-> none" reads as backward.
@@ -1138,55 +1308,6 @@ DASHBOARD_JS = r"""
     }).join("");
     return ovCard("recent", "Recent activity", rows, feed.length > 12);
   }
-  // Cross-master agreement (global Overview lead card). H.crossMaster is computed
-  // in Python; this only renders it. byStep keys arrive as JSON strings, so we
-  // parseInt before handing them to the int-keyed swatchFor/labelFor helpers
-  // (swatchFor("-1") would otherwise miss varFor's `k===-1` guard).
-  function crossMasterCard(){
-    var cm = H.crossMaster;
-    if (!cm) return "";
-    // The done-everywhere progress bar + the identical/differ counts + by-step chips.
-    var donePct = pct(cm.doneEverywhere, cm.total);
-    var head = '<p class="cm-headline"><b>'+cm.doneEverywhere+'</b> / '+cm.total+' done everywhere</p>'
-      + '<div class="bar cm-bar"><span style="width:'+donePct+'%;background:var(--accent)"></span></div>';
-    var ident = '<p class="cm-line">identical in all masters: <b>'+cm.identical+'</b></p>';
-    var single = (cm.masterCount < 2) ? ' <span class="cm-note">(single master)</span>' : '';
-    // The differ count drills down: a chevron disclosure slides out the actual glyph
-    // names (H.crossMaster.differGlyphs) as chips; each chip opens the journey modal
-    // via the shared data-jglyph delegate. state.cmDifferOpen keeps it open across
-    // re-renders; the toggle itself mutates the DOM in place (see the data-cmdiffer
-    // branch) so the max-height transition can play.
-    var differGlyphs = cm.differGlyphs || [];
-    var differLine;
-    if (differGlyphs.length){
-      var open = !!state.cmDifferOpen;
-      var glyphChips = differGlyphs.map(function(n){
-        return '<button type="button" class="cm-dg" data-jglyph="'+esc(n)
-          + '" title="'+esc(n+" — differs between masters · click for its journey")+'">'+esc(n)+'</button>';
-      }).join("");
-      differLine = '<button type="button" class="cm-line cm-differ-h" data-cmdiffer="1" aria-expanded="'+open
-        + '" aria-controls="cm-differ-panel" title="Show the glyphs that differ between masters">'
-        + '<span class="cm-chev" aria-hidden="true">'+(open?"▾":"▸")+'</span>'
-        + '<span>differ between masters: <b>'+cm.differ+'</b>'+single+'</span></button>'
-        + '<div id="cm-differ-panel" class="cm-differ-panel'+(open?" open":"")+'">'+glyphChips+'</div>';
-    } else {
-      differLine = '<p class="cm-line">differ between masters: <b>'+cm.differ+'</b>'+single+'</p>';
-    }
-    var byStep = cm.byStep || {};
-    var chips = Object.keys(byStep).map(function(k){
-      var key = parseInt(k, 10);
-      // a real button carrying data-fkey, so the shared document-level delegate
-      // toggles colour focus exactly like the Overview ring legend items.
-      var on = state.focus === key, off = state.focus !== null && !on;
-      return '<button type="button" class="cm-step'+(on?" on":"")+(off?" off":"")
-        + '" data-fkey="'+key+'" title="'+esc(labelFor(key)+" — click to focus these glyphs")+'">'+swatchFor(key)
-        + '<span class="cm-step-n">'+byStep[k]+'</span></button>';
-    }).join("");
-    var steps = chips
-      ? '<div class="cm-steps"><span class="cm-steps-l">by step:</span>'+chips+'</div>'
-      : "";
-    return ovCard("crossMaster", "Across masters", head + ident + differLine + steps, false);
-  }
   // The activity calendar (heatmap / standard month grid) lives on the Overview, as a
   // full-width card. Clicking a day still scrubs the Time Machine (jumping to the
   // Timeline tab if it isn't on screen — see the data-calday handler).
@@ -1227,14 +1348,51 @@ DASHBOARD_JS = r"""
     var svg = '<svg class="ovz" viewBox="-26 0 252 200" role="img" aria-label="'+esc(m.name+" colour spread")+'">'+grid+spokes+poly+axt+'</svg>';
     return ovCard("radar", "Colour spread by master", '<div class="ovz-wrap">'+svg+'</div>', false);
   }
+  // Overview "This week" card: graded completion change over the last 7 days + how many
+  // glyph layers advanced a step. Hidden until there's a snapshot >=7 days back.
+  function weekProgressCard(){
+    var dates = (H.trend && H.trend.dates) || [];
+    if (dates.length < 2) return "";
+    var latest = dates[dates.length-1], weekAgo = snapDate(dates, isoMinusDays(latest, 7));
+    if (weekAgo === latest) return "";
+    var nowPct = gradedOverallPct(), thenPct = gradedOverallPctAt(weekAgo), delta = nowPct - thenPct;
+    var monthAgo = snapDate(dates, isoMinusDays(latest, 30)), monthDelta = nowPct - gradedOverallPctAt(monthAgo);
+    function wkStat(d, lab){ var a = rankArrow(d); return '<span class="wk-stat"><span class="wk-delta '+a.c+'">'+a.g+' '+(d>0?"+":"")+d+'%</span><span class="wk-sub">'+lab+'</span></span>'; }
+    var gains = [], colorMoves = {};
+    H.masters.forEach(function(m){
+      var snap = stateAt(m.id, weekAgo), names = H.glyphNames || [], ks = m.keys || [];
+      gains.push({ m:m, d:Math.round(gradedMasterPct(m) - gradedPctAt(m.id, weekAgo)) });   // weekly gain
+      for (var i=0;i<names.length;i++){
+        if (!isCounted(names[i])) continue;
+        var nowK = (ks[i] != null) ? ks[i] : -1, thenK = (snap[names[i]] != null) ? snap[names[i]] : -1;
+        // a glyph moved TO a visible colour this week -> tally it for "focus of the week"
+        if (String(nowK) !== String(thenK) && nowK !== -1 && H.order.indexOf(String(nowK)) !== -1){
+          colorMoves[String(nowK)] = (colorMoves[String(nowK)] || 0) + 1;
+        }
+      }
+    });
+    // top 3 most-improved masters (positive weekly gain), and the top 3 colours that gained
+    // the most glyphs this week.
+    var topMasters = gains.filter(function(x){ return x.d > 0; })
+      .sort(function(a,b){ return b.d - a.d || (a.m.name < b.m.name ? -1 : 1); }).slice(0, 3);
+    var moveTotal = Object.keys(colorMoves).reduce(function(s,k){ return s + colorMoves[k]; }, 0);
+    var topColors = Object.keys(colorMoves).map(function(k){ return { k:parseInt(k,10), n:colorMoves[k] }; })
+      .sort(function(a,b){ return b.n - a.n || a.k - b.k; }).slice(0, 3);
+    var mList = topMasters.map(function(g){ return '<li>'+esc(g.m.name)+'<b>+'+g.d+'%</b></li>'; }).join("");
+    var cList = topColors.map(function(f){ var pc = moveTotal ? Math.round(f.n / moveTotal * 100) : 0; return '<li><i class="wk-sw" style="background:var('+varFor(f.k)+')"></i>'+esc(labelFor(f.k))+'<b>+'+f.n+'<span class="wk-pct">(+'+pc+'%)</span></b></li>'; }).join("");
+    var bestBlock = mList ? '<div class="wk-row"><span class="wk-k">Most improved masters</span><ol class="wk-list">'+mList+'</ol></div>' : '';
+    var focusBlock = cList ? '<div class="wk-row"><span class="wk-k">Focus of the week</span><ol class="wk-list">'+cList+'</ol></div>' : '';
+    var extra = (bestBlock || focusBlock) ? '<div class="wk-extra">'+bestBlock+focusBlock+'</div>' : '';
+    var monthStat = (monthAgo !== latest) ? wkStat(monthDelta, "past 30 days") : "";
+    var body = '<div class="wk-head">'+wkStat(delta, "past 7 days")+monthStat+'</div>'
+      + extra;
+    return ovCard("week", "This week", body, false);
+  }
   function overviewExtras(){
     if (!H.masters.length) return "";
-    var cards = '<div class="ov-extra">'+crossMasterCard()+leaderboard()+histogram()+'</div>';
-    // The completion-over-time chart lives on the Timeline tab (its hero); the Overview
-    // no longer duplicates it. Keep the activity calendar here as the time-context card.
-    var cal = calendarCard();
-    if (cal){ cards += '<div class="ov-cal-solo">'+cal+'</div>'; }
-    return cards;
+    // This-week progress + the "Furthest along" leaderboard. (Histogram removed; the
+    // activity calendar moved to the Timeline tab.)
+    return '<div class="ov-extra">'+weekProgressCard()+leaderboard()+'</div>';
   }
   // Recent activity is the per-master change feed (all moves, history-aware), so it
   // belongs with the selected master, not the global Overview. The old last-save
@@ -1253,7 +1411,7 @@ DASHBOARD_JS = r"""
   function tabsView(){
     if (state.master==null) return overall()+overviewExtras();   // no master selected -> global view + extras
     var m = masterById(state.master);
-    return '<div class="panel" role="tabpanel">'+masterOverall(m)+categoryCoverageCard()+scriptCoverageCard()+heatmap(m)+masterExtras()+'</div>';
+    return '<div class="panel" role="tabpanel">'+versionCard()+masterOverall(m)+categoryCoverageCard()+scriptCoverageCard()+heatmap(m)+'</div>';
   }
   function covStacked(r){
     // a left-aligned stacked bar of the colours actually set in this group; no inline
@@ -1272,7 +1430,7 @@ DASHBOARD_JS = r"""
     var uncolored = r.uncolored || 0;
     if (uncolored){ var wu = r.total ? uncolored/r.total*100 : 0;
       segs += seg(wu, 'var(--c-none)', 'cov-none', esc(H.noneLabel+" — "+Math.round(wu)+"%")); }
-    return '<div class="cov-bar" role="img" aria-label="'+esc(r.key+": colour distribution")+'">'+segs+'</div>';
+    return '<div class="cov-bar'+(scrubAnim?" scrub":"")+'" role="img" aria-label="'+esc(r.key+": colour distribution")+'">'+segs+'</div>';
   }
   // ----- Script grid: one rounded card per script, filled with that script's
   //       label-colour blend, a sample glyph and its glyph count (#13) ---------
@@ -1414,7 +1572,8 @@ DASHBOARD_JS = r"""
   }
   // Two-column version surfaced in the focused-master Overview, just under the bar.
   function categoryCoverageCard(){
-    return '<div class="ov-catcov"><div class="cov-h"><span class="cov-title">Colours set by category</span></div>'
+    // Heading removed — the category rows are self-evident under the bar.
+    return '<div class="ov-catcov">'
       + '<div class="cov-rows cov-grid2">'+categoryCoverageBody()+'</div></div>';
   }
   // The "Colours set by script" grid for the focused master, surfaced in the Overview
@@ -1587,7 +1746,7 @@ DASHBOARD_JS = r"""
       var dim = state.master!=null && m.id!==state.master;   // a master is selected, not this one
       var sel = state.master!=null && m.id===state.master;
       var smooth = smoothPath(pts);                          // every line is smooth, not just the focused one
-      var dots = pts.map(function(o){ return '<circle class="tl-dot'+(dim?" tl-dim":"")+'" cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="'+(sel?3:2.5)+'" fill="var(--tl-dot)"><title>'+esc(m.name+" · "+o.date+" · "+Math.round(o.pc)+"%")+'</title></circle>'; }).join("");
+      var dots = pts.map(function(o){ return '<circle class="tl-dot'+(dim?" tl-dim":"")+'" cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="'+(sel?2.2:1.8)+'" fill="var(--tl-dot)"><title>'+esc(m.name+" · "+o.date+" · "+Math.round(o.pc)+"%")+'</title></circle>'; }).join("");
       if (sel){
         // #10 hero area: gentle smoothed line + a soft gradient fill that closes
         // down to the baseline Y(0). Dots above stay at exact values (honest).
@@ -1615,6 +1774,46 @@ DASHBOARD_JS = r"""
     var hitLayer = '<rect class="tl-crossarea" x="'+pl+'" y="'+ptop+'" width="'+iw.toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
     var chart = '<svg class="tl-chart'+(tlChartShouldAnim?" tl-anim":"")+'" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData+' aria-label="Completion over time per master. Click a point to pick that moment; left and right arrow keys step the picked moment.">'+(defs?'<defs>'+defs+'</defs>':'')+weekBands+ax.colBars+grid+xticks+lines+ax.scrubRule+hitLayer+'</svg>';
     return { chart:chart, legend:legend, foot:"" };   // the start/end date row moved to the navigator's ticks
+  }
+  // ----- Global Timeline: median completion + min-max spread band -----------------
+  // One bold median line + a soft band spanning the slowest-to-fastest master at each date.
+  // Stays readable at ANY master count (replaces the per-master line spaghetti). Same SVG
+  // scaffold + data-snaps as trendParts, so click-to-scrub works for free.
+  function trendBandParts(W, Ht){
+    var ax = calendarAxis(W, Ht);
+    var pl = ax.pl, pr = ax.pr, ptop = ax.ptop, ih = ax.ih, iw = ax.iw;
+    var dayOff = ax.dayOff, X = ax.X, Y = ax.Y;
+    var grid = [0,25,50,75,100].map(function(g){
+      var y = Y(g).toFixed(1);
+      return '<line class="tl-grid" x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'"/>'
+        + '<text class="tl-axis" x="'+(pl-5)+'" y="'+(parseFloat(y)+3).toFixed(1)+'" text-anchor="end">'+g+'</text>';
+    }).join("");
+    var pm = pctMatrix();
+    var up = [], lo = [], md = [];
+    for (var j = 0; j < pm.dates.length; j++){
+      var col = []; for (var i = 0; i < pm.M.length; i++){ col.push(pm.M[i][j]); }
+      col.sort(function(a, b){ return a - b; });
+      var mn = col.length ? col[0] : 0, mx = col.length ? col[col.length-1] : 0;
+      var mid = !col.length ? 0 : (col.length % 2 ? col[(col.length-1)/2] : (col[col.length/2-1] + col[col.length/2]) / 2);
+      var x = X(dayOff(pm.dates[j]));
+      up.push({ x:x, y:Y(mx) }); lo.push({ x:x, y:Y(mn) });
+      md.push({ x:x, y:Y(mid), pc:mid, mn:mn, mx:mx, date:pm.dates[j] });
+    }
+    var fill = smoothPath(up) + smoothPath(lo.slice().reverse()).replace(/^M/, "L") + "Z";
+    var medLine = '<path class="tl-spread-med" pathLength="1" d="'+smoothPath(md)+'"/>';
+    var dots = md.map(function(o){
+      return '<circle class="tl-spread-dot" cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="2"><title>'
+        + esc("Median "+Math.round(o.pc)+"% \u00b7 range "+Math.round(o.mn)+"\u2013"+Math.round(o.mx)+"% \u00b7 "+o.date)+'</title></circle>';
+    }).join("");
+    var snaps = ax.snaps;
+    var crossData = ' data-snaps="'+esc(JSON.stringify(snaps))+'" data-topy="'+ptop+'" data-boty="'+Y(0).toFixed(1)+'"';
+    var hitLayer = '<rect class="tl-crossarea" x="'+pl+'" y="'+ptop+'" width="'+iw.toFixed(1)+'" height="'+ih.toFixed(1)+'"/>';
+    // Caption moved into the (i) tooltip at the card's top-right (tlGraphInfo).
+    var chart = '<svg class="tl-chart'+(tlChartShouldAnim?" tl-anim":"")+'" viewBox="0 0 '+W+' '+Ht+'" role="img" tabindex="0"'+crossData
+      + ' aria-label="Family completion over time: median line with the min to max spread across all masters. Click a point to pick that moment.">'
+      + ax.weekBands + ax.colBars + grid + ax.xticks
+      + '<path class="tl-spread-fill" d="'+fill+'"/>' + medLine + dots + ax.scrubRule + hitLayer + '</svg>';
+    return { chart:chart, legend:"", foot:"" };
   }
   function streamParts(W, Ht){
     var ax = calendarAxis(W, Ht);
@@ -1661,6 +1860,7 @@ DASHBOARD_JS = r"""
     }
     var bandKeys = order.slice();                          // bottom -> top by palette order
     var bands = "";
+    var bandTops = "";                                     // top-edge strokes, drawn over every fill
     // cumulative top of the stack at each date, seeded at 0 (baseline = Y(0)).
     var cum = tally.map(function(){ return 0; });
     bandKeys.forEach(function(k){
@@ -1671,8 +1871,12 @@ DASHBOARD_JS = r"""
       var any = upper.some(function(v, i){ return v - lower[i] > 0.0001; });
       if (!any){ return; }
       bands += '<path class="tl-band" d="'+bandPath(lower, upper)+'" fill="var('+varFor(k)+')"><title>'+esc(labelFor(k))+'</title></path>';
+      // Trace the band's TOP edge in its own colour at higher opacity so each softened layer
+      // still reads as a defined curve. Same smoothing as the fill's upper edge.
+      var upPts = tally.map(function(t, i){ return { x:X(dayOff(t.date)), y:Y(upper[i]) }; });
+      bandTops += '<path class="tl-band-top" d="'+smoothPath(upPts)+'" stroke="var('+varFor(k)+')"/>';
     });
-    var bandGroup = bands;
+    var bandGroup = bands + bandTops;                      // strokes layer above all fills
     // The graded line traced along the stack TOP (the same curve as the colour-less Line
     // view) + dots, labelled by scope ("Overall" when aggregating, else the master name).
     var scopeName = "Overall";
@@ -1684,7 +1888,7 @@ DASHBOARD_JS = r"""
     // No accent top-line in focus mode: the coloured band stack already traces the
     // completion curve. Keep small dots as clickable per-snapshot moment markers.
     var topDots = topPts.map(function(o, i){
-      return '<circle class="tl-dot" cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="2.5" fill="var(--tl-dot)">'
+      return '<circle class="tl-dot" cx="'+o.x.toFixed(1)+'" cy="'+o.y.toFixed(1)+'" r="1.8" fill="var(--tl-dot)">'
         + '<title>'+esc(scopeName+" · "+tally[i].date+" · "+Math.round(cum[i])+"%")+'</title></circle>';
     }).join("");
     bandGroup += topDots;
@@ -1709,11 +1913,15 @@ DASHBOARD_JS = r"""
   function tlSpanToggle(){
     if (fullSeries().length < 3){ return ""; }
     var active = state.tlSpan || (isZoomed() ? "" : "all");
-    var btns = TL_SPANS.map(function(sp){
-      var on = active === sp[0];
-      return '<button type="button" class="tl-sw-btn tl-span-btn" data-tlspan="'+sp[0]+'" aria-pressed="'+on+'" title="'+(sp[0]==="all"?"Full history":"Last "+sp[1])+'">'+sp[1]+'</button>';
+    var activeIdx = -1;
+    TL_SPANS.forEach(function(sp, i){ if (sp[0] === active){ activeIdx = i; } });
+    var btns = TL_SPANS.map(function(sp, i){
+      return '<button type="button" data-tlspan="'+sp[0]+'" aria-pressed="'+(i===activeIdx)+'" title="'+(sp[0]==="all"?"Full history":"Last "+sp[1])+'">'+sp[1]+'</button>';
     }).join("");
-    return '<div class="tl-switch tl-spanbar" role="group" aria-label="Timeline duration">'+btns+'</div>';
+    // Same sliding-pill segmented switch as the Graph/Calendar toggle (--segn segments).
+    // While the range is dragged manually no preset is active (activeIdx<0) -> no pill.
+    var hl = activeIdx >= 0 ? segHL("tlspan", activeIdx) : "";
+    return '<span class="segsw tl-spanbar" role="group" aria-label="Timeline duration" style="--segn:'+TL_SPANS.length+';--seg:'+(activeIdx<0?0:activeIdx)+'">'+hl+btns+'</span>';
   }
   function setTlSpan(span){
     state.tlSpan = span;
@@ -1750,6 +1958,23 @@ DASHBOARD_JS = r"""
     });
     NAVCACHE_KEY = key;
     return NAVCACHE;
+  }
+  // ----- Per-master graded-% matrix over the windowed axis (band/grid/heatmap share it) ---
+  // M[i][j] = gradedPctAt(masters[i].id, dates[j]) for the active (zoom-windowed) dates. One
+  // stateAt scan per (master,date); cached so switching view or scrubbing never recomputes it.
+  var PMCACHE = null, PMCACHE_KEY = "";
+  function pctMatrix(){
+    var series = calendarAxis(680, 200).series;
+    var dates = series.map(function(p){ return p.date; });
+    var key = state.tlGran + ":" + state.tlBucket + ":" + state.viewLo + ":" + state.viewHi
+      + ":" + dates.length + ":" + (dates.length ? dates[dates.length-1] : "") + ":" + H.masters.length;
+    if (PMCACHE && PMCACHE_KEY === key){ return PMCACHE; }
+    var M = H.masters.map(function(m){
+      return dates.map(function(d){ return gradedPctAt(m.id, d); });
+    });
+    PMCACHE = { dates:dates, M:M, masters:H.masters };
+    PMCACHE_KEY = key;
+    return PMCACHE;
   }
   function rangeNav(W){
     var s = fullSeries();
@@ -1793,7 +2018,7 @@ DASHBOARD_JS = r"""
       var anchor = i === 0 ? "start" : (i === s.length - 1 ? "end" : "middle");
       navTicks += '<text class="tl-xtick" x="'+X(i).toFixed(1)+'" y="'+(ptop+ih+11).toFixed(1)+'" text-anchor="'+anchor+'">'+esc(tickLabel(p.date))+'</text>';
     });
-    var reset = isZoomed() ? '<button type="button" class="tl-nav-reset" data-navreset="1" title="Show the full history">Reset zoom</button>' : "";
+    var reset = "";   // Reset-zoom button removed (double-click the navigator to reset).
     return '<div class="tl-nav-wrap">'
       + '<svg class="tl-nav" viewBox="0 0 '+W+' '+Ht+'" data-navsnaps="'+esc(JSON.stringify(snaps))+'" role="group" aria-label="Range navigator — drag the handles to zoom the chart to a date range">'
       + '<path class="tl-nav-area" d="'+area+'"/><path class="tl-nav-line" d="'+line+'"/>'
@@ -2066,19 +2291,24 @@ DASHBOARD_JS = r"""
     return scrubIndex();
   }
   // Tiny completion-over-time polyline for a lane (chart Y-flip idiom, mini box).
-  function laneSparkSVG(values){
+  function laneSparkSVG(values, key){
     var n = values.length, w = 64, h = 16, pad = 1.5, iw = w - pad*2, ih = h - pad*2;
-    if (n < 2) return "";
-    var pts = values.map(function(v, i){
-      var x = pad + i/(n-1)*iw;
-      var y = pad + ih - Math.max(0, Math.min(100, v))/100*ih;
-      return x.toFixed(1)+","+y.toFixed(1);
-    }).join(" ");
+    if (n < 1) return "";
+    // First snapshot has a single point: draw a flat line across the box at that level
+    // (Hugo wants the line look at every moment, never a bar). morphSparks still tweens it.
+    var yOf = function(v){ return pad + ih - Math.max(0, Math.min(100, v))/100*ih; };
+    var pts = (n === 1)
+      ? (pad.toFixed(1)+","+yOf(values[0]).toFixed(1)+" "+(w-pad).toFixed(1)+","+yOf(values[0]).toFixed(1))
+      : values.map(function(v, i){
+          var x = pad + i/(n-1)*iw;
+          return x.toFixed(1)+","+yOf(v).toFixed(1);
+        }).join(" ");
     // Draw-in the line when switching focused master (laneSparkShouldAnim), reusing the
-    // chart's tlDraw keyframe via pathLength="1". Reduced-motion neutralises it.
+    // chart's tlDraw keyframe via pathLength="1". Reduced-motion neutralises it. The
+    // data-spark key lets morphSparks() tween this line's shape when the moment changes.
     var animCls = laneSparkShouldAnim ? " tl-spark-anim" : "";
     return '<svg class="tl-lane-spark'+animCls+'" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true">'
-      + '<polyline points="'+pts+'" pathLength="1" fill="none"/></svg>';
+      + '<polyline data-spark="'+esc(key||"")+'" points="'+pts+'" pathLength="1" fill="none"/></svg>';
   }
   // ----- #17 per-category progress lanes over time ---------------------------
   function categoryLanes(){
@@ -2113,14 +2343,19 @@ DASHBOARD_JS = r"""
       var delta = prevISO ? cur - laneGradedPct(names, prevISO) : 0;
       return { cat:cat, count:names.length, values:values, cur:cur, delta:delta };
     });
-    // laggard-first: lowest current % on top (name as a stable tie-breaker).
-    lanes.sort(function(a, b){ return (a.cur - b.cur) || (a.cat < b.cat ? -1 : 1); });
+    // Fixed canonical order (Glyphs Font-View style: Letter, Number, ...), so the lanes
+    // never reshuffle when the picked moment / data changes. Unknown categories fall after,
+    // alphabetically.
+    var CAT_ORDER = ["Letter","Number","Punctuation","Mark","Separator","Symbol","Other"];
+    lanes.sort(function(a, b){
+      var ia = CAT_ORDER.indexOf(a.cat); ia = ia < 0 ? CAT_ORDER.length : ia;
+      var ib = CAT_ORDER.indexOf(b.cat); ib = ib < 0 ? CAT_ORDER.length : ib;
+      return (ia - ib) || (a.cat < b.cat ? -1 : 1);
+    });
     var rows = lanes.map(function(ln){
       var ra = rankArrow(ln.delta); var arrow = ra.g, arrowCls = ra.c;
       var deltaTxt = prevISO ? ((ln.delta>0?"+":"")+ln.delta+"% vs "+esc(dateLabel(prevISO))) : "first snapshot";
-      var mid2 = (ln.values.length < 2)
-        ? '<span class="tl-lane-bar"><span style="width:'+ln.cur+'%"></span></span>'
-        : laneSparkSVG(ln.values);
+      var mid2 = laneSparkSVG(ln.values, "cat:"+ln.cat);   // line at every moment (incl. first date)
       return '<div class="tl-lane'+(ln.cur>=100?" done":"")+'">'
         + '<span class="tl-lane-n" title="'+esc(ln.cat)+'">'+esc(ln.cat)+' <small>('+ln.count+')</small></span>'
         + '<span class="tl-lane-mid">'+mid2+'</span>'
@@ -2148,6 +2383,9 @@ DASHBOARD_JS = r"""
     }
     var scripts = Object.keys(groups).filter(function(s){ return s !== "Other"; });   // skip the "Other" bucket
     if (!scripts.length) return "";
+    // When Latin is the ONLY writing system, the per-script breakdown just mirrors the
+    // overall progress -> hide the whole section (no point showing a single "Latin" lane).
+    if (scripts.length === 1 && /^latin$/i.test(scripts[0])) return "";
     var mid = reglogMaster();
     if (!mid) return "";
     // read the scrubbed Time-Machine checkpoint (master view) / latest (global): the % at
@@ -2169,9 +2407,7 @@ DASHBOARD_JS = r"""
     var rows = lanes.map(function(ln){
       var ra = rankArrow(ln.delta); var arrow = ra.g, arrowCls = ra.c;
       var deltaTxt = prevISO ? ((ln.delta>0?"+":"")+ln.delta+"% vs "+esc(dateLabel(prevISO))) : "first snapshot";
-      var mid2 = (ln.values.length < 2)
-        ? '<span class="tl-lane-bar"><span style="width:'+ln.cur+'%"></span></span>'
-        : laneSparkSVG(ln.values);
+      var mid2 = laneSparkSVG(ln.values, "scr:"+ln.script);   // line at every moment (incl. first date)
       return '<div class="tl-lane'+(ln.cur>=100?" done":"")+'">'
         + '<span class="tl-lane-n" title="'+esc(prettyScript(ln.script))+'">'+esc(prettyScript(ln.script))+' <small>('+ln.count+')</small></span>'
         + '<span class="tl-lane-mid">'+mid2+'</span>'
@@ -2200,7 +2436,9 @@ DASHBOARD_JS = r"""
     var dates = (H.trend && H.trend.dates) || [];
     if (!dates.length) return;
     var clamped = Math.max(0, Math.min(dates.length-1, idx));
+    var prev = state.tlScrub;
     state.tlScrub = (clamped === dates.length-1) ? null : clamped;
+    if (state.tlScrub !== prev) scrubAnim = true;   // a new moment: animate the bars/cells/lines that follow it
     update();
   }
   // ----- #20 rich onboarding seed states for sparse history -------------------
@@ -2364,8 +2602,7 @@ DASHBOARD_JS = r"""
   function activityCalendar(){
     var dates = (H.trend && H.trend.dates) || [];
     if (dates.length < 2) return "";
-    return '<div class="tl-cal-card"><div class="tl-cal-h"><span class="tl-cal-ttl">Activity calendar</span></div>'
-      + standardCalendar() + '</div>';
+    return '<div class="tl-cal-card">' + standardCalendar() + '</div>';
   }
   // Timeline mode toggle: Time (group saves over time) vs Save (one point per save).
   // In Time mode a second toggle picks the grouping bucket (Hours/Days/Months). Hidden
@@ -2392,27 +2629,67 @@ DASHBOARD_JS = r"""
     }
     return '<div class="tl-granbar"><span class="tl-granlabel">Timeline</span>'+modes+buckets+'</div>';
   }
+  // Shared sliding highlight for any .segsw switch. Remembers the previous --seg index per
+  // switch key, so a click can MORPH the pill from the old segment to the new one. The report
+  // rebuilds the DOM via innerHTML each render, so a plain CSS transition never fires on the
+  // fresh element — we drive the slide with a keyframe gated on a click flag (segswAnimKey).
+  function segHL(key, seg){
+    var prev = segswPrev.hasOwnProperty(key) ? segswPrev[key] : seg;
+    segswPrev[key] = seg;
+    var anim = (segswAnimKey === key && prev !== seg) ? " anim" : "";
+    return '<span class="segsw-hl'+anim+'" style="--seg-from:'+prev+';--seg-to:'+seg+'" aria-hidden="true"></span>';
+  }
+  // The little (i) at the top-right of the graph card; its tooltip explains what the band is.
+  function tlGraphInfo(){
+    var pm = pctMatrix();
+    var txt = "Median completion over time · shaded band spans min–max across "+pm.masters.length+" masters";
+    // A CSS hover/focus tooltip (the native title attribute does not surface reliably in the
+    // Glyphs WebView). Positioned top-right OVER the chart by .tl-info-wrap.
+    return '<span class="tl-info-wrap">'
+      + '<button type="button" class="tl-info" aria-label="'+esc(txt)+'" aria-describedby="cfd-tl-tip">i</button>'
+      + '<span class="tl-info-tip" id="cfd-tl-tip" role="tooltip">'+esc(txt)+'</span></span>';
+  }
+  // Segmented switch (sliding highlight) that flips the shared Timeline card between the
+  // completion Graph and the Activity Calendar — only one is on screen at a time.
+  function tlPaneSwitch(){
+    var cal = state.tlPane === "calendar";
+    return '<span class="segsw tl-paneswitch" role="group" aria-label="Timeline view" style="--seg:'+(cal?1:0)+'">'
+      + segHL("tlpane", cal?1:0)
+      + '<button type="button" data-tlpane="graph" aria-pressed="'+(!cal)+'" title="Show the completion graph">Graph</button>'
+      + '<button type="button" data-tlpane="calendar" aria-pressed="'+cal+'" title="Show the activity calendar">Calendar</button></span>';
+  }
   function timelineView(){
     // #20: <3 snapshots routes to the rich seed states (a skeleton + locked chips at
     // <2, a compact one-day diff at ==2). The full view needs >=3 to be meaningful.
-    // The granularity toggle sits ABOVE the seed gate so it stays reachable even when
-    // the active granularity has too few points (you can always switch back).
-    var gran = tlGranToggle();
     var dates = (H.trend && H.trend.dates) || [];
     if (dates.length < 3){
-      return '<section class="timeline">'+gran+'<section class="tl-empty">'+seedState()+'</section></section>';
+      return '<section class="timeline"><section class="tl-empty">'+seedState()+'</section></section>';
     }
-    // One graph (the graded completion Line). Global (no master) -> a neutral line per
-    // master. Focusing a master AUTO-SHOWS that master's weighted per-colour breakdown
-    // under its line (no Colours button — focus is the switch).
-    var parts = (state.master != null) ? streamParts(680, 200) : trendParts(680, 200);
+    // One graph (the graded completion Line). Global (no master) -> a neutral band per
+    // master. Focusing a master AUTO-SHOWS that master's weighted per-colour breakdown.
+    var parts = (state.master != null) ? streamParts(680, 200) : trendBandParts(680, 200);
     tlChartShouldAnim = false;                   // consumed: animate only on entering Timeline, not on scrub/zoom
-    var chartBlock = '<div class="tl-chartbar">'+tlSpanToggle()+'</div>'+parts.chart+rangeNav(680)+parts.foot;
+    // The graph and the Activity calendar share ONE card; the segmented switch flips
+    // between them. The duration (Day/Week/Month/Year/All) presets sit next to the graph.
+    var graphPane = '<div class="tl-chartwrap">'+parts.chart+tlGraphInfo()+'</div>'+rangeNav(680)+parts.foot;
+    var calPane = '<div class="tl-calpane">'+activityCalendar()+'</div>';
+    var pane = (state.tlPane === "calendar") ? calPane : graphPane;
+    // Header row: Graph/Calendar switch on the LEFT, the duration presets (1D/1W/1M/1Y/All)
+    // on the RIGHT — aligned on one line. The (i) info button moved INTO the chart (top-right).
+    var spans = (state.tlPane === "calendar") ? "" : tlSpanToggle();
+    var card = '<div class="tl-graphcard"><div class="tl-graphcard-h">'+tlPaneSwitch()+spans+'</div>'+pane+'</div>';
     // Clicking the chart picks a moment (scrub): the left-sidebar discs + the category /
     // script lanes recompute at that moment. The lanes sit in a two-column grid.
-    var lanesGrid = '<div class="tl-lanes-grid">'+categoryLanes()+scriptLanes()+'</div>';
+    // In the Calendar pane the category/script lanes are hidden entirely (just the calendar).
+    var scriptL = (state.tlPane === "calendar") ? "" : scriptLanes();
+    // No Script lanes (e.g. a Latin-only font) -> let the category lanes use the freed second
+    // column (two-up) instead of leaving an empty half.
+    var lanesGrid = (state.tlPane === "calendar") ? ""
+      : (scriptL
+          ? '<div class="tl-lanes-grid">'+categoryLanes()+scriptL+'</div>'
+          : '<div class="tl-lanes-grid tl-lanes-cat2">'+categoryLanes()+'</div>');
     laneSparkShouldAnim = false;                  // consumed: lanes draw-in once per focus switch, not on scrub/zoom
-    return '<section class="timeline">'+gran+chartBlock+lanesGrid
+    return '<section class="timeline">'+card+lanesGrid
       + outlineChangesView()+touchedAfterDoneView()+'</section>';
   }
   function renderBody(){
@@ -2519,6 +2796,30 @@ DASHBOARD_JS = r"""
     }
   }
 
+  // ----- Before/After switch + "play" auto-toggle ----------------------------
+  var baTimer = null;
+  function baSyncUI(){
+    var segs = document.querySelectorAll(".ba-seg"), i;
+    for (i=0;i<segs.length;i++){
+      var on = (segs[i].getAttribute("data-ba")==="before") === state.before;
+      segs[i].classList.toggle("on", on); segs[i].setAttribute("aria-pressed", on);
+    }
+    var pb = document.querySelector(".ba-play");
+    if (pb){ pb.classList.toggle("on", !!state.baPlaying);
+      pb.setAttribute("aria-pressed", !!state.baPlaying);
+      pb.textContent = state.baPlaying ? "􀊗" : "􀊕"; }   // pause while playing, else play
+  }
+  function baStopPlay(){ if (baTimer){ clearInterval(baTimer); baTimer = null; } state.baPlaying = false; baSyncUI(); }
+  function baStartPlay(){
+    if (baTimer) return;
+    state.baPlaying = true; baSyncUI();
+    // Flip before<->after every second; self-stops if the control leaves the DOM (view change).
+    baTimer = setInterval(function(){
+      if (!document.querySelector(".ba-play")){ baStopPlay(); return; }
+      state.before = !state.before; baSyncUI(); applyBeforeAfter();
+    }, 1000);
+  }
+
   // Count-up a lane's percentage from -> to (uses the rAF timestamp, no clock).
   function tweenNumber(el, from, to, dur){
     requestAnimationFrame(function step(ts){
@@ -2546,17 +2847,101 @@ DASHBOARD_JS = r"""
     }
   }
 
+  // Count-up the big Overview ring's % number. On the first Overview paint (intro) it
+  // sweeps 0 -> value in step with the ring's draw-in; afterwards it tweens only when the
+  // value actually changes (focus/scrub) and snaps under reduced-motion / headless.
+  var ringNumCache = null;
+  function animateRingNumber(intro){
+    var el = document.querySelector(".overall .ov-ring-t[data-to]");
+    if (!el) return;
+    var to = parseInt(el.getAttribute("data-to"), 10) || 0;
+    var anim = !window.__cfdNoAnim && !(window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
+    var from = intro ? 0 : (ringNumCache == null ? to : ringNumCache);
+    ringNumCache = to;
+    if (!anim || from === to){ el.textContent = to + "%"; return; }
+    el.textContent = from + "%";
+    tweenNumber(el, from, to, intro ? 800 : 460);
+  }
+
+  // On a Global<->Focus master switch, fade ONLY the headline ring + its legend. Everything
+  // else (category-coverage bars, glyph cells, timeline lanes) updates IN PLACE — no flash —
+  // with its own count-ups / sparkline morphs handling the value changes. Each faded element
+  // is fresh from the innerHTML rebuild, so adding the keyframe class plays it once. Silenced
+  // under reduced-motion / headless.
+  function fadeData(){
+    if (noAnim()) return;
+    var body = document.getElementById("cfd-body"); if (!body) return;
+    var els = body.querySelectorAll(".ov-ring,.ov-legend");
+    for (var i=0;i<els.length;i++){ els[i].classList.add("cfd-fade"); }
+  }
+  function noAnim(){
+    return !!window.__cfdNoAnim ||
+      (window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
+  }
+  // ----- lane sparkline morph (scrub) ----------------------------------------
+  // Tween each lane's polyline from its PREVIOUS shape to the new one when the picked
+  // moment changes, so the line reshapes smoothly between two time points instead of
+  // snapping. Points are cached per data-spark key. sparkPrev is refreshed every render
+  // (even with animate=false) so the next morph starts from what's on screen.
+  function _parsePts(s){
+    return (s||"").trim().split(/\s+/).map(function(p){ var c=p.split(","); return [parseFloat(c[0]), parseFloat(c[1])]; })
+      .filter(function(p){ return !isNaN(p[0]) && !isNaN(p[1]); });
+  }
+  function _ptsStr(a){ return a.map(function(p){ return p[0].toFixed(1)+","+p[1].toFixed(1); }).join(" "); }
+  function _resample(pts, count){
+    if (pts.length === count) return pts.slice();
+    var out = [], last = pts.length - 1;
+    for (var i=0;i<count;i++){
+      var t = (count<2?0:i/(count-1))*last, lo = Math.floor(t), hi = Math.min(lo+1, last), f = t-lo;
+      out.push([pts[lo][0]+(pts[hi][0]-pts[lo][0])*f, pts[lo][1]+(pts[hi][1]-pts[lo][1])*f]);
+    }
+    return out;
+  }
+  function _tweenSpark(poly, a, b, finalPts){
+    var dur = 380, start = null;
+    poly.setAttribute("points", _ptsStr(a));      // start from the old shape (no flash of the target)
+    function frame(ts){
+      if (start == null) start = ts;
+      var k = Math.min(1, (ts - start)/dur), e = 1 - Math.pow(1-k, 3);   // easeOutCubic
+      if (k >= 1){ poly.setAttribute("points", _ptsStr(finalPts)); return; }
+      poly.setAttribute("points", _ptsStr(a.map(function(p,i){ return [p[0]+(b[i][0]-p[0])*e, p[1]+(b[i][1]-p[1])*e]; })));
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+  function morphSparks(animate){
+    var polys = document.querySelectorAll(".tl-lane-spark polyline[data-spark]");
+    Array.prototype.forEach.call(polys, function(poly){
+      var key = poly.getAttribute("data-spark");
+      var target = _parsePts(poly.getAttribute("points"));
+      var prev = sparkPrev[key];
+      sparkPrev[key] = target;                     // always refresh, so the next morph is from what's shown
+      if (!animate || noAnim() || !prev || prev.length < 2 || target.length < 2) return;
+      if (_ptsStr(prev) === _ptsStr(target)) return;
+      var npts = Math.max(prev.length, target.length, 2);
+      _tweenSpark(poly, _resample(prev, npts), _resample(target, npts), target);
+    });
+  }
   function update(){
     hideTip();
     barsAnim = !introPlayed;                    // fill the colour bar once on first paint, never on master switches
     introPlayed = true;
-    document.getElementById("cfd-body").innerHTML = renderBody();
+    var masterChanged = (lastRenderMaster !== "__cfd_init__") && (state.master !== lastRenderMaster);
+    lastRenderMaster = state.master;
+    var bodyEl = document.getElementById("cfd-body");
+    bodyEl.innerHTML = renderBody();
+    if (masterChanged){                          // Global<->Focus switch: fade ONLY the data panels
+      fadeData();                                // the disc tower runs its own per-disc focus crossfade
+    }
+    morphSparks(scrubAnim);                       // tween lane sparkline shapes on scrub (always refresh the cache)
     document.documentElement.setAttribute("data-theme", state.theme);
     var tl = document.getElementById("cfd-timeline"); if (tl) tl.setAttribute("aria-pressed", state.view==="timeline");
     var ov = document.getElementById("cfd-overview"); if (ov) ov.setAttribute("aria-pressed", state.view==="tabs");
     var sb = document.getElementById("cfd-sort"); if (sb) sb.textContent = "↕ Sort: "+(state.sort==="progress"?"progress":"workflow");
     paintScriptCards();
     animateLaneNumbers();                        // count-up the lane %s when the picked moment / focus changes
+    animateRingNumber(barsAnim);                 // count-up the Overview ring %; sweeps 0->value on first paint
+    scrubAnim = false;                           // consumed: the scrub animation runs once per picked moment
   }
 
   // Re-organise the heatmap when the focused colour changes (a FLIP animation):
@@ -2776,11 +3161,10 @@ DASHBOARD_JS = r"""
       document.documentElement.setAttribute("data-theme", state.theme);
     });
     // Switch view by chip. Leaving the Overview tab clears any colour focus, so the
-    // tower discs + heatmap return to the full distribution (focus only lives in
-    // Overview); the tower's render loop picks up the cleared state.focus next frame.
+    // Switching Overview <-> Timeline KEEPS the colour focus (it's restored when you return
+    // to Overview); only the chart draw-in is armed when entering Timeline.
     function toggleView(name){
       var v = state.view===name ? "tabs" : name;
-      if (v!=="tabs"){ state.focus = null; }
       if (v==="timeline"){ tlChartShouldAnim = true; }   // draw-in the chart on entering Timeline
       state.view = v; update();
     }
@@ -2791,6 +3175,16 @@ DASHBOARD_JS = r"""
       if (e.key==="Escape"){ closeExport(); closeJourney(); if (state.focus!==null){ setFocus(null); } }
     });
     var bodyEl = document.getElementById("cfd-body");
+    // Glyph-cell size slider: resize the grid LIVE (set the CSS var on the .heat section
+    // directly) while dragging, so there's no full re-render per input tick; state.cellSize
+    // persists the choice for the next render.
+    bodyEl.addEventListener("input", function(e){
+      var sz = e.target.closest && e.target.closest("[data-cellsize]");
+      if (!sz) return;
+      var v = parseInt(sz.value, 10) || 40;
+      state.cellSize = v;
+      var heat = sz.closest(".heat"); if (heat){ heat.style.setProperty("--cell-min", v+"px"); heat.classList.toggle("heat-2col", v < 26); }
+    });
     bodyEl.addEventListener("mouseover", function(e){
       var cell = e.target.closest(".heat .cell"); if (cell) showTip(cell.getAttribute("data-glyph"), e.clientX, e.clientY);
     });
@@ -2800,12 +3194,14 @@ DASHBOARD_JS = r"""
     bodyEl.addEventListener("click", function(e){
       var tab = e.target.closest(".tab"); if (tab){ state.master = tab.getAttribute("data-m"); laneSparkShouldAnim = true; update(); return; }
       var ox = e.target.closest("[data-ovexpand]"); if (ox){ var ok=ox.getAttribute("data-ovexpand"); state.ovExpand[ok]=!state.ovExpand[ok]; update(); return; }
-      var hs = e.target.closest("[data-hsort]"); if (hs){ state.heatSort = hs.getAttribute("data-hsort"); update(); return; }
+      var hs = e.target.closest("[data-hsort]"); if (hs){ segswAnimKey = "hsort"; state.heatSort = hs.getAttribute("data-hsort"); update(); return; }
+      var hr = e.target.closest("[data-heatrecent]"); if (hr){ state.heatRecent = !state.heatRecent; update(); return; }
+      var tp = e.target.closest("[data-tlpane]"); if (tp){ segswAnimKey = "tlpane"; state.tlPane = tp.getAttribute("data-tlpane"); state.tlScrub = null; update(); return; }
       var fn = e.target.closest("[data-funnel]"); if (fn){ state.funnelOpen = (state.funnelOpen === false); update(); return; }
       var tc = e.target.closest("[data-tlcat]"); if (tc){ var ck=tc.getAttribute("data-tlcat"); state.tlCatOpen[ck]=!state.tlCatOpen[ck]; update(); return; }
       var oc = e.target.closest("[data-oc]"); if (oc){ var ok=oc.getAttribute("data-oc"); state.ocOpen[ok]=!state.ocOpen[ok]; update(); return; }
-      var cr = e.target.closest(".lb-row[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; laneSparkShouldAnim = true; update(); return; }
-      var sp = e.target.closest("[data-tlspan]"); if (sp){ setTlSpan(sp.getAttribute("data-tlspan")); return; }
+      var cr = e.target.closest(".lb-row[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; state.focus = null; laneSparkShouldAnim = true; update(); return; }
+      var sp = e.target.closest("[data-tlspan]"); if (sp){ segswAnimKey = "tlspan"; setTlSpan(sp.getAttribute("data-tlspan")); return; }
       var tg = e.target.closest("[data-tlgrantoggle]"); if (tg){ setGranularity(state.tlGran==="time" ? "save" : "time"); return; }
       var tb = e.target.closest("[data-tlbucket]"); if (tb){ setBucket(tb.getAttribute("data-tlbucket")); return; }
       var nr = e.target.closest("[data-navreset]"); if (nr){ navReset(); return; }
@@ -2824,25 +3220,13 @@ DASHBOARD_JS = r"""
       // when the latest snapshot is picked) and re-render through the normal update()
       // path, so the .cell background transition crossfades back to today's colours.
       var scl = e.target.closest("[data-scrubclear]"); if (scl){ state.tlScrub = null; update(); return; }
-      var cmd = e.target.closest("[data-cmdiffer]"); if (cmd){
-        // Cross-master "differ" drill-down: toggle in place, skipping the full
-        // re-render, so the CSS max-height transition can play; __cfdNoAnim snaps it
-        // open instantly like the prefers-reduced-motion CSS gate. state keeps it
-        // across re-renders.
-        state.cmDifferOpen = !state.cmDifferOpen;
-        var pnl = document.getElementById("cm-differ-panel");
-        if (pnl){
-          if (window.__cfdNoAnim){ pnl.style.transition = "none"; }
-          pnl.classList.toggle("open", state.cmDifferOpen);
-        }
-        cmd.setAttribute("aria-expanded", state.cmDifferOpen);
-        var chev = cmd.querySelector(".cm-chev");
-        if (chev){ chev.textContent = state.cmDifferOpen ? "▾" : "▸"; }
-        return; }
+      var vn = e.target.closest("[data-vnav]"); if (vn){ e.preventDefault(); vnavShouldAnim = true; scrubSet(parseInt(vn.getAttribute("data-vnav"),10)); return; }
       var jr = e.target.closest("[data-jglyph]"); if (jr){ openJourney(jr.getAttribute("data-jglyph")); return; }
       var jc = e.target.closest(".heat .cell"); if (jc && (e.metaKey || e.ctrlKey)){ e.preventDefault(); openJourney(jc.getAttribute("data-glyph")); return; }
-      var ba = e.target.closest(".ba-toggle");
-      if (ba){ e.preventDefault(); state.before = !state.before; ba.setAttribute("aria-pressed", state.before); ba.textContent = state.before ? "Before" : "After"; applyBeforeAfter(); return; }
+      var bseg = e.target.closest(".ba-seg");
+      if (bseg){ e.preventDefault(); baStopPlay(); state.before = (bseg.getAttribute("data-ba")==="before"); baSyncUI(); applyBeforeAfter(); return; }
+      var bplay = e.target.closest(".ba-play");
+      if (bplay){ e.preventDefault(); if (state.baPlaying){ baStopPlay(); } else { baStartPlay(); } return; }
     });
     // Click the chart to PICK a moment (scrub -> sidebar discs + lanes follow); the
     // left/right arrow keys step the picked moment while the chart is focused.
@@ -2984,15 +3368,15 @@ DASHBOARD_JS = r"""
     // picked moment changes, instead of snapping. Reduced-motion / headless = instant.
     var TOWER_ANIM = !window.__cfdNoAnim && !(window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
     // ----- Colour Bloom opening intro (variant 4: smootherstep, ~760ms/disc, ~120ms stagger) -----
-    // Each disc starts as a grey blank; its colour wedge sweeps in (conic wipe from 12 o'clock),
-    // staggered top->bottom down the stack. Plays ONCE on open, frame-paced like the spin ramp
+    // Each disc starts as a blurry grey blank; its colour BLOOMS in via a soft cross-fade (no
+    // hard conic wipe / cut line), staggered top->bottom down the stack. Plays ONCE on open, frame-paced like the spin ramp
     // (~60fps). Reduced-motion / headless: skipped entirely (discs render full colour at once).
     var GREYFIELDS = H.masters.map(function(m){ var d=focusedCounts(m,null); return buildField(d.counts,d.uncolored,true); });
     function smootherstep(t){ t=t<0?0:(t>1?1:t); return t*t*t*(t*(t*6-15)+10); }
-    var INTRO_PER = 46, INTRO_STAG = 7;            // ~760ms per disc, ~120ms stagger at 60fps
+    var INTRO_PER = 23, INTRO_STAG = 4;            // 2x faster: ~380ms per disc, ~65ms stagger at 60fps
     var introFrame = 0, introDone = !TOWER_ANIM;   // reduced-motion: no intro, full colour immediately
     function introReveal(i){ if (introDone) return 1; return smootherstep((introFrame - i*INTRO_STAG)/INTRO_PER); }
-    var PREV_FIELDS = null, morph = 1, MORPH_STEP = 0.022;   // slow colour dissolve (a touch faster)
+    var PREV_FIELDS = null, morph = 1, MORPH_STEP = 0.044;   // colour dissolve, 2x faster
     var mtmp = document.createElement("canvas"); mtmp.width = mtmp.height = Math.round(FS*dpr);
     var mctx = mtmp.getContext("2d");
     function fieldFor(i){
@@ -3057,11 +3441,11 @@ DASHBOARD_JS = r"""
         if (filt) g.filter=filt;
       }
       g.globalAlpha=DISC_ALPHA;
-      if (reveal<1 && greyA){            // Colour Bloom intro: grey blank base, colour wedge wipes in
+      if (reveal<1 && greyA){            // Colour Bloom intro: cross-fade the already-blurry grey
+        // base INTO the blurry colour field — a soft bloom, NOT a hard conic wedge/cut line.
+        // reveal is smootherstep-eased, so the colour blooms in evenly with no edgy sweep.
         g.drawImage(greyA,-o,-o,o*2,o*2);
-        if (reveal>0){ g.save(); g.beginPath(); g.moveTo(0,0);
-          g.arc(0,0,rx*1.3,-Math.PI/2,-Math.PI/2+reveal*Math.PI*2); g.closePath(); g.clip();
-          g.drawImage(fA,-o,-o,o*2,o*2); g.restore(); }
+        if (reveal>0){ g.globalAlpha=DISC_ALPHA*reveal; g.drawImage(fA,-o,-o,o*2,o*2); }
       } else { g.drawImage(fA,-o,-o,o*2,o*2); }
       g.filter="none"; g.globalAlpha=1; g.restore();
       g.save(); g.translate(cx,cy); g.scale(1,ry/rx); g.beginPath(); g.arc(0,0,rx,0,7); g.clip();
@@ -3104,7 +3488,15 @@ DASHBOARD_JS = r"""
       }
       vt = Math.max(0, Math.min(maxTop, vt));
       if (focusAmt.length!==M){ focusAmt=[]; for (var z=0;z<M;z++) focusAmt[z]=(z===sel?0:1); }
-      for (var i=0;i<M;i++){ focusAmt[i] = (sel<0 || i===sel) ? 0 : 1; }   // instant switch, no fade
+      // Ease each disc's trim toward its target (0 = lit, 1 = dimmed) so changing focus FADES:
+      // the previously-selected disc dims out and the newly-selected disc lights in, instead of
+      // the whole tower flashing. Reduced-motion / headless snaps instantly.
+      var FOCUS_STEP = 0.08;   // gentle ease (prev disc dims out / new lights in, slower)
+      for (var i=0;i<M;i++){
+        var tgt = (sel<0 || i===sel) ? 0 : 1;
+        if (!TOWER_ANIM){ focusAmt[i] = tgt; }
+        else { var df = tgt - focusAmt[i]; focusAmt[i] = (Math.abs(df) < 0.005) ? tgt : (focusAmt[i] + df*FOCUS_STEP); }
+      }
       var rx=Math.min(92, W*0.42), ry=rx*tilt;
       var topY=ry+16, botPad=ry+12;
       var dz=VISIBLE>1?Math.min(51,(Hc-topY-botPad)/(VISIBLE-1)):0, cx=W/2;   // ~15% tighter stack
@@ -3140,9 +3532,18 @@ DASHBOARD_JS = r"""
       if (sel<0){
         for (var n=M-1;n>=0;n--){ if (vis(n)) focusDisc(n); }   // no selection: every disc full
       } else {
-        var below=[], above=[];
-        for (var n2=M-1;n2>=0;n2--){ if (!vis(n2)) continue; if (n2>sel) below.push(n2); else if (n2<sel) above.push(n2); }
-        group(below); if (vis(sel)) focusDisc(sel); group(above);
+        // Back-to-front: fully-dimmed discs composite together (one layer, no overlap seams);
+        // the selected disc AND any still-transitioning disc (focusAmt mid-way — e.g. the one
+        // just deselected) render individually via focusDisc so their fade is visible.
+        var pend = [];
+        var flushPend = function(){ if (pend.length){ group(pend); pend=[]; } };
+        for (var n2=M-1;n2>=0;n2--){
+          if (!vis(n2)) continue;
+          var moving = (n2!==sel) && focusAmt[n2] > 0.005 && focusAmt[n2] < 0.995;
+          if (n2===sel || moving){ flushPend(); focusDisc(n2); }
+          else { pend.push(n2); }
+        }
+        flushPend();
       }
       // The TOP disc shows the page background through its hole (not the disc
       // below): find the topmost visible non-empty disc and punch its hole through

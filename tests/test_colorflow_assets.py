@@ -191,8 +191,10 @@ def test_overview_ring_has_colour_label_legend() -> None:
     assert "ov-legend" in ov and "ov-leg-item" in ov          # colour labels beside the ring
     assert 'data-fkey="' in ov                                # legend items focus a colour like the arcs
     assert "ov-leg-sw" in ov and "ov-leg-pct" in ov
-    assert "legItem(-1, H.noneLabel" in ov                    # includes the None bucket
+    assert "legItem(-1, H.noneLabel" not in ov                # None is intentionally omitted here
+    # Laid out as a 3-column grid (not a single vertical list).
     assert ".ov-legend{" in css and ".ov-leg-item" in css
+    assert "grid-template-columns:repeat(3" in css
 
 
 def test_lanes_no_headers_green_at_100_and_shown_in_focus() -> None:
@@ -305,21 +307,17 @@ def test_dashboard_has_activity_calendar() -> None:
     assert ".tl-cal-card" in css and ".tl-mcal-grid{" in css
 
 
-def test_dashboard_calendar_lives_on_overview() -> None:
+def test_dashboard_calendar_lives_on_timeline() -> None:
     js = assets.DASHBOARD_JS
-    # the calendar is an Overview card, not part of the Timeline section anymore
     assert "function calendarCard(" in js
+    # the calendar moved OFF the Overview and onto the Timeline tab (full width)
     overview_extras = js.split("function overviewExtras(")[1].split("\n  function ")[0]
-    assert "calendarCard()" in overview_extras
-    # the duplicate Overview chart is gone, so the calendar gets its own full-width slot
-    assert '"ov-cal-solo">\'+cal+\'' in overview_extras
-    assert "timelineCard()" not in overview_extras
+    assert "calendarCard()" not in overview_extras
+    assert "histogram()" not in overview_extras           # "Masters by completion" card removed
     timeline_view = js.split("function timelineView(")[1].split("\n  function ")[0]
-    assert "activityCalendar()" not in timeline_view     # moved off the Timeline tab
-    # clicking a day when the Time Machine isn't on screen hops to the Timeline tab
-    assert 'state.view = "timeline"' in js
-    css = assets.DASHBOARD_CSS
-    assert ".ov-cal-solo{" in css
+    # the calendar is MERGED into the graph card; a Graph/Calendar switch flips between them
+    assert "activityCalendar()" in timeline_view and "tlPaneSwitch()" in timeline_view
+    assert 'data-tlpane="calendar"' in js and 'data-tlpane="graph"' in js
 
 
 def test_dashboard_calendar_is_month_grid_only() -> None:
@@ -397,7 +395,9 @@ def test_cumulative_progress_shown_as_workflow_funnel() -> None:
     # the funnel now lives ONLY on the focused-master card (the global Overview card is a
     # bare ring): the master card feeds countFor and toggles via its % number.
     master_overall = js.split("function masterOverall(", 1)[1].split("\n  function ", 1)[0]
-    assert "funnelHTML(function(k){ return countFor(m,k)||0; }, total)" in master_overall
+    # funnel is fed a per-step count provider (cumFor); live path reuses countFor(m,k).
+    assert "funnelHTML(cumFor, total)" in master_overall
+    assert "countFor(m,kk)||0" in master_overall
     assert 'class="ov-pct" data-funnel="1"' in master_overall
     # the global card dropped the funnel + its ring-button toggle entirely
     overall = js.split("function overall(", 1)[1].split("\n  function ", 1)[0]
@@ -440,15 +440,15 @@ def test_overview_card_is_big_colour_selectable_ring_only() -> None:
     assert "stroke-dasharray=" in ring_fn              # arcs placed by dash length/offset
     assert 'data-fkey="\'+sg.key+\'"' in ring_fn       # arc selects that colour
     assert "state.focus === sg.key" in ring_fn         # the focused arc is highlighted
-    assert "sz = big ? 132" in ring_fn                 # the big Overview hero ring
+    assert "sz = big ? 78" in ring_fn                  # the big Overview hero ring (5% up from 74)
     # overall() is ring-only: shares fed in, selectable + big, no bar / no funnel
     overall = js.split("function overall(", 1)[1].split("\n  function ", 1)[0]
-    assert "ring(compP, ringSegs, {big:true, select:true})" in overall
+    assert "ring(compP, ringSegs, {big:true, select:true, anim:barsAnim||scrubAnim})" in overall
     assert "ov-ringonly" in overall
     assert 'class="seg' not in overall                 # the stacked makeup bar is gone
     assert "funnelHTML(" not in overall                # the step funnel is gone
     css = assets.DASHBOARD_CSS
-    assert ".ov-ring-big .ov-ring-t{font-size:26px" in css   # bigger % text
+    assert ".ov-ring-big .ov-ring-t{font-size:18px" in css   # % text (ring 30% smaller)
     assert ".ov-ring-seg.off{" in css                        # non-focused arcs dim
 
 
@@ -579,8 +579,9 @@ def test_timeline_chart_auto_colours_on_master_focus() -> None:
     # one graph, always shown. Focusing a master AUTO-shows its colour breakdown
     # (streamParts); Global (no master) is the plain per-master line (trendParts). No
     # Colours button, no deadline panel, no moment-disc row below the chart.
-    assert "var chartBlock" in tv
-    assert "(state.master != null) ? streamParts(680, 200) : trendParts(680, 200)" in tv
+    assert "var graphPane" in tv
+    # focused master -> colour Flow; global -> the median+spread band
+    assert "(state.master != null) ? streamParts(680, 200) : trendBandParts(680, 200)" in tv
     assert "tlColorsToggle()" not in tv and "function tlColorsToggle(" not in js
     assert "momentDiscs()" not in tv and "deadlinePanel()" not in tv
     # the category + script lanes sit in a two-column grid; Time Machine row gone
@@ -635,7 +636,8 @@ def test_dashboard_timeline_chart_has_no_static_legend() -> None:
     js = assets.DASHBOARD_JS
     tv = js.split("function timelineView(")[1].split("\n  function ")[0]
     assert "tl-legend" not in tv                          # static colour/name legend removed
-    assert "parts.chart+rangeNav(680)+parts.foot" in tv   # chart + (short, full-width) navigator + (empty) foot
+    assert "parts.chart+tlGraphInfo()" in tv              # chart wrapped with the (i) info button
+    assert "rangeNav(680)+parts.foot" in tv               # + (short, full-width) navigator + (empty) foot
     assert "tl-legend-card" not in assets.DASHBOARD_CSS    # its style dropped too
 
 
@@ -673,28 +675,22 @@ def test_dashboard_heatmap_time_travels_with_the_picked_moment() -> None:
     # glyphs without an event by that date fall back to uncoloured (-1).
     assert "scrubSnap[H.glyphNames[i]] != null ? scrubSnap[H.glyphNames[i]] : -1" in heat
     assert "items.push([H.glyphNames[i], key0, i])" in heat
-    # the before/after toggle hides while time-travelling (it compares live runs),
-    # and the cell's was/now pair collapses to the historical colour
-    assert "(!scrubSnap && Object.keys(ch).length)" in heat
-    assert "(!scrubSnap && ch[name] != null)" in heat
+    # the before/after toggle works at ANY picked moment: scrubbed -> it diffs the picked day
+    # vs the PREVIOUS snapshot date; not scrubbed -> vs the last run
+    assert "scrubPrevSnap = stateAt(m.id, sdates[si-1])" in heat
+    assert "var wasKey = (ch[name] != null) ? ch[name][0] : key" in heat
+    assert "var toggle = (Object.keys(ch).length)" in heat
 
 
-def test_dashboard_heatmap_scrub_pill_present_and_dismissible() -> None:
+def test_dashboard_heatmap_scrub_pill_removed() -> None:
     js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
     heat = js.split("function heatmap(", 1)[1].split("\n  function changes(", 1)[0]
-    # a dismissible pill above the grid names the viewed moment (friendly date)
-    assert 'class="heat-pill" role="status"' in heat
-    assert "Viewing '+esc(dateLabel(scrubISO))" in heat
-    assert "back to today" in heat and 'data-scrubclear="1"' in heat
-    # the button clears the picked moment (scrubSet's latest==live reset) and
-    # re-renders through the normal update() path so the .cell transition fades
-    assert '[data-scrubclear]' in js
-    assert "state.tlScrub = null; update();" in js
-    # pill styled with theme tokens only, so dark and light both work
-    pill_rules = [line for line in css.splitlines() if line.startswith(".heat-pill")]
-    assert pill_rules
-    assert all("var(--" in rule for rule in pill_rules)
-    assert all("#" not in rule for rule in pill_rules)
+    # the "Viewing … — back to today" pill was removed per request
+    assert 'class="heat-pill"' not in heat
+    assert "back to today" not in heat
+    assert ".heat-pill" not in css                            # dead style removed too
+    # scrub still drives the cells' historical colours (time-travel intact)
+    assert "scrubSnap" in heat and "stateAt(m.id, sdate)" in heat
 
 
 def test_dashboard_navigator_has_date_ticks_no_side_dates() -> None:
@@ -742,11 +738,18 @@ def test_dashboard_uses_even_spacing_in_both_modes() -> None:
 
 def test_dashboard_has_duration_presets() -> None:
     js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
-    # duration presets (1D/1W/1M/1Y/All) that drive the zoom window (segmented switch)
-    assert "tl-switch" in js and "tl-sw-btn" in js
-    assert ".tl-switch" in css and ".tl-spanbar" in css
+    # duration presets (1D/1W/1M/1Y/All) drive the zoom window, rendered as the SAME sliding-
+    # pill segmented switch (.segsw) as the Graph/Calendar toggle.
+    span = js.split("function tlSpanToggle(", 1)[1].split("\n  function ", 1)[0]
+    assert 'class="segsw tl-spanbar"' in span and "--segn:" in span
+    assert 'segHL("tlspan"' in span                         # sliding pill, keyed per switch
+    assert ".tl-spanbar" in css
     assert "function tlSpanToggle(" in js and "function setTlSpan(" in js
-    assert "data-tlspan" in js and "tlSpanToggle()" in js   # rendered + injected in the toolbar
+    assert "data-tlspan" in js                              # engine + markup retained
+    assert 'segswAnimKey = "tlspan"' in js                  # clicking a preset arms the slide
+    tv = js.split("function timelineView(", 1)[1].split("\n  function ", 1)[0]
+    assert "tlSpanToggle()" in tv                           # range presets next to the graph
+    assert "tlGranToggle" not in tv                         # the granularity bar stays removed
     for label in ('"1D"', '"1W"', '"1M"', '"1Y"', '"All"'):
         assert label in js, label
 
@@ -768,7 +771,7 @@ def test_dashboard_js_uses_graded_step_progress() -> None:
     assert "function gradedOverallPct(" in js
     assert "(i+1)/N" in js                                # first step = 1/N, final = 100%
     assert "% complete" in js                             # graded % shown in the headline
-    assert "function masterPct(m){ return gradedMasterPct(m); }" in js  # leaderboard/histogram use it
+    assert "function masterPct(m){ return gradedMasterPct(m); }" in js  # leaderboard uses it
 
 
 def test_dashboard_js_routes_focus_through_setfocus() -> None:
@@ -780,11 +783,13 @@ def test_dashboard_js_routes_focus_through_setfocus() -> None:
     assert "barMaster" not in js                                 # no re-fill on master switch
 
 
-def test_dashboard_js_clears_focus_when_leaving_overview() -> None:
+def test_dashboard_js_keeps_focus_across_overview_timeline() -> None:
     js = assets.DASHBOARD_JS
     assert "function toggleView(" in js
-    # leaving Overview (any non-"tabs" view) clears the colour focus
-    assert 'if (v!=="tabs"){ state.focus = null; }' in js
+    tv = js.split("function toggleView(", 1)[1].split("state.view = v; update();", 1)[0]
+    # switching Overview <-> Timeline KEEPS the colour focus (no reset on entering Timeline)
+    assert "state.focus = null" not in tv
+    assert 'if (v==="timeline"){ tlChartShouldAnim = true; }' in tv
     # only Timeline routes through the helper now: the Coverage tab was removed (its
     # category + script cards folded into the focused-master Overview), Compare earlier.
     assert 'toggleView("coverage")' not in js
@@ -922,7 +927,7 @@ def test_dashboard_colours_auto_on_master_focus() -> None:
     js = assets.DASHBOARD_JS
     assert "tlColors" not in js                              # the toggle + its state are gone
     assert "function tlColorsToggle(" not in js and "data-tlcolors" not in js
-    assert "(state.master != null) ? streamParts(680, 200) : trendParts(680, 200)" in js
+    assert "(state.master != null) ? streamParts(680, 200) : trendBandParts(680, 200)" in js
     assert "tlModeToggle(" not in js and "state.tlMode" not in js   # old mode toggle removed
 
 
@@ -948,15 +953,14 @@ def test_dashboard_js_single_backward_feed() -> None:
 
 def test_dashboard_js_recent_is_per_master_only() -> None:
     js = assets.DASHBOARD_JS
-    # The global Overview extras must NOT call the per-master change feed.
+    # The Recent-activity card was removed from the report UI; a "recently modified" grid
+    # filter replaces it. It is rendered NOWHERE now.
     extras = js.split("function overviewExtras(")[1].split("}")[0]
-    assert "recentCard(" not in extras
-    # Recent activity lives in the per-master panel instead, scoped to state.master.
-    assert "function masterExtras(" in js
-    master_extras = js.split("function masterExtras(")[1].split("}")[0]
-    assert "recentCard()" in master_extras
-    assert "regressionCard()" not in master_extras       # the last-save card was removed
-    assert "masterExtras()" in js.split("function tabsView(")[1].split("}")[0]
+    assert "recentCard(" not in extras                   # not on the global Overview
+    tabs = js.split("function tabsView(")[1].split("}")[0]
+    assert "masterExtras()" not in tabs                  # focused-master panel no longer renders it
+    # the replacement: a recently-modified toggle on the glyph grid
+    assert 'data-heatrecent' in js and "state.heatRecent" in js
 
 
 def test_dashboard_js_has_recent_card() -> None:
@@ -973,72 +977,6 @@ def test_dashboard_js_recent_card_when_label() -> None:
     js = assets.DASHBOARD_JS
     assert "function whenLabel(" in js
     assert '"today"' in js
-
-
-def test_dashboard_js_has_cross_master_card() -> None:
-    js = assets.DASHBOARD_JS
-    assert "function crossMasterCard(" in js
-    assert "H.crossMaster" in js
-    # headline + done-everywhere bar + identical/differ counts + by-step chips
-    assert "done everywhere" in js
-    assert "identical in all masters" in js
-    assert "differ between masters" in js
-    assert "by step:" in js
-    assert "(single master)" in js
-    assert "cm-differ-list" not in js        # the old flat list stays gone (see disclosure)
-    # byStep swatches reuse the shared swatchFor helper (parseInt -> int key)
-    assert "swatchFor(key)" in js
-    # wired into the global Overview extras
-    extras = js.split("function overviewExtras(")[1].split("}")[0]
-    assert "crossMasterCard()" in extras
-
-
-def test_dashboard_js_cross_master_differ_disclosure() -> None:
-    """Drill-down: the differ count line becomes a chevron disclosure button
-    (aria-expanded + aria-controls) over a max-height panel of glyph-name chips;
-    each chip opens the journey modal via the shared data-jglyph delegate."""
-    js = assets.DASHBOARD_JS
-    card = js.split("function crossMasterCard(")[1].split("\n  function ")[0]
-    assert "cm.differGlyphs" in card
-    assert 'data-cmdiffer="1"' in card
-    assert "aria-expanded" in card
-    assert 'aria-controls="cm-differ-panel"' in card
-    assert "cm-chev" in card
-    # the glyph chips carry data-jglyph so the existing delegate calls openJourney
-    assert 'class="cm-dg" data-jglyph=' in card
-    assert "openJourney(jr.getAttribute" in js
-    # when nothing differs the plain count line stays (no empty disclosure)
-    assert "differ between masters" in card
-    # open state survives full re-renders
-    assert "state.cmDifferOpen" in card
-    assert "cmDifferOpen: false" in js
-
-
-def test_dashboard_js_cross_master_differ_toggle_handler() -> None:
-    """The disclosure toggles the DOM in place (classList + aria-expanded, NO full
-    update()) so the CSS max-height slide can animate; the window.__cfdNoAnim test
-    escape hatch snaps the transition off, mirroring the reduced-motion CSS gate."""
-    js = assets.DASHBOARD_JS
-    branch = js.split('closest("[data-cmdiffer]")')[1].split("return;")[0]
-    assert "state.cmDifferOpen = !state.cmDifferOpen" in branch
-    assert 'classList.toggle("open", state.cmDifferOpen)' in branch
-    assert 'setAttribute("aria-expanded", state.cmDifferOpen)' in branch
-    assert "window.__cfdNoAnim" in branch and '"none"' in branch
-    assert "update()" not in branch
-
-
-def test_dashboard_js_cross_master_step_chips_toggle_focus() -> None:
-    """The by-step chips are buttons carrying data-fkey with on/off focus classes,
-    so the shared document-level [data-fkey] delegate toggles colour focus on them
-    exactly like the Overview ring legend (state.focus + update via setFocus)."""
-    js = assets.DASHBOARD_JS
-    card = js.split("function crossMasterCard(")[1].split("\n  function ")[0]
-    assert "data-fkey=\"'+key+'\"" in card
-    assert '<button type="button" class="cm-step' in card
-    assert "state.focus === key" in card           # .on / .off mirror the legend
-    # the one shared delegate serves both the ring legend and these chips
-    assert 'closest("[data-fkey]")' in js
-    assert "setFocus(state.focus===fk ? null : fk)" in js
 
 
 def test_dashboard_js_recent_progress_panel_removed() -> None:
@@ -1104,8 +1042,8 @@ def test_dashboard_js_has_category_progress_lanes() -> None:
     assert "tl-lane" in lanes
     # laggard-first ordering (lowest current % on top)
     assert "sort(" in lanes
-    # degrades to a current-% bar at 1-2 snapshots (no sparkline to draw)
-    assert "tl-lane-bar" in lanes
+    # always a sparkline line, even at the first snapshot (single point -> flat line); never a bar
+    assert "laneSparkSVG(ln.values" in lanes and "tl-lane-bar" not in lanes
 
 
 def test_dashboard_css_styles_category_lane_class() -> None:
@@ -1145,8 +1083,8 @@ def test_dashboard_js_has_script_progress_lanes() -> None:
     assert "tl-lane" in lanes
     # laggard-first ordering (lowest current % on top)
     assert "sort(" in lanes
-    # degrades to a current-% bar at 1-2 snapshots (no sparkline to draw)
-    assert "tl-lane-bar" in lanes
+    # always a sparkline line, even at the first snapshot (single point -> flat line); never a bar
+    assert "laneSparkSVG(ln.values" in lanes and "tl-lane-bar" not in lanes
 
 
 def test_dashboard_deadline_feature_removed() -> None:
@@ -1236,39 +1174,12 @@ def test_build_html_has_no_help_button() -> None:
     assert "http://" not in html and "https://" not in html   # invariant preserved
 
 
-def test_dashboard_css_styles_cross_master_card() -> None:
-    css = assets.DASHBOARD_CSS
-    # Every class crossMasterCard emits needs a layout rule.
-    for selector in (".cm-headline", ".cm-bar", ".cm-line", ".cm-note",
-                     ".cm-steps", ".cm-steps-l", ".cm-step", ".cm-step-n"):
-        assert selector in css, selector
-
-
-def test_dashboard_css_styles_cross_master_disclosure() -> None:
-    """Drill-down CSS: disclosure header + chevron + sliding panel + glyph chips,
-    all on theme variables; the reduced-motion gate kills the max-height slide."""
-    css = assets.DASHBOARD_CSS
-    for selector in (".cm-differ-h", ".cm-chev", ".cm-differ-panel",
-                     ".cm-differ-panel.open", ".cm-dg"):
-        assert selector in css, selector
-    # NB: split on the line-start rule — the reduced-motion block also mentions
-    # .cm-differ-panel (mid-line) and sits earlier in the stylesheet.
-    panel = css.split("\n.cm-differ-panel{")[1].split("}")[0]
-    assert "max-height:0" in panel and "transition:max-height" in panel
-    reduce_block = css.split("@media (prefers-reduced-motion:reduce){")[1].split("\n")[0]
-    assert ".cm-differ-panel{transition:none}" in reduce_block
-    # the step chips highlight like the ring legend items (.ov-leg-item family)
-    assert ".cm-step:hover,.cm-step.on{" in css
-    assert ".cm-step.off{opacity:.4}" in css
-
-
 def test_build_html_wires_all_report_insight_features() -> None:
     """End-to-end smoke: every new render unit + its wiring marker is present in
     the generated document, and the self-contained/no-network invariant holds."""
     html = assets.build_html(_model())
     # render units
-    for marker in ("function crossMasterCard(",
-                   "function recentCard(", "function categoryLanes(",
+    for marker in ("function recentCard(", "function categoryLanes(",
                    "function openJourney(",
                    "function journeyOf(", "function stateAt("):
         assert marker in html, marker
@@ -1459,39 +1370,15 @@ def test_print_coverage_uses_active_scope_not_focused_master_only() -> None:
     assert 'add("psec-coverage", "Coverage by category", printCoverageRows())' in js
 
 
-def test_leaderboard_rows_lead_with_master_letterform_chip() -> None:
-    """Each "Furthest along" row starts with the master's own "Aa" outline
-    (H.masters[].preview {d, vb}), so a Thin master visibly looks thin and a Black
-    looks black. Rows whose master has no preview render exactly as before."""
-    js = assets.DASHBOARD_JS
-    assert "function lbChip(" in js
-    chip_fn = js.split("function lbChip(", 1)[1].split("\n  function ", 1)[0]
-    assert 'if (!pv || !pv.d) return "";' in chip_fn            # guard: no preview -> no chip markup
-    assert 'class="lb-chip"' in chip_fn
-    assert 'aria-hidden="true"' in chip_fn                      # decorative; row title/name carry the label
-    assert 'preserveAspectRatio="xMidYMid meet"' in chip_fn     # fit any master's proportions
-    assert 'fill="currentColor"' in chip_fn                     # inherits theme text colour
-    # the chip leads the row, before the name; rows feed the preview through as r.pv
+def test_leaderboard_has_no_aa_chip() -> None:
+    """The "Aa" letterform chip was removed from each "Furthest along" row — no builder,
+    no markup, no CSS."""
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    assert "function lbChip(" not in js and "lbChip(" not in js
     row_fn = js.split("function lbRow(", 1)[1].split("\n  function ", 1)[0]
-    assert "lbChip(r.pv)" in row_fn
-    assert row_fn.index("lbChip(r.pv)") < row_fn.index('class="lb-n"')
-    assert "pv:m.preview" in js.split("function leaderboard(", 1)[1].split("\n  function ", 1)[0]
-
-
-def test_leaderboard_chip_css_is_compact_and_theme_safe() -> None:
-    """The chip is a fixed ~28px-tall box styled from theme tokens (dark AND light),
-    and the .lb-n name column keeps its flex-basis so names don't get cropped."""
-    css = assets.DASHBOARD_CSS
-    chip = css.split(".lb-chip{", 1)[1].split("}", 1)[0]
-    assert "flex:0 0 40px" in chip and "height:28px" in chip    # compact fixed box keeps rows aligned
-    assert "color:var(--text)" in chip and "opacity:.85" in chip
-    chip_svg = css.split(".lb-chip svg{", 1)[1].split("}", 1)[0]
-    assert "display:block" in chip_svg
-    # name column untouched: same basis collapsed and expanded as before the chip
-    assert ".lb-n{flex:0 0 96px" in css
-    assert ".ov-card.open .lb-n{flex-basis:170px}" in css
-    # no new animation machinery rode in with the chip
-    assert "lb-chip" not in css.split("@media (prefers-reduced-motion:reduce)", 1)[1].split("\n", 1)[0]
+    assert "lb-chip" not in row_fn
+    assert ".lb-chip{" not in css and ".lb-chip svg{" not in css
+    assert "pv:m.preview" not in js.split("function leaderboard(", 1)[1].split("\n  function ", 1)[0]
 
 
 # --------------------------------------------------------------------------- #
@@ -1515,7 +1402,8 @@ def test_dashboard_js_has_centralised_counted_set_helper() -> None:
 
 def test_dashboard_js_has_no_exporting_only_toggle() -> None:
     """The exclusion is always on: no toolbar toggle, no setter, no state field,
-    no pref seeding — the toolbar keeps only Overview / Timeline / Export."""
+    no pref seeding — the toolbar keeps only Overview / Timeline (Export moved to
+    the header, next to the theme toggle)."""
     js = assets.DASHBOARD_JS
     assert "cfd-exo" not in js                               # old toggle id (cfd-export survives)
     assert "setExporting" not in js
@@ -1523,7 +1411,11 @@ def test_dashboard_js_has_no_exporting_only_toggle() -> None:
     assert "H.exporting" not in js
     assert "Exporting only" not in js
     toolbar = js.split("function toolbar(")[1].split("\n  function ")[0]
-    assert toolbar.count("<button") == 3
+    assert toolbar.count("<button") == 2                     # Overview + Timeline only
+    assert "cfd-export" not in toolbar                       # export left the toolbar
+    header = js.split("function header(")[1].split("\n  function ")[0]
+    assert 'id="cfd-export"' in header and 'class="icon"' in header   # now a header icon button
+    assert "􀈂" in header                                     # SF Symbol square.and.arrow.up
 
 
 def test_dashboard_js_percentage_helpers_use_counted_denominators() -> None:
@@ -1582,3 +1474,419 @@ def test_dashboard_js_counted_stats_mirror_raw_counts_shape() -> None:
     assert "countedSet()" in count_for and "countedStats(m)" in count_for
     assert "m.counts[String(k)]" in count_for                # raw truth when nothing to exclude
     assert "function uncoloredFor(" in js
+
+
+def test_flow_bands_softened_with_top_stroke_and_smaller_dots() -> None:
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    # Lower band fill opacity + a per-band top-edge stroke (same colour, higher opacity).
+    assert ".tl-band{stroke:none;fill-opacity:.4}" in css
+    assert ".tl-band-top{" in css and "opacity:.92" in css
+    assert 'class="tl-band-top"' in js
+    assert 'stroke="var('+"'"+"+varFor(k)+" in js or 'class="tl-band-top"' in js
+    # White snapshot dots shrunk (flow view 2.5 -> 1.8).
+    assert 'r="1.8"' in js
+
+
+def test_disc_intro_blooms_via_crossfade_not_a_conic_wipe() -> None:
+    js = assets.DASHBOARD_JS
+    # Opening intro cross-fades the grey base into the colour field (alpha * eased reveal),
+    # instead of the old hard pie-wedge clip.
+    assert "g.globalAlpha=DISC_ALPHA*reveal" in js
+    assert "-Math.PI/2+reveal*Math.PI*2" not in js          # the conic-wipe clip is gone
+
+
+def test_before_after_is_a_switch_with_play_autoswitch() -> None:
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    assert "ba-toggle" not in js                             # old single chip replaced
+    assert 'class="ba-seg' in js and 'data-ba="before"' in js and 'data-ba="after"' in js
+    assert 'class="ba-play' in js and "data-baplay" in js
+    # Play mode flips before/after every second and self-stops when the control unmounts.
+    assert "setInterval(" in js and "}, 1000)" in js
+    assert "state.before = !state.before" in js
+    assert ".ba-seg" in css and ".ba-play" in css
+
+
+def test_overview_has_no_across_masters_card() -> None:
+    # The "Across masters" (cross-master) card was removed from the Overview.
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    assert "crossMasterCard" not in js
+    assert "Across masters" not in js
+    assert "data-cmdiffer" not in js and "cmDifferOpen" not in js
+    extras = js.split("function overviewExtras(")[1].split("}")[0]
+    assert "crossMasterCard()" not in extras
+    assert ".cm-headline" not in css and ".cm-differ-panel" not in css
+
+
+def test_master_card_has_version_navigator() -> None:
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    # A dot-per-snapshot timeline above the master's distribution bar, hidden under 2 versions.
+    assert "function versionNav(" in js
+    assert "dates.length < 2" in js
+    assert 'data-vnav="' in js
+    # the timeline lives in its OWN card (versionCard), rendered ABOVE the master progress card
+    assert "function versionCard(" in js
+    vc = js.split("function versionCard(", 1)[1].split("\n  function ", 1)[0]
+    assert "versionNav()" in vc and "vnav-card" in vc
+    tabs = js.split("function tabsView(", 1)[1].split("\n  function ", 1)[0]
+    assert "versionCard()" in tabs and tabs.index("versionCard()") < tabs.index("masterOverall(m)")
+    mo = js.split("function masterOverall(", 1)[1].split("\n  function ", 1)[0]
+    assert "versionNav()" not in mo                                 # lifted out of the progress card
+    # Clicking a dot scrubs that master to the picked snapshot (reuses scrubSet).
+    assert 'closest("[data-vnav]")' in js and "scrubSet(parseInt(vn.getAttribute" in js
+    # The bar/% become scrub-aware: reconstructed from stateAt + gradedPctAt at the version.
+    assert "stateAt(m.id, date)" in mo and "gradedPctAt(m.id, date)" in mo
+    assert ".vnav-dot" in css and ".vnav-line" in css and ".vnav-card{" in css
+
+
+# --------------------------------------------------------------------------- #
+# Global Timeline: median + min-max spread band (scales to many masters)
+# --------------------------------------------------------------------------- #
+
+
+def test_timeline_global_is_band_only() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function trendBandParts(" in js and "function pctMatrix(" in js
+    # the grid + heatmap views and their toggle were trashed -- only the band remains
+    assert "function masterGridParts(" not in js
+    assert "function masterHeatParts(" not in js
+    assert "function tlViewToggle(" not in js and "function setTlView(" not in js
+    assert "state.tlView" not in js and "data-tlview" not in js
+
+
+def test_timeline_band_is_the_global_view() -> None:
+    js = assets.DASHBOARD_JS
+    tv = js.split("function timelineView(", 1)[1].split("\n  function ", 1)[0]
+    # focused master -> colour Flow; global -> the band, no view toggle
+    assert "(state.master != null) ? streamParts(680, 200) : trendBandParts(680, 200)" in tv
+    assert "rangeNav(680)" in tv and "tlViewToggle" not in tv
+
+
+def test_timeline_pct_matrix_cached_excludes_scrub() -> None:
+    js = assets.DASHBOARD_JS
+    assert "function pctMatrix(" in js and "PMCACHE" in js and "PMCACHE_KEY" in js
+    pm = js.split("function pctMatrix(", 1)[1].split("\n  function ", 1)[0]
+    assert "gradedPctAt(" in pm
+    assert "state.viewLo" in pm and "state.viewHi" in pm     # window busts the cache
+    assert "state.tlScrub" not in pm                         # scrubbing must NOT bust it
+
+
+def test_timeline_band_median_minmax() -> None:
+    js = assets.DASHBOARD_JS
+    band = js.split("function trendBandParts(", 1)[1].split("\n  function ", 1)[0]
+    assert "smoothPath(" in band
+    assert "tl-spread-fill" in band and "tl-spread-med" in band and "tl-spread-dot" in band
+    assert 'class="tl-chart' in band and "data-snaps" in band   # click-to-scrub for free
+    assert 'class="tl-band"' not in band                        # no collision with Flow streamgraph
+    assert "col.sort(" in band                                  # median/min/max from sorted column
+
+
+def test_timeline_band_css_and_reduced_motion() -> None:
+    css = assets.DASHBOARD_CSS
+    for cls in (".tl-spread-fill", ".tl-spread-med", ".tl-spread-dot", ".tl-cap"):
+        assert cls in css, cls
+    assert ".tl-mgrid" not in css and ".tl-heatcell" not in css and ".tl-viewbar" not in css
+    rm = css.split("prefers-reduced-motion", 1)[1].split("}}", 1)[0]
+    assert ".tl-anim .tl-spread-med{animation:none" in rm
+
+
+# --------------------------------------------------------------------------- #
+# Brand colour (#9f75ff) replaces the old blue accent in both themes
+# --------------------------------------------------------------------------- #
+
+
+def test_accent_is_brand_purple_both_themes() -> None:
+    css = assets.DASHBOARD_CSS
+    # both theme blocks now use the Color Flow purple, not the old blues
+    assert css.count("--accent:#9f75ff") == 2
+    assert "#6e7bff" not in css and "#5b62ff" not in css
+    # everything still consumes it through the var, so one swap repaints buttons/bars/etc.
+    assert ".lb-bar>span{display:block;height:100%;background:var(--accent)" in css
+
+
+# --------------------------------------------------------------------------- #
+# Overview ring: left-aligned, wider legend columns, draw-in + count-up
+# --------------------------------------------------------------------------- #
+
+
+def test_overview_ring_left_aligned_and_wider_legend() -> None:
+    css = assets.DASHBOARD_CSS
+    assert ".ov-ringonly{flex-direction:column;align-items:flex-start" in css   # ring sits left
+    assert "justify-content:flex-start" in css.split(".ov-ringrow{", 1)[1].split("}", 1)[0]
+    legend = css.split(".ov-legend{", 1)[1].split("}", 1)[0]
+    assert "gap:4px 44px" in legend                                             # wide column gap + roomy rows
+    # zebra striping: alternate visual rows (3-col grid) get a faint tint so lines read as a table
+    assert ".ov-leg-item:nth-child(6n+4)" in css
+    # extra breathing room between the colour label and its %
+    assert "padding-left:44px" in css.split(".ov-leg-pct{", 1)[1].split("}", 1)[0]
+
+
+def test_overview_ring_draw_in_and_count_up() -> None:
+    js = assets.DASHBOARD_JS
+    css = assets.DASHBOARD_CSS
+    # CSS: ONE global progression sweep (a single mask arc), not per-segment; reduced-motion off
+    assert "@keyframes ovRingSweep" in css
+    assert ".ov-ring.ov-anim .ov-ring-reveal{animation:ovRingSweep" in css
+    assert "animation-delay:var(--d" not in css                  # no per-segment stagger
+    rm = css.split("prefers-reduced-motion", 1)[1].split("}}", 1)[0]
+    assert ".ov-ring.ov-anim .ov-ring-reveal{animation:none" in rm
+    # JS: ring() takes an anim flag -> wraps the arcs in one sweep mask + data-to for the count-up
+    ring_fn = js.split("function ring(p, segs, opts)", 1)[1].split("\n  function ", 1)[0]
+    assert "anim = !!opts.anim" in ring_fn
+    assert '" ov-anim"' in ring_fn and "--d:" not in ring_fn      # global, no per-segment vars
+    assert "ov-ring-reveal" in ring_fn and 'mask="url(#ovRingReveal)"' in ring_fn
+    assert 'data-to="\'+p+\'"' in ring_fn
+    overall = js.split("function overall(", 1)[1].split("\n  function ", 1)[0]
+    assert "anim:barsAnim" in overall
+    # the % count-up reuses tweenNumber and is gated to the intro on first paint
+    assert "function animateRingNumber(" in js
+    upd = js.split("function update(", 1)[1].split("\n  function ", 1)[0]
+    assert "animateRingNumber(barsAnim)" in upd
+
+
+# --------------------------------------------------------------------------- #
+# Furthest along: two columns, progress bar always visible
+# --------------------------------------------------------------------------- #
+
+
+def test_leaderboard_two_columns_wide_bar_all_rows() -> None:
+    css = assets.DASHBOARD_CSS
+    js = assets.DASHBOARD_JS
+    body = css.split(".ovc-leaderboard .ov-card-body{", 1)[1].split("}", 1)[0]
+    assert "grid-template-columns:repeat(2,minmax(0,1fr))" in body              # two columns
+    bar = css.split(".lb-bar{", 1)[1].split("}", 1)[0]
+    assert "flex:0 0 104px" in bar                                              # fixed narrow bar -> every bar equal, more room for names
+    name = css.split(".lb-n{", 1)[1].split("}", 1)[0]
+    assert "flex:1 1 auto" in name                                             # name grows into the freed space
+    # zebra striping: alternate rows (2-col grid) get a faint tint so rows read as a table
+    assert ".ovc-leaderboard .lb-row:nth-child(4n+3)" in css
+    lb = js.split("function leaderboard(", 1)[1].split("\n  function ", 1)[0]
+    # every master shown, fully (no scroll, no "Show all"): non-expandable card, no top-N slice
+    assert ".slice(0,10)" not in lb and "rows.length>10" not in lb
+    assert 'ovCard("leaderboard", "Furthest along", bars, false)' in lb
+    assert "lbRow(r, barsAnim, i)" in lb                                        # bars animate on first paint
+    lbrow = js.split("function lbRow(", 1)[1].split("\n  function ", 1)[0]
+    assert 'class="lb-bar"' in lbrow                                            # every row draws the bar
+    assert "lb-fill" in lbrow and "intro" in lbrow                             # grow-in fill markup
+    assert ".lb-fill.intro{animation:segGrow" in css                           # the load animation
+    # focusing a master from the leaderboard clears the colour filter
+    click = js.split('closest(".lb-row[data-m]")', 1)[1].split("return;", 1)[0]
+    assert "state.focus = null" in click
+
+
+# --------------------------------------------------------------------------- #
+# Sliding segmented switches + grid "recently modified" filter + Timeline merge
+# --------------------------------------------------------------------------- #
+
+
+def test_segmented_switches_and_grid_filter() -> None:
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    # a sliding-highlight segmented switch, shared by the grid sort + the Timeline toggle
+    assert ".segsw{position:relative;display:grid" in css
+    seg = css.split(".segsw-hl{position:absolute", 1)[1].split("}", 1)[0]
+    assert "transform:translateX(calc(var(--seg,0)*100%))" in seg and "transition:transform" in seg
+    rm = css.split("prefers-reduced-motion", 1)[1].split("}}", 1)[0]
+    assert ".segsw-hl{transition:none" in rm
+    heat = js.split("function heatmap(", 1)[1].split("\n  function ", 1)[0]
+    assert 'class="segsw hsort"' in heat and "--seg:'+(state.heatSort" in heat   # grid sort is a segsw
+    assert "function tlPaneSwitch(" in js and 'class="segsw tl-paneswitch"' in js
+    # recently-modified grid filter (opt-in) keeps only glyphs in the changeset since last run
+    assert "if (state.heatRecent && Object.keys(ch).length){" in heat
+    assert "ch[it[0]] != null" in heat
+    assert 'data-heatrecent="1"' in heat
+
+
+def test_segmented_switch_purple_morph_and_graph_info() -> None:
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    # the active pill is purple (brand accent); the active label is white
+    seg = css.split(".segsw-hl{position:absolute", 1)[1].split("}", 1)[0]
+    assert "background:color-mix(in srgb,var(--accent)" in seg   # purple, dimmed (less bright)
+    assert ".segsw>button[aria-pressed=true]{color:#fff" in css
+    # the pill MORPHS old->new on click via a keyframe (innerHTML rebuild kills CSS transitions)
+    assert ".segsw-hl.anim{animation:segswSlide" in css
+    assert "@keyframes segswSlide" in css and "var(--seg-from" in css and "var(--seg-to" in css
+    rm = css.split("prefers-reduced-motion", 1)[1].split("}}", 1)[0]
+    assert ".segsw-hl.anim{animation:none" in rm
+    # shared helper remembers the previous segment per switch key + arms the slide on click
+    assert "function segHL(" in js and "segswPrev" in js and "segswAnimKey" in js
+    assert 'segswAnimKey = "tlpane"' in js and 'segswAnimKey = "hsort"' in js
+    assert 'segHL("tlpane"' in js and 'segHL("hsort"' in js
+    # the Graph/Calendar switch sits on the LEFT; an (i) info button (top-right OVER the chart)
+    # carries the band caption as a CSS hover/focus tooltip (native title is unreliable in WebKit)
+    assert ".tl-graphcard-h{display:flex;justify-content:space-between" in css
+    assert ".tl-info{" in css and ".tl-info-tip{" in css
+    info = js.split("function tlGraphInfo(", 1)[1].split("\n  function ", 1)[0]
+    assert "Median completion over time" in info and 'class="tl-info"' in info
+    assert 'class="tl-info-tip"' in info and 'role="tooltip"' in info
+
+
+def test_scrub_and_master_switch_animations() -> None:
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    # scrub sets a one-shot flag, consumed after the render
+    scrubset = js.split("function scrubSet(", 1)[1].split("\n  function ", 1)[0]
+    assert "scrubAnim = true" in scrubset
+    upd = js.split("function update(){", 1)[1].split("\n  function ", 1)[0]
+    assert "scrubAnim = false" in upd                       # consumed once per picked moment
+    # #5: the category bars + glyph cells get a scrub class; the global ring re-sweeps
+    assert '(scrubAnim?" scrub":"")' in js
+    assert "anim:barsAnim||scrubAnim" in js                 # global ring sweeps on scrub
+    assert ".cov-bar.scrub{" in css and "@keyframes covGrow" in css
+    assert ".heat.scrub .cell{" in css and "@keyframes cellPop" in css
+    # #2: lane sparklines carry a key and morph between moments via a JS point-tween
+    assert 'data-spark="' in js and "function morphSparks(" in js
+    assert "morphSparks(scrubAnim)" in upd
+    assert "requestAnimationFrame" in js and "sparkPrev" in js
+    # #9: Global<->Focus master switch fades ONLY the data panels (not the chrome, and NOT the
+    # whole disc tower — the tower runs its own per-disc focus crossfade)
+    assert "lastRenderMaster" in upd and "fadeData()" in upd
+    fd = js.split("function fadeData(", 1)[1].split("\n  function ", 1)[0]
+    # only inner data graphics fade, never the card frames (no .overall/.sgrid card containers)
+    # only the headline ring + its legend fade on a focus switch; categories, cells and lanes
+    # just update in place (no flash)
+    assert ".ov-ring" in fd and ".ov-legend" in fd and 'classList.add("cfd-fade")' in fd
+    assert ".overall" not in fd and ".sgrid" not in fd and ".cov-bar" not in fd
+    assert ".heat .grid" not in fd and ".tl-lanes" not in fd
+    assert "cfd-tower-cv" not in upd                        # tower no longer whole-canvas fades
+    assert ".cfd-fade{animation:cfdFade" in css and "@keyframes cfdFade" in css
+    # all of these are silenced under reduced motion
+    rm = css.split("prefers-reduced-motion", 1)[1].split("}}", 1)[0]
+    assert ".cfd-fade{animation:none" in rm and ".cov-bar.scrub{animation:none" in rm
+    assert ".heat.scrub .cell{animation:none" in rm
+
+
+def test_glyph_cell_size_slider() -> None:
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    heat = js.split("function heatmap(", 1)[1].split("\n  function changes(", 1)[0]
+    # a range slider in the grid header drives the cell size; the section carries the var
+    assert "data-cellsize" in heat and 'type="range"' in heat and 'class="cell-size"' in heat
+    assert "--cell-min:" in heat
+    assert "state.cellSize" in js                                   # default + live update
+    # the grid columns honour the var (falling back to 40px)
+    assert "minmax(var(--cell-min,40px),1fr)" in css and ".cell-size{" in css
+    # live resize without a full re-render: an input listener sets the CSS var directly
+    inp = js.split('addEventListener("input"', 1)[1].split("});", 1)[0]
+    assert 'setProperty("--cell-min"' in inp and "state.cellSize = v" in inp
+
+
+def test_timeline_graph_and_calendar_share_one_card() -> None:
+    js = assets.DASHBOARD_JS
+    tv = js.split("function timelineView(", 1)[1].split("\n  function ", 1)[0]
+    # one card, switched between the graph pane and the calendar pane (never both)
+    assert "tl-graphcard" in tv
+    assert "var graphPane" in tv and "var calPane" in tv
+    assert 'state.tlPane === "calendar"' in tv
+    assert "tlSpanToggle()" in tv                 # range presets live next to the graph
+    # the click handler flips the pane AND resets the picked moment back to latest
+    assert 'closest("[data-tlpane]")' in js and "state.tlPane = tp.getAttribute" in js
+    pane_click = js.split('closest("[data-tlpane]")', 1)[1].split("return;", 1)[0]
+    assert "state.tlScrub = null" in pane_click
+
+
+def test_lane_sparkline_draws_flat_line_for_single_snapshot() -> None:
+    """Category/script lanes show the sparkline LINE at every moment, including the
+    first snapshot: a single data point degrades to a flat line across the box (never
+    a progress bar)."""
+    js = assets.DASHBOARD_JS
+    spark = js.split("function laneSparkSVG(", 1)[1].split("\n  function ", 1)[0]
+    assert "n === 1" in spark and "n < 1" in spark      # flat line for one point; empty only at zero
+    assert "tl-lane-spark" in spark
+
+
+def test_version_nav_line_draw_animation() -> None:
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    vn = js.split("function versionNav(", 1)[1].split("\n  function ", 1)[0]
+    assert "vnav-fill" in vn and "vnavShouldAnim" in vn          # a progress line + animate-once flag
+    # full-width fill clipped to the current node via scaleX, with the previous fraction
+    # remembered so the line grows/shrinks from the old node end (not redrawn from the start)
+    assert "transform:scaleX(" in vn and "--vnav-from:" in vn and "--vnav-to:" in vn
+    assert "vnavPrevFrac" in vn
+    # clicking a node arms the draw animation before scrubbing
+    click = js.split('closest("[data-vnav]")', 1)[1].split("return;", 1)[0]
+    assert "vnavShouldAnim = true" in click
+    assert "@keyframes vnavGrow" in css and ".vnav-fill.anim{animation:vnavGrow" in css
+    assert "scaleX(var(--vnav-from" in css and "scaleX(var(--vnav-to" in css   # interpolate prev->new
+    assert ".vnav-fill{" in css and "width:calc(100% - 10px)" in css           # spans the whole track
+    rm = css.split("prefers-reduced-motion", 1)[1].split("}}", 1)[0]
+    assert ".vnav-fill.anim{animation:none" in rm
+
+
+def test_before_after_falls_back_to_journey_history() -> None:
+    js = assets.DASHBOARD_JS
+    heat = js.split("function heatmap(", 1)[1].split("\n  function ", 1)[0]
+    # with no last-run diff, derive each glyph's previous colour from saved history so the
+    # Before/After switch still appears + works
+    assert "if (!Object.keys(ch).length){" in heat
+    assert "jev[jev.length-2][1]" in heat and "ch[gn] = [pk]" in heat
+
+
+def test_overview_this_week_card() -> None:
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    assert "function weekProgressCard(" in js
+    assert "function gradedOverallPctAt(" in js
+    extras = js.split("function overviewExtras(", 1)[1].split("\n  function ", 1)[0]
+    assert "weekProgressCard()" in extras                        # on the global Overview
+    wk = js.split("function weekProgressCard(", 1)[1].split("\n  function ", 1)[0]
+    assert "isoMinusDays(latest, 7)" in wk and "snapDate(dates" in wk
+    # past-7-days AND past-30-days deltas, built by the shared wkStat helper
+    assert "isoMinusDays(latest, 30)" in wk and "monthDelta" in wk
+    assert 'wkStat(delta, "past 7 days")' in wk and '"past 30 days"' in wk
+    assert 'ovCard("week"' in wk
+    assert ".wk-delta{" in css and ".wk-stat{" in css
+    # full-width card; the verbose "complete now · was X% on …" meta line is gone
+    assert ".ov-extra .ovc-week{grid-column:1/-1}" in css
+    assert "wk-meta" not in wk
+    # top 3 most-improved masters (by %) AND the top 3 colours that gained the most glyphs
+    assert "Most improved masters" in wk and "Focus of the week" in wk
+    assert "colorMoves" in wk and ".slice(0, 3)" in wk
+    assert ".wk-extra{" in css and ".wk-sw{" in css and ".wk-list{" in css
+
+
+def test_timeline_calendar_uses_full_width() -> None:
+    css = assets.DASHBOARD_CSS
+    # in the Timeline calendar pane the month grid stretches to the full width (1fr columns),
+    # overriding the compact centred 28px default used by the Overview mini-calendar
+    assert ".tl-calpane .tl-mcal-grid{grid-template-columns:repeat(7,minmax(0,1fr))" in css
+    assert "justify-content:stretch" in css
+
+
+def test_script_lanes_hidden_when_latin_is_the_only_script() -> None:
+    js = assets.DASHBOARD_JS
+    lanes = js.split("function scriptLanes(", 1)[1].split("\n  function ", 1)[0]
+    # a lone-Latin font: the per-script breakdown just mirrors the overall progress, so the
+    # whole section is suppressed
+    assert "/^latin$/i.test(scripts[0])" in lanes
+    assert 'scripts.length === 1' in lanes
+
+
+def test_category_lanes_use_fixed_canonical_order() -> None:
+    js = assets.DASHBOARD_JS
+    lanes = js.split("function categoryLanes(", 1)[1].split("\n  function ", 1)[0]
+    # lanes keep a stable Glyphs Font-View order (Letter, Number, ...), never reshuffling on
+    # scrub/data change; the old laggard-first %-sort is gone
+    assert 'CAT_ORDER = ["Letter","Number","Punctuation","Mark","Separator","Symbol","Other"]' in lanes
+    assert "CAT_ORDER.indexOf(a.cat)" in lanes
+    assert "(a.cur - b.cur)" not in lanes
+
+
+def test_tower_focus_change_fades_per_disc_not_whole_tower() -> None:
+    js = assets.DASHBOARD_JS
+    # the previously-selected disc dims out and the new one lights in by EASING each disc's
+    # trim toward its target — no instant snap, and no whole-canvas fade
+    assert "var FOCUS_STEP = 0.08" in js
+    assert "instant switch, no fade" not in js
+    # transitioning discs render individually (focusDisc) so their fade is visible; the settled
+    # dimmed mass still composites as one layer (group) to avoid overlap seams
+    assert "var flushPend = function()" in js
+    assert "focusAmt[n2] > 0.005 && focusAmt[n2] < 0.995" in js
+
+
+def test_glyph_cell_size_slider_allows_smaller_cells() -> None:
+    js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
+    heat = js.split("function heatmap(", 1)[1].split("\n  function changes(", 1)[0]
+    # the cell-size slider runs 20..80
+    assert 'class="cell-size" min="20" max="80"' in heat
+    # below 26px the category SECTIONS lay out two-up (CSS columns), each block kept whole
+    assert "var twoCol = cz < 26" in heat and "heat-2col" in heat and 'class="heat-cats"' in heat
+    assert ".heat.heat-2col .heat-cats{column-count:2" in css and "break-inside:avoid" in css
+    # the switch happens live while dragging the slider (no full re-render needed)
+    inp = js.split('addEventListener("input"', 1)[1].split("});", 1)[0]
+    assert 'classList.toggle("heat-2col"' in inp
