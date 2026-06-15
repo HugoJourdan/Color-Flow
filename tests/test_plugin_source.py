@@ -47,8 +47,17 @@ def _palette_start_body() -> str:
 
 
 def _validate_menu_item_body() -> str:
-    """Return the source of ``validateMenuItem_`` (up to the next method def)."""
-    return _method_body("validateMenuItem_")
+    """Return the source of the palette's ``validateMenuItem_``.
+
+    The dedicated ``ColorFlowRainbowMenuHandler`` also defines a
+    ``validateMenuItem_`` (the simplified single-item validator), so scan from
+    the palette class definition to get the shared validator that branches on
+    the action selector.
+    """
+    class_start = PLUGIN_SOURCE.index("class ColorFlow(PalettePlugin):")
+    start = PLUGIN_SOURCE.index("def validateMenuItem_(", class_start)
+    end = PLUGIN_SOURCE.index("\n\tdef ", start)
+    return PLUGIN_SOURCE[start:end]
 
 
 def test_validate_menu_item_branches_on_action_selector() -> None:
@@ -682,9 +691,9 @@ def test_report_button_triggers_report_flow() -> None:
 
 def test_sync_header_hides_report_no_eye() -> None:
     body = _method_body("_sync_header")
-    # Collapsing the palette hides the report button; there is no eye to hide.
+    # Collapsing the palette (or a blocked trial) hides the report button; no eye.
     assert "_titleReport" in body
-    assert "report.setHidden_(collapsed)" in body
+    assert "report.setHidden_(collapsed or blocked)" in body
     assert "eye.setHidden_(collapsed)" not in body
     assert "gear.setHidden_(collapsed)" not in body
 
