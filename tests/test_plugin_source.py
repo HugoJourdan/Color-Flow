@@ -12,7 +12,7 @@ from pathlib import Path
 
 RESOURCES = (
     Path(__file__).resolve().parent.parent
-    / "Color Flow.glyphsPalette"
+    / "AZ-Colorflow.glyphsPalette"
     / "Contents"
     / "Resources"
 )
@@ -38,9 +38,9 @@ def _module_function_body(name: str) -> str:
 
 
 def _palette_start_body() -> str:
-    """Return the source of ``ColorFlow.start`` (the loader-bar class has its
+    """Return the source of ``AZColorflow.start`` (the loader-bar class has its
     own ``start``, so scan from the palette class definition)."""
-    class_start = PLUGIN_SOURCE.index("class ColorFlow(PalettePlugin):")
+    class_start = PLUGIN_SOURCE.index("class AZColorflow(PalettePlugin):")
     start = PLUGIN_SOURCE.index("def start(", class_start)
     end = PLUGIN_SOURCE.index("\n\tdef ", start)
     return PLUGIN_SOURCE[start:end]
@@ -49,12 +49,12 @@ def _palette_start_body() -> str:
 def _validate_menu_item_body() -> str:
     """Return the source of the palette's ``validateMenuItem_``.
 
-    The dedicated ``ColorFlowRainbowMenuHandler`` also defines a
+    The dedicated ``AZColorflowRainbowMenuHandler`` also defines a
     ``validateMenuItem_`` (the simplified single-item validator), so scan from
     the palette class definition to get the shared validator that branches on
     the action selector.
     """
-    class_start = PLUGIN_SOURCE.index("class ColorFlow(PalettePlugin):")
+    class_start = PLUGIN_SOURCE.index("class AZColorflow(PalettePlugin):")
     start = PLUGIN_SOURCE.index("def validateMenuItem_(", class_start)
     end = PLUGIN_SOURCE.index("\n\tdef ", start)
     return PLUGIN_SOURCE[start:end]
@@ -187,8 +187,8 @@ def test_settings_pane_vc_title_is_color_flow() -> None:
     # Verified GlyphsCore mechanism: -addViewController: makes the Settings tab identifier
     # = vc.representedObject and the label = vc.title. So both title and representedObject
     # are "Color Flow" (the string showMainPreferencesWithIdentifier: matches).
-    assert "class ColorFlowPreferencesController(AppKit.NSViewController):" in PLUGIN_SOURCE
-    assert 'COLORFLOW_PREF_IDENTIFIER = "Color Flow"' in PLUGIN_SOURCE
+    assert "class AZColorflowPreferencesController(AppKit.NSViewController):" in PLUGIN_SOURCE
+    assert 'COLORFLOW_PREF_IDENTIFIER = "AZ-Colorflow"' in PLUGIN_SOURCE
     reg = _module_function_body("_register_preferences_pane")
     assert "view_controller.setTitle_(COLORFLOW_PREF_IDENTIFIER)" in reg
     assert "view_controller.setRepresentedObject_(COLORFLOW_PREF_IDENTIFIER)" in reg
@@ -260,7 +260,7 @@ def test_store_labels_and_profile_controls_removed_from_pane() -> None:
     assert "group.lcReset" not in PLUGIN_SOURCE
     assert "def _import_profile(" not in PLUGIN_SOURCE
     assert "def _export_profile(" not in PLUGIN_SOURCE
-    assert "import colorflow_profile" not in PLUGIN_SOURCE
+    assert "import azcolorflow_profile" not in PLUGIN_SOURCE
 
 
 def test_settings_pane_build_order_labels_then_font_glyph_order() -> None:
@@ -382,7 +382,7 @@ def test_visibility_cell_is_an_eye_toggle() -> None:
     assert "class EyeToggleList2Cell(CheckBoxList2Cell):" in PLUGIN_SOURCE
     cell = PLUGIN_SOURCE[
         PLUGIN_SOURCE.index("class EyeToggleList2Cell(CheckBoxList2Cell):") :
-        PLUGIN_SOURCE.index("class ColorFlowSettingsView:")
+        PLUGIN_SOURCE.index("class AZColorflowSettingsView:")
     ]
     assert '_eye_symbol("eye.slash")' in cell      # state OFF = hidden
     assert '_eye_symbol("eye.fill")' in cell        # state ON  = shown
@@ -520,8 +520,8 @@ def test_routing_replacement_reads_swap_default_at_call_time() -> None:
     body = _method_body("_cf_setColorIndex_")
     # Reads SWAP_KEY each call (no re-swizzle on toggle) and uses the pure decision module.
     assert "Glyphs.defaults[SWAP_KEY]" in body
-    assert "colorflow_routing.should_apply_swap(event_type)" in body
-    assert "colorflow_routing.resolve_color_target(option, swap)" in body
+    assert "azcolorflow_routing.should_apply_swap(event_type)" in body
+    assert "azcolorflow_routing.resolve_color_target(option, swap)" in body
     # Routes to layer.colorIndex or glyph.colorIndex.
     assert "layer.colorIndex = color_index" in body
     assert "glyph.colorIndex = color_index" in body
@@ -563,8 +563,8 @@ def test_register_uses_gscallbackhandler_api_unassigned() -> None:
 
 def test_register_covers_only_jump_command_in_one_group() -> None:
     body = _module_function_body("_register_native_shortcuts")
-    assert '_SHORTCUT_GROUP = "Color Flow"' in PLUGIN_SOURCE
-    assert '_SHORTCUT_ID_PREFIX = "com.hugojourdan.ColorFlow."' in PLUGIN_SOURCE
+    assert '_SHORTCUT_GROUP = "AZ-Colorflow"' in PLUGIN_SOURCE
+    assert '_SHORTCUT_ID_PREFIX = "com.hugojourdan.AZColorflow."' in PLUGIN_SOURCE
     # Exactly one command: the jump (Hugo's wording), no step toggles.
     assert '"Jump to next color glyph"' in body
     assert '_SHORTCUT_ID_PREFIX + "jumpNext"' in body
@@ -576,7 +576,7 @@ def test_register_covers_only_jump_command_in_one_group() -> None:
 
 def test_shortcut_handler_has_jump_selector_and_validate() -> None:
     # One ObjC selector for the jump command on a long-lived NSObject target.
-    assert "class ColorFlowShortcutHandler(NSObject):" in PLUGIN_SOURCE
+    assert "class AZColorflowShortcutHandler(NSObject):" in PLUGIN_SOURCE
     assert "def jumpNextShortcut_(self, sender) -> None:" in PLUGIN_SOURCE
     # GSShortcutCommandProtocol conformance, typed as returning an ObjC BOOL.
     assert "def validateShortcutCommand_editViewController_(" in PLUGIN_SOURCE
@@ -612,7 +612,7 @@ def test_no_exporting_only_checkbox_anywhere() -> None:
     # The exclusion is always on — no opt-in checkbox, no pref key anywhere.
     assert "Count exporting glyphs only" not in PLUGIN_SOURCE
     assert "popover.exporting" not in PLUGIN_SOURCE
-    assert "ColorFlow-Exporting" not in PLUGIN_SOURCE
+    assert "AZColorflow-Exporting" not in PLUGIN_SOURCE
     assert "_popover_exporting" not in PLUGIN_SOURCE
     assert "def _exporting" not in PLUGIN_SOURCE
 
@@ -641,7 +641,7 @@ def test_derive_counts_is_exact_census_not_cumulative() -> None:
 def test_counts_cache_single_variant() -> None:
     # Always-on exclusion -> one cache variant again; no mode suffix anywhere.
     assert '"-exporting"' not in PLUGIN_SOURCE
-    assert '_SHORTCUT_COUNTS_KEY = "com.hugojourdan.ColorFlow-counts-"' in PLUGIN_SOURCE
+    assert '_SHORTCUT_COUNTS_KEY = "com.hugojourdan.AZColorflow-counts-"' in PLUGIN_SOURCE
     counts_body = _method_body("_counts")
     assert "key = _SHORTCUT_COUNTS_KEY + masterId" in counts_body
     invalidate = _method_body("_invalidate_counts")

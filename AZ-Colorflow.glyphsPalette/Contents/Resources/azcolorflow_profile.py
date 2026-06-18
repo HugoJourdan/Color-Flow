@@ -1,6 +1,6 @@
 """Portable Color Flow workflow profiles — export / import / diff.
 
-A ``.colorflow`` file is a small JSON bundle of everything that defines a Color
+A ``.azcolorflow`` file is a small JSON bundle of everything that defines a Color
 Flow workflow: the ``colorNames.txt`` text (colour order, labels, visibility,
 None label), the Rainbow Font View source, and the 12 Glyphs label colours
 (RGBA). Sharing one lets a team standardise their workflow.
@@ -36,7 +36,7 @@ def build_profile(color_names: str, rainbow_source: str,
 
 
 def serialize(profile: dict) -> str:
-    """The profile as pretty JSON, ready to write to a ``.colorflow`` file."""
+    """The profile as pretty JSON, ready to write to a ``.azcolorflow`` file."""
     return json.dumps(profile, ensure_ascii=False, indent=2)
 
 
@@ -56,17 +56,17 @@ def _coerce_label_colors(raw_colors: object) -> list[tuple]:
 
 
 def parse(text: str) -> dict:
-    """Parse + normalise a ``.colorflow`` file into a profile dict. Raises
+    """Parse + normalise a ``.azcolorflow`` file into a profile dict. Raises
     ``ValueError`` on malformed JSON, a non-object, an unsupported version, or a
     malformed ``labelColors`` field."""
     try:
         raw = json.loads(text)
     except (ValueError, TypeError) as error:
-        raise ValueError(f"Not a valid .colorflow file: {error}") from error
+        raise ValueError(f"Not a valid .azcolorflow file: {error}") from error
     if not isinstance(raw, dict):
-        raise ValueError("Not a valid .colorflow file: expected a JSON object.")
+        raise ValueError("Not a valid .azcolorflow file: expected a JSON object.")
     if raw.get("version") != PROFILE_VERSION:
-        raise ValueError(f"Unsupported .colorflow version: {raw.get('version')!r}")
+        raise ValueError(f"Unsupported .azcolorflow version: {raw.get('version')!r}")
     # Tolerant parsing: unknown keys in the raw JSON (e.g. retired fields
     # written by older plugin versions) are simply ignored.
     return build_profile(

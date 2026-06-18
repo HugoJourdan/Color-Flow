@@ -1,11 +1,11 @@
-"""Regression: ColorFlow framework-override methods must be @objc.python_method.
+"""Regression: AZColorflow framework-override methods must be @objc.python_method.
 
 These methods either share a name with an inherited ObjC selector (e.g.
 ``update``, a 0-arg PalettePlugin/NSObject selector) or are PalettePlugin
 lifecycle hooks. If the ``@objc.python_method`` decorator is missing, PyObjC
 tries to bridge the Python method as the inherited selector and raises
 ``objc.BadPrototypeError`` at class creation -- the whole plugin then fails to
-load ("'update' expects 0 arguments, <function ColorFlow.update> has 1
+load ("'update' expects 0 arguments, <function AZColorflow.update> has 1
 positional arguments"). The ``update`` decorator was dropped once during the
 licensing work and shipped a crash on load; this guard prevents a repeat.
 
@@ -21,13 +21,13 @@ import pytest
 
 RESOURCES = (
     Path(__file__).resolve().parent.parent
-    / "Color Flow.glyphsPalette"
+    / "AZ-Colorflow.glyphsPalette"
     / "Contents"
     / "Resources"
 )
 PLUGIN_SOURCE = (RESOURCES / "plugin.py").read_text(encoding="utf-8")
 
-# ColorFlow methods that MUST carry @objc.python_method.
+# AZColorflow methods that MUST carry @objc.python_method.
 FRAMEWORK_OVERRIDES = ("settings", "start", "update", "__del__")
 
 
@@ -38,6 +38,6 @@ def test_framework_override_is_objc_python_method(method: str) -> None:
     idx = PLUGIN_SOURCE.index(marker)
     preceding = PLUGIN_SOURCE[:idx].rstrip()
     assert preceding.endswith("@objc.python_method"), (
-        f"ColorFlow.{method} must be decorated @objc.python_method "
+        f"AZColorflow.{method} must be decorated @objc.python_method "
         "or PyObjC raises BadPrototypeError at class creation"
     )

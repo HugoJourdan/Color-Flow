@@ -22,7 +22,7 @@ from datetime import datetime
 from typing import Any
 
 import AppKit
-import colorflow_filters
+import azcolorflow_filters
 
 # Shared, GlyphsApp-free colorNames logic (also embedded into the jump
 # shortcut script by tools/generate_shortcuts.py). Glyphs puts this bundle's
@@ -35,7 +35,7 @@ import colornav
 
 # Pure swap-Option-color-routing decision logic (no AppKit); the swizzled
 # setColorIndex: replacement below delegates its two decisions here.
-import colorflow_routing
+import azcolorflow_routing
 
 # Font-View colour grouping engine (the merged Rainbow FontView half).
 import fontview
@@ -89,7 +89,7 @@ def _pump_runloop() -> None:
 		pass
 
 
-class _ColorFlowLoaderBar(AppKit.NSView):
+class _AZColorflowLoaderBar(AppKit.NSView):
 	# A self-contained "rainbow fill" loading bar for the report-generation sheet:
 	# the workflow colours fill a rounded track 0->100% with a live percentage.
 	# Progress is REAL: the build calls set_progress() at each phase (and every few
@@ -294,17 +294,17 @@ class _ColorFlowLoaderBar(AppKit.NSView):
 #																									   #
 ########################################################################################################
 
-_SHORTCUT_GROUP = "Color Flow"
-_SHORTCUT_ID_PREFIX = "com.hugojourdan.ColorFlow."
-_SHORTCUT_COUNTS_KEY = "com.hugojourdan.ColorFlow-counts-"
+_SHORTCUT_GROUP = "AZ-Colorflow"
+_SHORTCUT_ID_PREFIX = "com.hugojourdan.AZColorflow."
+_SHORTCUT_COUNTS_KEY = "com.hugojourdan.AZColorflow-counts-"
 
 # Boolean default backing the "Swap Option color routing" toggle (Settings pane).
 # Read at call time by the swizzled setColorIndex: replacement, so flipping it
-# takes effect with no re-swizzle. Matches the com.hugojourdan.ColorFlow-* convention.
-SWAP_KEY = "com.hugojourdan.ColorFlow-SwapColorRouting"
+# takes effect with no re-swizzle. Matches the com.hugojourdan.AZColorflow-* convention.
+SWAP_KEY = "com.hugojourdan.AZColorflow-SwapColorRouting"
 # Glyphs marked non-exporting in Glyphs are ALWAYS excluded from every
 # completion percentage — palette counts/bars here, and the report's displayed
-# percentages (colorflow_dashboard ships the same exclusion set client-side).
+# percentages (azcolorflow_dashboard ships the same exclusion set client-side).
 
 # Strong module-level reference to the registered target. GSShortcutItem holds its
 # target WEAK and Glyphs builds one palette instance per document window, so the
@@ -385,7 +385,7 @@ def _jump_to_next_unfinished() -> None:
 	font.newTab("/" + names[index])
 
 
-class ColorFlowShortcutHandler(NSObject):
+class AZColorflowShortcutHandler(NSObject):
 	"""Long-lived target for the native shortcut command (one per session)."""
 
 	# GSShortcutCommandProtocol: Glyphs asks right before performing the action.
@@ -418,7 +418,7 @@ def _register_native_shortcuts() -> None:
 		return
 	callback_handler = objc.lookUpClass("GSCallbackHandler")
 	register = callback_handler.registerShortcutCommand_group_identifier_action_target_character_modifierFlags_
-	target = ColorFlowShortcutHandler.alloc().init()
+	target = AZColorflowShortcutHandler.alloc().init()
 	# Mark registered BEFORE the call: a partial failure must not re-register
 	# when the next window opens (it would only fail again).
 	_SHORTCUT_HANDLER = target
@@ -436,7 +436,7 @@ def _register_native_shortcuts() -> None:
 _RAINBOW_MENU_TITLE = "Color Flow: Font Glyph Order"
 
 
-class ColorFlowRainbowMenuHandler(NSObject):
+class AZColorflowRainbowMenuHandler(NSObject):
 	"""Long-lived target for the Rainbow File-menu item (one per session).
 
 	The shared File menu holds a single item; targeting a per-window palette
@@ -446,7 +446,7 @@ class ColorFlowRainbowMenuHandler(NSObject):
 	"""
 
 	def init(self) -> Any:
-		self = objc.super(ColorFlowRainbowMenuHandler, self).init()
+		self = objc.super(AZColorflowRainbowMenuHandler, self).init()
 		if self is None:
 			return None
 		try:
@@ -496,7 +496,7 @@ def _install_rainbow_menu() -> None:
 	title = _RAINBOW_MENU_TITLE
 	# Mark installed BEFORE wiring the menu: a partial failure must not let the next
 	# window re-attempt (it would only fail again, and could stack a second item).
-	handler = ColorFlowRainbowMenuHandler.alloc().init()
+	handler = AZColorflowRainbowMenuHandler.alloc().init()
 	_RAINBOW_MENU_HANDLER = handler
 	menu_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
 		title, "toggleRainbow:", "")
@@ -523,7 +523,7 @@ def _install_rainbow_menu() -> None:
 # internally, so an IMP-preserving swizzle cannot invert it (the original would just re-make the
 # stock choice). We FULLY REPLACE the (small, self-contained) method body. The replacement reads the
 # SWAP_KEY default at CALL TIME, so flipping the Settings toggle needs no re-swizzle. The decision
-# logic lives in the pure, unit-tested colorflow_routing module.
+# logic lives in the pure, unit-tested azcolorflow_routing module.
 
 # Idempotency guard: Glyphs builds one palette instance per document window; the installer must run
 # its class-method replacement exactly once per app session.
@@ -549,7 +549,7 @@ def _cf_setColorIndex_(self, color_index) -> None:
 		except Exception:
 			layers = []
 
-		if event is None or not colorflow_routing.should_apply_swap(event_type):
+		if event is None or not azcolorflow_routing.should_apply_swap(event_type):
 			# Non-mouse / no event: stock GLYPH routing, ignore Option (safe default).
 			# (The `event is None` test is redundant with should_apply_swap — a None
 			# event_type already returns False — but it lets the type checker narrow
@@ -557,7 +557,7 @@ def _cf_setColorIndex_(self, color_index) -> None:
 			target = "glyph"
 		else:
 			option = bool(event.modifierFlags() & AppKit.NSEventModifierFlagOption)
-			target = colorflow_routing.resolve_color_target(option, swap)
+			target = azcolorflow_routing.resolve_color_target(option, swap)
 
 		# Wrap the mutation in the font's disable/enableUpdateInterface so the UI
 		# updates once (mirrors stock). The accessor lives on GSFont; reach it via a
@@ -722,13 +722,13 @@ def _runtime_copy_imp(
 # every open palette instance refreshes live.
 
 # The notification name every palette instance observes; the pane posts it after any edit.
-COLORFLOW_SETTINGS_CHANGED = "ColorFlowSettingsChanged"
+COLORFLOW_SETTINGS_CHANGED = "AZColorflowSettingsChanged"
 
 # The pane's Settings tab identifier AND its visible label. Verified against GlyphsCore:
 # -addViewController: makes the tab identifier = vc.representedObject and the label =
 # vc.title, and showMainPreferencesWithIdentifier: selects the tab by that identifier. So
 # we set representedObject = title = this string, and jump to the same string.
-COLORFLOW_PREF_IDENTIFIER = "Color Flow"
+COLORFLOW_PREF_IDENTIFIER = "AZ-Colorflow"
 
 # Registered exactly once per app session (palettes instantiate once per document window). The VC is
 # held module-globally so AppKit does not deallocate it out from under the Settings window.
@@ -945,7 +945,7 @@ class EyeToggleList2Cell(CheckBoxList2Cell):
 			print("Color Flow [eye cell] error:\n" + traceback.format_exc())
 
 
-class ColorFlowSettingsView:
+class AZColorflowSettingsView:
 	"""Builds + owns the vanilla controls for the Color Flow preferences pane and routes
 	every edit through the module-level shared helpers (which broadcast to open palettes).
 
@@ -1065,7 +1065,7 @@ class ColorFlowSettingsView:
 		# are pinned below and are NOT draggable. A row can stay NAMED yet hidden. The drop
 		# persists via the shared _apply_color_order -> colornames.reorder_visible_rows path
 		# and broadcasts.
-		drag_type = "dev.colorflow.slotRow"
+		drag_type = "dev.azcolorflow.slotRow"
 		try:
 			group.lcList = List2(
 				(margin, lc_list_y, inner, lc_list_h),
@@ -1122,7 +1122,7 @@ class ColorFlowSettingsView:
 
 		# License recovery button — always-enabled, opens the license sheet.
 		group.licenseBtn = Button((margin, beh_lic_y, inner, 22), "License…",
-			callback=lambda sender: __import__("_colorflow_lic", fromlist=["bootstrap"]).bootstrap.show_license_ui(__import__("_colorflow_lic_config").CONFIG))
+			callback=lambda sender: __import__("_azcolorflow_lic", fromlist=["bootstrap"]).bootstrap.show_license_ui(__import__("_azcolorflow_lic_config").CONFIG))
 		self._license_btn = group.licenseBtn
 
 		# Make the full-width controls grow with the Settings tab. Each is pinned to the top,
@@ -1209,7 +1209,7 @@ class ColorFlowSettingsView:
 
 	def _slot_make_drag_data(self, index) -> dict:
 		"""Pack the dragged source row index onto the pasteboard for the self-reorder."""
-		return {"dev.colorflow.slotRow": int(index)}
+		return {"dev.azcolorflow.slotRow": int(index)}
 
 	def _slot_drop_candidate(self, info) -> str:
 		"""Accept a self-move drop (rejects external drags, which carry no source)."""
@@ -1226,7 +1226,7 @@ class ColorFlowSettingsView:
 			sender = info.get("sender")
 			source_indexes = sorted(
 				int(i) for i in sender.getDropItemValues(
-					info.get("items") or [], "dev.colorflow.slotRow"))
+					info.get("items") or [], "dev.azcolorflow.slotRow"))
 			items = list(self._slot_items)
 			moved = [items[i] for i in source_indexes if 0 <= i < len(items)]
 			if not moved or not all(self._slot_is_visible(item) for item in moved):
@@ -1376,13 +1376,13 @@ class ColorFlowSettingsView:
 			print("Color Flow [pane slot edit] error:\n" + traceback.format_exc())
 
 
-class ColorFlowPreferencesController(AppKit.NSViewController):
+class AZColorflowPreferencesController(AppKit.NSViewController):
 	"""NSViewController whose view is the Color Flow settings pane. Glyphs' Settings
 	window holds it via addViewToPreferences:. The heavy lifting lives on the
-	module-level ColorFlowSettingsView so the title-only VC stays thin."""
+	module-level AZColorflowSettingsView so the title-only VC stays thin."""
 
 	def initWithSettingsView_(self, settings_view) -> Any:
-		self = objc.super(ColorFlowPreferencesController, self).init()
+		self = objc.super(AZColorflowPreferencesController, self).init()
 		if self is None:
 			return None
 		self._settingsView = settings_view
@@ -1441,8 +1441,8 @@ def _register_preferences_pane() -> None:
 	delegate = _app_delegate()
 	if delegate is None or not hasattr(delegate, "addViewToPreferences_"):
 		return
-	controller = ColorFlowSettingsView()
-	view_controller = ColorFlowPreferencesController.alloc().initWithSettingsView_(controller)
+	controller = AZColorflowSettingsView()
+	view_controller = AZColorflowPreferencesController.alloc().initWithSettingsView_(controller)
 	if view_controller is None:
 		return
 	# title -> the Settings tab's visible label; representedObject -> the tab IDENTIFIER
@@ -1550,7 +1550,7 @@ except objc.error:
 	_CFBuyButton = CFBuyButton
 
 
-class ColorFlow(PalettePlugin):
+class AZColorflow(PalettePlugin):
 
 	# Body height in the license-blocked state. Not 0 — a literal-0 body strips the
 	# padding Glyphs keeps under a collapsed section header, making the band read
@@ -1568,14 +1568,14 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def settings(self) -> None:
-		from _colorflow_lic_config import CONFIG
-		from _colorflow_lic import bootstrap
+		from _azcolorflow_lic_config import CONFIG
+		from _azcolorflow_lic import bootstrap
 		self._ent = bootstrap.start(CONFIG)
 		# Publish the live Gate so the module-level "Jump to next" shortcut handler
 		# (no palette instance) can consult the same licence state.
 		global _SHARED_ENT
 		_SHARED_ENT = self._ent
-		self.name = 'Color Flow'
+		self.name = 'AZ-Colorflow'
 		self.init = False
 		self.colorKeys = {
 						"0":(0.85, 0.26, 0.06, 0.5),
@@ -1810,9 +1810,9 @@ class ColorFlow(PalettePlugin):
 				for index, label in colornames.visible_labels(meaning).items()]
 			text = colornames.read_color_names(colornames.get_key_file(self._font_dir(font)))
 			none_label = colornames.parse_settings(text)[1] or "None"
-			group = colorflow_filters.build_filter_group(steps, none_label)
+			group = azcolorflow_filters.build_filter_group(steps, none_label)
 			existing = [dict(entry) for entry in (font.customParameters["Filters"] or [])]
-			font.customParameters["Filters"] = colorflow_filters.merge_into_filters(existing, group)
+			font.customParameters["Filters"] = azcolorflow_filters.merge_into_filters(existing, group)
 			Message("Added the “Color Flow” smart-filter group to the sidebar "
 				"(filters by glyph colour).", title="Color Flow")
 		except Exception:
@@ -1849,7 +1849,7 @@ class ColorFlow(PalettePlugin):
 			label = AppKit.NSTextField.labelWithString_("Generating Color Flow report\u2026")
 			label.setFrame_(AppKit.NSMakeRect(16, 30, 224, 16))
 			content.addSubview_(label)
-			loader = _ColorFlowLoaderBar.alloc().initWithFrame_(AppKit.NSMakeRect(16, 5, 224, 22))
+			loader = _AZColorflowLoaderBar.alloc().initWithFrame_(AppKit.NSMakeRect(16, 5, 224, 22))
 			loader.configure(labelcolors.read_label_colors())
 			content.addSubview_(loader)
 			self._reportLoader = loader
@@ -2072,7 +2072,7 @@ class ColorFlow(PalettePlugin):
 		# Deferred from start(). Shows the tutorial once ever (global flag), attaching a
 		# sheet to the document window; falls back to a floating panel if none is found.
 		try:
-			if Glyphs.defaults["com.hugojourdan.ColorFlow-TutorialShown"]:
+			if Glyphs.defaults["com.hugojourdan.AZColorflow-TutorialShown"]:
 				return
 			if getattr(self, "_tutorialPanel", None) is not None:
 				return                                  # already on screen
@@ -2100,8 +2100,8 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _present_tutorial(self) -> None:
-		import colorflow_tutorial
-		self._tutorialSlides = colorflow_tutorial.slides()
+		import azcolorflow_tutorial
+		self._tutorialSlides = azcolorflow_tutorial.slides()
 		count = len(self._tutorialSlides)
 		if count == 0:
 			return
@@ -2168,7 +2168,7 @@ class ColorFlow(PalettePlugin):
 		self._tutorial_render()
 		self._install_tutorial_key_monitor()
 
-		Glyphs.defaults["com.hugojourdan.ColorFlow-TutorialShown"] = True
+		Glyphs.defaults["com.hugojourdan.AZColorflow-TutorialShown"] = True
 		# Present as a sheet attached to the document window; floating fallback if none.
 		parent = self._tutorial_parent_window()
 		if parent is not None:
@@ -2220,7 +2220,7 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _tutorial_render(self) -> None:
-		import colorflow_tutorial
+		import azcolorflow_tutorial
 		slides = getattr(self, "_tutorialSlides", [])
 		count = len(slides)
 		title = self._tutorialTitle
@@ -2228,7 +2228,7 @@ class ColorFlow(PalettePlugin):
 		dot_buttons = getattr(self, "_tutorialDotButtons", [])
 		if count == 0 or title is None or body is None:
 			return
-		index = colorflow_tutorial.clamp_index(getattr(self, "_tutorialIndex", 0), count)
+		index = azcolorflow_tutorial.clamp_index(getattr(self, "_tutorialIndex", 0), count)
 		self._tutorialIndex = index
 		slide = slides[index]
 		title.setStringValue_(slide.title)
@@ -2238,9 +2238,9 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def _tutorial_step(self, delta: int) -> None:
-		import colorflow_tutorial
+		import azcolorflow_tutorial
 		count = len(getattr(self, "_tutorialSlides", []))
-		self._tutorialIndex = colorflow_tutorial.clamp_index(
+		self._tutorialIndex = azcolorflow_tutorial.clamp_index(
 			getattr(self, "_tutorialIndex", 0) + delta, count)
 		self._tutorial_render()
 
@@ -2351,7 +2351,7 @@ class ColorFlow(PalettePlugin):
 	def _rainbow_conflict_check(self) -> None:
 		# Warn once if the standalone Rainbow FontView is still installed (two
 		# plugins fighting over glyphOrder would conflict).
-		if Glyphs.defaults["com.hugojourdan.ColorFlow-RainbowConflictWarned"]:
+		if Glyphs.defaults["com.hugojourdan.AZColorflow-RainbowConflictWarned"]:
 			return
 		barItem = Glyphs.menu[FILE_MENU]
 		submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
@@ -2364,7 +2364,7 @@ class ColorFlow(PalettePlugin):
 					"Color Flow now includes Font-View grouping, so please disable or "
 					"remove Rainbow FontView to avoid them conflicting.",
 					title="Color Flow", OKButton=None)
-				Glyphs.defaults["com.hugojourdan.ColorFlow-RainbowConflictWarned"] = True
+				Glyphs.defaults["com.hugojourdan.AZColorflow-RainbowConflictWarned"] = True
 				return
 
 	# --- ObjC selectors (no python_method decorator: called by menu / timer) ---
@@ -2414,7 +2414,7 @@ class ColorFlow(PalettePlugin):
 		document = notification.object()
 		# Scope to THIS palette's own document. The observer is registered with
 		# object=None (Glyphs needs the notification before its window controller
-		# resolves), and Glyphs builds one ColorFlow instance per window — so every
+		# resolves), and Glyphs builds one AZColorflow instance per window — so every
 		# instance is told about every document's save. Ignore saves that aren't this
 		# instance's, so only the owning palette records/re-saves its timeline.
 		# Best-effort + null-safe: if we can't resolve our own document, fall through
@@ -2501,25 +2501,25 @@ class ColorFlow(PalettePlugin):
 		if not getattr(font, "filepath", None):
 			print("Color Flow: font has no file path yet — timeline kept in memory, "
 				"persists once the file is saved to disk.")
-		import colorflow_dashboard
+		import azcolorflow_dashboard
 		# Storage rule: git-tracked fonts keep their history in git commits, so we don't
 		# *also* accrue userData snapshots (that would double-store the same timeline).
 		# The report merges the frozen pre-git userData past with git going forward.
 		# Untracked fonts (no repo, or not yet committed) keep writing userData so the
 		# timeline still accrues for users who don't use git.
-		if colorflow_dashboard.is_git_tracked(font):
+		if azcolorflow_dashboard.is_git_tracked(font):
 			print("Color Flow: font is git-tracked — timeline reads from git, "
 				"skipping userData snapshot.")
 			return False
-		key = colorflow_dashboard.TIMELINE_USERDATA_KEY
+		key = azcolorflow_dashboard.TIMELINE_USERDATA_KEY
 		# Compare the encoded userData string before/after: it changes iff a new entry was
 		# written (count alone is unreliable — capping can drop an old day as one is added).
-		before = colorflow_dashboard._read_user_data(font, key)
-		snapshot = colorflow_dashboard.build_master_glyph_colors(font)
-		colorflow_dashboard.record_history(font, snapshot, datetime.now())
-		recorded = colorflow_dashboard._read_user_data(font, key) != before
+		before = azcolorflow_dashboard._read_user_data(font, key)
+		snapshot = azcolorflow_dashboard.build_master_glyph_colors(font)
+		azcolorflow_dashboard.record_history(font, snapshot, datetime.now())
+		recorded = azcolorflow_dashboard._read_user_data(font, key) != before
 		try:
-			saves = len(colorflow_dashboard.load_history(font))
+			saves = len(azcolorflow_dashboard.load_history(font))
 			save_word = "save" if saves == 1 else "saves"
 			if recorded:
 				print(f"Color Flow: timeline snapshot recorded to userData "
@@ -3281,8 +3281,8 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def _onLicenseChanged(self) -> None:
 		try:
-			from _colorflow_lic_config import CONFIG
-			from _colorflow_lic import bootstrap
+			from _azcolorflow_lic_config import CONFIG
+			from _azcolorflow_lic import bootstrap
 			self._ent = bootstrap.start(CONFIG)
 			# Keep the shortcut handler's shared Gate in sync after activation.
 			global _SHARED_ENT
@@ -3300,8 +3300,8 @@ class ColorFlow(PalettePlugin):
 		# refreshes entitlement live via _onLicenseChanged so the palette
 		# unlocks without a Glyphs reload.
 		try:
-			from _colorflow_lic_config import CONFIG
-			from _colorflow_lic import bootstrap
+			from _azcolorflow_lic_config import CONFIG
+			from _azcolorflow_lic import bootstrap
 			from AppKit import (
 				NSAlert,
 				NSAlertFirstButtonReturn,
@@ -3340,15 +3340,15 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def _run_dashboard(self, progress=None, open_when_done: bool = True) -> Any:
 		# ``progress`` (optional ``Callable[[float], None]``) is forwarded to
-		# colorflow_dashboard.main so the report-sheet loader can track real build
+		# azcolorflow_dashboard.main so the report-sheet loader can track real build
 		# progress; None when opened outside the sheet flow. Returns the written report
 		# Path (or None) so the sheet flow can offer Open / Save instead of auto-opening.
 		try:
 			import importlib
 
-			import colorflow_dashboard
-			importlib.reload(colorflow_dashboard)
-			return colorflow_dashboard.main(Glyphs.font, progress=progress, open_when_done=open_when_done)
+			import azcolorflow_dashboard
+			importlib.reload(azcolorflow_dashboard)
+			return azcolorflow_dashboard.main(Glyphs.font, progress=progress, open_when_done=open_when_done)
 		except Exception:
 			import traceback
 			print("Color Flow [dashboard] error:\n" + traceback.format_exc())

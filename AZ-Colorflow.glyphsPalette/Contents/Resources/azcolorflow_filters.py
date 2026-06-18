@@ -16,7 +16,7 @@ and writes it back.
 
 from __future__ import annotations
 
-GROUP_NAME = "Color Flow"
+GROUP_NAME = "AZ-Colorflow"
 # Glyphs' sentinel for "no colour label" in a colorIndex predicate.
 NO_COLOR_INDEX = 255
 

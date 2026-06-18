@@ -3,7 +3,7 @@
 Summarises, per master, how the font's glyphs are distributed across the Color
 Flow colour labels, and which glyphs changed colour since the last run. This
 module builds the data model and writes the report; the interactive HTML/CSS/JS
-that renders it lives in ``colorflow_assets`` (one self-contained, offline file).
+that renders it lives in ``azcolorflow_assets`` (one self-contained, offline file).
 
 The numbers come from the same shared ``colornames`` counting as the palette
 sidebar (same glyph set: ALL glyphs, the layer's own ``layer.color`` only).
@@ -18,7 +18,7 @@ Design notes:
   * the "what changed since last run" snapshot lives in ``Glyphs.defaults`` keyed
     by file path — NOT in the .glyphs file and NOT in a sidecar — so the source
     stays clean while the diff still survives across sessions;
-  * ``build_model`` returns a plain dict; ``colorflow_assets.build_html`` embeds it
+  * ``build_model`` returns a plain dict; ``azcolorflow_assets.build_html`` embeds it
     as JSON and the inline JS app renders it (search/filter/sort, tabs + compare,
     per-glyph heatmap, light/dark) with no network and no dependencies.
 
@@ -38,10 +38,10 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import quote
 
-import colorflow_assets
-import colorflow_git
-import colorflow_history_store
-import colorflow_outline_diff
+import azcolorflow_assets
+import azcolorflow_git
+import azcolorflow_history_store
+import azcolorflow_outline_diff
 import colornames
 import glyphsvg
 import labelcolors
@@ -56,26 +56,26 @@ except Exception:  # pragma: no cover - only importable inside Glyphs
 
 
 # Where the cross-session diff snapshot is stored (app prefs, not the font file).
-DEFAULTS_KEY = "com.hugojourdan.ColorFlow-DashboardSnapshot"
+DEFAULTS_KEY = "com.hugojourdan.AZColorflow-DashboardSnapshot"
 
 # Hidden power-user pref: when truthy, the per-glyph outline SVGs are omitted from
 # the report. The embedded glyph paths are by far the heaviest part of the file, so
 # skipping them makes the report dramatically lighter (cells render as plain colour
 # swatches). Set from the Macro panel:
-#   Glyphs.defaults["com.hugojourdan.ColorFlow-NoGlyphSVG"] = True
-NO_GLYPH_SVG_KEY = "com.hugojourdan.ColorFlow-NoGlyphSVG"
+#   Glyphs.defaults["com.hugojourdan.AZColorflow-NoGlyphSVG"] = True
+NO_GLYPH_SVG_KEY = "com.hugojourdan.AZColorflow-NoGlyphSVG"
 
 # Outline-changes view (#D): how many recent git-committed days to diff for glyph
 # shape changes. Re-opening each historical commit is expensive, so this is a small
 # recent window by default. Set to 0 to disable the feature entirely. Tunable via:
-#   Glyphs.defaults["com.hugojourdan.ColorFlow-OutlineChangeDays"] = 10
-OUTLINE_CHANGE_DAYS_KEY = "com.hugojourdan.ColorFlow-OutlineChangeDays"
+#   Glyphs.defaults["com.hugojourdan.AZColorflow-OutlineChangeDays"] = 10
+OUTLINE_CHANGE_DAYS_KEY = "com.hugojourdan.AZColorflow-OutlineChangeDays"
 OUTLINE_CHANGE_DAYS_DEFAULT = 10   # diff the last ~10 committed days
 OUTLINE_CHANGE_LIMIT = 60          # cap changed glyphs kept per day (avoid huge days)
 
 
 # --------------------------------------------------------------------------- #
-# Pure data layer (no GlyphsApp) — unit-tested in tests/test_colorflow_dashboard
+# Pure data layer (no GlyphsApp) — unit-tested in tests/test_azcolorflow_dashboard
 # --------------------------------------------------------------------------- #
 
 def color_to_key(color) -> int:
@@ -289,7 +289,7 @@ def save_snapshot(font, snapshot: dict) -> None:
 # so existing users don't lose their history on upgrade.)
 # --------------------------------------------------------------------------- #
 
-HISTORY_KEY = "com.hugojourdan.ColorFlow-DashboardHistory"           # legacy (Glyphs.defaults)
+HISTORY_KEY = "com.hugojourdan.AZColorflow-DashboardHistory"           # legacy (Glyphs.defaults)
 TIMELINE_USERDATA_KEY = "com.hugojourdan.ColorFlow.timelineHistory"  # primary (font userData)
 
 
@@ -350,7 +350,7 @@ def load_history(font) -> dict[str, dict[str, dict[str, int]]]:
     unavailable. Datetime keys sort lexicographically = chronologically."""
     if Glyphs is None or font is None:
         return {}
-    history = colorflow_history_store.decode_history(
+    history = azcolorflow_history_store.decode_history(
         _read_user_data(font, TIMELINE_USERDATA_KEY))
     if not history:
         history = _legacy_history(font)
@@ -404,7 +404,7 @@ def record_history(font, snapshot: dict, now: datetime) -> None:
     series[now.strftime("%Y-%m-%dT%H:%M:%S")] = snapshot
     series = _keep_last_save_of_past_days(series)
     _write_user_data(
-        font, TIMELINE_USERDATA_KEY, colorflow_history_store.encode_history(series))
+        font, TIMELINE_USERDATA_KEY, azcolorflow_history_store.encode_history(series))
 
 
 def write_history(font, history: dict) -> None:
@@ -417,7 +417,7 @@ def write_history(font, history: dict) -> None:
         return
     series = _keep_last_save_of_past_days({str(key): history[key] for key in history})
     _write_user_data(
-        font, TIMELINE_USERDATA_KEY, colorflow_history_store.encode_history(series))
+        font, TIMELINE_USERDATA_KEY, azcolorflow_history_store.encode_history(series))
 
 
 def _git_open_colors(path) -> dict | None:
@@ -509,7 +509,7 @@ def outline_change_days() -> int:
 
 def collect_outline_changes(font) -> dict:
     """``{iso_date: [change, ...]}`` of glyph outline changes across this font's recent
-    git commits (see ``colorflow_outline_diff``). Empty when the font isn't git-tracked,
+    git commits (see ``azcolorflow_outline_diff``). Empty when the font isn't git-tracked,
     the light-report pref is on, or the day window is 0 — so the view stays dormant."""
     if Glyphs is None or not font.filepath or no_glyph_svg():
         return {}
@@ -518,9 +518,9 @@ def collect_outline_changes(font) -> dict:
         return {}
     # collect_git_history is generic over the per-day payload; here _git_open_paths
     # returns outline path maps rather than colour snapshots, so cast for the type.
-    day_maps = cast(dict, colorflow_git.collect_git_history(
+    day_maps = cast(dict, azcolorflow_git.collect_git_history(
         font.filepath, _git_open_paths, cap=cap_days))
-    return colorflow_outline_diff.outline_changes(day_maps, limit_per_day=OUTLINE_CHANGE_LIMIT)
+    return azcolorflow_outline_diff.outline_changes(day_maps, limit_per_day=OUTLINE_CHANGE_LIMIT)
 
 
 def is_git_tracked(font) -> bool:
@@ -535,8 +535,8 @@ def is_git_tracked(font) -> bool:
         return False
     try:
         target = Path(path)
-        repo = colorflow_git.git_root(target)
-        return repo is not None and colorflow_git.is_tracked(repo, target)
+        repo = azcolorflow_git.git_root(target)
+        return repo is not None and azcolorflow_git.is_tracked(repo, target)
     except Exception:
         return False
 
@@ -550,7 +550,7 @@ def backfill_from_git(font, progress=None) -> int:
     if Glyphs is None or not font.filepath:
         return 0
     existing = load_history(font)
-    git_history = colorflow_git.collect_commit_history(
+    git_history = azcolorflow_git.collect_commit_history(
         font.filepath, _git_open_colors, progress=progress)
     if not git_history:
         return 0
@@ -568,7 +568,7 @@ def commit_timeline_history(font) -> dict[str, dict[str, dict[str, int]]]:
     if Glyphs is None or not getattr(font, "filepath", None):
         return {}
     try:
-        return colorflow_git.collect_commit_history(font.filepath, _git_open_colors)
+        return azcolorflow_git.collect_commit_history(font.filepath, _git_open_colors)
     except Exception:
         return {}
 
@@ -582,7 +582,7 @@ def git_day_history(font) -> dict[str, dict[str, dict[str, int]]]:
     if Glyphs is None or not getattr(font, "filepath", None):
         return {}
     try:
-        return cast(dict, colorflow_git.collect_git_history(
+        return cast(dict, azcolorflow_git.collect_git_history(
             font.filepath, _git_open_colors))
     except Exception:
         return {}
@@ -688,7 +688,7 @@ def cross_master_summary(current: dict, master_ids: list[str],
 # Full JSON model
 # --------------------------------------------------------------------------- #
 
-_OUTLINE_CACHE_KEY = "com.dinamo.colorflow.outlineCache"
+_OUTLINE_CACHE_KEY = "com.dinamo.azcolorflow.outlineCache"
 
 
 def _change_stamp(glyph) -> float | None:
@@ -1214,7 +1214,7 @@ def build_model(font, now: datetime, current: dict, previous: dict, progress=Non
     day_history = group_saves_by_date(load_history(font))
     git_days = git_day_history(font)
     if git_days:
-        day_history = colorflow_git.merge_history(day_history, git_days)
+        day_history = azcolorflow_git.merge_history(day_history, git_days)
     history = {**day_history, today: current}
     series = history_series(history, order)
     dates = [point["date"] for point in series]
@@ -1349,7 +1349,7 @@ def main(font=None, progress=None, open_when_done: bool = True) -> Path | None:
     previous = load_snapshot(font) or current
     model = build_model(font, now, current, previous, progress=lambda frac: _emit(0.15 + 0.65 * frac))
     _emit(0.80)
-    html = colorflow_assets.build_html(model)
+    html = azcolorflow_assets.build_html(model)
     _emit(0.94)
     save_snapshot(font, current)
     # Note: today's snapshot is NOT persisted here — generating a report must not modify

@@ -1,4 +1,4 @@
-"""Tests for the git-backfill plumbing (``colorflow_git``).
+"""Tests for the git-backfill plumbing (``azcolorflow_git``).
 
 A real temporary git repository is built with commits stamped on chosen dates, so
 the git-shelling logic (root detection, tracking, one-commit-per-day collapsing,
@@ -13,7 +13,7 @@ import os
 import subprocess
 from pathlib import Path
 
-import colorflow_git as git
+import azcolorflow_git as git
 
 
 def _run(args: list[str], cwd: Path, date: str | None = None) -> None:

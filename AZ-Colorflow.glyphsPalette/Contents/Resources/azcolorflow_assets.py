@@ -1,6 +1,6 @@
 """Inline assets + HTML shell for the Color Font Dashboard.
 
-Turns the data model (see colorflow_dashboard.build_model) into one
+Turns the data model (see azcolorflow_dashboard.build_model) into one
 self-contained, offline .html with inline CSS + inline vanilla JS. No network,
 no dependencies. The model is the single source of truth the JS app renders.
 """
@@ -3656,7 +3656,7 @@ DASHBOARD_JS = r"""
       header() + toolbar()
       + '<div id="cfd-main"><aside id="cfd-tower" aria-label="Masters"><canvas id="cfd-tower-cv" width="240" height="560"></canvas></aside><div id="cfd-body"></div></div>'
       + '<footer class="ft"><span class="ft-l">'+esc(H.fileName)+' · v'+esc(H.version)+'</span>'
-      + '<span class="ft-r">ColorFlow Report — '+esc(H.generated)+'</span></footer>';
+      + '<span class="ft-r">AZ-Colorflow Report — '+esc(H.generated)+'</span></footer>';
     bind(); update(); initTower();
     window.__cfdExport = { csv: exportCSV, json: exportJSON, rows: exportRows, printHTML: buildPrintReport };
     // After the first paint the bars have run their fill animation once; stop

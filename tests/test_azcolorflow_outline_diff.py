@@ -1,6 +1,6 @@
 """Tests for the pure outline-diff logic (Glyphs-free)."""
 
-import colorflow_outline_diff as od
+import azcolorflow_outline_diff as od
 
 
 def _p(d: str, vb: str = "0 0 10 10") -> dict:

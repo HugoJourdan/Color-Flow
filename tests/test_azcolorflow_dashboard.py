@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import SupportsIndex, overload
 
-import colorflow_dashboard as db
+import azcolorflow_dashboard as db
 import colornames as cc
 
 # --------------------------------------------------------------------------- #
@@ -586,7 +586,7 @@ def test_backfill_from_git_imports_commits_under_live_saves(monkeypatch) -> None
             "2026-06-02T12:00:00": {"m1": {"A": 9}},   # collides with the live save's key
         }
 
-    monkeypatch.setattr(db.colorflow_git, "collect_commit_history", fake_commits)
+    monkeypatch.setattr(db.azcolorflow_git, "collect_commit_history", fake_commits)
     imported = db.backfill_from_git(font)
     assert imported == 1                          # only the non-colliding commit is new
     history = db.load_history(font)
@@ -600,7 +600,7 @@ def test_backfill_from_git_no_op_when_not_in_repo(monkeypatch) -> None:
     monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
     font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
     monkeypatch.setattr(
-        db.colorflow_git, "collect_commit_history",
+        db.azcolorflow_git, "collect_commit_history",
         lambda path, load, cap=60, progress=None: {},  # not a git repo / nothing tracked
     )
     assert db.backfill_from_git(font) == 0

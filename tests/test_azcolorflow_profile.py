@@ -1,8 +1,8 @@
-"""Tests for the portable .colorflow profile (export / import / diff)."""
+"""Tests for the portable .azcolorflow profile (export / import / diff)."""
 
 from __future__ import annotations
 
-import colorflow_profile as profile
+import azcolorflow_profile as profile
 import pytest
 
 

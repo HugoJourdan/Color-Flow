@@ -6,7 +6,7 @@ import base64
 import gzip
 import json
 
-import colorflow_assets as assets
+import azcolorflow_assets as assets
 
 
 def _model() -> dict:

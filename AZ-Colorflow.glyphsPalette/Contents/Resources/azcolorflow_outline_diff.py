@@ -1,6 +1,6 @@
 """Find glyphs whose OUTLINES changed between dated font versions.
 
-Color Flow already reconstructs a font's dated history from git (``colorflow_git``)
+Color Flow already reconstructs a font's dated history from git (``azcolorflow_git``)
 to drive the timeline. This module is the pure, Glyphs-free companion that turns a
 sequence of per-day *outline* snapshots into "what shape changed, and when".
 

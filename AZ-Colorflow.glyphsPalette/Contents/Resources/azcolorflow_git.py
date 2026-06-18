@@ -11,7 +11,7 @@ This module is the import-clean, fully unit-tested plumbing: it shells out to gi
 and extracts historical file content, but the font-reading step is injected as a
 ``load_colors`` callable so the orchestration is testable without Glyphs. The Glyphs
 side (open a historical font headlessly, run ``build_master_glyph_colors``) lives in
-``colorflow_dashboard`` where GlyphsApp is already imported.
+``azcolorflow_dashboard`` where GlyphsApp is already imported.
 """
 
 from __future__ import annotations

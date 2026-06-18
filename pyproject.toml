@@ -1,5 +1,5 @@
 [project]
-name = "color-flow-dev"
+name = "az-colorflow-dev"
 version = "0.0.0"
 description = "Dev tooling and tests for the Color Flow Glyphs plugin (not shipped in the .glyphsPalette bundle)."
 requires-python = ">=3.11"
@@ -17,7 +17,7 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true
-source = ["Color Flow.glyphsPalette/Contents/Resources"]
+source = ["AZ-Colorflow.glyphsPalette/Contents/Resources"]
 # plugin.py and settings_panel.py are PyObjC/vanilla UI that only runs inside
 # Glyphs; they can't be exercised headlessly, so exclude them from the target.
 omit = ["*/plugin.py", "*/settings_panel.py"]
@@ -30,11 +30,11 @@ line-length = 100
 target-version = "py311"
 # The plugin source lives inside the .glyphsPalette bundle (a space-containing
 # dir); list it explicitly alongside the tests.
-extend-include = ["Color Flow.glyphsPalette/Contents/Resources/*.py"]
+extend-include = ["AZ-Colorflow.glyphsPalette/Contents/Resources/*.py"]
 
 [tool.ruff.lint]
 # A "modern Python" set (pyflakes + pycodestyle logic/syntax + import order +
-# pyupgrade + bugbear). E501 is intentionally excluded: colorflow_assets.py
+# pyupgrade + bugbear). E501 is intentionally excluded: azcolorflow_assets.py
 # embeds long HTML/CSS/JS string literals that shouldn't be wrapped.
 select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
 
@@ -42,14 +42,14 @@ select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
 # plugin.py and the shipped shortcut scripts use `from vanilla import *` /
 # `from GlyphsApp import *`; those names are runtime-only globals injected by
 # Glyphs, so star-import warnings there are expected, not actionable.
-"Color Flow.glyphsPalette/Contents/Resources/plugin.py" = ["F403", "F405", "I001"]
+"AZ-Colorflow.glyphsPalette/Contents/Resources/plugin.py" = ["F403", "F405", "I001"]
 "Color Flow Shortcut/*.py" = ["F403", "F405", "F821"]
 
 [tool.pyright]
-include = ["Color Flow.glyphsPalette/Contents/Resources", "tests"]
-# Resolve the bundle's sibling modules (colornames, colorflow_dashboard) the way
+include = ["AZ-Colorflow.glyphsPalette/Contents/Resources", "tests"]
+# Resolve the bundle's sibling modules (colornames, azcolorflow_dashboard) the way
 # Glyphs does — by adding Resources/ to the path.
-extraPaths = ["Color Flow.glyphsPalette/Contents/Resources"]
+extraPaths = ["AZ-Colorflow.glyphsPalette/Contents/Resources"]
 # GlyphsApp / AppKit only exist inside Glyphs; the imports are guarded at runtime.
 reportMissingImports = false
 reportMissingModuleSource = false

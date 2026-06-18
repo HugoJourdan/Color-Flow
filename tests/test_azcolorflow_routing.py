@@ -1,8 +1,8 @@
-"""Tests for the pure swap-color-routing decision logic (colorflow_routing)."""
+"""Tests for the pure swap-color-routing decision logic (azcolorflow_routing)."""
 
 from __future__ import annotations
 
-import colorflow_routing as routing
+import azcolorflow_routing as routing
 import pytest
 
 

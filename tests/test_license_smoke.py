@@ -2,7 +2,7 @@
 import sys
 from pathlib import Path
 
-RES = Path(__file__).resolve().parents[1] / 'Color Flow.glyphsPalette/Contents/Resources'
+RES = Path(__file__).resolve().parents[1] / 'AZ-Colorflow.glyphsPalette/Contents/Resources'
 sys.path.insert(0, str(RES))
 
 
@@ -16,12 +16,12 @@ class FakeDefaults:
 
 
 def test_config_loads_and_starts_trial():
-    from _colorflow_lic_config import CONFIG
-    from _colorflow_lic import bootstrap, _licensing
+    from _azcolorflow_lic_config import CONFIG
+    from _azcolorflow_lic import bootstrap, _licensing
     _licensing._reset_for_testing()
     gate = bootstrap.start(
         CONFIG, defaults=FakeDefaults(),
         transport=lambda *a: {"status": 200, "body": {}},
     )
     assert gate.kind == "trial" and not gate.blocked
-    assert CONFIG.defaults_prefix == 'com.hugojourdan.ColorFlow'
+    assert CONFIG.defaults_prefix == 'com.hugojourdan.AZColorflow'

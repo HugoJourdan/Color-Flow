@@ -6,7 +6,7 @@ only; here we exercise the slide data and the navigation maths the sheet drives.
 
 from __future__ import annotations
 
-import colorflow_tutorial as tut
+import azcolorflow_tutorial as tut
 
 
 def test_slides_are_nonempty_with_title_and_body() -> None:

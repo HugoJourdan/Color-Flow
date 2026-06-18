@@ -9,7 +9,7 @@ from pathlib import Path
 
 RESOURCES = (
     Path(__file__).resolve().parent.parent
-    / "Color Flow.glyphsPalette"
+    / "AZ-Colorflow.glyphsPalette"
     / "Contents"
     / "Resources"
 )

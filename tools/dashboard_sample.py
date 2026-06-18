@@ -10,10 +10,10 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-RESOURCES = Path(__file__).resolve().parent.parent / "Color Flow.glyphsPalette" / "Contents" / "Resources"
+RESOURCES = Path(__file__).resolve().parent.parent / "AZ-Colorflow.glyphsPalette" / "Contents" / "Resources"
 sys.path.insert(0, str(RESOURCES))
 
-import colorflow_assets as assets  # noqa: E402
+import azcolorflow_assets as assets  # noqa: E402
 
 STEPS = [
     {"key": 8, "label": "Outline corrected"},

@@ -6,7 +6,7 @@ import base64
 import gzip
 import json
 
-import colorflow_history_store as store
+import azcolorflow_history_store as store
 
 SAMPLE = {
     "2026-06-01": {"m1": {"A": 0, "B": -1}, "m2": {"A": 1, "B": 0}},
