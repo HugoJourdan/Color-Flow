@@ -30,8 +30,8 @@ except Exception:  # pragma: no cover - objc only exists inside Glyphs
 # Capability name -> ObjC class name, for COMPILED providers (e.g. Caliper)
 # that cannot run Python to self-register. Resolved lazily via objc.lookUpClass.
 _BUILTIN_OBJC = {
-    "measurement.pipeline": "DNMMeasurementPipeline",
-    "measurement.drawing": "DNMDrawing",
+    "measurement.pipeline": "AZMeasurementPipeline",
+    "measurement.drawing": "AZDrawing",
 }
 
 # Shared advisory-lock key. Identical to the sentinel shipped in the 2026-06-14
