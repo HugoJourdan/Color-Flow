@@ -1,0 +1,2569 @@
+{
+glyphname = four;
+layers = (
+{
+color = 0;
+layerId = m002;
+shapes = (
+{
+closed = 1;
+nodes = (
+(446,0,l),
+(446,171,l),
+(545,171,l),
+(545,252,l),
+(446,252,l),
+(446,716,l),
+(371,716,l),
+(9,216,l),
+(35,297,l),
+(35,171,l),
+(353,171,l),
+(353,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(379,607,l),
+(353,616,l),
+(353,252,l),
+(76,252,l),
+(95,216,l)
+);
+}
+);
+userData = {
+assembly = "PUSHB[ ]	/* 1 value pushed */
+133
+CALL[ ]	/* CallFunction */
+IF[ ]	/* If */
+PUSHW[ ]	/* 5 values pushed */
+12 -6 12 12 320
+PUSHB[ ]	/* 5 values pushed */
+86 13 6 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+NPUSHB[ ]	/* 55 values pushed */
+86 18 88 12 104 12 154 12 169 12 201 12 5 76 3 76 13 148 4 3 18 1 2 8 0 12 6 3 7 5 10 11 3 7 0 12 12 13 13 202 3 4 20 3 3 4 3 13 0 2 12 13 4 7 3
+PUSHW[ ]	/* 4 values pushed */
+699 8 2 416
+NPUSHB[ ]	/* 10 values pushed */
+0 4 4 0 12 12 0 202 10 4
+PUSHW[ ]	/* 1 value pushed */
+614
+PUSHB[ ]	/* 8 values pushed */
+5 5 10 64 29 31 52 10
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+16 16 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-26
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-18
+PUSHB[ ]	/* 5 values pushed */
+13 13 6 85 10
+PUSHW[ ]	/* 1 value pushed */
+311
+NPUSHB[ ]	/* 13 values pushed */
+7 64 34 35 52 7 128 33 53 7 144 15 2
+PUSHW[ ]	/* 1 value pushed */
+-64
+NPUSHB[ ]	/* 11 values pushed */
+13 20 52 0 2 16 2 32 2 3 2
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 2
+PUSHW[ ]	/* 1 value pushed */
+-28
+PUSHB[ ]	/* 7 values pushed */
+13 13 6 85 2 181 14
+PUSHW[ ]	/* 1 value pushed */
+396
+PUSHB[ ]	/* 2 values pushed */
+139 24
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[01100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10110]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+MIRP[10100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[00110]	/* MoveIndirectRelPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[11101]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10100]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+MIRP[10110]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP1[ ]	/* SetRefPoint1 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+SRP1[ ]	/* SetRefPoint1 */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SDPVTL[1]	/* SetDualPVectorToLine */
+MDAP[0]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SFVTCA[0]	/* SetFVectorToAxis */
+RDTG[ ]	/* RoundDownToGrid */
+SRP0[ ]	/* SetRefPoint0 */
+MDRP[00100]	/* MoveDirectRelPt */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+IUP[1]	/* InterpolateUntPts */
+IUP[0]	/* InterpolateUntPts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+PUSHW[ ]	/* 2 values pushed */
+13 -34
+PUSHB[ ]	/* 3 values pushed */
+18 57 13
+PUSHW[ ]	/* 1 value pushed */
+-44
+NPUSHB[ ]	/* 11 values pushed */
+51 57 3 34 45 57 3 4 29 29 60
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+NPUSHB[ ]	/* 20 values pushed */
+12 64 11 57 12 128 80 57 12 64 38 57 12 34 28 57 12 64 45 57
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+ELSE[ ]	/* Else */
+PUSHB[ ]	/* 7 values pushed */
+12 4 9 6 3 13 2
+PUSHW[ ]	/* 1 value pushed */
+818
+PUSHB[ ]	/* 8 values pushed */
+108 13 13 4 0 12 4 5
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+RTG[ ]	/* RoundToGrid */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+MDAP[1]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[0]	/* ShiftPointByLastPoint */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IUP[0]	/* InterpolateUntPts */
+IUP[1]	/* InterpolateUntPts */
+EIF[ ]	/* EndIf */";
+};
+width = 580;
+},
+{
+color = 4;
+layerId = "283E986A-134F-4AF4-B959-DB98CF22EB16";
+metricWidth = "=610";
+shapes = (
+{
+closed = 1;
+nodes = (
+(460,0,l),
+(460,171,l),
+(559,171,l),
+(559,252,l),
+(460,252,l),
+(460,716,l),
+(385,716,l),
+(23,216,l),
+(49,297,l),
+(49,171,l),
+(367,171,l),
+(367,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(393,607,l),
+(367,616,l),
+(367,252,l),
+(90,252,l),
+(109,216,l)
+);
+}
+);
+userData = {
+assembly = "PUSHB[ ]	/* 1 value pushed */
+133
+CALL[ ]	/* CallFunction */
+IF[ ]	/* If */
+PUSHW[ ]	/* 5 values pushed */
+12 -6 12 12 320
+PUSHB[ ]	/* 5 values pushed */
+86 13 6 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+NPUSHB[ ]	/* 55 values pushed */
+86 18 88 12 104 12 154 12 169 12 201 12 5 76 3 76 13 148 4 3 18 1 2 8 0 12 6 3 7 5 10 11 3 7 0 12 12 13 13 202 3 4 20 3 3 4 3 13 0 2 12 13 4 7 3
+PUSHW[ ]	/* 4 values pushed */
+699 8 2 416
+NPUSHB[ ]	/* 10 values pushed */
+0 4 4 0 12 12 0 202 10 4
+PUSHW[ ]	/* 1 value pushed */
+614
+PUSHB[ ]	/* 8 values pushed */
+5 5 10 64 29 31 52 10
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+16 16 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-26
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-18
+PUSHB[ ]	/* 5 values pushed */
+13 13 6 85 10
+PUSHW[ ]	/* 1 value pushed */
+311
+NPUSHB[ ]	/* 13 values pushed */
+7 64 34 35 52 7 128 33 53 7 144 15 2
+PUSHW[ ]	/* 1 value pushed */
+-64
+NPUSHB[ ]	/* 11 values pushed */
+13 20 52 0 2 16 2 32 2 3 2
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 2
+PUSHW[ ]	/* 1 value pushed */
+-28
+PUSHB[ ]	/* 7 values pushed */
+13 13 6 85 2 181 14
+PUSHW[ ]	/* 1 value pushed */
+396
+PUSHB[ ]	/* 2 values pushed */
+139 24
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[01100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10110]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+MIRP[10100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[00110]	/* MoveIndirectRelPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[11101]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10100]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+MIRP[10110]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP1[ ]	/* SetRefPoint1 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+SRP1[ ]	/* SetRefPoint1 */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SDPVTL[1]	/* SetDualPVectorToLine */
+MDAP[0]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SFVTCA[0]	/* SetFVectorToAxis */
+RDTG[ ]	/* RoundDownToGrid */
+SRP0[ ]	/* SetRefPoint0 */
+MDRP[00100]	/* MoveDirectRelPt */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+IUP[1]	/* InterpolateUntPts */
+IUP[0]	/* InterpolateUntPts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+PUSHW[ ]	/* 2 values pushed */
+13 -34
+PUSHB[ ]	/* 3 values pushed */
+18 57 13
+PUSHW[ ]	/* 1 value pushed */
+-44
+NPUSHB[ ]	/* 11 values pushed */
+51 57 3 34 45 57 3 4 29 29 60
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+NPUSHB[ ]	/* 20 values pushed */
+12 64 11 57 12 128 80 57 12 64 38 57 12 34 28 57 12 64 45 57
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+ELSE[ ]	/* Else */
+PUSHB[ ]	/* 7 values pushed */
+12 4 9 6 3 13 2
+PUSHW[ ]	/* 1 value pushed */
+818
+PUSHB[ ]	/* 8 values pushed */
+108 13 13 4 0 12 4 5
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+RTG[ ]	/* RoundToGrid */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+MDAP[1]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[0]	/* ShiftPointByLastPoint */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IUP[0]	/* InterpolateUntPts */
+IUP[1]	/* InterpolateUntPts */
+EIF[ ]	/* EndIf */";
+};
+width = 610;
+},
+{
+color = 0;
+layerId = m007;
+shapes = (
+{
+closed = 1;
+nodes = (
+(393,0,l),
+(429,171,l),
+(528,171,l),
+(545,252,l),
+(446,252,l),
+(545,716,l),
+(465,716,l),
+(2,216,l),
+(45,297,l),
+(18,171,l),
+(336,171,l),
+(300,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(456,607,l),
+(431,616,l),
+(353,252,l),
+(76,252,l),
+(94,216,l)
+);
+}
+);
+userData = {
+assembly = "PUSHB[ ]	/* 1 value pushed */
+133
+CALL[ ]	/* CallFunction */
+IF[ ]	/* If */
+PUSHW[ ]	/* 5 values pushed */
+12 -6 12 12 320
+PUSHB[ ]	/* 5 values pushed */
+86 13 6 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+NPUSHB[ ]	/* 55 values pushed */
+86 18 88 12 104 12 154 12 169 12 201 12 5 76 3 76 13 148 4 3 18 1 2 8 0 12 6 3 7 5 10 11 3 7 0 12 12 13 13 202 3 4 20 3 3 4 3 13 0 2 12 13 4 7 3
+PUSHW[ ]	/* 4 values pushed */
+699 8 2 416
+NPUSHB[ ]	/* 10 values pushed */
+0 4 4 0 12 12 0 202 10 4
+PUSHW[ ]	/* 1 value pushed */
+614
+PUSHB[ ]	/* 8 values pushed */
+5 5 10 64 29 31 52 10
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+16 16 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-26
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-18
+PUSHB[ ]	/* 5 values pushed */
+13 13 6 85 10
+PUSHW[ ]	/* 1 value pushed */
+311
+NPUSHB[ ]	/* 13 values pushed */
+7 64 34 35 52 7 128 33 53 7 144 15 2
+PUSHW[ ]	/* 1 value pushed */
+-64
+NPUSHB[ ]	/* 11 values pushed */
+13 20 52 0 2 16 2 32 2 3 2
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 2
+PUSHW[ ]	/* 1 value pushed */
+-28
+PUSHB[ ]	/* 7 values pushed */
+13 13 6 85 2 181 14
+PUSHW[ ]	/* 1 value pushed */
+396
+PUSHB[ ]	/* 2 values pushed */
+139 24
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[01100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10110]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+MIRP[10100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[00110]	/* MoveIndirectRelPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[11101]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10100]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+MIRP[10110]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP1[ ]	/* SetRefPoint1 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+SRP1[ ]	/* SetRefPoint1 */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SDPVTL[1]	/* SetDualPVectorToLine */
+MDAP[0]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SFVTCA[0]	/* SetFVectorToAxis */
+RDTG[ ]	/* RoundDownToGrid */
+SRP0[ ]	/* SetRefPoint0 */
+MDRP[00100]	/* MoveDirectRelPt */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+IUP[1]	/* InterpolateUntPts */
+IUP[0]	/* InterpolateUntPts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+PUSHW[ ]	/* 2 values pushed */
+13 -34
+PUSHB[ ]	/* 3 values pushed */
+18 57 13
+PUSHW[ ]	/* 1 value pushed */
+-44
+NPUSHB[ ]	/* 11 values pushed */
+51 57 3 34 45 57 3 4 29 29 60
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+NPUSHB[ ]	/* 20 values pushed */
+12 64 11 57 12 128 80 57 12 64 38 57 12 34 28 57 12 64 45 57
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+ELSE[ ]	/* Else */
+PUSHB[ ]	/* 7 values pushed */
+12 4 9 6 3 13 2
+PUSHW[ ]	/* 1 value pushed */
+818
+PUSHB[ ]	/* 8 values pushed */
+108 13 13 4 0 12 4 5
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+RTG[ ]	/* RoundToGrid */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+MDAP[1]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[0]	/* ShiftPointByLastPoint */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IUP[0]	/* InterpolateUntPts */
+IUP[1]	/* InterpolateUntPts */
+EIF[ ]	/* EndIf */";
+};
+width = 583;
+},
+{
+color = 0;
+layerId = m011;
+metricWidth = "=610";
+shapes = (
+{
+closed = 1;
+nodes = (
+(405,0,l),
+(441,171,l),
+(540,171,l),
+(557,252,l),
+(458,252,l),
+(557,716,l),
+(477,716,l),
+(14,216,l),
+(57,297,l),
+(30,171,l),
+(348,171,l),
+(312,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(468,607,l),
+(443,616,l),
+(365,252,l),
+(88,252,l),
+(106,216,l)
+);
+}
+);
+userData = {
+assembly = "PUSHB[ ]	/* 1 value pushed */
+133
+CALL[ ]	/* CallFunction */
+IF[ ]	/* If */
+PUSHW[ ]	/* 5 values pushed */
+12 -6 12 12 320
+PUSHB[ ]	/* 5 values pushed */
+86 13 6 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+NPUSHB[ ]	/* 55 values pushed */
+86 18 88 12 104 12 154 12 169 12 201 12 5 76 3 76 13 148 4 3 18 1 2 8 0 12 6 3 7 5 10 11 3 7 0 12 12 13 13 202 3 4 20 3 3 4 3 13 0 2 12 13 4 7 3
+PUSHW[ ]	/* 4 values pushed */
+699 8 2 416
+NPUSHB[ ]	/* 10 values pushed */
+0 4 4 0 12 12 0 202 10 4
+PUSHW[ ]	/* 1 value pushed */
+614
+PUSHB[ ]	/* 8 values pushed */
+5 5 10 64 29 31 52 10
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+16 16 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-26
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-18
+PUSHB[ ]	/* 5 values pushed */
+13 13 6 85 10
+PUSHW[ ]	/* 1 value pushed */
+311
+NPUSHB[ ]	/* 13 values pushed */
+7 64 34 35 52 7 128 33 53 7 144 15 2
+PUSHW[ ]	/* 1 value pushed */
+-64
+NPUSHB[ ]	/* 11 values pushed */
+13 20 52 0 2 16 2 32 2 3 2
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 2
+PUSHW[ ]	/* 1 value pushed */
+-28
+PUSHB[ ]	/* 7 values pushed */
+13 13 6 85 2 181 14
+PUSHW[ ]	/* 1 value pushed */
+396
+PUSHB[ ]	/* 2 values pushed */
+139 24
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[01100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10110]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+MIRP[10100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[00110]	/* MoveIndirectRelPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[11101]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10100]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+MIRP[10110]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP1[ ]	/* SetRefPoint1 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+SRP1[ ]	/* SetRefPoint1 */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SDPVTL[1]	/* SetDualPVectorToLine */
+MDAP[0]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SFVTCA[0]	/* SetFVectorToAxis */
+RDTG[ ]	/* RoundDownToGrid */
+SRP0[ ]	/* SetRefPoint0 */
+MDRP[00100]	/* MoveDirectRelPt */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+IUP[1]	/* InterpolateUntPts */
+IUP[0]	/* InterpolateUntPts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+PUSHW[ ]	/* 2 values pushed */
+13 -34
+PUSHB[ ]	/* 3 values pushed */
+18 57 13
+PUSHW[ ]	/* 1 value pushed */
+-44
+NPUSHB[ ]	/* 11 values pushed */
+51 57 3 34 45 57 3 4 29 29 60
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+NPUSHB[ ]	/* 20 values pushed */
+12 64 11 57 12 128 80 57 12 64 38 57 12 34 28 57 12 64 45 57
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+ELSE[ ]	/* Else */
+PUSHB[ ]	/* 7 values pushed */
+12 4 9 6 3 13 2
+PUSHW[ ]	/* 1 value pushed */
+818
+PUSHB[ ]	/* 8 values pushed */
+108 13 13 4 0 12 4 5
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+RTG[ ]	/* RoundToGrid */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+MDAP[1]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[0]	/* ShiftPointByLastPoint */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IUP[0]	/* InterpolateUntPts */
+IUP[1]	/* InterpolateUntPts */
+EIF[ ]	/* EndIf */";
+};
+width = 610;
+},
+{
+color = 9;
+layerId = "C0DE1129-6E49-4675-B2A9-508BF322FAF7";
+shapes = (
+{
+closed = 1;
+nodes = (
+(476,0,l),
+(476,147,l),
+(565,147,l),
+(565,272,l),
+(476,272,l),
+(476,716,l),
+(351,716,l),
+(2,237,l),
+(27,321,l),
+(27,147,l),
+(331,147,l),
+(331,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(385,589,l),
+(331,616,l),
+(331,272,l),
+(68,272,l),
+(113,214,l)
+);
+}
+);
+userData = {
+assembly = "PUSHB[ ]	/* 1 value pushed */
+133
+CALL[ ]	/* CallFunction */
+IF[ ]	/* If */
+PUSHW[ ]	/* 5 values pushed */
+12 -6 12 12 320
+PUSHB[ ]	/* 5 values pushed */
+86 13 6 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+NPUSHB[ ]	/* 55 values pushed */
+86 18 88 12 104 12 154 12 169 12 201 12 5 76 3 76 13 148 4 3 18 1 2 8 0 12 6 3 7 5 10 11 3 7 0 12 12 13 13 202 3 4 20 3 3 4 3 13 0 2 12 13 4 7 3
+PUSHW[ ]	/* 4 values pushed */
+699 8 2 416
+NPUSHB[ ]	/* 10 values pushed */
+0 4 4 0 12 12 0 202 10 4
+PUSHW[ ]	/* 1 value pushed */
+614
+PUSHB[ ]	/* 8 values pushed */
+5 5 10 64 29 31 52 10
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+16 16 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-26
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-18
+PUSHB[ ]	/* 5 values pushed */
+13 13 6 85 10
+PUSHW[ ]	/* 1 value pushed */
+311
+NPUSHB[ ]	/* 13 values pushed */
+7 64 34 35 52 7 128 33 53 7 144 15 2
+PUSHW[ ]	/* 1 value pushed */
+-64
+NPUSHB[ ]	/* 11 values pushed */
+13 20 52 0 2 16 2 32 2 3 2
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 2
+PUSHW[ ]	/* 1 value pushed */
+-28
+PUSHB[ ]	/* 7 values pushed */
+13 13 6 85 2 181 14
+PUSHW[ ]	/* 1 value pushed */
+396
+PUSHB[ ]	/* 2 values pushed */
+139 24
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[01100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10110]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+MIRP[10100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[00110]	/* MoveIndirectRelPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[11101]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10100]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+MIRP[10110]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP1[ ]	/* SetRefPoint1 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+SRP1[ ]	/* SetRefPoint1 */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SDPVTL[1]	/* SetDualPVectorToLine */
+MDAP[0]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SFVTCA[0]	/* SetFVectorToAxis */
+RDTG[ ]	/* RoundDownToGrid */
+SRP0[ ]	/* SetRefPoint0 */
+MDRP[00100]	/* MoveDirectRelPt */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+IUP[1]	/* InterpolateUntPts */
+IUP[0]	/* InterpolateUntPts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+PUSHW[ ]	/* 2 values pushed */
+13 -34
+PUSHB[ ]	/* 3 values pushed */
+18 57 13
+PUSHW[ ]	/* 1 value pushed */
+-44
+NPUSHB[ ]	/* 11 values pushed */
+51 57 3 34 45 57 3 4 29 29 60
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+NPUSHB[ ]	/* 20 values pushed */
+12 64 11 57 12 128 80 57 12 64 38 57 12 34 28 57 12 64 45 57
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+ELSE[ ]	/* Else */
+PUSHB[ ]	/* 7 values pushed */
+12 4 9 6 3 13 2
+PUSHW[ ]	/* 1 value pushed */
+818
+PUSHB[ ]	/* 8 values pushed */
+108 13 13 4 0 12 4 5
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+RTG[ ]	/* RoundToGrid */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+MDAP[1]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[0]	/* ShiftPointByLastPoint */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IUP[0]	/* InterpolateUntPts */
+IUP[1]	/* InterpolateUntPts */
+EIF[ ]	/* EndIf */";
+};
+width = 603;
+},
+{
+color = 0;
+layerId = "EA6155C1-32E8-43BD-AFDA-FC2A403D1133";
+shapes = (
+{
+closed = 1;
+nodes = (
+(423,0,l),
+(454,147,l),
+(542,147,l),
+(569,272,l),
+(480,272,l),
+(575,716,l),
+(445,716,l),
+(-1,237,l),
+(42,321,l),
+(5,147,l),
+(308,147,l),
+(278,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(455,587,l),
+(409,616,l),
+(335,272,l),
+(73,272,l),
+(107,212,l)
+);
+}
+);
+userData = {
+assembly = "PUSHB[ ]	/* 1 value pushed */
+133
+CALL[ ]	/* CallFunction */
+IF[ ]	/* If */
+PUSHW[ ]	/* 5 values pushed */
+12 -6 12 12 320
+PUSHB[ ]	/* 5 values pushed */
+86 13 6 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+NPUSHB[ ]	/* 55 values pushed */
+86 18 88 12 104 12 154 12 169 12 201 12 5 76 3 76 13 148 4 3 18 1 2 8 0 12 6 3 7 5 10 11 3 7 0 12 12 13 13 202 3 4 20 3 3 4 3 13 0 2 12 13 4 7 3
+PUSHW[ ]	/* 4 values pushed */
+699 8 2 416
+NPUSHB[ ]	/* 10 values pushed */
+0 4 4 0 12 12 0 202 10 4
+PUSHW[ ]	/* 1 value pushed */
+614
+PUSHB[ ]	/* 8 values pushed */
+5 5 10 64 29 31 52 10
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+16 16 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-26
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-18
+PUSHB[ ]	/* 5 values pushed */
+13 13 6 85 10
+PUSHW[ ]	/* 1 value pushed */
+311
+NPUSHB[ ]	/* 13 values pushed */
+7 64 34 35 52 7 128 33 53 7 144 15 2
+PUSHW[ ]	/* 1 value pushed */
+-64
+NPUSHB[ ]	/* 11 values pushed */
+13 20 52 0 2 16 2 32 2 3 2
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 2
+PUSHW[ ]	/* 1 value pushed */
+-28
+PUSHB[ ]	/* 7 values pushed */
+13 13 6 85 2 181 14
+PUSHW[ ]	/* 1 value pushed */
+396
+PUSHB[ ]	/* 2 values pushed */
+139 24
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[01100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10110]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+MIRP[10100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[00110]	/* MoveIndirectRelPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[11101]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10100]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+MIRP[10110]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP1[ ]	/* SetRefPoint1 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+SRP1[ ]	/* SetRefPoint1 */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SDPVTL[1]	/* SetDualPVectorToLine */
+MDAP[0]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SFVTCA[0]	/* SetFVectorToAxis */
+RDTG[ ]	/* RoundDownToGrid */
+SRP0[ ]	/* SetRefPoint0 */
+MDRP[00100]	/* MoveDirectRelPt */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+IUP[1]	/* InterpolateUntPts */
+IUP[0]	/* InterpolateUntPts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+PUSHW[ ]	/* 2 values pushed */
+13 -34
+PUSHB[ ]	/* 3 values pushed */
+18 57 13
+PUSHW[ ]	/* 1 value pushed */
+-44
+NPUSHB[ ]	/* 11 values pushed */
+51 57 3 34 45 57 3 4 29 29 60
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+NPUSHB[ ]	/* 20 values pushed */
+12 64 11 57 12 128 80 57 12 64 38 57 12 34 28 57 12 64 45 57
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+ELSE[ ]	/* Else */
+PUSHB[ ]	/* 7 values pushed */
+12 4 9 6 3 13 2
+PUSHW[ ]	/* 1 value pushed */
+818
+PUSHB[ ]	/* 8 values pushed */
+108 13 13 4 0 12 4 5
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+RTG[ ]	/* RoundToGrid */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+MDAP[1]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[0]	/* ShiftPointByLastPoint */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IUP[0]	/* InterpolateUntPts */
+IUP[1]	/* InterpolateUntPts */
+EIF[ ]	/* EndIf */";
+};
+width = 605;
+},
+{
+color = 4;
+layerId = "C747008B-1B1C-4AB9-9FA6-868414989717";
+shapes = (
+{
+closed = 1;
+nodes = (
+(490,0,l),
+(490,147,l),
+(579,147,l),
+(579,272,l),
+(490,272,l),
+(490,716,l),
+(365,716,l),
+(15,237,l),
+(41,321,l),
+(41,147,l),
+(345,147,l),
+(345,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(398,589,l),
+(345,616,l),
+(345,272,l),
+(82,272,l),
+(127,213,l)
+);
+}
+);
+userData = {
+assembly = "PUSHB[ ]	/* 1 value pushed */
+133
+CALL[ ]	/* CallFunction */
+IF[ ]	/* If */
+PUSHW[ ]	/* 5 values pushed */
+12 -6 12 12 320
+PUSHB[ ]	/* 5 values pushed */
+86 13 6 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+NPUSHB[ ]	/* 55 values pushed */
+86 18 88 12 104 12 154 12 169 12 201 12 5 76 3 76 13 148 4 3 18 1 2 8 0 12 6 3 7 5 10 11 3 7 0 12 12 13 13 202 3 4 20 3 3 4 3 13 0 2 12 13 4 7 3
+PUSHW[ ]	/* 4 values pushed */
+699 8 2 416
+NPUSHB[ ]	/* 10 values pushed */
+0 4 4 0 12 12 0 202 10 4
+PUSHW[ ]	/* 1 value pushed */
+614
+PUSHB[ ]	/* 8 values pushed */
+5 5 10 64 29 31 52 10
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+16 16 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-26
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-18
+PUSHB[ ]	/* 5 values pushed */
+13 13 6 85 10
+PUSHW[ ]	/* 1 value pushed */
+311
+NPUSHB[ ]	/* 13 values pushed */
+7 64 34 35 52 7 128 33 53 7 144 15 2
+PUSHW[ ]	/* 1 value pushed */
+-64
+NPUSHB[ ]	/* 11 values pushed */
+13 20 52 0 2 16 2 32 2 3 2
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 2
+PUSHW[ ]	/* 1 value pushed */
+-28
+PUSHB[ ]	/* 7 values pushed */
+13 13 6 85 2 181 14
+PUSHW[ ]	/* 1 value pushed */
+396
+PUSHB[ ]	/* 2 values pushed */
+139 24
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[01100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10110]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+MIRP[10100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[00110]	/* MoveIndirectRelPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[11101]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10100]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+MIRP[10110]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP1[ ]	/* SetRefPoint1 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+SRP1[ ]	/* SetRefPoint1 */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SDPVTL[1]	/* SetDualPVectorToLine */
+MDAP[0]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SFVTCA[0]	/* SetFVectorToAxis */
+RDTG[ ]	/* RoundDownToGrid */
+SRP0[ ]	/* SetRefPoint0 */
+MDRP[00100]	/* MoveDirectRelPt */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+IUP[1]	/* InterpolateUntPts */
+IUP[0]	/* InterpolateUntPts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+PUSHW[ ]	/* 2 values pushed */
+13 -34
+PUSHB[ ]	/* 3 values pushed */
+18 57 13
+PUSHW[ ]	/* 1 value pushed */
+-44
+NPUSHB[ ]	/* 11 values pushed */
+51 57 3 34 45 57 3 4 29 29 60
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+NPUSHB[ ]	/* 20 values pushed */
+12 64 11 57 12 128 80 57 12 64 38 57 12 34 28 57 12 64 45 57
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+ELSE[ ]	/* Else */
+PUSHB[ ]	/* 7 values pushed */
+12 4 9 6 3 13 2
+PUSHW[ ]	/* 1 value pushed */
+818
+PUSHB[ ]	/* 8 values pushed */
+108 13 13 4 0 12 4 5
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+RTG[ ]	/* RoundToGrid */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+MDAP[1]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[0]	/* ShiftPointByLastPoint */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IUP[0]	/* InterpolateUntPts */
+IUP[1]	/* InterpolateUntPts */
+EIF[ ]	/* EndIf */";
+};
+width = 610;
+},
+{
+color = 0;
+layerId = "98E14B20-1145-4070-88D8-1056D0FA6849";
+shapes = (
+{
+closed = 1;
+nodes = (
+(435,0,l),
+(467,147,l),
+(556,147,l),
+(582,272,l),
+(493,272,l),
+(587,716,l),
+(457,716,l),
+(11,237,l),
+(54,321,l),
+(18,147,l),
+(322,147,l),
+(290,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(467,587,l),
+(421,616,l),
+(348,272,l),
+(85,272,l),
+(120,212,l)
+);
+}
+);
+userData = {
+assembly = "PUSHB[ ]	/* 1 value pushed */
+133
+CALL[ ]	/* CallFunction */
+IF[ ]	/* If */
+PUSHW[ ]	/* 5 values pushed */
+12 -6 12 12 320
+PUSHB[ ]	/* 5 values pushed */
+86 13 6 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 12 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 14 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 12 12
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 11 11
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 7 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 8 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 5 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 6 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 9 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+PUSHB[ ]	/* 5 values pushed */
+86 10 8 13 13
+PUSHW[ ]	/* 1 value pushed */
+320
+NPUSHB[ ]	/* 55 values pushed */
+86 18 88 12 104 12 154 12 169 12 201 12 5 76 3 76 13 148 4 3 18 1 2 8 0 12 6 3 7 5 10 11 3 7 0 12 12 13 13 202 3 4 20 3 3 4 3 13 0 2 12 13 4 7 3
+PUSHW[ ]	/* 4 values pushed */
+699 8 2 416
+NPUSHB[ ]	/* 10 values pushed */
+0 4 4 0 12 12 0 202 10 4
+PUSHW[ ]	/* 1 value pushed */
+614
+PUSHB[ ]	/* 8 values pushed */
+5 5 10 64 29 31 52 10
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+16 16 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-26
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 10
+PUSHW[ ]	/* 1 value pushed */
+-18
+PUSHB[ ]	/* 5 values pushed */
+13 13 6 85 10
+PUSHW[ ]	/* 1 value pushed */
+311
+NPUSHB[ ]	/* 13 values pushed */
+7 64 34 35 52 7 128 33 53 7 144 15 2
+PUSHW[ ]	/* 1 value pushed */
+-64
+NPUSHB[ ]	/* 11 values pushed */
+13 20 52 0 2 16 2 32 2 3 2
+PUSHW[ ]	/* 1 value pushed */
+-32
+PUSHB[ ]	/* 5 values pushed */
+13 13 2 85 2
+PUSHW[ ]	/* 1 value pushed */
+-28
+PUSHB[ ]	/* 7 values pushed */
+13 13 6 85 2 181 14
+PUSHW[ ]	/* 1 value pushed */
+396
+PUSHB[ ]	/* 2 values pushed */
+139 24
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[01100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+CALL[ ]	/* CallFunction */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10110]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+MIRP[10100]	/* MoveIndirectRelPt */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[00110]	/* MoveIndirectRelPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[11101]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP0[ ]	/* SetRefPoint0 */
+MIRP[10100]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+MIRP[10110]	/* MoveIndirectRelPt */
+ALIGNRP[ ]	/* AlignRelativePt */
+SRP1[ ]	/* SetRefPoint1 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+SRP1[ ]	/* SetRefPoint1 */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IP[ ]	/* InterpolatePts */
+SDPVTL[1]	/* SetDualPVectorToLine */
+MDAP[0]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SFVTCA[0]	/* SetFVectorToAxis */
+RDTG[ ]	/* RoundDownToGrid */
+SRP0[ ]	/* SetRefPoint0 */
+MDRP[00100]	/* MoveDirectRelPt */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+ISECT[ ]	/* MovePtToIntersect */
+IUP[1]	/* InterpolateUntPts */
+IUP[0]	/* InterpolateUntPts */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+PUSHW[ ]	/* 2 values pushed */
+13 -34
+PUSHB[ ]	/* 3 values pushed */
+18 57 13
+PUSHW[ ]	/* 1 value pushed */
+-44
+NPUSHB[ ]	/* 11 values pushed */
+51 57 3 34 45 57 3 4 29 29 60
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+DELTAP1[ ]	/* DeltaExceptionP1 */
+RS[ ]	/* ReadStore */
+NOT[ ]	/* LogicalNot */
+IF[ ]	/* If */
+NPUSHB[ ]	/* 20 values pushed */
+12 64 11 57 12 128 80 57 12 64 38 57 12 34 28 57 12 64 45 57
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+EIF[ ]	/* EndIf */
+SVTCA[1]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+CALL[ ]	/* CallFunction */
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+CALL[ ]	/* CallFunction */
+ELSE[ ]	/* Else */
+PUSHB[ ]	/* 7 values pushed */
+12 4 9 6 3 13 2
+PUSHW[ ]	/* 1 value pushed */
+818
+PUSHB[ ]	/* 8 values pushed */
+108 13 13 4 0 12 4 5
+SVTCA[0]	/* SetFreedomAndProjectionVectorToAxis */
+RTG[ ]	/* RoundToGrid */
+MIAP[1]	/* MoveIndirectAbsPt */
+MIAP[1]	/* MoveIndirectAbsPt */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+MDAP[1]	/* MoveDirectAbsPt */
+CALL[ ]	/* CallFunction */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[1]	/* ShiftPointByLastPoint */
+SHP[0]	/* ShiftPointByLastPoint */
+SRP2[ ]	/* SetRefPoint2 */
+IP[ ]	/* InterpolatePts */
+IUP[0]	/* InterpolateUntPts */
+IUP[1]	/* InterpolateUntPts */
+EIF[ ]	/* EndIf */";
+};
+width = 610;
+},
+{
+color = 0;
+layerId = "0D541326-2E2C-438C-A379-7222465DC193";
+shapes = (
+{
+closed = 1;
+nodes = (
+(444,0,l),
+(444,173,l),
+(544,173,l),
+(544,250,l),
+(444,250,l),
+(444,716,l),
+(374,716,l),
+(11,214,l),
+(37,295,l),
+(37,173,l),
+(356,173,l),
+(356,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(380,609,l),
+(356,616,l),
+(356,250,l),
+(78,250,l),
+(94,216,l)
+);
+}
+);
+width = 580;
+},
+{
+color = 0;
+layerId = "60D07740-06F6-419A-9D45-C690C7D56FDA";
+shapes = (
+{
+closed = 1;
+nodes = (
+(391,0,l),
+(428,173,l),
+(528,173,l),
+(544,250,l),
+(444,250,l),
+(543,716,l),
+(468,716,l),
+(3,214,l),
+(46,295,l),
+(20,173,l),
+(340,173,l),
+(303,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(457,609,l),
+(434,616,l),
+(356,250,l),
+(77,250,l),
+(94,216,l)
+);
+}
+);
+width = 583;
+},
+{
+color = 1;
+layerId = "727DBAE4-FEC3-411D-9C56-8C5269236B22";
+shapes = (
+{
+closed = 1;
+nodes = (
+(472,0,l),
+(472,152,l),
+(563,152,l),
+(563,268,l),
+(472,268,l),
+(472,716,l),
+(357,716,l),
+(6,233,l),
+(31,316,l),
+(31,152,l),
+(337,152,l),
+(337,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(386,592,l),
+(337,616,l),
+(337,268,l),
+(72,268,l),
+(112,214,l)
+);
+}
+);
+width = 603;
+},
+{
+color = 0;
+layerId = "00865881-094F-4321-A9AD-266CDAC40971";
+shapes = (
+{
+closed = 1;
+nodes = (
+(419,0,l),
+(451,152,l),
+(541,152,l),
+(567,268,l),
+(476,268,l),
+(571,716,l),
+(451,716,l),
+(2,233,l),
+(45,316,l),
+(10,152,l),
+(315,152,l),
+(284,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(457,591,l),
+(415,616,l),
+(341,268,l),
+(76,268,l),
+(107,213,l)
+);
+}
+);
+width = 605;
+},
+{
+color = 1;
+layerId = "1B74EF21-5EB0-4AD3-94C8-1B1655792275";
+shapes = (
+{
+closed = 1;
+nodes = (
+(458,0,l),
+(458,173,l),
+(558,173,l),
+(558,250,l),
+(458,250,l),
+(458,716,l),
+(388,716,l),
+(25,214,l),
+(51,295,l),
+(51,173,l),
+(370,173,l),
+(370,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(394,609,l),
+(370,616,l),
+(370,250,l),
+(92,250,l),
+(108,216,l)
+);
+}
+);
+width = 610;
+},
+{
+color = 0;
+layerId = "0BE41063-9095-4523-A280-0B98DCAAC820";
+shapes = (
+{
+closed = 1;
+nodes = (
+(404,0,l),
+(441,173,l),
+(540,173,l),
+(557,250,l),
+(457,250,l),
+(556,716,l),
+(481,716,l),
+(16,214,l),
+(59,295,l),
+(33,173,l),
+(352,173,l),
+(316,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(470,609,l),
+(447,616,l),
+(369,250,l),
+(90,250,l),
+(107,216,l)
+);
+}
+);
+width = 610;
+},
+{
+color = 1;
+layerId = "C7C1C228-45D2-419D-A192-4885648E3F6B";
+shapes = (
+{
+closed = 1;
+nodes = (
+(484,0,l),
+(484,152,l),
+(575,152,l),
+(575,268,l),
+(484,268,l),
+(484,716,l),
+(369,716,l),
+(17,233,l),
+(43,316,l),
+(43,152,l),
+(349,152,l),
+(349,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(397,592,l),
+(349,616,l),
+(349,268,l),
+(84,268,l),
+(124,214,l)
+);
+}
+);
+width = 610;
+},
+{
+color = 0;
+layerId = "2E135EE0-ED80-444C-9DE8-11A0454B2814";
+shapes = (
+{
+closed = 1;
+nodes = (
+(429,0,l),
+(462,152,l),
+(553,152,l),
+(577,268,l),
+(486,268,l),
+(581,716,l),
+(461,716,l),
+(12,233,l),
+(55,316,l),
+(20,152,l),
+(327,152,l),
+(294,0,l)
+);
+},
+{
+closed = 1;
+nodes = (
+(467,591,l),
+(425,616,l),
+(351,268,l),
+(86,268,l),
+(117,213,l)
+);
+}
+);
+width = 610;
+}
+);
+note = uni0034;
+unicode = 52;
+}

@@ -11,7 +11,7 @@ def test_step_filter_is_exact_color_index_predicate() -> None:
 
 def test_build_group_one_filter_per_step_plus_none() -> None:
     group = filters.build_filter_group([(8, "Outline"), (4, "Anchors")], none_label="Untouched")
-    assert group["name"] == "AZ-Colorflow"
+    assert group["name"] == "AZ Colorflow"
     items = group["subGroup"]
     assert [item["predicate"] for item in items] == [
         "colorIndex == 8", "colorIndex == 4", f"colorIndex == {filters.NO_COLOR_INDEX}"]
@@ -33,10 +33,10 @@ def test_build_group_blank_label_falls_back_to_index() -> None:
 
 def test_merge_replaces_previous_group_and_keeps_others() -> None:
     existing = [{"name": "My filter", "predicate": "name LIKE 'a*'"},
-                {"name": "AZ-Colorflow", "subGroup": [{"name": "old"}]}]
+                {"name": "AZ Colorflow", "subGroup": [{"name": "old"}]}]
     group = filters.build_filter_group([(0, "Step")])
     merged = filters.merge_into_filters(existing, group)
-    assert [entry["name"] for entry in merged] == ["My filter", "AZ-Colorflow"]   # one AZ-Colorflow only
+    assert [entry["name"] for entry in merged] == ["My filter", "AZ Colorflow"]   # one AZ Colorflow only
     assert merged[-1]["subGroup"][0]["predicate"] == "colorIndex == 0"          # the new one
 
 

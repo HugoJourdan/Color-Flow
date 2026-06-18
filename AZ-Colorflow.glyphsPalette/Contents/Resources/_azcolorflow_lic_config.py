@@ -4,7 +4,7 @@ Edit glyphs_licensing/suite.py, then re-run: python setup.py config azcolorflow
 from _azcolorflow_lic.bootstrap import LicenseConfig
 
 CONFIG = LicenseConfig(
-    product='AZ-Colorflow',
+    product='AZ Colorflow',
     defaults_prefix='com.hugojourdan.AZColorflow',
     buy_url='https://hugojourdan.lemonsqueezy.com/checkout/buy/609c199f-4fb3-4d7a-acc9-cfb879be1734',
 )

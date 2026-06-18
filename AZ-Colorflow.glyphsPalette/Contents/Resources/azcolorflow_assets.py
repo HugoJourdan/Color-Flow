@@ -3656,7 +3656,7 @@ DASHBOARD_JS = r"""
       header() + toolbar()
       + '<div id="cfd-main"><aside id="cfd-tower" aria-label="Masters"><canvas id="cfd-tower-cv" width="240" height="560"></canvas></aside><div id="cfd-body"></div></div>'
       + '<footer class="ft"><span class="ft-l">'+esc(H.fileName)+' · v'+esc(H.version)+'</span>'
-      + '<span class="ft-r">AZ-Colorflow Report — '+esc(H.generated)+'</span></footer>';
+      + '<span class="ft-r">AZ Colorflow Report — '+esc(H.generated)+'</span></footer>';
     bind(); update(); initTower();
     window.__cfdExport = { csv: exportCSV, json: exportJSON, rows: exportRows, printHTML: buildPrintReport };
     // After the first paint the bars have run their fill animation once; stop

@@ -294,7 +294,7 @@ class _AZColorflowLoaderBar(AppKit.NSView):
 #																									   #
 ########################################################################################################
 
-_SHORTCUT_GROUP = "AZ-Colorflow"
+_SHORTCUT_GROUP = "AZ Colorflow"
 _SHORTCUT_ID_PREFIX = "com.hugojourdan.AZColorflow."
 _SHORTCUT_COUNTS_KEY = "com.hugojourdan.AZColorflow-counts-"
 
@@ -728,7 +728,7 @@ COLORFLOW_SETTINGS_CHANGED = "AZColorflowSettingsChanged"
 # -addViewController: makes the tab identifier = vc.representedObject and the label =
 # vc.title, and showMainPreferencesWithIdentifier: selects the tab by that identifier. So
 # we set representedObject = title = this string, and jump to the same string.
-COLORFLOW_PREF_IDENTIFIER = "AZ-Colorflow"
+COLORFLOW_PREF_IDENTIFIER = "AZ Colorflow"
 
 # Registered exactly once per app session (palettes instantiate once per document window). The VC is
 # held module-globally so AppKit does not deallocate it out from under the Settings window.
@@ -1575,7 +1575,7 @@ class AZColorflow(PalettePlugin):
 		# (no palette instance) can consult the same licence state.
 		global _SHARED_ENT
 		_SHARED_ENT = self._ent
-		self.name = 'AZ-Colorflow'
+		self.name = 'AZ Colorflow'
 		self.init = False
 		self.colorKeys = {
 						"0":(0.85, 0.26, 0.06, 0.5),

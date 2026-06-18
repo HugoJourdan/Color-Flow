@@ -188,7 +188,7 @@ def test_settings_pane_vc_title_is_color_flow() -> None:
     # = vc.representedObject and the label = vc.title. So both title and representedObject
     # are "Color Flow" (the string showMainPreferencesWithIdentifier: matches).
     assert "class AZColorflowPreferencesController(AppKit.NSViewController):" in PLUGIN_SOURCE
-    assert 'COLORFLOW_PREF_IDENTIFIER = "AZ-Colorflow"' in PLUGIN_SOURCE
+    assert 'COLORFLOW_PREF_IDENTIFIER = "AZ Colorflow"' in PLUGIN_SOURCE
     reg = _module_function_body("_register_preferences_pane")
     assert "view_controller.setTitle_(COLORFLOW_PREF_IDENTIFIER)" in reg
     assert "view_controller.setRepresentedObject_(COLORFLOW_PREF_IDENTIFIER)" in reg
@@ -563,7 +563,7 @@ def test_register_uses_gscallbackhandler_api_unassigned() -> None:
 
 def test_register_covers_only_jump_command_in_one_group() -> None:
     body = _module_function_body("_register_native_shortcuts")
-    assert '_SHORTCUT_GROUP = "AZ-Colorflow"' in PLUGIN_SOURCE
+    assert '_SHORTCUT_GROUP = "AZ Colorflow"' in PLUGIN_SOURCE
     assert '_SHORTCUT_ID_PREFIX = "com.hugojourdan.AZColorflow."' in PLUGIN_SOURCE
     # Exactly one command: the jump (Hugo's wording), no step toggles.
     assert '"Jump to next color glyph"' in body
