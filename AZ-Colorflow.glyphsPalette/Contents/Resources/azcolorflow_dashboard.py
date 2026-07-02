@@ -374,7 +374,7 @@ def _stash_corrupt_history(font, raw: object) -> None:
     if _read_user_data(font, backup_key) is None:
         _write_user_data(font, backup_key, str(raw))
     print(
-        "Color Flow: this font's embedded timeline history could not be decoded; "
+        "AZ Colorflow: this font's embedded timeline history could not be decoded; "
         f"the raw payload was preserved in userData[{backup_key!r}]."
     )
 
@@ -1480,7 +1480,7 @@ def main(font=None, progress=None, open_when_done: bool = True) -> Path | None:
 
     base = Path(font.filepath).stem if font.filepath else (font.familyName or "font")
     base = re.sub(r"[/\\:]+", "-", base)   # family names may contain path separators
-    out_path = Path(tempfile.gettempdir()) / f"{now.strftime('%Y%m%d')} {base} — Color Flow.html"
+    out_path = Path(tempfile.gettempdir()) / f"{now.strftime('%Y%m%d')} {base} — AZ Colorflow.html"
     try:
         out_path.write_text(html, encoding="utf-8")
     except OSError as error:

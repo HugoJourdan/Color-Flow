@@ -2545,8 +2545,8 @@ DASHBOARD_JS = r"""
       + '<div class="tl-seed-head">Building your timeline</div>'
       + skeleton
       + '<p class="tl-seed-sub">'+(byCommit
-          ? "Color Flow reads a snapshot from each git commit. The chart unlocks at 2 commits of history."
-          : "Color Flow saves a snapshot each time you save the font. The chart unlocks at 2 days of history.")+'</p>'
+          ? "AZ Colorflow reads a snapshot from each git commit. The chart unlocks at 2 commits of history."
+          : "AZ Colorflow saves a snapshot each time you save the font. The chart unlocks at 2 days of history.")+'</p>'
       + '<div class="tl-seed-locks">'+locks+'</div>'
       + histMeter
       + '</section>';
@@ -3170,7 +3170,7 @@ DASHBOARD_JS = r"""
     add("psec-coverage", "Coverage by category", printCoverageRows());
     add("psec-timeline", "Progress over time", timelineView());
     return '<section class="pcover"><div class="pcover-ttl">'+esc(H.family)+'</div>'
-      + '<div class="pcover-sub">Color Flow report · '+esc(H.fileName)+' · v'+esc(H.version)+' · '+esc(H.generated)+'</div>'
+      + '<div class="pcover-sub">AZ Colorflow report · '+esc(H.fileName)+' · v'+esc(H.version)+' · '+esc(H.generated)+'</div>'
       + '<nav class="ptabs" aria-label="Contents">'+toc.join("")+'</nav></section>' + secs;
   }
   function printReport(){

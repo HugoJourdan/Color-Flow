@@ -305,7 +305,7 @@ def _jump_to_next_unfinished() -> None:
 		return
 	font = Glyphs.font
 	if font is None:
-		Message("Open a font first.", title="Color Flow")
+		Message("Open a font first.", title="AZ Colorflow")
 		return
 	master = font.selectedFontMaster
 	if master is None:
@@ -331,7 +331,7 @@ def _jump_to_next_unfinished() -> None:
 			position = names.index(current)
 	index = colornav.next_unfinished_index(pairs, final_step, position)
 	if index is None:
-		Message("All glyphs finished.", title="Color Flow")
+		Message("All glyphs finished.", title="AZ Colorflow")
 		return
 	font.newTab("/" + names[index])
 
@@ -351,7 +351,7 @@ class AZColorflowShortcutHandler(NSObject):
 			_jump_to_next_unfinished()
 		except Exception:
 			import traceback
-			print("Color Flow [jump shortcut] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [jump shortcut] error:\n" + traceback.format_exc())
 
 
 def _register_native_shortcuts() -> None:
@@ -384,7 +384,7 @@ def _register_native_shortcuts() -> None:
 	)
 
 
-_RAINBOW_MENU_TITLE = "Color Flow: Font Glyph Order"
+_RAINBOW_MENU_TITLE = "AZ Colorflow: Font Glyph Order"
 
 
 class AZColorflowRainbowMenuHandler(NSObject):
@@ -429,7 +429,7 @@ class AZColorflowRainbowMenuHandler(NSObject):
 			self._fontview.toggle(font)
 		except Exception:
 			import traceback
-			print("Color Flow [Rainbow toggle] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [Rainbow toggle] error:\n" + traceback.format_exc())
 
 
 def _install_rainbow_menu() -> None:
@@ -568,7 +568,7 @@ def _cf_setColorIndex_(self, color_index) -> None:
 					pass
 	except Exception:
 		import traceback
-		print("Color Flow [setColorIndex swap] error:\n" + traceback.format_exc())
+		print("AZ Colorflow [setColorIndex swap] error:\n" + traceback.format_exc())
 
 
 def _install_color_routing_hook() -> None:
@@ -587,7 +587,7 @@ def _install_color_routing_hook() -> None:
 			font_view_controller = objc.lookUpClass("GSFontViewController")
 		except Exception:
 			import traceback
-			print("Color Flow [routing hook] GSFontViewController not found:\n"
+			print("AZ Colorflow [routing hook] GSFontViewController not found:\n"
 				+ traceback.format_exc())
 			return
 		# Mark installed BEFORE the swap: a partial failure must not let the next window
@@ -606,14 +606,14 @@ def _install_color_routing_hook() -> None:
 		objc.classAddMethods(font_view_controller, [private])
 		if _runtime_copy_imp("GSFontViewController", b"cf_swapSetColorIndex:",
 				b"setColorIndex:", b"v@:C"):
-			print("Color Flow: swap-routing hook installed on "
+			print("AZ Colorflow: swap-routing hook installed on "
 				"-[GSFontViewController setColorIndex:].")
 		else:
-			print("Color Flow [routing hook] could not replace setColorIndex: IMP; "
+			print("AZ Colorflow [routing hook] could not replace setColorIndex: IMP; "
 				"stock routing left intact.")
 	except Exception:
 		import traceback
-		print("Color Flow [routing hook] error:\n" + traceback.format_exc())
+		print("AZ Colorflow [routing hook] error:\n" + traceback.format_exc())
 
 
 def _runtime_copy_imp(
@@ -658,7 +658,7 @@ def _runtime_copy_imp(
 		return True
 	except Exception:
 		import traceback
-		print("Color Flow [routing hook] runtime IMP copy failed:\n" + traceback.format_exc())
+		print("AZ Colorflow [routing hook] runtime IMP copy failed:\n" + traceback.format_exc())
 		return False
 
 
@@ -717,7 +717,7 @@ def _broadcast_settings_changed() -> None:
 			COLORFLOW_SETTINGS_CHANGED, None)
 	except Exception:
 		import traceback
-		print("Color Flow [settings broadcast] error:\n" + traceback.format_exc())
+		print("AZ Colorflow [settings broadcast] error:\n" + traceback.format_exc())
 
 
 def _rgba_close(first, second, tol: float = 1e-4) -> bool:
@@ -823,7 +823,7 @@ def _poke_default_sort(font) -> None:
 		glyph.storeSortName = False
 	except Exception:
 		import traceback
-		print("Color Flow [default sort poke] error:\n" + traceback.format_exc())
+		print("AZ Colorflow [default sort poke] error:\n" + traceback.format_exc())
 
 
 def _apply_rainbow_source(font, segment: int) -> None:
@@ -844,7 +844,7 @@ def _apply_rainbow_source(font, segment: int) -> None:
 				grouping.enable(font)
 	except Exception:
 		import traceback
-		print("Color Flow [rainbow source] error:\n" + traceback.format_exc())
+		print("AZ Colorflow [rainbow source] error:\n" + traceback.format_exc())
 
 
 def _rainbow_segment_for_font(font) -> int:
@@ -897,7 +897,7 @@ class EyeToggleList2Cell(CheckBoxList2Cell):
 				button.setAlternateImage_(on_eye)
 		except Exception:
 			import traceback
-			print("Color Flow [eye cell] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [eye cell] error:\n" + traceback.format_exc())
 
 
 class AZColorflowSettingsView:
@@ -1053,7 +1053,7 @@ class AZColorflowSettingsView:
 			self._slot_list = group.lcList
 		except Exception:
 			import traceback
-			print("Color Flow [pane slot list build] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [pane slot list build] error:\n" + traceback.format_exc())
 			self._slot_list = None
 
 		# Font Glyph Order (bottom) ---------------------------------------------
@@ -1119,7 +1119,7 @@ class AZColorflowSettingsView:
 					visible=any(index == r[0] and r[2] for r in rows)))
 		except Exception:
 			import traceback
-			print("Color Flow [pane slot items] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [pane slot items] error:\n" + traceback.format_exc())
 			items = []
 		self._slot_items = items
 		return items
@@ -1149,7 +1149,7 @@ class AZColorflowSettingsView:
 					row_view.setAlphaValue_(1.0 if self._slot_is_visible(item) else 0.4)
 		except Exception:
 			import traceback
-			print("Color Flow [dim hidden rows] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [dim hidden rows] error:\n" + traceback.format_exc())
 
 	def _slot_drag_candidate(self, indexes) -> bool:
 		"""Allow a drag only when every picked row is VISIBLE (named). Hidden rows are fixed."""
@@ -1206,7 +1206,7 @@ class AZColorflowSettingsView:
 			return True
 		except Exception:
 			import traceback
-			print("Color Flow [pane slot drop] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [pane slot drop] error:\n" + traceback.format_exc())
 			return False
 
 	# ------------------------------------------------------------------ refresh
@@ -1223,7 +1223,7 @@ class AZColorflowSettingsView:
 				self._swap_checkbox.set(bool(Glyphs.defaults[SWAP_KEY]))
 		except Exception:
 			import traceback
-			print("Color Flow [pane reload] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [pane reload] error:\n" + traceback.format_exc())
 
 	# ------------------------------------------------------------------ callbacks
 	def _color_order_changed(self, sender) -> None:
@@ -1232,7 +1232,7 @@ class AZColorflowSettingsView:
 			_apply_rainbow_source(Glyphs.font, 1 if sender.get() else 0)
 		except Exception:
 			import traceback
-			print("Color Flow [pane rainbow] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [pane rainbow] error:\n" + traceback.format_exc())
 
 	def _swap_routing_changed(self, sender) -> None:
 		"""Persist the swap toggle. The swizzled setColorIndex: reads SWAP_KEY at call
@@ -1242,7 +1242,7 @@ class AZColorflowSettingsView:
 			Glyphs.defaults[SWAP_KEY] = bool(sender.get())
 		except Exception:
 			import traceback
-			print("Color Flow [pane swap routing] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [pane swap routing] error:\n" + traceback.format_exc())
 
 	def _reset_clicked(self, sender) -> None:
 		"""Confirm, then reset the 12 label colours + the names/order/visibility to defaults
@@ -1261,7 +1261,7 @@ class AZColorflowSettingsView:
 			self.reload()
 		except Exception:
 			import traceback
-			print("Color Flow [pane reset] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [pane reset] error:\n" + traceback.format_exc())
 
 	def _slot_edited(self, sender) -> None:
 		"""Fires after the user edits ANY cell (eye/checkbox, colour well or name) in the
@@ -1328,7 +1328,7 @@ class AZColorflowSettingsView:
 				self._dim_hidden_rows()
 		except Exception:
 			import traceback
-			print("Color Flow [pane slot edit] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [pane slot edit] error:\n" + traceback.format_exc())
 
 
 class AZColorflowPreferencesController(AppKit.NSViewController):
@@ -1379,7 +1379,7 @@ class AZColorflowPreferencesController(AppKit.NSViewController):
 			self._apply_preferred_size()
 		except Exception:
 			import traceback
-			print("Color Flow [pref loadView] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [pref loadView] error:\n" + traceback.format_exc())
 
 
 def _register_preferences_pane() -> None:
@@ -1582,7 +1582,7 @@ class AZColorflow(PalettePlugin):
 		try:
 			self.meaning = self.Load_Meaning()
 		except Exception as error:
-			print(f"Color Flow: could not load colorNames.txt ({error}); starting empty.")
+			print(f"AZ Colorflow: could not load colorNames.txt ({error}); starting empty.")
 			self.meaning = {}
 		self.width = 160
 		self.rectHeight = 10
@@ -1712,7 +1712,7 @@ class AZColorflow(PalettePlugin):
 			self._rainbow_conflict_check()
 		except Exception:
 			import traceback
-			print("Color Flow [Rainbow setup] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [Rainbow setup] error:\n" + traceback.format_exc())
 
 		# Swap Option color routing: replace -[GSFontViewController setColorIndex:]
 		# once per session (idempotent installer). Guarded like the rest — any
@@ -1721,7 +1721,7 @@ class AZColorflow(PalettePlugin):
 			_install_color_routing_hook()
 		except Exception:
 			import traceback
-			print("Color Flow [routing hook] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [routing hook] error:\n" + traceback.format_exc())
 
 		# Native shortcut command in Glyphs > Settings > Shortcuts (remappable,
 		# no Scripts-folder copying). Guarded like the Rainbow setup: a missing
@@ -1731,7 +1731,7 @@ class AZColorflow(PalettePlugin):
 			_register_native_shortcuts()
 		except Exception:
 			import traceback
-			print("Color Flow [shortcuts] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [shortcuts] error:\n" + traceback.format_exc())
 
 		# Add the Color Flow pane to Glyphs > Settings exactly once per app session
 		# (module-level _PREF_PANE_ADDED guard). Guarded: a failure only prints.
@@ -1739,7 +1739,7 @@ class AZColorflow(PalettePlugin):
 			_register_preferences_pane()
 		except Exception:
 			import traceback
-			print("Color Flow [prefs pane] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [prefs pane] error:\n" + traceback.format_exc())
 
 		# Observe edits made in the global Settings pane so THIS palette refreshes live.
 		try:
@@ -1748,7 +1748,7 @@ class AZColorflow(PalettePlugin):
 				self, "colorFlowSettingsChanged:", COLORFLOW_SETTINGS_CHANGED, None)
 		except Exception:
 			import traceback
-			print("Color Flow [settings observer] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [settings observer] error:\n" + traceback.format_exc())
 		try:
 			self.performSelector_withObject_afterDelay_("deferredHeaderSetup:", None, 2.0)
 		except Exception:
@@ -1766,7 +1766,7 @@ class AZColorflow(PalettePlugin):
 				self, "documentDidSave:", "GSDocumentWasSavedSuccessfully", None)
 		except Exception:
 			import traceback
-			print("Color Flow [save-observer] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [save-observer] error:\n" + traceback.format_exc())
 
 
 	########################################################################################################
@@ -1790,7 +1790,7 @@ class AZColorflow(PalettePlugin):
 		try:
 			font = Glyphs.font
 			if font is None:
-				Message("Open a font first.", title="Color Flow")
+				Message("Open a font first.", title="AZ Colorflow")
 				return
 			meaning = self.Load_Meaning()
 			steps = [(int(index), label)
@@ -1801,10 +1801,10 @@ class AZColorflow(PalettePlugin):
 			existing = [dict(entry) for entry in (font.customParameters["Filters"] or [])]
 			font.customParameters["Filters"] = azcolorflow_filters.merge_into_filters(existing, group)
 			Message(f"Added the “{azcolorflow_filters.GROUP_NAME}” smart-filter group "
-				"to the sidebar (filters by glyph colour).", title="Color Flow")
+				"to the sidebar (filters by glyph colour).", title="AZ Colorflow")
 		except Exception:
 			import traceback
-			print("Color Flow [smart filters] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [smart filters] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _popover_dashboard(self, sender) -> None:
@@ -1835,9 +1835,9 @@ class AZColorflow(PalettePlugin):
 			rect = AppKit.NSMakeRect(0, 0, 256, 54)   # compact, with a little breathing room top/bottom
 			panel = AppKit.NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
 				rect, AppKit.NSWindowStyleMaskTitled, AppKit.NSBackingStoreBuffered, False)
-			panel.setTitle_("Color Flow")
+			panel.setTitle_("AZ Colorflow")
 			content = panel.contentView()
-			label = AppKit.NSTextField.labelWithString_("Generating Color Flow report\u2026")
+			label = AppKit.NSTextField.labelWithString_("Generating AZ Colorflow report\u2026")
 			label.setFrame_(AppKit.NSMakeRect(16, 30, 224, 16))
 			content.addSubview_(label)
 			loader = _AZColorflowLoaderBar.alloc().initWithFrame_(AppKit.NSMakeRect(16, 5, 224, 22))
@@ -1854,7 +1854,7 @@ class AZColorflow(PalettePlugin):
 			self.performSelector_withObject_afterDelay_("runReportGeneration:", None, 0.08)
 		except Exception:
 			import traceback
-			print("Color Flow [report sheet] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [report sheet] error:\n" + traceback.format_exc())
 			self.Open_Color_Font_Dashboard(None)
 
 	def runReportGeneration_(self, sender) -> None:
@@ -1899,7 +1899,7 @@ class AZColorflow(PalettePlugin):
 				webbrowser.open(path.as_uri())
 			except Exception:
 				import traceback
-				print("Color Flow [open report] error:\n" + traceback.format_exc())
+				print("AZ Colorflow [open report] error:\n" + traceback.format_exc())
 
 	# ------------------------------------------------------------------ #
 	#  First-run tutorial sheet (multi-slide, arrow navigation)
@@ -1916,7 +1916,7 @@ class AZColorflow(PalettePlugin):
 			self._present_tutorial()
 		except Exception:
 			import traceback
-			print("Color Flow [tutorial] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [tutorial] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _tutorial_parent_window(self):
@@ -1947,7 +1947,7 @@ class AZColorflow(PalettePlugin):
 		rect = AppKit.NSMakeRect(0, 0, width, height)
 		panel = AppKit.NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
 			rect, AppKit.NSWindowStyleMaskTitled, AppKit.NSBackingStoreBuffered, False)
-		panel.setTitle_("Welcome to Color Flow")
+		panel.setTitle_("Welcome to AZ Colorflow")
 		content = panel.contentView()
 
 		title = AppKit.NSTextField.labelWithString_("")
@@ -2160,7 +2160,7 @@ class AZColorflow(PalettePlugin):
 			self.reload_after_settings()
 		except Exception:
 			import traceback
-			print("Color Flow [settings changed] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [settings changed] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _rainbow_conflict_check(self) -> None:
@@ -2177,9 +2177,9 @@ class AZColorflow(PalettePlugin):
 			if item.title() == "Rainbow FontView":
 				Message(
 					"The standalone Rainbow FontView plugin is still installed.\n\n"
-					"Color Flow now includes Font-View grouping, so please disable or "
+					"AZ Colorflow now includes Font-View grouping, so please disable or "
 					"remove Rainbow FontView to avoid them conflicting.",
-					title="Color Flow", OKButton=None)
+					title="AZ Colorflow", OKButton=None)
 				Glyphs.defaults["com.hugojourdan.AZColorflow-RainbowConflictWarned"] = True
 				return
 
@@ -2202,7 +2202,7 @@ class AZColorflow(PalettePlugin):
 				self.fontview.maybe_rebuild(font)
 		except Exception:
 			import traceback
-			print("Color Flow [Rainbow rebuild] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [Rainbow rebuild] error:\n" + traceback.format_exc())
 
 	# --- keep our grouping order out of saved files (Cocoa save notifications) ---
 
@@ -2228,9 +2228,9 @@ class AZColorflow(PalettePlugin):
 		# flush the just-written userData to disk. Don't record or re-save again.
 		if getattr(self, "_resaving", False):
 			self._resaving = False
-			print("Color Flow: timeline persisted to disk (follow-up save).")
+			print("AZ Colorflow: timeline persisted to disk (follow-up save).")
 			return
-		print("Color Flow [save]: GSDocumentWasSavedSuccessfully fired.")
+		print("AZ Colorflow [save]: GSDocumentWasSavedSuccessfully fired.")
 		font = None
 		try:
 			font = self._font_from_document(document)
@@ -2249,7 +2249,7 @@ class AZColorflow(PalettePlugin):
 			recorded = bool(self._record_dashboard_history(font))
 		except Exception:
 			import traceback
-			print("Color Flow [history] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [history] error:\n" + traceback.format_exc())
 		# Font-View glyphOrder restore (only relevant if a strip happened — currently
 		# inert because Glyphs has no pre-save hook to strip in; kept harmless).
 		try:
@@ -2262,7 +2262,7 @@ class AZColorflow(PalettePlugin):
 					pass
 		except Exception:
 			import traceback
-			print("Color Flow [did-save] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [did-save] error:\n" + traceback.format_exc())
 		self._strippedForSave = False
 		# Flush the freshly-written userData to disk NOW (no "save twice" needed): mark the
 		# doc dirty for the userData change and trigger one guarded follow-up save. Only
@@ -2278,7 +2278,7 @@ class AZColorflow(PalettePlugin):
 			except Exception:
 				self._resaving = False
 				import traceback
-				print("Color Flow [resave] error:\n" + traceback.format_exc())
+				print("AZ Colorflow [resave] error:\n" + traceback.format_exc())
 
 	def _clearResaving_(self, _arg) -> None:
 		# Fallback: if the follow-up save's notification never arrived, don't leave the
@@ -2294,10 +2294,10 @@ class AZColorflow(PalettePlugin):
 		# saves don't add junk while genuine colour changes are all captured. Returns True
 		# when it actually wrote a new snapshot (so the caller can flush it to disk).
 		if font is None:
-			print("Color Flow: no font on save — nothing recorded.")
+			print("AZ Colorflow: no font on save — nothing recorded.")
 			return False
 		if not getattr(font, "filepath", None):
-			print("Color Flow: font has no file path yet — timeline kept in memory, "
+			print("AZ Colorflow: font has no file path yet — timeline kept in memory, "
 				"persists once the file is saved to disk.")
 		import azcolorflow_dashboard
 		# Storage rule: git-tracked fonts keep their history in git commits, so we don't
@@ -2306,7 +2306,7 @@ class AZColorflow(PalettePlugin):
 		# Untracked fonts (no repo, or not yet committed) keep writing userData so the
 		# timeline still accrues for users who don't use git.
 		if azcolorflow_dashboard.is_git_tracked(font):
-			print("Color Flow: font is git-tracked — timeline reads from git, "
+			print("AZ Colorflow: font is git-tracked — timeline reads from git, "
 				"skipping userData snapshot.")
 			return False
 		key = azcolorflow_dashboard.TIMELINE_USERDATA_KEY
@@ -2320,10 +2320,10 @@ class AZColorflow(PalettePlugin):
 			saves = len(azcolorflow_dashboard.load_history(font))
 			save_word = "save" if saves == 1 else "saves"
 			if recorded:
-				print(f"Color Flow: timeline snapshot recorded to userData "
+				print(f"AZ Colorflow: timeline snapshot recorded to userData "
 					f"({saves} {save_word} logged; flushing to disk).")
 			else:
-				print(f"Color Flow: no colour change since last save — timeline unchanged "
+				print(f"AZ Colorflow: no colour change since last save — timeline unchanged "
 					f"({saves} {save_word} logged).")
 		except Exception:
 			pass
@@ -2503,7 +2503,7 @@ class AZColorflow(PalettePlugin):
 			self._update_title_bar()
 		except Exception:
 			import traceback
-			print("Color Flow [Update_Plugin_UI] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [Update_Plugin_UI] error:\n" + traceback.format_exc())
 
 	# Right-click “Set workflow step” on the Font/Edit-View selection (#6).
 	# The callback signature for a palette is not firmly documented, so the handler
@@ -2520,7 +2520,7 @@ class AZColorflow(PalettePlugin):
 					break
 			if menu is None:
 				return
-			submenu = AppKit.NSMenu.alloc().initWithTitle_("Color Flow")
+			submenu = AppKit.NSMenu.alloc().initWithTitle_("AZ Colorflow")
 			for color, label in self.meaning.items():
 				if not label:
 					continue
@@ -2533,12 +2533,12 @@ class AZColorflow(PalettePlugin):
 			clearItem.setTarget_(self)
 			clearItem.setRepresentedObject_("none")
 			submenu.addItem_(clearItem)
-			parent = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Color Flow", None, "")
+			parent = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("AZ Colorflow", None, "")
 			parent.setSubmenu_(submenu)
 			menu.addItem_(parent)
 		except Exception:
 			import traceback
-			print("Color Flow [context menu] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [context menu] error:\n" + traceback.format_exc())
 
 	def setStepFromMenu_(self, sender) -> None:
 		if self._gate():
@@ -2548,7 +2548,7 @@ class AZColorflow(PalettePlugin):
 			self._apply_step_to_selection(None if raw == "none" else int(raw))
 		except Exception:
 			import traceback
-			print("Color Flow [set step] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [set step] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _apply_step_to_selection(self, color) -> None:
@@ -2580,7 +2580,7 @@ class AZColorflow(PalettePlugin):
 			self._open_step_tab(color)
 		except Exception:
 			import traceback
-			print("Color Flow [row double-click] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [row double-click] error:\n" + traceback.format_exc())
 
 	# Exact census membership, matching the count badge: a glyph is "at" this
 	# step only when its layer colour IS this step (not beyond it), and the
@@ -2610,13 +2610,13 @@ class AZColorflow(PalettePlugin):
 			return
 		names = self._glyphs_for_step(color, masterId)
 		if not names:
-			Message(f"No glyphs at \u201c{self.meaning.get(color, str(color))}\u201d.", title="Color Flow")
+			Message(f"No glyphs at \u201c{self.meaning.get(color, str(color))}\u201d.", title="AZ Colorflow")
 			return
 		try:
 			font.newTab("/" + "/".join(names))
 		except Exception:
 			import traceback
-			print("Color Flow [open tab] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [open tab] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _make_count(self, color, count, yPos) -> None:
@@ -2641,7 +2641,7 @@ class AZColorflow(PalettePlugin):
 			self._popover_dashboard(sender)
 		except Exception:
 			import traceback
-			print("Color Flow [header report] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [header report] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _is_collapsed(self) -> bool:
@@ -2727,7 +2727,7 @@ class AZColorflow(PalettePlugin):
 			self._update_title_bar()
 		except Exception:
 			import traceback
-			print("Color Flow [header setup] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [header setup] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _window_root(self) -> Any:
@@ -2926,7 +2926,7 @@ class AZColorflow(PalettePlugin):
 			self._update_title_bar()
 		except Exception:
 			import traceback
-			print("Color Flow [title bar] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [title bar] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _teardown_title_bar(self) -> None:
@@ -3093,7 +3093,7 @@ class AZColorflow(PalettePlugin):
 			self._sync_header()
 		except Exception:
 			import traceback
-			print("Color Flow [blocked state] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [blocked state] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _clearBlockedState_(self) -> None:
@@ -3111,7 +3111,7 @@ class AZColorflow(PalettePlugin):
 			self._sync_header()
 		except Exception:
 			import traceback
-			print("Color Flow [clear blocked] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [clear blocked] error:\n" + traceback.format_exc())
 
 	@objc.python_method
 	def _onLicenseChanged(self) -> None:
@@ -3127,7 +3127,7 @@ class AZColorflow(PalettePlugin):
 			self.update(None)
 		except Exception:
 			import traceback
-			print("Color Flow [license refresh] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [license refresh] error:\n" + traceback.format_exc())
 
 	def buyLicense_(self, sender) -> None:
 		# Title-bar affordance shown while blocked: offer Buy (de-branded LS
@@ -3143,7 +3143,7 @@ class AZColorflow(PalettePlugin):
 				NSAlertSecondButtonReturn,
 			)
 			alert = NSAlert.alloc().init()
-			alert.setMessageText_("Color Flow")
+			alert.setMessageText_("AZ Colorflow")
 			alert.setInformativeText_("Buy a license, or enter a key you already have.")
 			alert.addButtonWithTitle_("Buy License")
 			alert.addButtonWithTitle_("Enter Key…")
@@ -3155,7 +3155,7 @@ class AZColorflow(PalettePlugin):
 				bootstrap.show_license_ui(CONFIG, on_activated=self._onLicenseChanged)
 		except Exception:
 			import traceback
-			print("Color Flow [buy] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [buy] error:\n" + traceback.format_exc())
 
 	########################################################################################################
 	#																									   #
@@ -3182,7 +3182,7 @@ class AZColorflow(PalettePlugin):
 			return azcolorflow_dashboard.main(Glyphs.font, progress=progress, open_when_done=open_when_done)
 		except Exception:
 			import traceback
-			print("Color Flow [dashboard] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [dashboard] error:\n" + traceback.format_exc())
 			return None
 
 	########################################################################################################

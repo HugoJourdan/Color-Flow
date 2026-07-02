@@ -550,7 +550,7 @@ def test_start_registers_native_shortcuts_guarded() -> None:
     guard_open = body.rindex("try:", 0, call)
     guard_close = body.index("except Exception:", call)
     assert guard_open < call < guard_close
-    assert "Color Flow [shortcuts] error" in body
+    assert "AZ Colorflow [shortcuts] error" in body
 
 
 def test_register_uses_gscallbackhandler_api_unassigned() -> None:

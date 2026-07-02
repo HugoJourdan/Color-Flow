@@ -72,7 +72,7 @@ def _color_flow_current_position(font, names):
 def _color_flow_jump():
     font = Glyphs.font
     if font is None:
-        Message("Open a font first.", title="Color Flow")
+        Message("Open a font first.", title="AZ Colorflow")
         return
     master = font.selectedFontMaster
     if master is None:
@@ -89,7 +89,7 @@ def _color_flow_jump():
     position = _color_flow_current_position(font, names)
     index = next_unfinished_index(pairs, final_step, position)
     if index is None:
-        Message("All glyphs finished.", title="Color Flow")
+        Message("All glyphs finished.", title="AZ Colorflow")
         return
     font.newTab("/" + names[index])
 
