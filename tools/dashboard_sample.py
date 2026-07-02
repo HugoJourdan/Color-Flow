@@ -63,12 +63,12 @@ def _journey_index(masters: list[dict]) -> dict:
     index: dict[str, dict[str, list[list]]] = {}
     for master in masters:
         per_glyph: dict[str, list[list]] = {}
-        for name, final_key in zip(NAMES, master["keys"]):
+        for name, final_key in zip(NAMES, master["keys"], strict=False):
             if final_key == -1:
                 continue
             events: list[list] = []
             previous = None
-            for date, key in zip(DATES, _step_sequence(name, final_key)):
+            for date, key in zip(DATES, _step_sequence(name, final_key), strict=False):
                 if key != previous:
                     events.append([date, key])
                     previous = key
@@ -102,7 +102,7 @@ def _model() -> dict:
                         "counts": _counts(keys), "uncolored": uncolored,
                         "preview": preview})
     outline = {"d": "M120 -700L520 -700L520 -100L120 -100Z", "vb": "80 -740 480 680"}
-    paths = {master["id"]: {name: outline for name, key in zip(NAMES, master["keys"])
+    paths = {master["id"]: {name: outline for name, key in zip(NAMES, master["keys"], strict=False)
                             if key != -1} for master in masters}
     return {
         "family": "Acme Sans", "fileName": "Acme.glyphs", "version": "2.5",
