@@ -53,6 +53,20 @@ def test_parse_rejects_non_iterable_label_colors() -> None:
         profile.parse('{"version": 1, "labelColors": 7}')   # field itself not a list
 
 
+def test_parse_rejects_non_numeric_label_colour_components() -> None:
+    # A junk component INSIDE an RGBA entry must also surface as ValueError at
+    # parse time — not as a bare TypeError later, when diff_profile compares
+    # the components arithmetically.
+    with pytest.raises(ValueError):
+        profile.parse('{"version": 1, "labelColors": [[1, 0, "x", 1]]}')
+    with pytest.raises(ValueError):
+        profile.parse('{"version": 1, "labelColors": [[null, 0, 0, 1]]}')
+    # numeric strings coerce to floats (and then diff cleanly)
+    parsed = profile.parse('{"version": 1, "labelColors": [["0.5", 0, 0, 1]]}')
+    assert parsed["labelColors"] == [[0.5, 0.0, 0.0, 1.0]]
+    assert profile.diff_profile(parsed, parsed) == []
+
+
 def test_diff_identical_profiles_is_empty() -> None:
     assert profile.diff_profile(_profile(), _profile()) == []
 

@@ -665,7 +665,7 @@ def test_dashboard_chart_click_scrubs_sidebar_discs() -> None:
 
 def test_dashboard_heatmap_time_travels_with_the_picked_moment() -> None:
     js = assets.DASHBOARD_JS
-    heat = js.split("function heatmap(", 1)[1].split("\n  function changes(", 1)[0]
+    heat = js.split("function heatmap(", 1)[1].split("\n  function masterPct(", 1)[0]
     # scrubbed -> the cells reconstruct the HISTORICAL colour state via stateAt,
     # at the same snapshot index the discs/lanes read (scrubIndex over trend dates)
     assert "state.tlScrub != null" in heat
@@ -684,13 +684,25 @@ def test_dashboard_heatmap_time_travels_with_the_picked_moment() -> None:
 
 def test_dashboard_heatmap_scrub_pill_removed() -> None:
     js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
-    heat = js.split("function heatmap(", 1)[1].split("\n  function changes(", 1)[0]
+    heat = js.split("function heatmap(", 1)[1].split("\n  function masterPct(", 1)[0]
     # the "Viewing … — back to today" pill was removed per request
     assert 'class="heat-pill"' not in heat
     assert "back to today" not in heat
     assert ".heat-pill" not in css                            # dead style removed too
     # scrub still drives the cells' historical colours (time-travel intact)
     assert "scrubSnap" in heat and "stateAt(m.id, sdate)" in heat
+
+
+def test_dashboard_heatmap_cell_links_require_a_file_path() -> None:
+    """An UNSAVED font has no path, and a glyphsapp:// link with an empty path
+    would target the wrong (frontmost) document — those cells render as plain
+    <span>s with the same classes/data attributes (hover/tooltip intact)."""
+    js = assets.DASHBOARD_JS
+    cell = js.split("function cellHTML(")[1].split("\n    var sections")[0]
+    assert "if (!H.filePath)" in cell                     # the non-link guard
+    assert "'<span class=\"' + cls" in cell               # span fallback, same classes
+    assert 'encodeURIComponent(H.filePath)' in cell       # link path never empty
+    assert 'encodeURIComponent(H.filePath || "")' not in js
 
 
 def test_dashboard_navigator_has_date_ticks_no_side_dates() -> None:
@@ -760,7 +772,10 @@ def test_dashboard_has_range_navigator() -> None:
     assert "function trendSeries(" in js and "function viewBounds(" in js   # zoom-window slicing
     assert "function navDrag(" in js and "function navReset(" in js         # drag + reset handlers
     assert 'data-navedge="mid"' in js and 'data-navedge="lo"' not in js     # mid literal; lo/hi via handle()
-    assert "data-navreset" in js                          # reset affordance
+    # reset affordance: double-clicking the navigator restores the full history
+    # (the dead data-navreset button/handler pair was removed)
+    assert 'e.target.closest(".tl-nav")' in js and "navReset()" in js
+    assert "data-navreset" not in js
     assert ".tl-nav-win" in css and ".tl-nav-h-bar" in css and ".tl-nav-scrim" in css
 
 
@@ -1538,6 +1553,25 @@ def test_master_card_has_version_navigator() -> None:
     assert ".vnav-dot" in css and ".vnav-line" in css and ".vnav-card{" in css
 
 
+def test_version_nav_skips_unchanged_versions_for_selected_master() -> None:
+    """In the per-master card, the version timeline only shows a dot where THAT
+    master's colours changed vs the previous snapshot (a static master collapses to
+    its baseline). data-vnav keeps the absolute series index so scrubbing still
+    lands on the right date; global view (no master) still shows every version."""
+    js = assets.DASHBOARD_JS
+    vn = js.split("function versionNav(", 1)[1].split("\n  function ", 1)[0]
+    assert "var mid = state.master" in vn
+    # builds the changed-index list by diffing this master's stateAt across dates
+    assert "stateAt(mid, dates[0])" in vn and "stateAt(mid, dates[k])" in vn
+    assert "vidx.push(k)" in vn
+    # global fallback shows every version
+    assert "dates.map(function(_d, i){ return i; })" in vn
+    # the dot still carries the ABSOLUTE index (di) for scrubSet
+    assert 'data-vnav="\'+di+\'"' in vn
+    # current/fill track the filtered position, not the absolute index
+    assert "activePos" in vn and "activePos/(vidx.length-1)" in vn
+
+
 # --------------------------------------------------------------------------- #
 # Global Timeline: median + min-max spread band (scales to many masters)
 # --------------------------------------------------------------------------- #
@@ -1755,7 +1789,7 @@ def test_scrub_and_master_switch_animations() -> None:
 
 def test_glyph_cell_size_slider() -> None:
     js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
-    heat = js.split("function heatmap(", 1)[1].split("\n  function changes(", 1)[0]
+    heat = js.split("function heatmap(", 1)[1].split("\n  function masterPct(", 1)[0]
     # a range slider in the grid header drives the cell size; the section carries the var
     assert "data-cellsize" in heat and 'type="range"' in heat and 'class="cell-size"' in heat
     assert "--cell-min:" in heat
@@ -1881,7 +1915,7 @@ def test_tower_focus_change_fades_per_disc_not_whole_tower() -> None:
 
 def test_glyph_cell_size_slider_allows_smaller_cells() -> None:
     js, css = assets.DASHBOARD_JS, assets.DASHBOARD_CSS
-    heat = js.split("function heatmap(", 1)[1].split("\n  function changes(", 1)[0]
+    heat = js.split("function heatmap(", 1)[1].split("\n  function masterPct(", 1)[0]
     # the cell-size slider runs 20..80
     assert 'class="cell-size" min="20" max="80"' in heat
     # below 26px the category SECTIONS lay out two-up (CSS columns), each block kept whole

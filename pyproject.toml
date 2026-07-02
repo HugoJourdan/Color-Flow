@@ -18,9 +18,9 @@ testpaths = ["tests"]
 [tool.coverage.run]
 branch = true
 source = ["AZ-Colorflow.glyphsPalette/Contents/Resources"]
-# plugin.py and settings_panel.py are PyObjC/vanilla UI that only runs inside
-# Glyphs; they can't be exercised headlessly, so exclude them from the target.
-omit = ["*/plugin.py", "*/settings_panel.py"]
+# plugin.py is PyObjC/vanilla UI that only runs inside Glyphs; it can't be
+# exercised headlessly, so exclude it from the target.
+omit = ["*/plugin.py"]
 
 [tool.coverage.report]
 show_missing = true

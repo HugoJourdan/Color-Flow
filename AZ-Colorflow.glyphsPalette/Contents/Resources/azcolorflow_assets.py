@@ -124,10 +124,6 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .icon{width:30px;height:28px;border:1px solid var(--border-2);border-radius:var(--r-sm);background:transparent;color:var(--muted);cursor:pointer}
 .icon:hover{color:var(--text)}
 .tb{position:sticky;top:57px;z-index:4;display:flex;align-items:center;gap:8px;padding:12px 0;background:var(--bg);border-bottom:1px solid var(--border);flex-wrap:wrap}
-.search{flex:1;min-width:180px;display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:6px 10px;color:var(--muted-2)}
-.search input{flex:1;background:transparent;border:0;outline:0;color:var(--text);font:inherit}
-.search input::placeholder{color:var(--muted-2)}
-.search kbd{border:1px solid var(--border-2);border-radius:4px;padding:0 5px;font:var(--fs-xs)/1.4 inherit;color:var(--muted-2)}
 .chip{font-size:var(--fs-xs);border:1px solid var(--border-2);border-radius:var(--r-sm);padding:6px 10px;background:var(--surface-2);color:var(--muted);cursor:pointer}
 .ba-switch{display:inline-flex;align-items:center;gap:6px}
 .ba-seg{font:inherit;font-size:var(--fs-xs);background:var(--surface-2);border:1px solid var(--border-2);color:var(--muted);padding:5px 10px;cursor:pointer}
@@ -580,7 +576,7 @@ DASHBOARD_JS = r"""
   var prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
   var state = {
     master: null,                          // no master selected -> global overview
-    view: "tabs", before: false, baPlaying: false, sort: "workflow",
+    view: "tabs", before: false, baPlaying: false,
     focus: null,
     ovExpand: {},                          // which Overview cards are expanded
     heatSort: "category",                  // focus-mode glyph grid: "category" | "color"
@@ -588,7 +584,6 @@ DASHBOARD_JS = r"""
     cellSize: 40,                          // glyph-grid cell min size in px (slider-controlled, 28..96)
     tlPane: "graph",                       // Timeline card: "graph" (chart) | "calendar" (activity calendar)
     funnelOpen: false,                     // per-step funnel: collapsed by default, toggled by the % ring/number
-    tlCatOpen: {},                         // Timeline Time-Machine category blocks expanded? (closed by default)
     ocOpen: {},                            // Timeline "Shape changes" day blocks expanded? (closed by default)
     tlGran: "save",                        // Timeline mode: "save" (one point per save, the base graph) | "time"
     tlBucket: "day",                       // Time-mode grouping: "hour" | "day" | "month"
@@ -803,15 +798,6 @@ DASHBOARD_JS = r"""
   }
   function uncoloredFor(m){ return countedSet() ? countedStats(m).uncolored : m.uncolored; }
   function startedOf(m){ return countedTotal() - uncoloredFor(m); }
-  function stepsSorted(m){
-    var s = H.steps.slice();
-    if (state.sort==="progress"){ s.sort(function(a,b){ return countFor(m,b.key)-countFor(m,a.key); }); }
-    return s;
-  }
-  function bar(value,total,cssVar,label){
-    return '<div class="bar" role="progressbar" aria-valuenow="'+value+'" aria-valuemin="0" aria-valuemax="'+total+'" aria-label="'+esc(label)+'">'
-      + '<span style="width:'+pct(value,total)+'%;background:var('+cssVar+')"></span></div>';
-  }
 
   function aggregate(){
     var grand = countedTotal() * H.masters.length;
@@ -987,17 +973,36 @@ DASHBOARD_JS = r"""
   function versionNav(){
     var dates = (H.trend && H.trend.dates) || [];
     if (dates.length < 2) return "";
+    // In the per-master card, only show a version where THIS master's colours actually
+    // changed (vs the previous snapshot) — a static master collapses to its single
+    // baseline. Global view (no master) still shows every version. data-vnav keeps the
+    // ABSOLUTE series index so scrubSet still lands on the right date.
+    var mid = state.master, vidx;
+    if (mid){
+      vidx = [0];
+      var prevSnap = JSON.stringify(stateAt(mid, dates[0]));
+      for (var k=1;k<dates.length;k++){
+        var snapK = JSON.stringify(stateAt(mid, dates[k]));
+        if (snapK !== prevSnap){ vidx.push(k); prevSnap = snapK; }
+      }
+    } else {
+      vidx = dates.map(function(_d, i){ return i; });
+    }
     var cur = scrubIndex();
-    var dots = dates.map(function(d, i){
-      var cls = "vnav-dot" + (i<=cur?" past":"") + (i===cur?" on":"");
-      return '<button type="button" class="'+cls+'" data-vnav="'+i+'" title="'+esc(d+(i===cur?" · showing":""))
-        + '" aria-label="'+esc("Version "+(i+1)+" of "+dates.length+", "+d)+'"'+(i===cur?' aria-current="true"':'')+'></button>';
+    // the version in effect at the scrubbed moment = latest change index <= cur
+    var activePos = 0;
+    for (var pi=0;pi<vidx.length;pi++){ if (vidx[pi] <= cur) activePos = pi; else break; }
+    var dots = vidx.map(function(di, p){
+      var d = dates[di];
+      var cls = "vnav-dot" + (p<=activePos?" past":"") + (p===activePos?" on":"");
+      return '<button type="button" class="'+cls+'" data-vnav="'+di+'" title="'+esc(d+(p===activePos?" · showing":""))
+        + '" aria-label="'+esc("Version "+(p+1)+" of "+vidx.length+", "+d)+'"'+(p===activePos?' aria-current="true"':'')+'></button>';
     }).join("");
     // A coloured progress line drawn from the first node to the current one. The fill spans
     // the whole track and is clipped with transform:scaleX(frac); when a node is clicked it
     // animates from the PREVIOUS fraction to the new one, so the line grows/shrinks from the
     // old node end (not redrawing from the start). transform-origin:left keeps node 0 fixed.
-    var frac = dates.length > 1 ? cur/(dates.length-1) : 0;
+    var frac = vidx.length > 1 ? activePos/(vidx.length-1) : 0;
     var animCls = vnavShouldAnim ? " anim" : ""; vnavShouldAnim = false;
     var fromFrac = vnavPrevFrac; vnavPrevFrac = frac;
     return '<div class="vnav" role="group" aria-label="Navigate saved versions">'
@@ -1133,15 +1138,23 @@ DASHBOARD_JS = r"""
       var wasKey = (ch[name] != null) ? ch[name][0] : key;
       var nowVar = varFor(key), wasVar = varFor(wasKey);
       var showVar = state.before ? wasVar : nowVar;
+      var p = paths[name];
+      var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '"/></svg>' : '';
+      var cls = 'cell' + (p ? ' glyph' : '') + (dim ? ' ncnt' : '');
+      var attrs = ' data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:color-mix(in srgb,var(' + showVar + ') 35%,transparent)"';
+      // An UNSAVED font has no file path, so a glyphsapp:// link would target the
+      // wrong document — render a non-link cell instead (same classes and data
+      // attributes, so the hover tooltip and animations still work).
+      if (!H.filePath){
+        return '<span class="' + cls + '"' + attrs + ' title="' + esc(name + " — " + lab) + '" aria-label="' + esc(name + ", " + lab) + '">' + inner + '</span>';
+      }
       // Fully percent-encode the path (encodeURIComponent → slashes become %2F),
       // exactly as the handbook example does. With literal slashes Glyphs misparses
       // the path and falls back to the frontmost font + active master, ignoring the
       // layer (master) we asked for. layer == master id selects the master layer.
-      var href = "glyphsapp://show/?path=" + encodeURIComponent(H.filePath || "")
+      var href = "glyphsapp://show/?path=" + encodeURIComponent(H.filePath)
         + "&glyph=" + encodeURIComponent(name) + "&layer=" + encodeURIComponent(m.id);
-      var p = paths[name];
-      var inner = p ? '<svg viewBox="' + esc(p.vb) + '" preserveAspectRatio="xMidYMid meet"><path d="' + esc(p.d) + '"/></svg>' : '';
-      return '<a class="cell' + (p ? ' glyph' : '') + (dim ? ' ncnt' : '') + '" href="' + href + '" data-glyph="' + esc(name) + '" data-now="' + nowVar + '" data-was="' + wasVar + '" style="background:color-mix(in srgb,var(' + showVar + ') 35%,transparent)" title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
+      return '<a class="' + cls + '" href="' + href + '"' + attrs + ' title="' + esc(name + " — " + lab + " (open in Glyphs)") + '" aria-label="' + esc(name + ", " + lab + ", open in Glyphs") + '">' + inner + '</a>';
     }
     var sections;
     if (state.heatSort === "color"){
@@ -1213,29 +1226,6 @@ DASHBOARD_JS = r"""
     var body = sections ? '<div class="heat-cats">'+sections+'</div>' : empty;
     return '<section class="heat'+(scrubAnim?" scrub":"")+(twoCol?" heat-2col":"")+'" style="--cell-min:'+cz+'px"><div class="heat-h">'+focusInfo+toggle+recentCtl+sortCtl+sizeCtl+'</div>'
       + body+'</section>';
-  }
-  function changes(m){
-    var ch = (H.changes && H.changes[m.id]) || {}, names = Object.keys(ch);
-    if (!names.length) return "";
-    var blocks = names.map(function(n){
-      var ok = ch[n][0], nk = ch[n][1];
-      return '<div class="chg"><span class="cn">'+esc(n)+'</span>'
-        + '<span class="sw" style="background:var('+varFor(ok)+')" title="'+esc("was "+labelFor(ok))+'" aria-label="'+esc("was "+labelFor(ok))+'"></span>'
-        + '<span class="arr" aria-hidden="true">▶</span>'
-        + '<span class="sw" style="background:var('+varFor(nk)+')" title="'+esc("now "+labelFor(nk))+'" aria-label="'+esc("now "+labelFor(nk))+'"></span></div>';
-    }).join("");
-    return '<details class="changes"><summary>Changed since last run ('+names.length+')</summary><div class="chgwrap">'+blocks+'</div></details>';
-  }
-  function masterTabs(){
-    var tabs = H.masters.map(function(m){
-      var on = m.id===state.master, pv = m.preview;
-      var label = (pv && pv.d)
-        ? '<svg class="tabsvg" viewBox="'+esc(pv.vb)+'" preserveAspectRatio="xMidYMid meet"><path d="'+esc(pv.d)+'" fill="currentColor"/></svg>'
-        : esc(m.name);
-      return '<button type="button" role="tab" aria-selected="'+on+'" class="tab'+(on?" on":"")
-        +'" data-m="'+esc(m.id)+'" title="'+esc(m.name)+'" aria-label="'+esc(m.name)+'">'+label+'</button>';
-    }).join("");
-    return '<div class="tabs" role="tablist">'+tabs+'</div>';
   }
   // ----- Overview extras (only when no master is selected) ------------------
   function masterPct(m){ return gradedMasterPct(m); }   // graded step progress
@@ -2937,7 +2927,6 @@ DASHBOARD_JS = r"""
     document.documentElement.setAttribute("data-theme", state.theme);
     var tl = document.getElementById("cfd-timeline"); if (tl) tl.setAttribute("aria-pressed", state.view==="timeline");
     var ov = document.getElementById("cfd-overview"); if (ov) ov.setAttribute("aria-pressed", state.view==="tabs");
-    var sb = document.getElementById("cfd-sort"); if (sb) sb.textContent = "↕ Sort: "+(state.sort==="progress"?"progress":"workflow");
     paintScriptCards();
     animateLaneNumbers();                        // count-up the lane %s when the picked moment / focus changes
     animateRingNumber(barsAnim);                 // count-up the Overview ring %; sweeps 0->value on first paint
@@ -3198,13 +3187,11 @@ DASHBOARD_JS = r"""
       var hr = e.target.closest("[data-heatrecent]"); if (hr){ state.heatRecent = !state.heatRecent; update(); return; }
       var tp = e.target.closest("[data-tlpane]"); if (tp){ segswAnimKey = "tlpane"; state.tlPane = tp.getAttribute("data-tlpane"); state.tlScrub = null; update(); return; }
       var fn = e.target.closest("[data-funnel]"); if (fn){ state.funnelOpen = (state.funnelOpen === false); update(); return; }
-      var tc = e.target.closest("[data-tlcat]"); if (tc){ var ck=tc.getAttribute("data-tlcat"); state.tlCatOpen[ck]=!state.tlCatOpen[ck]; update(); return; }
       var oc = e.target.closest("[data-oc]"); if (oc){ var ok=oc.getAttribute("data-oc"); state.ocOpen[ok]=!state.ocOpen[ok]; update(); return; }
       var cr = e.target.closest(".lb-row[data-m]"); if (cr){ var cid=cr.getAttribute("data-m"); state.master=(state.master===cid)?null:cid; state.focus = null; laneSparkShouldAnim = true; update(); return; }
       var sp = e.target.closest("[data-tlspan]"); if (sp){ segswAnimKey = "tlspan"; setTlSpan(sp.getAttribute("data-tlspan")); return; }
       var tg = e.target.closest("[data-tlgrantoggle]"); if (tg){ setGranularity(state.tlGran==="time" ? "save" : "time"); return; }
       var tb = e.target.closest("[data-tlbucket]"); if (tb){ setBucket(tb.getAttribute("data-tlbucket")); return; }
-      var nr = e.target.closest("[data-navreset]"); if (nr){ navReset(); return; }
       var cnv = e.target.closest("[data-calnav]"); if (cnv){
         calMonthRef();                                   // ensure calY/calM seeded
         state.calM += parseInt(cnv.getAttribute("data-calnav"),10);
@@ -3216,10 +3203,6 @@ DASHBOARD_JS = r"""
         if (state.view !== "timeline"){ state.view = "timeline"; state.focus = null; }  // hop to the chart
         scrubSet(ci); return; }                                       // pick that moment (disc + lanes follow)
       var fc = e.target.closest("[data-fclear]"); if (fc){ setFocus(null); return; }
-      // heatmap time-travel pill: clear the picked moment (same reset scrubSet applies
-      // when the latest snapshot is picked) and re-render through the normal update()
-      // path, so the .cell background transition crossfades back to today's colours.
-      var scl = e.target.closest("[data-scrubclear]"); if (scl){ state.tlScrub = null; update(); return; }
       var vn = e.target.closest("[data-vnav]"); if (vn){ e.preventDefault(); vnavShouldAnim = true; scrubSet(parseInt(vn.getAttribute("data-vnav"),10)); return; }
       var jr = e.target.closest("[data-jglyph]"); if (jr){ openJourney(jr.getAttribute("data-jglyph")); return; }
       var jc = e.target.closest(".heat .cell"); if (jc && (e.metaKey || e.ctrlKey)){ e.preventDefault(); openJourney(jc.getAttribute("data-glyph")); return; }

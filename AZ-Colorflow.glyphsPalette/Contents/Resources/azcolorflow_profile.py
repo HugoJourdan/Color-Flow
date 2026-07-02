@@ -41,17 +41,21 @@ def serialize(profile: dict) -> str:
 
 
 def _coerce_label_colors(raw_colors: object) -> list[tuple]:
-    """Validate the ``labelColors`` field into a list of RGBA tuples. Raises
-    ``ValueError`` if the field, or any entry, is not a list/tuple of values —
-    so a malformed profile surfaces as a caught ``ValueError`` rather than a
-    bare ``TypeError`` that the importer would let fail silently."""
+    """Validate the ``labelColors`` field into a list of RGBA tuples of floats.
+    Raises ``ValueError`` if the field or any entry is not a list/tuple, or if
+    any component is not a number — so a malformed profile surfaces as a caught
+    ``ValueError`` rather than a bare ``TypeError`` raised later (e.g. by
+    :func:`diff_profile` comparing components arithmetically)."""
     if not isinstance(raw_colors, list):
         raise ValueError(f"labelColors must be a list, got {type(raw_colors).__name__}.")
     coerced: list[tuple] = []
     for rgba in raw_colors:
         if not isinstance(rgba, (list, tuple)):
             raise ValueError(f"Each labelColors entry must be a list, got {type(rgba).__name__}.")
-        coerced.append(tuple(rgba))
+        try:
+            coerced.append(tuple(float(component) for component in rgba))
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"Each labelColors component must be a number: {error}") from error
     return coerced
 
 
@@ -83,7 +87,8 @@ def _label_color_changes(current: list, incoming: list) -> int:
     for index in range(max(len(current), len(incoming))):
         a = current[index] if index < len(current) else ()
         b = incoming[index] if index < len(incoming) else ()
-        if len(a) != len(b) or any(abs(x - y) > _COLOR_EPSILON for x, y in zip(a, b)):
+        # (zip only evaluates when the length check above passed, so strict is a no-op)
+        if len(a) != len(b) or any(abs(x - y) > _COLOR_EPSILON for x, y in zip(a, b, strict=True)):
             changed += 1
     return changed
 

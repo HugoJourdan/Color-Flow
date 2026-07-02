@@ -91,10 +91,12 @@ class FontViewGrouping:
 
     def disable(self, font) -> None:
         font.userData[ENABLED_KEY] = False
-        if bool(font.userData[HAD_ORDER_KEY]):
-            saved = font.userData[SAVED_ORDER_KEY]
-            font.customParameters[GLYPH_ORDER] = saved if saved else []
+        saved = font.userData[SAVED_ORDER_KEY] if bool(font.userData[HAD_ORDER_KEY]) else None
+        if saved:
+            font.customParameters[GLYPH_ORDER] = saved
         else:
+            # No saved order (never had one, or the snapshot was lost): remove the
+            # parameter — an empty ACTIVE glyphOrder would still override font order.
             self._remove_glyph_order(font)
         self._clear(font.userData, SAVED_ORDER_KEY)
         self._clear(font.userData, HAD_ORDER_KEY)
@@ -145,10 +147,12 @@ class FontViewGrouping:
             return False
         if not self._is_color_flow_order(font.customParameters[GLYPH_ORDER]):
             return False  # the active glyphOrder is the user's — leave it alone
-        if bool(font.userData[HAD_ORDER_KEY]):
-            saved = font.userData[SAVED_ORDER_KEY]
-            font.customParameters[GLYPH_ORDER] = saved if saved else []
+        saved = font.userData[SAVED_ORDER_KEY] if bool(font.userData[HAD_ORDER_KEY]) else None
+        if saved:
+            font.customParameters[GLYPH_ORDER] = saved
         else:
+            # No saved order (never had one, or the snapshot was lost): remove the
+            # parameter — an empty ACTIVE glyphOrder would still override font order.
             self._remove_glyph_order(font)
         return True
 

@@ -14,6 +14,8 @@ selected master, all modelled by the fakes below.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import colornames
 import fontview
 
@@ -68,6 +70,45 @@ class _FakeMaster:
         self.name = name
 
 
+class _FakeParam:
+    def __init__(self, name: str, value: object) -> None:
+        self.name = name
+        self.value = value
+        self.active = True
+
+
+class _FakeCustomParameters:
+    """Mimics ``GSFont.customParameters``: name-keyed get/set/del (a missing name
+    reads as ``None``) plus iteration over parameter OBJECTS, which is what the
+    engine's ``_glyph_order_param`` fallback relies on."""
+
+    def __init__(self) -> None:
+        self._params: list[_FakeParam] = []
+
+    def _find(self, name: str) -> _FakeParam | None:
+        return next((param for param in self._params if param.name == name), None)
+
+    def __getitem__(self, name: str) -> object | None:
+        param = self._find(name)
+        return param.value if param is not None else None
+
+    def __setitem__(self, name: str, value: object) -> None:
+        param = self._find(name)
+        if param is not None:
+            param.value = value
+        else:
+            self._params.append(_FakeParam(name, value))
+
+    def __delitem__(self, name: str) -> None:
+        param = self._find(name)
+        if param is None:
+            raise KeyError(name)
+        self._params.remove(param)
+
+    def __iter__(self) -> Iterator[_FakeParam]:
+        return iter(self._params)
+
+
 class _FakeFont:
     def __init__(self, masters: list[_FakeMaster], glyphs: list[_FakeGlyph]) -> None:
         self.masters = masters
@@ -77,6 +118,7 @@ class _FakeFont:
         self.selectedLayers: list[_FakeLayer] = []
         self.userData: _FakeProxy = _FakeProxy()
         self.tempData: _FakeProxy = _FakeProxy()
+        self.customParameters: _FakeCustomParameters = _FakeCustomParameters()
 
 
 # --------------------------------------------------------------------------- #
@@ -190,3 +232,63 @@ def test_off_selection_recolour_of_existing_glyph_not_detected() -> None:
     layer.color = 9  # change colour but leave it UNselected
     assert font.selectedLayers == []
     assert grouping.is_dirty(font) is False
+
+
+# --------------------------------------------------------------------------- #
+# Restoring the user's glyphOrder (disable / strip_for_save)
+# --------------------------------------------------------------------------- #
+
+def _enable_with_our_order(font: _FakeFont) -> None:
+    """Put the font in the enabled state with OUR grouping order active."""
+    font.userData[fontview.ENABLED_KEY] = True
+    font.customParameters[fontview.GLYPH_ORDER] = [f"{fontview.HEADER} (Layer)", "A", "B"]
+
+
+def test_disable_restores_the_saved_order_when_present() -> None:
+    font, grouping = _make_font()
+    _enable_with_our_order(font)
+    font.userData[fontview.HAD_ORDER_KEY] = True
+    font.userData[fontview.SAVED_ORDER_KEY] = ["B", "A"]
+    grouping.disable(font)
+    assert font.customParameters[fontview.GLYPH_ORDER] == ["B", "A"]
+
+
+def test_disable_with_lost_saved_order_removes_the_parameter() -> None:
+    # HAD_ORDER_KEY says the user had their own glyphOrder, but the saved
+    # snapshot was lost: restoring [] would leave an empty ACTIVE parameter
+    # overriding the font's natural order — remove the parameter instead.
+    font, grouping = _make_font()
+    _enable_with_our_order(font)
+    font.userData[fontview.HAD_ORDER_KEY] = True
+    font.userData[fontview.SAVED_ORDER_KEY] = None
+    grouping.disable(font)
+    assert font.customParameters[fontview.GLYPH_ORDER] is None
+
+
+def test_strip_for_save_restores_the_saved_order_when_present() -> None:
+    font, grouping = _make_font()
+    _enable_with_our_order(font)
+    font.userData[fontview.HAD_ORDER_KEY] = True
+    font.userData[fontview.SAVED_ORDER_KEY] = ["B", "A"]
+    assert grouping.strip_for_save(font) is True
+    assert font.customParameters[fontview.GLYPH_ORDER] == ["B", "A"]
+
+
+def test_strip_for_save_with_lost_saved_order_removes_the_parameter() -> None:
+    # Same falsy-saved-order guard on the save path: never write an empty
+    # active glyphOrder into the file.
+    font, grouping = _make_font()
+    _enable_with_our_order(font)
+    font.userData[fontview.HAD_ORDER_KEY] = True
+    font.userData[fontview.SAVED_ORDER_KEY] = ""
+    assert grouping.strip_for_save(font) is True
+    assert font.customParameters[fontview.GLYPH_ORDER] is None
+
+
+def test_strip_for_save_never_touches_a_user_glyph_order() -> None:
+    # The active glyphOrder is NOT ours (no header tag) -> leave it alone.
+    font, grouping = _make_font()
+    font.userData[fontview.ENABLED_KEY] = True
+    font.customParameters[fontview.GLYPH_ORDER] = ["B", "A"]
+    assert grouping.strip_for_save(font) is False
+    assert font.customParameters[fontview.GLYPH_ORDER] == ["B", "A"]
