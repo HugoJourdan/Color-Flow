@@ -24,35 +24,51 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-# 0 = unlimited: the timeline keeps a project's whole history. Callers that need to
-# bound the (expensive) per-commit headless opens pass a positive cap explicitly —
-# e.g. the outline-changes view's day window.
-DEFAULT_CAP = 0
+# Every git-history path is bounded to the most-recent `DEFAULT_CAP` points (days or
+# commits) unless the caller passes another positive cap explicitly — each point costs
+# a headless font open, so an unbounded ancient repo must not stall a report run.
+# When capping actually drops history a notice is printed (see _note_truncation).
+DEFAULT_CAP = 300
+
+# Hard ceiling for one git subprocess. These run on Glyphs' main thread; a stalled
+# git (fs hiccup, credential prompt, huge pack) must fail fast, not freeze the app.
+_GIT_TIMEOUT = 10
 
 # One per-master colour snapshot: {master_id: {glyph_name: key}}.
 Snapshot = dict[str, dict[str, int]]
 
 
+def _note_truncation(kind: str, cap: int, dropped: int) -> None:
+    """Make a cap that actually drops history visible (Macro window / test capture)
+    instead of silently truncating the timeline."""
+    print(
+        f"Color Flow: git history capped to the {cap} most recent {kind} "
+        f"({dropped} older {kind} skipped)."
+    )
+
+
 def _git_text(args: list[str], cwd: Path) -> str | None:
     """Run ``git <args>`` in ``cwd`` and return stdout as text, or ``None`` if git
-    is missing or the command fails (non-zero exit)."""
+    is missing, times out, or the command fails (non-zero exit)."""
     try:
         result = subprocess.run(
-            ["git", *args], cwd=str(cwd), capture_output=True, text=True, check=False
+            ["git", *args], cwd=str(cwd), capture_output=True, text=True, check=False,
+            timeout=_GIT_TIMEOUT, stdin=subprocess.DEVNULL,
         )
-    except (OSError, ValueError):
+    except (OSError, ValueError, subprocess.TimeoutExpired):
         return None
     return result.stdout if result.returncode == 0 else None
 
 
 def _git_bytes(args: list[str], cwd: Path) -> bytes | None:
     """Run ``git <args>`` in ``cwd`` and return stdout as raw bytes, or ``None`` on
-    failure — used for blob/archive content that should not be text-decoded."""
+    failure/timeout — used for blob/archive content that should not be text-decoded."""
     try:
         result = subprocess.run(
-            ["git", *args], cwd=str(cwd), capture_output=True, check=False
+            ["git", *args], cwd=str(cwd), capture_output=True, check=False,
+            timeout=_GIT_TIMEOUT, stdin=subprocess.DEVNULL,
         )
-    except (OSError, ValueError):
+    except (OSError, ValueError, subprocess.TimeoutExpired):
         return None
     return result.stdout if result.returncode == 0 else None
 
@@ -70,15 +86,24 @@ def git_root(path: Path) -> Path | None:
     return Path(root) if root else None
 
 
-def _rel(repo: Path, target: Path) -> str:
-    """``target`` as a POSIX path relative to ``repo`` (git speaks forward slashes)."""
-    return target.resolve().relative_to(repo.resolve()).as_posix()
+def _rel(repo: Path, target: Path) -> str | None:
+    """``target`` as a POSIX path relative to ``repo`` (git speaks forward slashes),
+    or ``None`` when it can't be expressed relative to the repo — symlinked working
+    copies or APFS case differences can make ``relative_to`` raise, and the git
+    plumbing should then degrade gracefully instead of blowing up the backfill."""
+    try:
+        return target.resolve().relative_to(repo.resolve()).as_posix()
+    except (ValueError, OSError):
+        return None
 
 
 def is_tracked(repo: Path, target: Path) -> bool:
     """Whether ``target`` (a file or a ``.glyphspackage`` directory) is tracked in
     ``repo`` — true when git lists at least one file at that path."""
-    out = _git_text(["ls-files", "--", _rel(repo, target)], repo)
+    rel = _rel(repo, target)
+    if rel is None:
+        return False
+    out = _git_text(["ls-files", "--", rel], repo)
     return bool(out and out.strip())
 
 
@@ -92,6 +117,8 @@ def day_commits(
     ISO date is in ``skip`` are then dropped (already recorded — used for incremental
     backfill). Follows first-parent only, so merges don't pull in side-branch states."""
     rel = _rel(repo, target)
+    if rel is None:
+        return []
     out = _git_text(
         ["log", "--first-parent", "--date=short", "--format=%cd|%H", "--", rel], repo
     )
@@ -108,6 +135,7 @@ def day_commits(
             latest_per_day[iso] = sha
     days = sorted(latest_per_day)            # oldest-first
     if cap and len(days) > cap:
+        _note_truncation("days", cap, len(days) - cap)
         days = days[-cap:]                   # keep the most-recent `cap` days
     if skip:
         days = [iso for iso in days if iso not in skip]
@@ -120,6 +148,8 @@ def extract_commit(repo: Path, target: Path, sha: str, dest_dir: Path) -> Path |
     and a ``.glyphspackage`` directory (``git archive`` -> in-memory tar extract).
     Returns ``None`` if the content can't be retrieved."""
     rel = _rel(repo, target)
+    if rel is None:
+        return None
     dest_dir.mkdir(parents=True, exist_ok=True)
     if target.is_dir():
         data = _git_bytes(["archive", "--format=tar", sha, "--", rel], repo)
@@ -144,7 +174,7 @@ def extract_commit(repo: Path, target: Path, sha: str, dest_dir: Path) -> Path |
 
 
 def commit_points(
-    repo: Path, target: Path, cap: int = DEFAULT_CAP
+    repo: Path, target: Path, cap: int = DEFAULT_CAP, skip: set[str] | None = None
 ) -> list[tuple[str, str]]:
     """Every commit of ``target`` (first-parent), oldest-first, as ``(key, sha)``.
 
@@ -152,8 +182,11 @@ def commit_points(
     each commit is its own point, keyed by a sortable local datetime
     (``YYYY-MM-DDTHH:MM:SS``). At most ``cap`` most-recent commits are kept. Keys are
     made unique (commits within the same second get a ``.1``/``.2`` suffix) so they can
-    index a snapshot dict and still sort lexicographically."""
+    index a snapshot dict and still sort lexicographically. Points whose final key is
+    in ``skip`` are then dropped (already recorded — used for incremental backfill)."""
     rel = _rel(repo, target)
+    if rel is None:
+        return []
     out = _git_text(
         ["log", "--first-parent", "--date=format-local:%Y-%m-%dT%H:%M:%S",
          "--format=%cd|%H", "--", rel], repo
@@ -170,6 +203,7 @@ def commit_points(
             raw.append((when, sha))
     raw.reverse()                                # git log is newest-first -> oldest-first
     if cap and len(raw) > cap:
+        _note_truncation("commits", cap, len(raw) - cap)
         raw = raw[-cap:]                         # keep the most-recent `cap` commits
     counts: dict[str, int] = {}
     points: list[tuple[str, str]] = []
@@ -178,6 +212,8 @@ def commit_points(
         counts[when] = seen + 1
         key = when if seen == 0 else f"{when}.{seen}"
         points.append((key, sha))
+    if skip:
+        points = [(key, sha) for key, sha in points if key not in skip]
     return points
 
 
@@ -239,16 +275,19 @@ def collect_commit_history(
     load_colors: Callable[[Path], Snapshot | None],
     cap: int = DEFAULT_CAP,
     progress: Callable[[float], None] | None = None,
+    skip: set[str] | None = None,
 ) -> dict[str, Snapshot]:
     """Reconstruct ``{commit_datetime: snapshot}`` from EVERY commit of ``font_path``
-    (not collapsed to one per day) — the substrate for the timeline's per-commit view.
-    Returns ``{}`` when the path is not in a git repo or not tracked."""
+    (not collapsed to one per day, capped to the ``cap`` most-recent commits) — the
+    substrate for the timeline's per-commit view. Commits whose datetime key is in
+    ``skip`` are not opened at all (incremental backfill: already-recorded checkpoints
+    cost nothing). Returns ``{}`` when the path is not in a git repo or not tracked."""
     target = Path(font_path)
     repo = git_root(target)
     if repo is None or not is_tracked(repo, target):
         return {}
     return _collect_snapshots(
-        repo, target, load_colors, commit_points(repo, target, cap), progress)
+        repo, target, load_colors, commit_points(repo, target, cap, skip), progress)
 
 
 def merge_history(
@@ -256,10 +295,12 @@ def merge_history(
 ) -> dict[str, Snapshot]:
     """Merge git-derived history under any existing live snapshots. Live snapshots
     win on a shared date (the user actually recorded those), git fills the gaps; the
-    result is capped to the most-recent ``cap`` dates (0 = uncapped, the default)."""
+    result is capped to the most-recent ``cap`` dates (0 = uncapped) — dropping any
+    is announced, never silent."""
     merged: dict[str, Snapshot] = dict(git_history)
     merged.update(existing)                  # live snapshots take precedence
     if cap and len(merged) > cap:
+        _note_truncation("dates", cap, len(merged) - cap)
         for old_date in sorted(merged)[: len(merged) - cap]:
             del merged[old_date]
     return merged

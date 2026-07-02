@@ -42,6 +42,15 @@ History = dict[str, dict[str, dict[str, int]]]
 SCHEMA_VERSION = 1   # legacy dense payload {"v":1,"h":history} (still decoded)
 DELTA_VERSION = 2    # current delta payload (see _to_delta)
 
+
+class HistoryDecodeError(ValueError):
+    """A history payload was *present* but could not be decoded.
+
+    Deliberately distinct from empty/missing input (which decodes to ``{}``): a
+    caller that gets ``{}`` back may safely write a fresh log, but on this error it
+    must preserve the raw payload (e.g. stash it under a backup key) before any
+    overwrite — otherwise one bad read silently destroys the font's timeline."""
+
 _GZIP_MAGIC = b"\x1f\x8b"
 _XZ_MAGIC = b"\xfd7zXZ\x00"
 
@@ -172,25 +181,31 @@ def decode_history(text: object) -> History:
     """Decode a string produced by :func:`encode_history` back to the history dict.
 
     Reads both the current delta payload (schema v2) and the legacy dense gzip payload
-    (schema v1) written by older builds. Returns ``{}`` for empty / missing / corrupt
-    input (never raises), and coerces every value to plain ``str``/``int`` so a value
-    read back from ``userData`` (which may be an ``NSString``/``NSDictionary``) behaves
-    like a normal Python dict."""
+    (schema v1) written by older builds. Returns ``{}`` for empty/missing input, and
+    coerces every value to plain ``str``/``int`` so a value read back from ``userData``
+    (which may be an ``NSString``/``NSDictionary``) behaves like a normal Python dict.
+
+    Raises :class:`HistoryDecodeError` when a payload is present but undecodable
+    (garbage base64, wrong compression, malformed JSON, unknown schema) — so callers
+    can tell "no data" from "data I must not clobber"."""
     if not text:
         return {}
     try:
         blob = base64.b64decode(str(text))
         decoded = json.loads(_decompress(blob).decode("utf-8"))
-    except Exception:
-        return {}
+    except Exception as error:
+        raise HistoryDecodeError(f"undecodable history payload: {error}") from error
     if not isinstance(decoded, dict):
-        return {}
-    if decoded.get("v") == DELTA_VERSION:
+        raise HistoryDecodeError("history payload is not a mapping")
+    version = decoded.get("v")
+    if version == DELTA_VERSION:
         try:
             return _from_delta(decoded)
-        except Exception:
-            return {}
-    return _coerce_dense(decoded.get("h"))
+        except Exception as error:
+            raise HistoryDecodeError(f"malformed delta payload: {error}") from error
+    if version == SCHEMA_VERSION:
+        return _coerce_dense(decoded.get("h"))
+    raise HistoryDecodeError(f"unknown history schema version: {version!r}")
 
 
 def _coerce_dense(history: object) -> History:

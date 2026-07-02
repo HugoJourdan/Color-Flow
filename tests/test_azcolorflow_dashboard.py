@@ -9,10 +9,11 @@ only thing left to manual testing is the real ``from GlyphsApp import ...`` line
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import SupportsIndex, overload
+from typing import Any, SupportsIndex, overload
 
 import azcolorflow_dashboard as db
 import colornames as cc
+import pytest
 
 # --------------------------------------------------------------------------- #
 # Fakes
@@ -226,6 +227,7 @@ class _FakeGlyphOrderParam:
         self._default = default_order
         self._custom = custom_order
         self._active = active
+        self.set_calls = 0                   # how many times `active` was written
 
     @property
     def active(self) -> bool:
@@ -233,6 +235,7 @@ class _FakeGlyphOrderParam:
 
     @active.setter
     def active(self, value: object) -> None:
+        self.set_calls += 1
         self._active = bool(value)
         self._font._apply_order(self._custom if self._active else self._default)
 
@@ -292,6 +295,54 @@ def test_default_glyph_order_passthrough_without_glyphorder_param() -> None:
     font = _FakeFont([_FakeMaster("m1", "R")], glyphs)
     font.customParameters = []  # has the API, but no glyphOrder parameter
     assert db.default_glyph_order(font, ["B", "A"]) == ["B", "A"]
+
+
+def test_default_glyph_order_does_not_touch_inactive_param() -> None:
+    # The parameter is already inactive -> font.glyphs is already in the default
+    # order, so the document must not be mutated at all (no `active` writes).
+    font = _glyph_order_font(["A", "B", "C"], ["C", "A", "B"])
+    param = font.customParameters[0]
+    param.active = False                     # user had it off; glyphs now default order
+    param.set_calls = 0
+    assert db.default_glyph_order(font, ["C", "A", "B"]) == ["A", "B", "C"]
+    assert param.set_calls == 0              # read-only path: zero document mutation
+    assert param.active is False             # and the prior state is untouched
+
+
+def test_default_glyph_order_restore_failure_is_loud(monkeypatch) -> None:
+    # If restoring the parameter fails, the failure must PROPAGATE — the old code
+    # swallowed it and silently left the user's glyphOrder disabled.
+    font = _glyph_order_font(["A", "B", "C"], ["C", "A", "B"])
+
+    def exploding_restore(self: _FakeGlyphOrderParam, value: object) -> None:
+        if bool(value):
+            raise RuntimeError("cannot restore")
+        self._active = False
+        self._font._apply_order(self._default)
+
+    monkeypatch.setattr(
+        _FakeGlyphOrderParam, "active",
+        property(_FakeGlyphOrderParam.active.fget, exploding_restore))
+    with pytest.raises(RuntimeError):
+        db.default_glyph_order(font, ["C", "A", "B"])
+
+
+def test_default_glyph_order_deactivation_failure_leaves_param_active(monkeypatch) -> None:
+    # If the deactivation itself fails, nothing was toggled: fall back to the input
+    # order and leave the parameter exactly as it was (active).
+    font = _glyph_order_font(["A", "B", "C"], ["C", "A", "B"])
+
+    def exploding_deactivate(self: _FakeGlyphOrderParam, value: object) -> None:
+        if not bool(value):
+            raise RuntimeError("cannot deactivate")
+        self._active = True
+        self._font._apply_order(self._custom)
+
+    monkeypatch.setattr(
+        _FakeGlyphOrderParam, "active",
+        property(_FakeGlyphOrderParam.active.fget, exploding_deactivate))
+    assert db.default_glyph_order(font, ["C", "A", "B"]) == ["C", "A", "B"]
+    assert font.customParameters[0].active is True
 
 
 def test_build_model_uses_default_order_over_glyph_iteration_order(tmp_path) -> None:
@@ -457,6 +508,76 @@ def test_coerce_snapshot_stringifies_and_ints() -> None:
     assert db._coerce_snapshot(None) == {}
 
 
+def test_save_snapshot_prunes_paths_missing_on_disk(monkeypatch, tmp_path) -> None:
+    # The defaults store is keyed by file path and used to accumulate an entry for
+    # every font ever reported; saving now prunes entries whose file is gone.
+    fake = _FakeGlyphsApp()
+    monkeypatch.setattr(db, "Glyphs", fake)
+    alive = tmp_path / "Alive.glyphs"
+    alive.write_text("x", encoding="utf-8")
+    fake.defaults[db.DEFAULTS_KEY] = {
+        str(alive): {"m1": {"A": 0}},
+        str(tmp_path / "Ghost.glyphs"): {"m1": {"A": 1}},   # deleted long ago
+    }
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath=str(tmp_path / "Current.glyphs"))
+    db.save_snapshot(font, {"m1": {"A": 2}})
+    store = fake.defaults[db.DEFAULTS_KEY]
+    assert isinstance(store, dict)
+    # ghost pruned; the on-disk sibling survives; the current font is always kept
+    # (even though its path isn't on disk yet).
+    assert set(store) == {str(alive), font.filepath}
+    assert store[font.filepath] == {"m1": {"A": 2}}
+
+
+# --------------------------------------------------------------------------- #
+# Corrupt embedded history — never silently overwritten
+# --------------------------------------------------------------------------- #
+
+def test_load_history_stashes_corrupt_payload(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    font.userData[db.TIMELINE_USERDATA_KEY] = "definitely-not-a-payload-!!"
+    assert db.load_history(font) == {}                       # unreadable -> empty view
+    backup_key = db.TIMELINE_USERDATA_KEY + db.CORRUPT_HISTORY_SUFFIX
+    assert font.userData[backup_key] == "definitely-not-a-payload-!!"
+    assert "could not be decoded" in capsys.readouterr().out  # loud, not silent
+
+
+def test_record_history_preserves_corrupt_payload_before_overwrite(monkeypatch) -> None:
+    # The exact data-loss scenario: a corrupt embedded timeline used to be replaced
+    # by a fresh 1-entry log. The fresh log is still written (the plugin must keep
+    # working) but the original payload survives under the backup key.
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    font.userData[db.TIMELINE_USERDATA_KEY] = "corrupt!!"
+    db.record_history(font, {"m1": {"A": 0}}, datetime(2026, 6, 6))
+    assert db.load_history(font) == {"2026-06-06T00:00:00": {"m1": {"A": 0}}}
+    backup_key = db.TIMELINE_USERDATA_KEY + db.CORRUPT_HISTORY_SUFFIX
+    assert font.userData[backup_key] == "corrupt!!"
+
+
+def test_corrupt_stash_keeps_the_first_copy(monkeypatch) -> None:
+    # A second corruption never overwrites the stashed original (the first corrupt
+    # payload is the one closest to the user's real history).
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    backup_key = db.TIMELINE_USERDATA_KEY + db.CORRUPT_HISTORY_SUFFIX
+    font.userData[backup_key] = "the-original-corrupt-copy"
+    font.userData[db.TIMELINE_USERDATA_KEY] = "newer-corruption!!"
+    assert db.load_history(font) == {}
+    assert font.userData[backup_key] == "the-original-corrupt-copy"
+
+
+def test_load_history_corrupt_primary_still_reads_legacy_store(monkeypatch) -> None:
+    # A corrupt userData payload must not block the legacy Glyphs.defaults fallback.
+    fake = _FakeGlyphsApp()
+    monkeypatch.setattr(db, "Glyphs", fake)
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    font.userData[db.TIMELINE_USERDATA_KEY] = "corrupt!!"
+    fake.defaults[db.HISTORY_KEY] = {font.filepath: {"2026-06-01": {"m1": {"A": 4}}}}
+    assert db.load_history(font) == {"2026-06-01": {"m1": {"A": 4}}}
+
+
 def test_record_history_round_trips_and_sorts(monkeypatch) -> None:
     monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
     font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
@@ -575,12 +696,15 @@ def test_write_history_replaces_uncapped_and_coalesces_past_days(monkeypatch) ->
 
 def test_backfill_from_git_imports_commits_under_live_saves(monkeypatch) -> None:
     # Backfill imports git COMMIT datetimes into the per-save log; a live save wins on a
-    # shared key, and only non-colliding commits count as newly imported.
+    # shared key, and only non-colliding commits count as newly imported. The collector
+    # receives the already-recorded keys as `skip`, so the backfill is truly incremental.
     monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
     font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
     db.record_history(font, {"m1": {"A": 5}}, datetime(2026, 6, 2, 12))   # a live save
+    seen: dict = {}
 
-    def fake_commits(path, load, cap=60, progress=None) -> dict:
+    def fake_commits(path, load, cap=0, progress=None, skip=None) -> dict:
+        seen["skip"] = skip
         return {
             "2026-06-01T09:00:00": {"m1": {"A": 0}},
             "2026-06-02T12:00:00": {"m1": {"A": 9}},   # collides with the live save's key
@@ -589,6 +713,7 @@ def test_backfill_from_git_imports_commits_under_live_saves(monkeypatch) -> None
     monkeypatch.setattr(db.azcolorflow_git, "collect_commit_history", fake_commits)
     imported = db.backfill_from_git(font)
     assert imported == 1                          # only the non-colliding commit is new
+    assert seen["skip"] == {"2026-06-02T12:00:00"}  # recorded keys are never re-opened
     history = db.load_history(font)
     assert history == {
         "2026-06-01T09:00:00": {"m1": {"A": 0}},
@@ -601,10 +726,38 @@ def test_backfill_from_git_no_op_when_not_in_repo(monkeypatch) -> None:
     font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
     monkeypatch.setattr(
         db.azcolorflow_git, "collect_commit_history",
-        lambda path, load, cap=60, progress=None: {},  # not a git repo / nothing tracked
+        lambda path, load, cap=0, progress=None, skip=None: {},  # not a repo / untracked
     )
     assert db.backfill_from_git(font) == 0
     assert db.load_history(font) == {}
+
+
+def test_backfill_from_git_uses_precollected_pass_without_recollecting(monkeypatch) -> None:
+    # When main() hands over the single per-run git pass, backfill must not walk the
+    # repo again — the collector is not called at all.
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+
+    def exploding_collect(*args, **kwargs) -> dict:
+        raise AssertionError("collect_commit_history must not be called")
+
+    monkeypatch.setattr(db.azcolorflow_git, "collect_commit_history", exploding_collect)
+    imported = db.backfill_from_git(
+        font, git_history={"2026-06-01T09:00:00": {"m1": {"A": 0}}})
+    assert imported == 1
+    assert db.load_history(font) == {"2026-06-01T09:00:00": {"m1": {"A": 0}}}
+
+
+def test_backfill_from_git_nothing_new_does_not_rewrite(monkeypatch) -> None:
+    # A precollected pass where every key is already recorded must not re-dirty the
+    # font (no userData write at all).
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    db.record_history(font, {"m1": {"A": 5}}, datetime(2026, 6, 2, 12))
+    before = font.userData[db.TIMELINE_USERDATA_KEY]
+    assert db.backfill_from_git(
+        font, git_history={"2026-06-02T12:00:00": {"m1": {"A": 9}}}) == 0
+    assert font.userData[db.TIMELINE_USERDATA_KEY] == before
 
 
 def test_coerce_history_stringifies_dates_and_ints() -> None:
@@ -769,6 +922,51 @@ def test_build_journey_index_empty_when_no_dates() -> None:
     assert db.build_journey_index({}, []) == {}
 
 
+def _dense_journey_index_reference(history: dict, dates: list) -> dict:
+    """The original dense O(masters x glyphs x dates) implementation, kept verbatim
+    as the oracle for the rewritten single-pass diff version."""
+    if not dates:
+        return {}
+    index: dict = {}
+    master_ids: set = set()
+    for per_master in history.values():
+        master_ids.update(per_master.keys())
+    for master_id in master_ids:
+        names: set = set()
+        for date in dates:
+            names.update(history.get(date, {}).get(master_id, {}).keys())
+        per_glyph: dict = {}
+        for name in names:
+            events: list = []
+            previous = None
+            for date in dates:
+                key = history.get(date, {}).get(master_id, {}).get(name, cc.NO_COLOR)
+                if key != previous:
+                    events.append([date, key])
+                    previous = key
+            per_glyph[name] = events
+        index[master_id] = per_glyph
+    return index
+
+
+def test_build_journey_index_matches_dense_reference() -> None:
+    # The rewrite must be behaviour-identical on every awkward shape at once: a
+    # master missing a date, a glyph appearing mid-history, a glyph disappearing
+    # and coming back, a glyph starting uncoloured, a second master appearing
+    # late, and a history entry whose date is outside the `dates` window (its
+    # master still shows up, with no events — exactly like the dense version).
+    history = {
+        "2026-06-01": {"m1": {"A": cc.NO_COLOR, "B": 2}},
+        "2026-06-02": {},                                        # m1 absent that day
+        "2026-06-03": {"m1": {"A": 1, "C": 4}, "m2": {"A": 0}},  # B gone; C + m2 appear
+        "2026-06-04": {"m1": {"A": 1, "B": 2, "C": 4}},          # B returns unchanged
+        "2026-09-09": {"m9": {"Z": 3}},                          # outside the window
+    }
+    dates = ["2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04"]
+    assert db.build_journey_index(history, dates) == _dense_journey_index_reference(
+        history, dates)
+
+
 class _FakeNSDate:
     def __init__(self, timestamp: float) -> None:
         self._timestamp = timestamp
@@ -901,7 +1099,7 @@ def test_build_model_emits_scripts_parallel_to_glyph_names(tmp_path) -> None:
 
     assert "scripts" in model
     assert len(model["scripts"]) == len(model["glyphNames"])   # parallel to glyphNames
-    by_name = dict(zip(model["glyphNames"], model["scripts"]))
+    by_name = dict(zip(model["glyphNames"], model["scripts"], strict=True))
     assert by_name == {"A": "latin", "alef-ar": "arabic", "comma": "Other"}
 
 
@@ -967,7 +1165,7 @@ def test_build_model_builds_per_commit_timeline_when_available(monkeypatch, tmp_
     (tmp_path / "colorNames.txt").write_text("purple=Outline\nNone=Nothing\n", encoding="utf-8")
     glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)})]
     font = _FakeFont([_FakeMaster("m1", "Regular")], glyphs, filepath=str(tmp_path / "F.glyphs"))
-    monkeypatch.setattr(db, "commit_timeline_history", lambda font: {
+    monkeypatch.setattr(db, "commit_timeline_history", lambda font, git_commits=None: {
         "2026-06-01T09:00:00": {"m1": {"A": cc.NO_COLOR}},
         "2026-06-01T15:00:00": {"m1": {"A": 8}},
     })
@@ -990,6 +1188,84 @@ def test_git_day_history_empty_without_filepath_or_glyphs(monkeypatch, tmp_path)
     assert db.git_day_history(font) == {}
 
 
+def test_git_day_history_derives_days_from_precollected_commits(monkeypatch, tmp_path) -> None:
+    # With this run's git pass in hand, the day view is derived (last checkpoint of
+    # each day wins) — git is not walked a second time.
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath=str(tmp_path / "F.glyphs"))
+
+    def exploding_collect(*args, **kwargs) -> dict:
+        raise AssertionError("collect_git_history must not be called")
+
+    monkeypatch.setattr(db.azcolorflow_git, "collect_git_history", exploding_collect)
+    days = db.git_day_history(font, git_commits={
+        "2026-06-01T09:00:00": {"m1": {"A": 0}},
+        "2026-06-01T17:00:00": {"m1": {"A": 1}},   # same day, later -> wins
+        "2026-06-02T10:00:00": {"m1": {"A": 2}},
+    })
+    assert days == {"2026-06-01": {"m1": {"A": 1}}, "2026-06-02": {"m1": {"A": 2}}}
+
+
+def test_commit_timeline_history_merges_precollected_with_saved_log(monkeypatch) -> None:
+    # Precollected commits (already-recorded keys skipped) are merged under the
+    # recorded save log — the skipped checkpoints live there — so the fine timeline
+    # is complete without re-opening a single commit.
+    monkeypatch.setattr(db, "Glyphs", _FakeGlyphsApp())
+    font = _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Acme.glyphs")
+    db.record_history(font, {"m1": {"A": 5}}, datetime(2026, 6, 2, 12))
+
+    def exploding_collect(*args, **kwargs) -> dict:
+        raise AssertionError("collect_commit_history must not be called")
+
+    monkeypatch.setattr(db.azcolorflow_git, "collect_commit_history", exploding_collect)
+    fine = db.commit_timeline_history(
+        font, git_commits={"2026-06-01T09:00:00": {"m1": {"A": 0}}})
+    assert fine == {
+        "2026-06-01T09:00:00": {"m1": {"A": 0}},
+        "2026-06-02T12:00:00": {"m1": {"A": 5}},   # the recorded save folds in
+    }
+    # tracked repo but nothing new and nothing recorded elsewhere -> stays empty
+    assert db.commit_timeline_history(
+        _FakeFont([_FakeMaster("m1", "R")], filepath="/fonts/Other.glyphs"),
+        git_commits={}) == {}
+
+
+def test_main_collects_git_commits_once_and_shares_the_pass(monkeypatch, tmp_path) -> None:
+    # THE single-pass invariant: one report run performs exactly one per-commit git
+    # collection (with the recorded keys skipped) — the backfill, the fine timeline
+    # and the day timeline all reuse it instead of re-opening every commit.
+    fake = _FakeGlyphsApp()
+    fake.defaults[db.OUTLINE_CHANGE_DAYS_KEY] = 0            # keep the outline view dormant
+    monkeypatch.setattr(db, "Glyphs", fake)
+    monkeypatch.setattr(db.webbrowser, "open", lambda uri: None)
+    monkeypatch.setattr(db, "is_git_tracked", lambda font: True)
+    calls = {"commits": 0, "days": 0}
+    seen: dict = {}
+
+    def fake_commits(path, load, cap=0, progress=None, skip=None) -> dict:
+        calls["commits"] += 1
+        seen["skip"] = skip
+        return {"2026-06-01T09:00:00": {"m1": {"A": 8}}}
+
+    def fake_days(path, load, cap=0, progress=None, skip=None) -> dict:
+        calls["days"] += 1
+        return {}
+
+    monkeypatch.setattr(db.azcolorflow_git, "collect_commit_history", fake_commits)
+    monkeypatch.setattr(db.azcolorflow_git, "collect_git_history", fake_days)
+    (tmp_path / "colorNames.txt").write_text("purple=Outline\nNone=Nothing\n", encoding="utf-8")
+    glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)})]
+    font = _FakeFont([_FakeMaster("m1", "Regular")], glyphs, filepath=str(tmp_path / "F.glyphs"))
+    db.record_history(font, {"m1": {"A": cc.NO_COLOR}}, datetime(2026, 6, 1, 8))  # a prior save
+
+    result = db.main(font, open_when_done=False)
+    assert result is not None
+    assert calls["commits"] == 1                             # ONE pass, not one per view
+    assert calls["days"] == 0                                # day view derived, not re-collected
+    assert seen["skip"] == {"2026-06-01T08:00:00"}           # recorded keys were skipped
+    assert "2026-06-01T09:00:00" in db.load_history(font)    # ...and the pass fed the backfill
+
+
 def test_build_model_merges_git_day_history_userdata_wins(monkeypatch, tmp_path) -> None:
     # When the font is git-tracked, the day-timeline reads from git and merges it under
     # any frozen pre-git userData past. On a shared day the live userData snapshot wins
@@ -999,7 +1275,7 @@ def test_build_model_merges_git_day_history_userdata_wins(monkeypatch, tmp_path)
     glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)})]
     font = _FakeFont([_FakeMaster("m1", "Regular")], glyphs, filepath=str(tmp_path / "F.glyphs"))
     db.record_history(font, {"m1": {"A": 8}}, datetime(2026, 6, 2))   # frozen pre-git userData day
-    monkeypatch.setattr(db, "git_day_history", lambda font: {
+    monkeypatch.setattr(db, "git_day_history", lambda font, git_commits=None: {
         "2026-06-01": {"m1": {"A": cc.NO_COLOR}},                     # git fills an earlier gap
         "2026-06-02": {"m1": {"A": 3}},                              # collides with userData's 8
     })
@@ -1035,7 +1311,7 @@ def test_build_model_fine_kind_is_commit_with_git(monkeypatch, tmp_path) -> None
     (tmp_path / "colorNames.txt").write_text("purple=Outline\nNone=Nothing\n", encoding="utf-8")
     glyphs = [_FakeGlyph("A", {"m1": _FakeLayerColor(8)})]
     font = _FakeFont([_FakeMaster("m1", "Regular")], glyphs, filepath=str(tmp_path / "F.glyphs"))
-    monkeypatch.setattr(db, "commit_timeline_history", lambda font: {
+    monkeypatch.setattr(db, "commit_timeline_history", lambda font, git_commits=None: {
         "2026-06-01T09:00:00": {"m1": {"A": cc.NO_COLOR}},
         "2026-06-01T15:00:00": {"m1": {"A": 8}},
     })
@@ -1269,7 +1545,7 @@ def _counting_extractor(monkeypatch) -> list[int]:
     real = db.glyphsvg.layer_outline_em
     calls = [0]
 
-    def counted(*args: object, **kwargs: object) -> dict:
+    def counted(*args: Any, **kwargs: Any) -> dict:
         calls[0] += 1
         return real(*args, **kwargs)
 

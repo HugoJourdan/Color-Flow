@@ -7,6 +7,7 @@ import gzip
 import json
 
 import azcolorflow_history_store as store
+import pytest
 
 SAMPLE = {
     "2026-06-01": {"m1": {"A": 0, "B": -1}, "m2": {"A": 1, "B": 0}},
@@ -28,12 +29,38 @@ def test_encoding_is_deterministic() -> None:
     assert store.encode_history(SAMPLE) == store.encode_history(SAMPLE)
 
 
-def test_decode_tolerates_garbage() -> None:
+def test_decode_empty_or_missing_input_is_empty() -> None:
+    # "no data" stays a plain empty dict — callers may freely start a fresh log.
     assert store.decode_history(None) == {}
     assert store.decode_history("") == {}
-    assert store.decode_history("not-base64-!!") == {}
-    # valid base64 but not gzip
-    assert store.decode_history(base64.b64encode(b"plain").decode()) == {}
+
+
+def _wrap(payload: object) -> str:
+    """base64(gzip(json(payload))) — a structurally valid container for any payload."""
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    return base64.b64encode(gzip.compress(raw, mtime=0)).decode("ascii")
+
+
+def test_decode_raises_on_undecodable_payload() -> None:
+    # "data present but unreadable" must be distinguishable from "no data": the
+    # caller has to preserve the raw value instead of overwriting it with a fresh
+    # log, so every corrupt shape raises HistoryDecodeError.
+    with pytest.raises(store.HistoryDecodeError):
+        store.decode_history("not-base64-!!")                      # bad base64
+    with pytest.raises(store.HistoryDecodeError):
+        store.decode_history(base64.b64encode(b"plain").decode())  # not gzip/xz
+    with pytest.raises(store.HistoryDecodeError):
+        store.decode_history(_wrap([1, 2, 3]))                     # JSON but not a mapping
+    with pytest.raises(store.HistoryDecodeError):
+        store.decode_history(_wrap({"v": 99, "h": {}}))            # unknown schema version
+    with pytest.raises(store.HistoryDecodeError):
+        store.decode_history(_wrap(                                # malformed delta model
+            {"v": 2, "dates": ["2026-06-01"], "base": {"m1": {"A": "xx"}}, "steps": {}}))
+
+
+def test_decode_error_is_a_value_error() -> None:
+    # callers that only knew the old contract catch ValueError and keep working
+    assert issubclass(store.HistoryDecodeError, ValueError)
 
 
 def test_decode_coerces_values_to_str_and_int() -> None:
