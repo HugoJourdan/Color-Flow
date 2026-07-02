@@ -1561,8 +1561,11 @@ def test_version_nav_skips_unchanged_versions_for_selected_master() -> None:
     js = assets.DASHBOARD_JS
     vn = js.split("function versionNav(", 1)[1].split("\n  function ", 1)[0]
     assert "var mid = state.master" in vn
-    # builds the changed-index list by diffing this master's stateAt across dates
-    assert "stateAt(mid, dates[0])" in vn and "stateAt(mid, dates[k])" in vn
+    # builds the changed-index list from the cached per-snapshot change counts
+    # (changeCounts, walked off the sparse journeyIndex) — equivalent to diffing this
+    # master's stateAt across dates, without a full reconstruction per date per render
+    assert "changeCounts(mid)" in vn
+    assert "stateAt(" not in vn and "JSON.stringify" not in vn
     assert "vidx.push(k)" in vn
     # global fallback shows every version
     assert "dates.map(function(_d, i){ return i; })" in vn
@@ -1602,6 +1605,59 @@ def test_timeline_pct_matrix_cached_excludes_scrub() -> None:
     assert "gradedPctAt(" in pm
     assert "state.viewLo" in pm and "state.viewHi" in pm     # window busts the cache
     assert "state.tlScrub" not in pm                         # scrubbing must NOT bust it
+
+
+def test_snapshot_caches_key_on_the_timeline_dataset() -> None:
+    """Every stateAt-derived aggregate cache (change counts, graded % at a date, Flow
+    colour tallies, week colour moves) keys on tlDatasetKey() — the same keying + reset
+    discipline as NAVCACHE/PMCACHE: switching granularity/bucket (applyGranularity
+    swaps the timeline dataset) drops the cache; scrubbing and zooming reuse it."""
+    js = assets.DASHBOARD_JS
+    key_fn = js.split("function tlDatasetKey(", 1)[1].split("\n  function ", 1)[0]
+    assert "state.tlGran" in key_fn and "state.tlBucket" in key_fn
+    assert "dates.length" in key_fn                          # dataset signature busts the key
+    assert "state.tlScrub" not in key_fn and "state.viewLo" not in key_fn  # scrub/zoom must NOT
+    for cache in ("CHGCACHE", "GPCACHE", "COLCACHE", "WKCACHE"):
+        assert f'var {cache} = {{}}, {cache}_KEY = "";' in js, cache       # declared like NAVCACHE
+        assert f"if ({cache}_KEY !== key){{ {cache} = {{}}; {cache}_KEY = key; }}" in js, cache
+
+
+def test_version_nav_and_calendar_share_cached_change_counts() -> None:
+    """changeCounts(masterId): per-snapshot changed-glyph counts walked straight off
+    the sparse journeyIndex (O(events + dates), cached) — behaviour-identical to
+    diffing full stateAt snapshots: same hidden-key normalisation, a glyph appearing
+    counts as a change, events cancelling out between two snapshots do not, and
+    chg[0] stays 0 (no predecessor)."""
+    js = assets.DASHBOARD_JS
+    cc = js.split("function changeCounts(", 1)[1].split("\n  function ", 1)[0]
+    assert "H.journeyIndex" in cc and "stateAt(" not in cc   # sparse events, no reconstruction
+    assert "H.order.indexOf(String(k))" in cc                # stateAt's hidden-key normalisation
+    assert "tlDatasetKey()" in cc and "CHGCACHE[masterId]" in cc
+    # the activity calendar reads the same cached counts instead of re-diffing stateAt
+    cal = js.split("function calActivity(", 1)[1].split("\n  function ", 1)[0]
+    assert "changeCounts(masterId)" in cal and "stateAt(" not in cal
+
+
+def test_graded_pct_at_memoised_per_master_and_date() -> None:
+    js = assets.DASHBOARD_JS
+    gp = js.split("function gradedPctAt(", 1)[1].split("\n  function ", 1)[0]
+    assert "GPCACHE" in gp and "tlDatasetKey()" in gp
+    assert 'masterId + "|" + date' in gp
+
+
+def test_flow_tally_and_week_moves_memoised() -> None:
+    """streamParts sums cached per-master|date colour tallies (colTally), and the
+    'Focus of the week' loop lives in weekColorMoves — both stateAt walks now run
+    once per timeline dataset instead of on every re-render."""
+    js = assets.DASHBOARD_JS
+    ct = js.split("function colTally(", 1)[1].split("\n  function ", 1)[0]
+    assert "COLCACHE" in ct and "stateAt(mid, iso)" in ct and "isCounted(name)" in ct
+    stream = js.split("function streamParts(", 1)[1].split("\n  function ", 1)[0]
+    assert "colTally(mid, p.date)" in stream
+    wk_fn = js.split("function weekColorMoves(", 1)[1].split("\n  function ", 1)[0]
+    assert "WKCACHE" in wk_fn and "stateAt(m.id, weekAgo)" in wk_fn
+    wk = js.split("function weekProgressCard(", 1)[1].split("\n  function ", 1)[0]
+    assert "weekColorMoves(weekAgo)" in wk and "stateAt(" not in wk
 
 
 def test_timeline_band_median_minmax() -> None:

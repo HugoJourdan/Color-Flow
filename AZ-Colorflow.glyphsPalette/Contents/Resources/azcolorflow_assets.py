@@ -863,10 +863,19 @@ DASHBOARD_JS = r"""
   // use. Reconstructs the state at the date (stateAt) and sums step weights, so the
   // Line chart, the ring and Flow all tell one consistent story. (Was final-step-only,
   // which sat at 0 until glyphs reached the last colour, then cliffed to 100.)
+  // Memoised per master|date: the matrix/week/nav surfaces ask for the same pairs on
+  // every re-render, and each answer is a full stateAt reconstruction. Same keying +
+  // reset discipline as NAVCACHE/PMCACHE — the key is the active timeline dataset
+  // (tlDatasetKey), so switching granularity/bucket drops the memo; scrubbing keeps it.
+  var GPCACHE = {}, GPCACHE_KEY = "";
   function gradedPctAt(masterId, date){
+    var key = tlDatasetKey();
+    if (GPCACHE_KEY !== key){ GPCACHE = {}; GPCACHE_KEY = key; }
+    var ck = masterId + "|" + date;
+    if (GPCACHE[ck] != null){ return GPCACHE[ck]; }
     var W = stepWeights().weight, total = countedTotal() || 1, snap = stateAt(masterId, date), s = 0;
     for (var name in snap){ if (!isCounted(name)) continue; var w = W[String(snap[name])]; if (w){ s += w; } }
-    return s / total * 100;
+    return (GPCACHE[ck] = s / total * 100);
   }
   function gradedOverallPct(){ var s=0, tot=0; H.masters.forEach(function(m){ s+=gradedSum(m); tot+=countedTotal(); }); return tot? Math.round(s/tot*100):0; }
   // Overall graded % AT a past snapshot date (avg of per-master gradedPctAt — countedTotal
@@ -976,14 +985,15 @@ DASHBOARD_JS = r"""
     // In the per-master card, only show a version where THIS master's colours actually
     // changed (vs the previous snapshot) — a static master collapses to its single
     // baseline. Global view (no master) still shows every version. data-vnav keeps the
-    // ABSOLUTE series index so scrubSet still lands on the right date.
+    // ABSOLUTE series index so scrubSet still lands on the right date. The change flags
+    // come from changeCounts() (cached, walked off the sparse journeyIndex) — same
+    // nodes as diffing full stateAt snapshots, without paying that on every render.
     var mid = state.master, vidx;
     if (mid){
       vidx = [0];
-      var prevSnap = JSON.stringify(stateAt(mid, dates[0]));
+      var chg = changeCounts(mid);
       for (var k=1;k<dates.length;k++){
-        var snapK = JSON.stringify(stateAt(mid, dates[k]));
-        if (snapK !== prevSnap){ vidx.push(k); prevSnap = snapK; }
+        if (chg[k]){ vidx.push(k); }
       }
     } else {
       vidx = dates.map(function(_d, i){ return i; });
@@ -1338,6 +1348,30 @@ DASHBOARD_JS = r"""
     var svg = '<svg class="ovz" viewBox="-26 0 252 200" role="img" aria-label="'+esc(m.name+" colour spread")+'">'+grid+spokes+poly+axt+'</svg>';
     return ovCard("radar", "Colour spread by master", '<div class="ovz-wrap">'+svg+'</div>', false);
   }
+  // "Focus of the week" tally: how many glyphs moved TO each visible colour since the
+  // week-ago snapshot, across all masters. Needs a stateAt reconstruction per master,
+  // so it's cached like NAVCACHE/PMCACHE (key = the active timeline dataset, entries
+  // per compared snapshot date) — the Overview re-renders on every click and must not
+  // pay the full-history walk again.
+  var WKCACHE = {}, WKCACHE_KEY = "";
+  function weekColorMoves(weekAgo){
+    var key = tlDatasetKey();
+    if (WKCACHE_KEY !== key){ WKCACHE = {}; WKCACHE_KEY = key; }
+    if (WKCACHE[weekAgo]) return WKCACHE[weekAgo];
+    var colorMoves = {}, names = H.glyphNames || [];
+    H.masters.forEach(function(m){
+      var snap = stateAt(m.id, weekAgo), ks = m.keys || [];
+      for (var i=0;i<names.length;i++){
+        if (!isCounted(names[i])) continue;
+        var nowK = (ks[i] != null) ? ks[i] : -1, thenK = (snap[names[i]] != null) ? snap[names[i]] : -1;
+        // a glyph moved TO a visible colour this week -> tally it for "focus of the week"
+        if (String(nowK) !== String(thenK) && nowK !== -1 && H.order.indexOf(String(nowK)) !== -1){
+          colorMoves[String(nowK)] = (colorMoves[String(nowK)] || 0) + 1;
+        }
+      }
+    });
+    return (WKCACHE[weekAgo] = colorMoves);
+  }
   // Overview "This week" card: graded completion change over the last 7 days + how many
   // glyph layers advanced a step. Hidden until there's a snapshot >=7 days back.
   function weekProgressCard(){
@@ -1348,18 +1382,9 @@ DASHBOARD_JS = r"""
     var nowPct = gradedOverallPct(), thenPct = gradedOverallPctAt(weekAgo), delta = nowPct - thenPct;
     var monthAgo = snapDate(dates, isoMinusDays(latest, 30)), monthDelta = nowPct - gradedOverallPctAt(monthAgo);
     function wkStat(d, lab){ var a = rankArrow(d); return '<span class="wk-stat"><span class="wk-delta '+a.c+'">'+a.g+' '+(d>0?"+":"")+d+'%</span><span class="wk-sub">'+lab+'</span></span>'; }
-    var gains = [], colorMoves = {};
+    var gains = [], colorMoves = weekColorMoves(weekAgo);
     H.masters.forEach(function(m){
-      var snap = stateAt(m.id, weekAgo), names = H.glyphNames || [], ks = m.keys || [];
       gains.push({ m:m, d:Math.round(gradedMasterPct(m) - gradedPctAt(m.id, weekAgo)) });   // weekly gain
-      for (var i=0;i<names.length;i++){
-        if (!isCounted(names[i])) continue;
-        var nowK = (ks[i] != null) ? ks[i] : -1, thenK = (snap[names[i]] != null) ? snap[names[i]] : -1;
-        // a glyph moved TO a visible colour this week -> tally it for "focus of the week"
-        if (String(nowK) !== String(thenK) && nowK !== -1 && H.order.indexOf(String(nowK)) !== -1){
-          colorMoves[String(nowK)] = (colorMoves[String(nowK)] || 0) + 1;
-        }
-      }
     });
     // top 3 most-improved masters (positive weekly gain), and the top 3 colours that gained
     // the most glyphs this week.
@@ -1816,9 +1841,9 @@ DASHBOARD_JS = r"""
     var tally = ax.series.map(function(p){
       var byKey = {}; order.forEach(function(k){ byKey[k] = 0; }); var none = 0;
       scopeIds.forEach(function(mid){
-        var snap = stateAt(mid, p.date);
-        for (var name in snap){ if (!isCounted(name)) continue; var sk = String(snap[name]);
-          if (snap[name] === -1 || order.indexOf(sk) === -1){ none++; } else { byKey[sk]++; } }
+        var t = colTally(mid, p.date);             // memoised per master|date
+        order.forEach(function(k){ byKey[k] += t.byKey[k]; });
+        none += t.none;
       });
       return { date:p.date, byKey:byKey, none:none };
     });
@@ -1895,6 +1920,22 @@ DASHBOARD_JS = r"""
       return '<span class="tl-lg"><i style="background:var('+varFor(k)+')"></i>'+esc(labelFor(k))+'</span>';
     }).join("") + '<span class="tl-lg"><i class="tl-lg-hatch"></i>'+esc(H.noneLabel)+'</span>';
     return { chart:chart, legend:legend, foot:"" };   // the start/end date row moved to the navigator's ticks
+  }
+  // Colour tally of ONE master at ONE snapshot (exclusion-aware) for the Flow bands.
+  // Every stacked-band render re-reads the same master|date pairs, and each tally is a
+  // full stateAt reconstruction — so it's memoised like NAVCACHE/PMCACHE (key = the
+  // active timeline dataset; zoom, scrub and view switches all reuse the entries).
+  var COLCACHE = {}, COLCACHE_KEY = "";
+  function colTally(mid, iso){
+    var key = tlDatasetKey();
+    if (COLCACHE_KEY !== key){ COLCACHE = {}; COLCACHE_KEY = key; }
+    var ck = mid + "|" + iso;
+    if (COLCACHE[ck]) return COLCACHE[ck];
+    var order = H.order || [], byKey = {}; order.forEach(function(k){ byKey[k] = 0; }); var none = 0;
+    var snap = stateAt(mid, iso);
+    for (var name in snap){ if (!isCounted(name)) continue; var sk = String(snap[name]);
+      if (snap[name] === -1 || order.indexOf(sk) === -1){ none++; } else { byKey[sk]++; } }
+    return (COLCACHE[ck] = { byKey:byKey, none:none });
   }
   // Preset duration windows (1D / 1W / 1M / 1Y / All) that zoom the chart to the last N
   // period. They drive the SAME zoom window as the range navigator (state.viewLo/viewHi),
@@ -2511,16 +2552,13 @@ DASHBOARD_JS = r"""
       + '</section>';
   }
   // ----- Activity calendar (GitHub-contribution style) -----------------------
-  // Per snapshot date, how many glyphs changed colour vs the previous snapshot
-  // (diff of stateAt over the chosen master). Non-snapshot calendar days are 0.
+  // Per snapshot date, how many glyphs changed colour vs the previous snapshot —
+  // the shared changeCounts() walk (cached; equivalent to diffing full stateAt
+  // snapshots) over the chosen master. Non-snapshot calendar days are 0.
   function calActivity(masterId){
     var dates = (H.trend && H.trend.dates) || [];
-    var counts = {}, prev = null;
-    for (var d=0; d<dates.length; d++){
-      var st = stateAt(masterId, dates[d]), c = 0, name;
-      if (prev){ for (name in st){ if (st[name] !== prev[name]) c++; } }
-      counts[dates[d]] = c; prev = st;
-    }
+    var chg = changeCounts(masterId), counts = {};
+    for (var d=0; d<dates.length; d++){ counts[dates[d]] = chg[d]; }
     return counts;
   }
   // Shared per-master activity level: 1 (no change) .. 4 (busiest snapshot).
@@ -2718,6 +2756,54 @@ DASHBOARD_JS = r"""
       if (key !== null) out[name] = (key !== -1 && H.order.indexOf(String(key))===-1) ? -1 : key;
     }
     return out;
+  }
+  // ----- Shared caches over the journey substrate -----------------------------
+  // Everything derived from journeyIndex only changes when applyGranularity() swaps
+  // the timeline dataset (Save vs Time / hour-day-month bucketing). tlDatasetKey() is
+  // that identity — the SAME keying + reset discipline as NAVCACHE/PMCACHE: a key
+  // mismatch drops the cache; scrubbing, zooming and master/view switches keep it.
+  function tlDatasetKey(){
+    var dates = (H.trend && H.trend.dates) || [];
+    return state.tlGran + ":" + state.tlBucket
+      + ":" + dates.length + ":" + (dates.length ? dates[dates.length-1] : "");
+  }
+  // Per-master change counts per snapshot: chg[k] = how many glyphs' EFFECTIVE colour
+  // (hidden keys read as -1, same normalisation as stateAt) differs between dates[k-1]
+  // and dates[k]; chg[0] = 0 (no predecessor). Walked straight off the sparse
+  // journeyIndex events — O(events + dates) per master, ONCE — instead of
+  // reconstructing and diffing a full per-glyph snapshot per date per render.
+  // versionNav and the activity calendar read it on every re-render. Events that
+  // cancel out between two snapshots (away and back inside one gap) count as no
+  // change, exactly like diffing the snapshots themselves.
+  var CHGCACHE = {}, CHGCACHE_KEY = "";
+  function changeCounts(masterId){
+    var key = tlDatasetKey();
+    if (CHGCACHE_KEY !== key){ CHGCACHE = {}; CHGCACHE_KEY = key; }
+    if (CHGCACHE[masterId]) return CHGCACHE[masterId];
+    var dates = (H.trend && H.trend.dates) || [];
+    var chg = dates.map(function(){ return 0; });
+    var perMaster = (H.journeyIndex && H.journeyIndex[masterId]) || {};
+    for (var name in perMaster){
+      var events = perMaster[name];
+      // eff = the glyph's value once this bucket's events are applied; committed = its
+      // value at the previous snapshot; undefined = not in the snapshot yet, so a glyph
+      // APPEARING (first event, even uncoloured) counts as a change. Explicit undefined
+      // inits: vars are function-scoped and must not leak across glyphs.
+      var bp = 0, cur = -1, eff = undefined, committed = undefined;
+      for (var i=0;i<events.length;i++){
+        while (bp < dates.length && dates[bp] < events[i][0]){ bp++; }
+        if (bp >= dates.length) break;             // event after the last snapshot: never visible
+        if (bp !== cur){                           // close the previous snapshot's event group
+          if (cur > 0 && eff !== committed){ chg[cur]++; }
+          if (cur !== -1){ committed = eff; }
+          cur = bp;
+        }
+        var k = events[i][1];
+        eff = (k !== -1 && H.order.indexOf(String(k)) === -1) ? -1 : k;
+      }
+      if (cur > 0 && eff !== committed){ chg[cur]++; }
+    }
+    return (CHGCACHE[masterId] = chg);
   }
   function showTip(name, x, y){
     var journey = journeyFor(name);
