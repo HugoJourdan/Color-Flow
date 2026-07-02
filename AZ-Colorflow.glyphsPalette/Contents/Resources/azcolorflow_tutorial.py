@@ -4,9 +4,8 @@ The AppKit sheet that renders these slides lives in ``plugin.py`` (it needs Glyp
 and so can't be unit-tested); everything in this module is pure, so the slide data
 and the navigation maths are fully testable.
 
-The slides below are placeholder/fake content for now. They are deliberately shaped
-as ``(title, body)`` pairs so they can later be generated from ``README.md`` without
-touching the sheet code — only :func:`slides` would change.
+Slides are plain ``(title, body)`` pairs; the sheet code only ever calls
+:func:`slides`, so the content can be edited (or regenerated) without touching it.
 """
 
 from __future__ import annotations
@@ -22,39 +21,42 @@ class Slide:
     body: str
 
 
-# TODO: replace with content extracted from README.md. Fake content for testing.
-PLACEHOLDER_SLIDES: tuple[Slide, ...] = (
+SLIDES: tuple[Slide, ...] = (
     Slide(
-        "Welcome to AZ Colorflow",
-        "AZ Colorflow turns the colour labels you already use in Glyphs into a live "
-        "picture of how far along your font is. This quick tour shows the basics — "
-        "use the arrows to move between pages.",
+        "What AZ Colorflow does",
+        "AZ Colorflow turns Glyphs' twelve colour labels into named workflow steps, "
+        "so a layer's colour says exactly how far each glyph has come. The palette "
+        "lists your steps with a live glyph count per step and highlights every step "
+        "the selected glyphs have already reached.",
     ),
     Slide(
-        "Colour your glyphs",
-        "Give each glyph (or layer) a colour label as you work: one colour per stage "
-        "of your process, for example Drawn, Spaced, Kerned, Done. AZ Colorflow reads "
-        "those labels — you don't have to change how you work.",
+        "Make the steps yours",
+        "Steps are defined in colorNames.txt — a copy next to the .glyphs file wins, "
+        "otherwise the shared file in the Glyphs folder is used. Edit everything in "
+        "Glyphs → Settings → AZ Colorflow: double-click a name to rename, click the "
+        "swatch to recolour, the eye to show or hide, and drag rows to reorder.",
     ),
     Slide(
-        "Read the palette",
-        "The palette groups your glyphs by colour and shows how many are at each "
-        "stage, so you can see at a glance what's finished and what still needs "
-        "attention. Drag to reorder colours and double-click to rename a label.",
+        "Work faster",
+        "Right-click a selection and pick a step from the AZ Colorflow menu to "
+        "colour it, or double-click a palette row to open exactly that step's glyphs "
+        "in a new Edit tab. Assign a key to “Jump to next color glyph” in Glyphs → "
+        "Settings → Shortcuts to step through unfinished glyphs.",
     ),
     Slide(
-        "Generate a report",
-        "Open the ⋯ menu and choose “Open Color Font Dashboard” for a shareable "
-        "HTML snapshot of your progress. Keep the project in git (or turn on "
-        "auto-commit) and the report also charts how your colours progressed over "
-        "time. That's it — happy colouring!",
+        "Track your progress",
+        "Collapse the palette for a colour progress bar in its header; expand it and "
+        "the header's report button builds the Color Font Dashboard — per-master "
+        "progress, a per-glyph heatmap and a save-by-save timeline (git-tracked "
+        "fonts read their history from commits). File → “AZ Colorflow: Font Glyph "
+        "Order” groups the Font View by colour.",
     ),
 )
 
 
 def slides() -> list[Slide]:
     """The ordered list of tutorial slides to display."""
-    return list(PLACEHOLDER_SLIDES)
+    return list(SLIDES)
 
 
 def clamp_index(index: int, count: int) -> int:

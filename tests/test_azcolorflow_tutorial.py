@@ -21,7 +21,7 @@ def test_slides_returns_a_fresh_list() -> None:
     # callers can mutate the returned list without corrupting the shared content
     first = tut.slides()
     first.append(tut.Slide("x", "y"))
-    assert len(tut.slides()) == len(tut.PLACEHOLDER_SLIDES)
+    assert len(tut.slides()) == len(tut.SLIDES)
 
 
 def test_clamp_index_constrains_to_bounds() -> None:
