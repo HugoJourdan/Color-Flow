@@ -1381,6 +1381,30 @@ class AZColorflowPreferencesController(AppKit.NSViewController):
 			import traceback
 			print("AZ Colorflow [pref loadView] error:\n" + traceback.format_exc())
 
+	# Glyphs 4's Settings sidebar reads GSPreferenceViewControllerProtocol off each
+	# registered pane: required -imageName, optional -image. Both are respondsToSelector-
+	# guarded (that's why the pane showed with no icon before). We supply an SF Symbol so
+	# the tab gets a glyph in the native blue line-icon style. -imageName covers the path
+	# where Glyphs builds the image itself (imageWithSystemSymbolName:); -image covers the
+	# path where it wants a ready NSImage. Fallback chain keeps an icon across macOS
+	# versions (swatchpalette is macOS 14+). Both return objects, so the default PyObjC
+	# selector signatures are correct.
+	def imageName(self) -> str:
+		return "swatchpalette"
+
+	def image(self) -> Any:
+		symbol_ctor = getattr(
+			AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_", None
+		)
+		if symbol_ctor is None:   # pre-macOS 11: no SF Symbols
+			return None
+		for name in ("swatchpalette", "paintpalette", "circle.hexagongrid", "drop.halffull"):
+			image = symbol_ctor(name, "AZ Colorflow")
+			if image is not None:
+				image.setTemplate_(True)   # tint to match the native sidebar icons
+				return image
+		return None
+
 
 def _register_preferences_pane() -> None:
 	"""Add the Color Flow pane to Glyphs > Settings exactly once per app session.
