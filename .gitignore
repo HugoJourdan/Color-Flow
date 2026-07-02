@@ -15,6 +15,10 @@ htmlcov/
 # macOS
 .DS_Store
 
+# Glyphs backup / autosave copies
+*.glyphs.bak*
+*(Autosaved).glyphspackage/
+
 # Stray Glyphs support tree accidentally created by no-$HOME test runs
 /Library/
 
