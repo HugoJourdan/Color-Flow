@@ -58,32 +58,33 @@ from GlyphsApp.plugins import *
 from GlyphsApp.UI import *
 from GlyphsApp import *
 
+# Glyphs 4 added Window/Button/PopUpButton/ComboBox to GlyphsApp.UI with a
+# title-first signature (Window(title="", frame=None, ...)). The star imports
+# above let those shadow vanilla's posSize-first widgets that this palette is
+# written against, so e.g. Window((w, h)) passed the size tuple as the title and
+# crashed in setTitle_ (-[OC_BuiltinPythonArray length]). Pin the overlapping
+# names back to vanilla; every other GlyphsApp precedence above is unchanged.
+from vanilla import Window, Button, PopUpButton, ComboBox  # noqa: E402,F401,F811
+
 
 _PUMP_STATE = {"last": 0.0}
 _PUMP_INTERVAL = 1.0 / 60.0
-_MAX_EVENTS_PER_PUMP = 20
 
 
 def _pump_runloop() -> None:
-	"""Drain queued events + run the run loop once so the report loader bar
-	repaints while the synchronous build holds the main thread. Throttled to
-	~60 Hz, bounded event count, fully fail-safe. Mirrors the Argus audit pump:
-	without explicit pumping the OS shows the beachball within ~2 s of unbroken
-	main-thread work and the determinate bar would freeze instead of tracking
-	real progress."""
+	"""Run the run loop once so the report loader bar repaints while the
+	synchronous build holds the main thread. Throttled to ~60 Hz, fully
+	fail-safe. Deliberately does NOT dequeue/dispatch user input events:
+	sending clicks/keys mid-build would let the user mutate the font while the
+	report is being generated. runUntilDate_ alone services timers + display
+	updates, which is all the loader bar needs to keep tracking real progress
+	instead of beachballing."""
 	import time
 	now = time.monotonic()
 	if now - _PUMP_STATE["last"] < _PUMP_INTERVAL:
 		return
 	_PUMP_STATE["last"] = now
 	try:
-		app = AppKit.NSApplication.sharedApplication()
-		for _ in range(_MAX_EVENTS_PER_PUMP):
-			event = app.nextEventMatchingMask_untilDate_inMode_dequeue_(
-				AppKit.NSEventMaskAny, NSDate.distantPast(), "kCFRunLoopDefaultMode", True)
-			if event is None:
-				break
-			app.sendEvent_(event)
 		NSRunLoop.currentRunLoop().runUntilDate_(NSDate.distantPast())
 	except Exception:
 		pass
@@ -108,8 +109,6 @@ class _AZColorflowLoaderBar(AppKit.NSView):
 		self._colors = [self._saturate(rgba, 1.6) for rgba in raw]   # vivid, punchy hues
 		self._value = 0.0    # displayed fraction (eased toward _target)
 		self._target = 0.0   # latest real-progress milestone (monotonic, never decreases)
-		self._fillImage = None   # cached blurred gradient fill (rebuilt on size change)
-		self._fillKey = None
 		self.start()
 
 	@objc.python_method
@@ -121,46 +120,6 @@ class _AZColorflowLoaderBar(AppKit.NSView):
 		val = min(1.0, val * 1.15 + 0.12)
 		red, green, blue = colorsys.hsv_to_rgb(hue, min(1.0, sat * factor), val)
 		return (red, green, blue, rgba[3] if len(rgba) > 3 else 1.0)
-
-	@objc.python_method
-	def _blurred_fill(self, gradient: Any, width: float, bar_h: float, radius: float) -> Any:
-		# Render the full-width gradient offscreen and Gaussian-blur it so the colours
-		# read soft/dreamy like the favicon. Returns an NSImage sized to the bar, or
-		# None when Core Image is unavailable (caller falls back to the crisp gradient).
-		try:
-			import Quartz
-			source = AppKit.NSImage.alloc().initWithSize_(AppKit.NSMakeSize(width, bar_h))
-			source.lockFocus()
-			gradient.drawInRect_angle_(AppKit.NSMakeRect(0.0, 0.0, width, bar_h), 0.0)
-			source.unlockFocus()
-			image = Quartz.CIImage.alloc().initWithData_(source.TIFFRepresentation())
-			blur = Quartz.CIFilter.filterWithName_("CIGaussianBlur")
-			if image is None or blur is None:
-				return None
-			blur.setValue_forKey_(image, "inputImage")
-			blur.setValue_forKey_(radius, "inputRadius")
-			output = blur.valueForKey_("outputImage")
-			if output is None:
-				return None
-			# Push saturation back up — the blur averages neighbouring hues and dulls them,
-			# so re-boost so the bar reads vivid/colourful even while soft.
-			controls = Quartz.CIFilter.filterWithName_("CIColorControls")
-			if controls is not None:
-				controls.setValue_forKey_(output, "inputImage")
-				controls.setValue_forKey_(1.7, "inputSaturation")   # blur dulls hues -> re-vivify
-				controls.setValue_forKey_(0.12, "inputBrightness")  # lift so the halo reads as light
-				boosted = controls.valueForKey_("outputImage")
-				if boosted is not None:
-					output = boosted
-			output = output.imageByCroppingToRect_(image.extent())   # blur expands extent; crop back
-			rep = AppKit.NSCIImageRep.alloc().initWithCIImage_(output)
-			if rep is None:
-				return None
-			result = AppKit.NSImage.alloc().initWithSize_(AppKit.NSMakeSize(width, bar_h))
-			result.addRepresentation_(rep)
-			return result
-		except Exception:
-			return None
 
 	@objc.python_method
 	def start(self) -> None:
@@ -221,18 +180,13 @@ class _AZColorflowLoaderBar(AppKit.NSView):
 		radius = bar_h / 2.0
 		bar_rect = AppKit.NSMakeRect(0.0, bar_y, bar_w, bar_h)
 		filled = prog * bar_w
-		# Build (and cache once per size) the blurred + brightened rainbow used for
-		# fill — the glow halo; the bar draws the crisp gradient.
+		# The crisp rainbow gradient drawn as the bar's fill (single-colour fallback
+		# when fewer than two workflow colours are available).
 		nscolors = [
 			AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(rgba[0], rgba[1], rgba[2], 1.0)
 			for rgba in colors
 		]
 		blend = AppKit.NSGradient.alloc().initWithColors_(nscolors) if len(nscolors) >= 2 else None
-		key = (int(round(bar_w)), int(round(bar_h)))
-		if blend is not None and getattr(self, "_fillKey", None) != key:
-			self._fillImage = self._blurred_fill(blend, bar_w, bar_h, bar_h * 1.6)
-			self._fillKey = key
-		fill_image = getattr(self, "_fillImage", None)
 		# Soft colour glow that HUGS the rounded bar: a shadow bloom cast by the filled pill,
 		# drawn behind the track and then covered by it — not a
 		# rectangular ghost peeking out behind the rounded track (the "second bar").
@@ -260,10 +214,7 @@ class _AZColorflowLoaderBar(AppKit.NSView):
 			# reveal the fill only up to the filled fraction (colours stay anchored)
 			AppKit.NSBezierPath.bezierPathWithRect_(
 				AppKit.NSMakeRect(0.0, bar_y, filled, bar_h)).addClip()
-			if blend is None and fill_image is not None:
-				fill_image.drawInRect_fromRect_operation_fraction_(
-					bar_rect, AppKit.NSZeroRect, AppKit.NSCompositingOperationSourceOver, 1.0)
-			elif blend is not None:
+			if blend is not None:
 				blend.drawInRect_angle_(bar_rect, 0.0)
 			elif nscolors:
 				nscolors[0].set()
@@ -502,7 +453,9 @@ def _install_rainbow_menu() -> None:
 		title, "toggleRainbow:", "")
 	menu_item.setTarget_(handler)
 	bar_item = Glyphs.menu[FILE_MENU]
-	submenu = bar_item.submenu() if hasattr(bar_item, "submenu") else None
+	# respondsToSelector_, not hasattr: hasattr on a PyObjC-bridged object scans
+	# the entire ObjC selector table when the attribute is missing.
+	submenu = bar_item.submenu() if bar_item.respondsToSelector_(b"submenu") else None
 	if submenu is not None:
 		for item in list(submenu.itemArray()):
 			if item.title() == title:
@@ -773,7 +726,9 @@ def _rgba_close(first, second, tol: float = 1e-4) -> bool:
 	colours — an unchanged well must compare equal so editing a name / visibility never
 	churns (and colour-space-drifts) the colours."""
 	try:
-		return all(abs(float(left) - float(right)) <= tol for left, right in zip(first, second))
+		return len(first) == len(second) and all(
+			abs(float(left) - float(right)) <= tol for left, right in zip(first, second, strict=True)
+		)
 	except Exception:
 		return False
 
@@ -1439,7 +1394,9 @@ def _register_preferences_pane() -> None:
 	if _PREF_PANE_ADDED:
 		return
 	delegate = _app_delegate()
-	if delegate is None or not hasattr(delegate, "addViewToPreferences_"):
+	# respondsToSelector_, not hasattr: hasattr on the bridged app delegate scans
+	# the entire ObjC selector table when the method is missing.
+	if delegate is None or not delegate.respondsToSelector_(b"addViewToPreferences:"):
 		return
 	controller = AZColorflowSettingsView()
 	view_controller = AZColorflowPreferencesController.alloc().initWithSettingsView_(controller)
@@ -1479,18 +1436,19 @@ def _open_preferences_pane() -> None:
 	delegate = _app_delegate()
 	if delegate is None:
 		return
-	if hasattr(delegate, "showMainPreferencesWithIdentifier_"):
+	# respondsToSelector_, not hasattr/getattr: those scan the entire ObjC
+	# selector table on the bridged delegate when the method is missing.
+	if delegate.respondsToSelector_(b"showMainPreferencesWithIdentifier:"):
 		try:
 			delegate.showMainPreferencesWithIdentifier_(COLORFLOW_PREF_IDENTIFIER)
 			return
 		except Exception:
 			pass  # fall through to a plain Settings open
-	for selector in ("showMainPreferences_", "showPreferencesPanel_",
-			"showPreferences_", "openPreferences_"):
+	for selector in (b"showMainPreferences:", b"showPreferencesPanel:",
+			b"showPreferences:", b"openPreferences:"):
 		try:
-			method = getattr(delegate, selector, None)
-			if method is not None:
-				method(None)
+			if delegate.respondsToSelector_(selector):
+				delegate.performSelector_withObject_(selector, None)
 				return
 		except Exception:
 			continue
@@ -1550,6 +1508,28 @@ except objc.error:
 	_CFBuyButton = CFBuyButton
 
 
+# Transparent full-row companion view that shows the pointing hand while the
+# mouse hovers an openable palette row. It owns its cursor rect itself
+# (resetCursorRects — the canonical AppKit way), so no NSTrackingArea with
+# owner=self is needed: a tracking area RETAINS its owner, and owning it from
+# the palette instance kept every AZColorflow alive forever. hitTest_ returns
+# None so clicks fall through to the overlay underneath (whose double-click
+# gesture recognizer opens the step tab). Guarded with lookUpClass so a plugin
+# reload doesn't re-register the ObjC class name.
+try:
+	_CFRowHoverView = objc.lookUpClass("CFRowHoverView")
+except objc.error:
+
+	class CFRowHoverView(AppKit.NSView):
+		def resetCursorRects(self):
+			self.addCursorRect_cursor_(self.bounds(), AppKit.NSCursor.pointingHandCursor())
+
+		def hitTest_(self, point):
+			return None   # cursor-only: never intercept clicks meant for the row overlay
+
+	_CFRowHoverView = CFRowHoverView
+
+
 class AZColorflow(PalettePlugin):
 
 	# Body height in the license-blocked state. Not 0 — a literal-0 body strips the
@@ -1576,7 +1556,6 @@ class AZColorflow(PalettePlugin):
 		global _SHARED_ENT
 		_SHARED_ENT = self._ent
 		self.name = 'AZ Colorflow'
-		self.init = False
 		self.colorKeys = {
 						"0":(0.85, 0.26, 0.06, 0.5),
 						"1":(0.99, 0.62, 0.11, 0.5),
@@ -1658,6 +1637,22 @@ class AZColorflow(PalettePlugin):
 				setattr(self.paletteView.frame, str(k)+"colorTag", Box((0, yPos-self.shift-1, 6, 19), fillColor=(AppKit.NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(k)])), cornerRadius=0, borderWidth=0))
 				yPos += 19
 
+	# This palette's OWN document font. Glyphs builds one palette instance per
+	# document window, so Glyphs.font (the FRONTMOST font) can belong to a
+	# different document while this palette's window sits in the background.
+	# Falls back to Glyphs.font when the window controller is not attached yet
+	# (settings() runs before the palette is docked).
+	@objc.python_method
+	def _palette_font(self) -> Any:
+		try:
+			if self._windowController:
+				font = self._windowController.documentFont()
+				if font is not None:
+					return font
+		except Exception:
+			pass
+		return Glyphs.font
+
 	# Re-read colorNames.txt and rebuild the palette after a Settings-panel save.
 	@objc.python_method
 	def reload_after_settings(self) -> None:
@@ -1674,9 +1669,15 @@ class AZColorflow(PalettePlugin):
 		except Exception:
 			pass
 		self._lastSignature = None
+		# The step order/visibility changed, so the cached per-step counts (keyed
+		# on the OLD order) are stale — drop them before the rebuild below.
+		try:
+			self._invalidate_counts(self.font.selectedFontMaster.id)
+		except Exception:
+			pass
 		self.Update_Plugin_UI()
 		try:
-			font = Glyphs.font
+			font = self._palette_font()
 			if getattr(self, "fontview", None) is not None and font is not None and self.fontview.is_enabled(font):
 				self.fontview.maybe_rebuild(font)
 		except Exception:
@@ -1691,7 +1692,6 @@ class AZColorflow(PalettePlugin):
 		except Exception:
 			pass
 		self.font = Glyphs.font
-		self.init = False
 		self.update(self._windowController)
 
 		# First run: show the multi-slide tutorial sheet once the document window
@@ -1776,28 +1776,15 @@ class AZColorflow(PalettePlugin):
 	########################################################################################################
 
 	@objc.python_method
-	def _rainbow_menu_title(self) -> str:
-		return "Color Flow: Font Glyph Order"
-
-	@objc.python_method
-	def _close_popover(self) -> None:
-		popover = getattr(self, "_popover", None)
-		if popover is not None:
-			try:
-				popover.close()
-			except Exception:
-				pass
-			self._popover = None
-
-	@objc.python_method
 	def _font_dir(self, font) -> str | None:
 		return os.path.dirname(font.filepath) if (font is not None and font.filepath) else None
 
 	@objc.python_method
 	def _generate_smart_filters(self, sender) -> None:
-		# Build a "Color Flow" smart-filter group (one filter per visible step +
-		# None) and merge it into the font's Filters parameter. Filters match the
-		# GLYPH colour — Glyphs has no per-master layer-colour predicate.
+		# Build a smart-filter group (named azcolorflow_filters.GROUP_NAME; one
+		# filter per visible step + None) and merge it into the font's Filters
+		# parameter. Filters match the GLYPH colour — Glyphs has no per-master
+		# layer-colour predicate.
 		if self._gate():
 			return
 		try:
@@ -1813,8 +1800,8 @@ class AZColorflow(PalettePlugin):
 			group = azcolorflow_filters.build_filter_group(steps, none_label)
 			existing = [dict(entry) for entry in (font.customParameters["Filters"] or [])]
 			font.customParameters["Filters"] = azcolorflow_filters.merge_into_filters(existing, group)
-			Message("Added the “Color Flow” smart-filter group to the sidebar "
-				"(filters by glyph colour).", title="Color Flow")
+			Message(f"Added the “{azcolorflow_filters.GROUP_NAME}” smart-filter group "
+				"to the sidebar (filters by glyph colour).", title="Color Flow")
 		except Exception:
 			import traceback
 			print("Color Flow [smart filters] error:\n" + traceback.format_exc())
@@ -1823,7 +1810,6 @@ class AZColorflow(PalettePlugin):
 	def _popover_dashboard(self, sender) -> None:
 		# The timeline records itself to the font's userData on every save (non-git
 		# fonts) — no git commits, no opt-in. So generating a report just builds it.
-		self._close_popover()
 		self._present_report_sheet()
 
 	# Present a titled panel as a sheet on the palette window with an
@@ -1835,6 +1821,11 @@ class AZColorflow(PalettePlugin):
 		# _popover_dashboard -> here, and the header button). Gate here so a blocked
 		# licence cannot generate a report by any path.
 		if self._gate():
+			return
+		# Re-entry guard: a report build is already running (sheet up, 30 Hz
+		# loader ticking). Presenting a second sheet would orphan the first
+		# panel and leave its NSTimer loader running forever.
+		if getattr(self, "_reportPanel", None) is not None:
 			return
 		try:
 			parent = self.dialog.window() if self.dialog is not None else None
@@ -1909,160 +1900,6 @@ class AZColorflow(PalettePlugin):
 			except Exception:
 				import traceback
 				print("Color Flow [open report] error:\n" + traceback.format_exc())
-
-	@objc.python_method
-	def _save_report_path(self, path) -> None:
-		# Shared "save a copy of the .html" via NSSavePanel — used by the sheet's Save
-		# button and the inline web view's Save… button. No-op when there's no report.
-		if path is None:
-			return
-		try:
-			save_panel = AppKit.NSSavePanel.savePanel()
-			save_panel.setNameFieldStringValue_(path.name)
-			try:
-				save_panel.setAllowedFileTypes_(["html"])
-			except Exception:
-				pass
-			if save_panel.runModal() == AppKit.NSModalResponseOK:
-				url = save_panel.URL()
-				dest = url.path() if url is not None else None
-				if dest:
-					with open(dest, "wb") as handle:
-						handle.write(path.read_bytes())
-		except Exception:
-			import traceback
-			print("Color Flow [save report] error:\n" + traceback.format_exc())
-
-	# ----- View here: the report inside an embedded WKWebView -------------------
-	def viewReportInline_(self, sender) -> None:
-		path = getattr(self, "_reportPath", None)
-		self._dismiss_report_sheet()                 # close the small action sheet first
-		if path is not None:
-			self._present_report_webview(path)
-
-	@objc.python_method
-	def _present_report_webview(self, path) -> None:
-		# Embed the self-contained report in a WKWebView and present it as a sheet on the
-		# document window (the docked palette is too narrow to host it). glyphsapp:// glyph
-		# links route to Glyphs via a block-free JS message handler; the file:// report
-		# loads in place. Falls back to a floating window with no doc window; browser on error.
-		try:
-			import WebKit
-			style = (AppKit.NSWindowStyleMaskTitled | AppKit.NSWindowStyleMaskClosable
-				| AppKit.NSWindowStyleMaskResizable | AppKit.NSWindowStyleMaskMiniaturizable)
-			window = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
-				AppKit.NSMakeRect(0, 0, 1040, 740), style, AppKit.NSBackingStoreBuffered, False)
-			window.setTitle_("Color Flow — " + path.name)
-			window.setReleasedWhenClosed_(False)
-			window.setDelegate_(self)
-			content = window.contentView()
-			bar_h = 40
-			size = content.bounds().size
-			config = WebKit.WKWebViewConfiguration.alloc().init()
-			# Route clicks on glyphsapp:// glyph links to Glyphs through a JS message
-			# handler — block-free, unlike a navigation-policy completion handler (whose
-			# block crashes PyObjC). The file:// report itself just loads normally.
-			controller = config.userContentController()
-			controller.addScriptMessageHandler_name_(self, "cfGlyph")
-			click_js = (
-				"document.addEventListener('click',function(e){"
-				"var a=e.target.closest&&e.target.closest('a[href^=\"glyphsapp:\"]');"
-				"if(a){e.preventDefault();try{"
-				"window.webkit.messageHandlers.cfGlyph.postMessage(a.getAttribute('href'));"
-				"}catch(err){}}},true);"
-			)
-			controller.addUserScript_(
-				WebKit.WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
-					click_js, WebKit.WKUserScriptInjectionTimeAtDocumentEnd, True))
-			web = WebKit.WKWebView.alloc().initWithFrame_configuration_(
-				AppKit.NSMakeRect(0, bar_h, size.width, size.height - bar_h), config)
-			web.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
-			web.loadFileURL_allowingReadAccessToURL_(
-				AppKit.NSURL.fileURLWithPath_(str(path)),
-				AppKit.NSURL.fileURLWithPath_(str(path.parent)))
-			content.addSubview_(web)
-			save_btn = AppKit.NSButton.buttonWithTitle_target_action_("Save…", self, "saveReportFile:")
-			save_btn.setFrame_(AppKit.NSMakeRect(12, 8, 90, 24))
-			save_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
-			save_btn.setAutoresizingMask_(AppKit.NSViewMaxXMargin)
-			content.addSubview_(save_btn)
-			browser_btn = AppKit.NSButton.buttonWithTitle_target_action_("Open in Browser", self, "openReportBrowser:")
-			browser_btn.setFrame_(AppKit.NSMakeRect(108, 8, 130, 24))
-			browser_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
-			browser_btn.setAutoresizingMask_(AppKit.NSViewMaxXMargin)
-			content.addSubview_(browser_btn)
-			done_btn = AppKit.NSButton.buttonWithTitle_target_action_("Done", self, "dismissReportWindow:")
-			done_btn.setFrame_(AppKit.NSMakeRect(size.width - 92, 8, 80, 24))
-			done_btn.setBezelStyle_(AppKit.NSBezelStyleRounded)
-			done_btn.setKeyEquivalent_("\r")
-			done_btn.setAutoresizingMask_(AppKit.NSViewMinXMargin)
-			content.addSubview_(done_btn)
-			self._reportWindow = window
-			self._reportWeb = web
-			self._reportController = controller
-			self._reportWebPath = path
-			parent = None
-			try:
-				doc = Glyphs.font.parent if (Glyphs.font is not None) else None
-				wc = doc.windowController() if doc is not None else None
-				parent = wc.window() if wc is not None else None
-			except Exception:
-				parent = None
-			if parent is None:
-				try:
-					parent = AppKit.NSApp.mainWindow() or AppKit.NSApp.keyWindow()
-				except Exception:
-					parent = None
-			if parent is not None:
-				parent.beginSheet_completionHandler_(window, None)
-			else:
-				window.center()
-				window.makeKeyAndOrderFront_(None)
-		except Exception:
-			import traceback
-			print("Color Flow [inline report] error:\n" + traceback.format_exc())
-			try:
-				webbrowser.open(path.as_uri())
-			except Exception:
-				pass
-
-	def saveReportFile_(self, sender) -> None:
-		self._save_report_path(getattr(self, "_reportWebPath", None))
-
-	def openReportBrowser_(self, sender) -> None:
-		path = getattr(self, "_reportWebPath", None)
-		if path is not None:
-			try:
-				webbrowser.open(path.as_uri())
-			except Exception:
-				pass
-
-	def dismissReportWindow_(self, sender) -> None:
-		self._dismiss_report_window()
-
-	@objc.python_method
-	def _dismiss_report_window(self) -> None:
-		# End the report sheet (or close the floating fallback window) and drop refs,
-		# removing the script-message handler to break the controller -> self cycle.
-		window = getattr(self, "_reportWindow", None)
-		controller = getattr(self, "_reportController", None)
-		if controller is not None:
-			try:
-				controller.removeScriptMessageHandlerForName_("cfGlyph")
-			except Exception:
-				pass
-		if window is not None:
-			try:
-				parent = window.sheetParent()
-				if parent is not None:
-					parent.endSheet_(window)
-				window.orderOut_(None)
-			except Exception:
-				pass
-		self._reportController = None
-		self._reportWeb = None
-		self._reportWindow = None
-		self._reportWebPath = None
 
 	# ------------------------------------------------------------------ #
 	#  First-run tutorial sheet (multi-slide, arrow navigation)
@@ -2180,9 +2017,21 @@ class AZColorflow(PalettePlugin):
 	@objc.python_method
 	def _install_tutorial_key_monitor(self) -> None:
 		# Left / right arrow keys step between slides while the tutorial is up.
+		# The handler closure retains self (and the monitor retains the handler),
+		# so it self-destructs: if the tutorial panel is gone or off screen —
+		# closed by any path, not just the close bubble — it removes the monitor
+		# and passes the event through, breaking the retain chain.
 		def _handler(event):
 			try:
-				if getattr(self, "_tutorialPanel", None) is None:
+				panel = getattr(self, "_tutorialPanel", None)
+				if panel is None or not panel.isVisible():
+					monitor = getattr(self, "_tutorialKeyMonitor", None)
+					self._tutorialKeyMonitor = None
+					if monitor is not None:
+						try:
+							AppKit.NSEvent.removeMonitor_(monitor)
+						except Exception:
+							pass
 					return event
 				code = event.keyCode()
 				if code == 123:               # left arrow
@@ -2277,40 +2126,6 @@ class AZColorflow(PalettePlugin):
 		self._tutorialBody = None
 		self._tutorialDotButtons = []
 
-
-	def userContentController_didReceiveScriptMessage_(self, controller, message) -> None:
-		# A glyphsapp:// glyph link was clicked in the embedded report — hand the URL to
-		# the system so Glyphs opens the glyph, instead of navigating the web view.
-		try:
-			href = message.body()
-			url = AppKit.NSURL.URLWithString_(str(href)) if href else None
-			if url is not None:
-				AppKit.NSWorkspace.sharedWorkspace().openURL_(url)
-		except Exception:
-			pass
-
-	def windowWillClose_(self, notification) -> None:
-		# Drop our strong refs when the inline report window closes (avoids a leak; the
-		# guard keeps this safe even though self may be the delegate of other windows).
-		try:
-			closing = notification.object() if notification is not None else None
-		except Exception:
-			closing = None
-		if closing is not None and closing == getattr(self, "_reportWindow", None):
-			controller = getattr(self, "_reportController", None)
-			if controller is not None:
-				try:
-					controller.removeScriptMessageHandlerForName_("cfGlyph")
-				except Exception:
-					pass
-			self._reportController = None
-			self._reportWeb = None
-			self._reportWindow = None
-			self._reportWebPath = None
-
-	def dismissReportSheet_(self, sender) -> None:
-		self._dismiss_report_sheet()
-
 	@objc.python_method
 	def _dismiss_report_sheet(self) -> None:
 		self._reportPath = None
@@ -2354,7 +2169,8 @@ class AZColorflow(PalettePlugin):
 		if Glyphs.defaults["com.hugojourdan.AZColorflow-RainbowConflictWarned"]:
 			return
 		barItem = Glyphs.menu[FILE_MENU]
-		submenu = barItem.submenu() if hasattr(barItem, "submenu") else None
+		# respondsToSelector_, not hasattr (bridged object — see _install_rainbow_menu).
+		submenu = barItem.submenu() if barItem.respondsToSelector_(b"submenu") else None
 		if submenu is None:
 			return
 		for item in list(submenu.itemArray()):
@@ -2370,29 +2186,11 @@ class AZColorflow(PalettePlugin):
 	# --- ObjC selectors (no python_method decorator: called by menu / timer) ---
 
 	def validateMenuItem_(self, menuItem) -> bool:
-		# This validates EVERY menu item targeting the plugin (Rainbow toggle,
-		# context-menu entries) — only the Rainbow toggle carries an on/off
-		# checkmark, so branch on the action selector.
-		try:
-			action = str(menuItem.action()) if menuItem.action() else ""
-		except Exception:
-			action = ""
-		font = Glyphs.font
-		if action != "toggleRainbow:":
-			return font is not None
-		if font is None:
-			menuItem.setState_(NSOffState)
-			return False
-		try:
-			menuItem.setState_(NSOnState if self.fontview.is_enabled(font) else NSOffState)
-		except Exception:
-			menuItem.setState_(NSOffState)
-		return True
-
-	def toggleRainbow_(self, sender) -> None:
-		if self._gate():
-			return
-		self.Toggle_Rainbow(sender)
+		# Validates the menu items targeting the plugin instance (the context-menu
+		# entries): enabled whenever a font is open. The Rainbow File-menu item
+		# targets the module-level _RAINBOW_MENU_HANDLER singleton, whose own
+		# validateMenuItem_ handles the on/off checkmark.
+		return Glyphs.font is not None
 
 	def rainbowDebouncedRebuild_(self, sender) -> None:
 		font = self._pendingFont or Glyphs.font
@@ -2535,30 +2333,18 @@ class AZColorflow(PalettePlugin):
 	def _font_from_document(self, document) -> Any:
 		if document is None:
 			return None
-		font = getattr(document, "font", None)
-		if callable(font):
-			try:
+		# respondsToSelector_, not hasattr/getattr: those scan the entire ObjC
+		# selector table on the bridged object when the attribute is missing.
+		font = None
+		try:
+			if document.respondsToSelector_(b"font"):
 				font = document.font()
-			except Exception:
-				font = None
-		if font is None and hasattr(document, "glyphs") and hasattr(document, "userData"):
+		except Exception:
+			font = None
+		if (font is None and document.respondsToSelector_(b"glyphs")
+				and document.respondsToSelector_(b"userData")):
 			font = document  # the notification object is already a GSFont
 		return font
-
-	# --- python callbacks (action menu + the ObjC toggle target) ---
-
-	@objc.python_method
-	def Toggle_Rainbow(self, sender) -> None:
-		if self._gate():
-			return
-		font = Glyphs.font
-		if font is None:
-			return
-		try:
-			self.fontview.toggle(font)
-		except Exception:
-			import traceback
-			print("Color Flow [Rainbow toggle] error:\n" + traceback.format_exc())
 
 	# ------------------------------------------------------------------ inline label rename
 
@@ -2567,21 +2353,6 @@ class AZColorflow(PalettePlugin):
 		if hasattr(check, "getNSButton"):
 			return check.getNSButton()
 		return check._nsObject
-
-	@objc.python_method
-	def _strip_focus_rings(self, view) -> None:
-		# Remove the blue AppKit focus ring (halo) from a view and every descendant.
-		# NSFocusRingTypeNone == 1.
-		try:
-			view.setFocusRingType_(1)
-		except Exception:
-			pass
-		try:
-			subviews = view.subviews()
-		except Exception:
-			return
-		for sub in subviews:
-			self._strip_focus_rings(sub)
 
 	########################################################################################################
 	#																									   #
@@ -2660,12 +2431,13 @@ class AZColorflow(PalettePlugin):
 			view.addGestureRecognizer_(click)
 		except Exception:
 			pass
+		# Pointing-hand cursor while hovering the row: a dedicated subview owns
+		# the cursor rect (see _CFRowHoverView) — an NSTrackingArea with
+		# owner=self would retain this palette instance forever.
 		try:
-			area = AppKit.NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
-				view.bounds(),
-				AppKit.NSTrackingCursorUpdate | AppKit.NSTrackingActiveInKeyWindow,
-				self, None)
-			view.addTrackingArea_(area)
+			hover = _CFRowHoverView.alloc().initWithFrame_(view.bounds())
+			hover.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
+			view.addSubview_(hover)
 		except Exception:
 			pass
 
@@ -2689,11 +2461,6 @@ class AZColorflow(PalettePlugin):
 	@objc.python_method
 	def Update_Plugin_UI(self) -> None:
 		try:
-			for attr in getattr(self, "_metaAttrs", []) + getattr(self, "_bodyAttrs", []):
-				if hasattr(self.paletteView.frame, attr):
-					delattr(self.paletteView.frame, attr)
-			self._metaAttrs = []
-			self._bodyAttrs = []
 			if not self.font or not self.meaning:
 				return
 			self._rowChecks = {}
@@ -2804,13 +2571,7 @@ class AZColorflow(PalettePlugin):
 
 	# Review Queue: DOUBLE-click a row to open exactly that step's glyphs in a
 	# new Edit tab to walk through them. The count badge is a passive display.
-	# Pointing-hand cursor while hovering an openable row.
-	def cursorUpdate_(self, event) -> None:
-		try:
-			AppKit.NSCursor.pointingHandCursor().set()
-		except Exception:
-			pass
-
+	# (The pointing-hand hover cursor lives on the row overlay's _CFRowHoverView.)
 	def rowDoubleClicked_(self, sender) -> None:
 		try:
 			color = self._color_for_recognizer(sender)
@@ -2890,7 +2651,19 @@ class AZColorflow(PalettePlugin):
 				return True
 			if view.isHiddenOrHasHiddenAncestor():
 				return True
-			return view.visibleRect().size.height < 2.0
+			# Glyphs 4 collapses a sidebar section by shrinking the section container
+			# to the header height and sliding the body OUT of it (negative origin.y),
+			# not by hiding it or zeroing its height — so the old
+			# visibleRect().height < 2 test never fired (it reports the header height).
+			# Detect collapse by how much of the body overlaps its container's bounds:
+			# ~0 when collapsed, ~full body height when expanded.
+			container = view.superview()
+			if container is None:
+				return view.visibleRect().size.height < 2.0
+			frame = view.frame()
+			container_h = container.bounds().size.height
+			overlap = min(frame.origin.y + frame.size.height, container_h) - max(frame.origin.y, 0.0)
+			return overlap < 2.0
 		except Exception:
 			return False
 
@@ -2898,7 +2671,26 @@ class AZColorflow(PalettePlugin):
 	def _sync_header(self) -> None:
 		bar = getattr(self, "_titleBar", None)
 		if bar is None:
-			return
+			# Retry injection here (idempotent: _inject_title_bar no-ops once
+			# _titleBar is set). The one-shot 2s deferral in deferredHeaderSetup_
+			# can fire before Glyphs 4 has docked the palette / built the header,
+			# and there is no repeating timer — so drive it from UPDATEINTERFACE.
+			# Capped: when the title field is never found (say, a future header
+			# layout), give up after a few consecutive failures instead of
+			# re-walking the whole window (depth-40) on every UPDATEINTERFACE
+			# forever. The counter resets on success.
+			tries = getattr(self, "_headerInjectTries", 0)
+			if tries >= 8:
+				return
+			try:
+				self._inject_title_bar()
+			except Exception:
+				pass
+			bar = getattr(self, "_titleBar", None)
+			if bar is None:
+				self._headerInjectTries = tries + 1
+				return
+			self._headerInjectTries = 0
 		try:
 			collapsed = self._is_collapsed()
 			blocked = bool(getattr(getattr(self, "_ent", None), "blocked", False))
@@ -2953,12 +2745,19 @@ class AZColorflow(PalettePlugin):
 
 	@objc.python_method
 	def _search_title(self, view, depth) -> Any:
-		if view is None or depth > 12:
+		# Depth cap generous enough for Glyphs 4's deeper sidebar nesting
+		# (GSSidebarStackView > NSView > GSSidebarHeaderView > NSStackView > title
+		# NSTextField lands ~13 deep; G3's old cap of 12 silently missed it).
+		if view is None or depth > 40:
 			return None
 		try:
 			if view.isKindOfClass_(AppKit.NSTextField):
 				value = str(view.stringValue() or "")
-				if "Color Flow" in value:
+				# Match the live palette title (self.name), not a hardcoded string —
+				# the rename to "AZ Colorflow" broke the old "Color Flow" literal, which
+				# silently skipped the header injection (no report button, no colour bar).
+				# Case-insensitive so a header that upper-cases the title still matches.
+				if self.name and self.name.lower() in value.lower():
 					return view
 		except Exception:
 			pass
@@ -2983,12 +2782,31 @@ class AZColorflow(PalettePlugin):
 			if header is None:
 				return
 			bounds = header.bounds()
+			# Glyphs 4's section header is a horizontal NSStackView (auto-layout), so
+			# manual-frame addSubview_ children don't lay out there. Add our controls as
+			# ARRANGED subviews with explicit size constraints; the stack positions them
+			# and honours setHidden_ (which _sync_header already toggles) by reflowing.
+			# Glyphs 3's plain-NSView header keeps the original absolute-frame path.
+			is_stack = bool(header.isKindOfClass_(AppKit.NSStackView))
+			def _add(view, width=None, height=None):
+				if is_stack:
+					view.setTranslatesAutoresizingMaskIntoConstraints_(False)
+					# Insert right after the title (index 0), BEFORE Glyphs's own
+					# disclosure chevron + "⋯" menu, so those stay to the right of our
+					# bar/report. (Appending would put our controls rightmost instead.)
+					header.insertArrangedSubview_atIndex_(view, 1)
+					if width is not None:
+						view.widthAnchor().constraintEqualToConstant_(width).setActive_(True)
+					if height is not None:
+						view.heightAnchor().constraintEqualToConstant_(height).setActive_(True)
+				else:
+					header.addSubview_(view)
 			btn = 14.0
 			pad = 8.0
 			ctrlY = (bounds.size.height - btn) / 2.0
 			# Eye button removed (visibility now lives in Settings); report is rightmost.
 			reportX = bounds.size.width - pad - btn
-			barWidth, barHeight = 75.6, 6.0   # 10% narrower than 84 (right edge unchanged)
+			barWidth, barHeight = 48.0, 6.0   # narrow; leaves room for the native disclosure chevron on its right
 			barX = bounds.size.width - pad - barWidth
 			barY = (bounds.size.height - barHeight) / 2.0
 			bar = AppKit.NSView.alloc().initWithFrame_(((barX, barY), (barWidth, barHeight)))
@@ -3000,8 +2818,12 @@ class AZColorflow(PalettePlugin):
 				bar.layer().setBackgroundColor_(AppKit.NSColor.colorWithRed_green_blue_alpha_(0.5, 0.5, 0.5, 0.18).CGColor())
 			except Exception:
 				pass
-			header.addSubview_(bar)
+			_add(bar, barWidth, barHeight)
 			self._titleBar = bar
+			# Remember the intended bar size. As an arranged subview the stack
+			# collapses the bar's width to 0 while it is hidden (the expanded state),
+			# so _update_title_bar can't trust bar.bounds() when it computes the fill.
+			self._barSize = (barWidth, barHeight)
 			report = AppKit.NSButton.alloc().initWithFrame_(((reportX, ctrlY), (btn, btn)))
 			report.setBordered_(False)
 			report.setAutoresizingMask_(AppKit.NSViewMinXMargin)
@@ -3030,7 +2852,7 @@ class AZColorflow(PalettePlugin):
 					report.setTitle_("\U0001F4CA")
 			except Exception:
 				pass
-			header.addSubview_(report)
+			_add(report, btn, btn)
 			self._titleReport = report
 			# Buy button — an orange pill (filled, rounded, white text) so it clearly
 			# reads as a button. Right-aligned in the header, shown only while blocked
@@ -3066,7 +2888,7 @@ class AZColorflow(PalettePlugin):
 			except Exception:
 				buy.setTitle_("Buy")
 			buy.setHidden_(True)
-			header.addSubview_(buy)
+			_add(buy, buyW, buyH)
 			self._titleBuy = buy
 			# Lock glyph after the plugin name; the name is dimmed when disabled.
 			self._titleField = field
@@ -3093,11 +2915,15 @@ class AZColorflow(PalettePlugin):
 				lock.setTextColor_(AppKit.NSColor.secondaryLabelColor())
 				lock.setStringValue_("􀎡")  # SF Symbol lock (renders in the system font)
 				lock.setHidden_(True)
-				header.addSubview_(lock)
+				_add(lock, 18.0, fr.size.height)
 				self._titleLock = lock
 			except Exception:
 				pass
 			self._sync_header()
+			# Draw the completion fill once now: injection can happen via the
+			# _sync_header retry path (not just deferredHeaderSetup_), which would
+			# otherwise leave the bar empty until the next counts-changing update.
+			self._update_title_bar()
 		except Exception:
 			import traceback
 			print("Color Flow [title bar] error:\n" + traceback.format_exc())
@@ -3140,14 +2966,18 @@ class AZColorflow(PalettePlugin):
 				return
 			for sub in list(bar.subviews()):
 				sub.removeFromSuperview()
-			named_colors = []
-			for glyph in self.font.glyphs:
-				layer = glyph.layers[masterId]
-				named_colors.append((glyph.name, layer.color if layer is not None else None))
-			colors = colornames.exclude_named_colors(named_colors, excluded)
-			exclusive = colornames.single_counts_from_colors(colors, order)
-			width = bar.bounds().size.width
-			height = bar.bounds().size.height
+			# Reuse the cached per-step census (same derivation, same exclusion
+			# set) instead of recounting the whole font on every header sync.
+			exclusive = self._counts(masterId)
+			# Use the intended bar size, not bar.bounds(): while the bar is hidden
+			# (expanded state) the stack collapses its width to 0, which would zero
+			# every fill segment and leave the bar empty once collapsed.
+			size = getattr(self, "_barSize", None)
+			if size is not None:
+				width, height = size
+			else:
+				width = bar.bounds().size.width
+				height = bar.bounds().size.height
 			xPos = 0.0
 			for key in order:
 				count = exclusive.get(key, 0)
@@ -3166,8 +2996,6 @@ class AZColorflow(PalettePlugin):
 		except Exception:
 			pass
 
-	# UPDATEINTERFACE handler: cheap dirty-check on selection + layer colours.
-	@objc.python_method
 	@objc.python_method
 	def _gate(self) -> bool:
 		# True when the licence is blocked (trial expired / unlicensed). Nags once
@@ -3183,6 +3011,7 @@ class AZColorflow(PalettePlugin):
 				pass
 		return blocked
 
+	# UPDATEINTERFACE handler: cheap dirty-check on selection + layer colours.
 	@objc.python_method
 	def update(self, sender) -> None:
 		ent = getattr(self, "_ent", None)
@@ -3216,16 +3045,27 @@ class AZColorflow(PalettePlugin):
 			return
 
 		selectedLayers = self.font.selectedLayers or []
-		signature = (masterId, tuple(
-			((layer.parent.name if layer.parent is not None else ""), layer.color)
-			for layer in selectedLayers))
-		if signature == getattr(self, "_lastSignature", None):
+		# Two-part signature: WHICH layers are selected (names) and WHAT colours
+		# they carry. The selection part only gates the UI rebuild; the cached
+		# per-step counts are derived from layer COLOURS, so they are dropped only
+		# when the colour part changed for the SAME selection (a swatch click /
+		# undo) or the master switched — a pure selection move (arrow keys) keeps
+		# the cache and skips the 3-4 full-font recounts per keystroke.
+		selection = tuple(
+			(layer.parent.name if layer.parent is not None else "")
+			for layer in selectedLayers)
+		colors = tuple(layer.color for layer in selectedLayers)
+		signature = (masterId, selection, colors)
+		last = getattr(self, "_lastSignature", None)
+		if signature == last:
 			return
 		self._lastSignature = signature
-		# A layer colour changed (or selection moved) — the cached per-step counts
-		# are derived from layer colours, so drop them and let Update_Plugin_UI
-		# recompute. (Nothing else invalidates them now the palette is display-only.)
-		self._invalidate_counts(masterId)
+		colors_changed = (
+			last is None
+			or last[0] != masterId
+			or (last[1] == selection and last[2] != colors))
+		if colors_changed:
+			self._invalidate_counts(masterId)
 		self.Update_Plugin_UI()
 
 	@objc.python_method
@@ -3238,11 +3078,6 @@ class AZColorflow(PalettePlugin):
 		try:
 			group = self.paletteView.frame
 			# Clear per-row widgets (same idiom as Update_Plugin_UI).
-			for attr in getattr(self, "_metaAttrs", []) + getattr(self, "_bodyAttrs", []):
-				if hasattr(group, attr):
-					delattr(group, attr)
-			self._metaAttrs = []
-			self._bodyAttrs = []
 			for color in list(getattr(self, "meaning", {}).keys()):
 				for suffix in ("", "box", "count", "hl", "click"):
 					attr = str(color) + suffix
@@ -3331,8 +3166,7 @@ class AZColorflow(PalettePlugin):
 	#																									   #
 
 	# Open the HTML Color Font Dashboard for the current font (per-master colour
-	# distribution + what changed since last run). Reloaded each time so edits to
-	# dashboard.py take effect without restarting Glyphs.
+	# distribution + what changed since last run).
 	@objc.python_method
 	def Open_Color_Font_Dashboard(self, sender) -> None:
 		self._run_dashboard(None)
@@ -3344,10 +3178,7 @@ class AZColorflow(PalettePlugin):
 		# progress; None when opened outside the sheet flow. Returns the written report
 		# Path (or None) so the sheet flow can offer Open / Save instead of auto-opening.
 		try:
-			import importlib
-
 			import azcolorflow_dashboard
-			importlib.reload(azcolorflow_dashboard)
 			return azcolorflow_dashboard.main(Glyphs.font, progress=progress, open_when_done=open_when_done)
 		except Exception:
 			import traceback
@@ -3368,8 +3199,11 @@ class AZColorflow(PalettePlugin):
 	# never diverge (see tools/generate_shortcuts.py).
 	@objc.python_method
 	def Load_Meaning(self) -> dict:
+		# Resolve against this palette's OWN font (not the frontmost one): a
+		# background window's palette must keep reading its own per-font-dir
+		# colorNames.txt, whatever document is frontmost.
 		fontDir = None
-		font = Glyphs.font
+		font = self._palette_font()
 		if font is not None and font.filepath:
 			fontDir = os.path.dirname(font.filepath)
 		return colornames.load_meaning(fontDir)

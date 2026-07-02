@@ -50,9 +50,9 @@ def _validate_menu_item_body() -> str:
     """Return the source of the palette's ``validateMenuItem_``.
 
     The dedicated ``AZColorflowRainbowMenuHandler`` also defines a
-    ``validateMenuItem_`` (the simplified single-item validator), so scan from
-    the palette class definition to get the shared validator that branches on
-    the action selector.
+    ``validateMenuItem_`` (the Rainbow item's checkmark validator), so scan
+    from the palette class definition to get the palette's own validator for
+    the context-menu entries.
     """
     class_start = PLUGIN_SOURCE.index("class AZColorflow(PalettePlugin):")
     start = PLUGIN_SOURCE.index("def validateMenuItem_(", class_start)
@@ -60,27 +60,37 @@ def _validate_menu_item_body() -> str:
     return PLUGIN_SOURCE[start:end]
 
 
-def test_validate_menu_item_branches_on_action_selector() -> None:
-    body = _validate_menu_item_body()
-    # Must inspect the menu item's action selector, not stamp every item.
-    assert "menuItem.action()" in body
-    assert '"toggleRainbow:"' in body
-    # Non-rainbow items bail out BEFORE any setState_ call, so the Rainbow
-    # checkmark never leaks onto settings / backfill / context-menu items.
-    branch = body.index('!= "toggleRainbow:"')
-    first_set_state = body.index("setState_")
-    assert branch < first_set_state
+def _rainbow_handler_validate_body() -> str:
+    """Return the source of ``AZColorflowRainbowMenuHandler.validateMenuItem_``
+    (the singleton File-menu handler that owns the Rainbow checkmark)."""
+    class_start = PLUGIN_SOURCE.index("class AZColorflowRainbowMenuHandler(NSObject):")
+    start = PLUGIN_SOURCE.index("def validateMenuItem_(", class_start)
+    end = PLUGIN_SOURCE.index("\n\tdef ", start)
+    return PLUGIN_SOURCE[start:end]
 
 
-def test_validate_menu_item_rainbow_disabled_without_font() -> None:
+def test_palette_validate_menu_item_has_no_rainbow_branch() -> None:
     body = _validate_menu_item_body()
-    # Original semantics preserved for the Rainbow toggle: with no font the
-    # item is unchecked and disabled.
-    no_font = body.index("if font is None:")
+    # The Rainbow File-menu item targets the module-level singleton handler,
+    # so the palette's validator (context-menu entries) must not branch on —
+    # or stamp — the Rainbow checkmark; it only gates on an open font. The
+    # palette-side toggleRainbow_/Toggle_Rainbow pair is gone with it.
+    assert "toggleRainbow:" not in body
+    assert "setState_" not in body
+    assert "return Glyphs.font is not None" in body
+    assert "def Toggle_Rainbow(" not in PLUGIN_SOURCE
+
+
+def test_rainbow_checkmark_lives_on_singleton_handler() -> None:
+    body = _rainbow_handler_validate_body()
+    # Original Rainbow semantics preserved on the handler: with no font the
+    # item is unchecked and disabled; otherwise the checkmark reflects the
+    # current font's grouping state.
+    no_font = body.index("if font is None")
     tail = body[no_font:]
     assert "menuItem.setState_(NSOffState)" in tail
-    assert "return False" in tail
-    assert "NSOnState if self.fontview.is_enabled(font) else NSOffState" in tail
+    assert "return font is not None" in tail
+    assert "NSOnState if self._fontview.is_enabled(font) else NSOffState" in tail
 
 
 def test_single_click_row_focus_removed() -> None:
@@ -654,10 +664,13 @@ def test_palette_row_has_no_coloured_bar() -> None:
     # colour cue is now the 6px colorTag strip + the count number, so no "box" Box and
     # no bar denominator remain in the row builder.
     assert '+"box"' not in body and "barWidth" not in body
-    # the non-exporting exclusion still drives the title-bar census
+    # the non-exporting exclusion still drives the title-bar census, which now
+    # reuses the cached per-step counts (same derivation, same exclusion set)
+    # instead of recounting the whole font on every header sync
     title = _method_body("_update_title_bar")
     assert "self._excluded_glyph_names()" in title
-    assert "colornames.exclude_named_colors(named_colors, excluded)" in title
+    assert "self._counts(masterId)" in title
+    assert "colornames.exclude_named_colors(" not in title
 
 
 # --------------------------------------------------------------------------- #
