@@ -352,15 +352,27 @@ class _AZColorflowReportWindow(AppKit.NSObject):
 			webview.setNavigationDelegate_(self)
 			window.setContentView_(webview)
 
+			# Titlebar accessory sizing is frame-driven: an auto-layout NSStackView with
+			# nothing pinning it collapses to zero and the buttons never appear. Use a
+			# plain container with explicit frames instead.
 			save = AppKit.NSButton.buttonWithTitle_target_action_("Save…", self, "saveReport:")
 			browser = AppKit.NSButton.buttonWithTitle_target_action_("Open in Browser", self, "openInBrowser:")
 			for button in (save, browser):
 				button.setControlSize_(AppKit.NSControlSizeSmall)
 				button.setFont_(AppKit.NSFont.systemFontOfSize_(AppKit.NSFont.smallSystemFontSize()))
-			stack = AppKit.NSStackView.stackViewWithViews_([save, browser])
-			stack.setEdgeInsets_((2, 0, 2, 8))   # top, leading, bottom, trailing
+				button.setTranslatesAutoresizingMaskIntoConstraints_(True)
+				button.sizeToFit()
+			gap, margin, height = 8.0, 10.0, 24.0
+			save_size = save.frame().size
+			browser_size = browser.frame().size
+			container = AppKit.NSView.alloc().initWithFrame_(AppKit.NSMakeRect(
+				0, 0, save_size.width + gap + browser_size.width + margin, height))
+			save.setFrameOrigin_((0.0, (height - save_size.height) / 2.0))
+			browser.setFrameOrigin_((save_size.width + gap, (height - browser_size.height) / 2.0))
+			container.addSubview_(save)
+			container.addSubview_(browser)
 			accessory = AppKit.NSTitlebarAccessoryViewController.alloc().init()
-			accessory.setView_(stack)
+			accessory.setView_(container)
 			accessory.setLayoutAttribute_(getattr(AppKit, "NSLayoutAttributeTrailing", AppKit.NSLayoutAttributeRight))
 			window.addTitlebarAccessoryViewController_(accessory)
 
