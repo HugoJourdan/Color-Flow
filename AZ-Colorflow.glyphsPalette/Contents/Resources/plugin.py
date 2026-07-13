@@ -340,13 +340,19 @@ class _AZColorflowReportWindow(AppKit.NSObject):
 
 			rect = AppKit.NSMakeRect(0, 0, 1180, 840)
 			mask = (AppKit.NSWindowStyleMaskTitled | AppKit.NSWindowStyleMaskClosable
-				| AppKit.NSWindowStyleMaskMiniaturizable | AppKit.NSWindowStyleMaskResizable)
+				| AppKit.NSWindowStyleMaskMiniaturizable | AppKit.NSWindowStyleMaskResizable
+				| AppKit.NSWindowStyleMaskFullSizeContentView)
 			window = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
 				rect, mask, AppKit.NSBackingStoreBuffered, False)
 			window.setReleasedWhenClosed_(False)
 			window.setMinSize_(AppKit.NSMakeSize(800, 600))
 			window.setFrameAutosaveName_("AZColorflowReportWindow")
 			window.setDelegate_(self)
+			# Chromeless look: no visible title bar — the report fills the window, the
+			# traffic lights and the accessory buttons float over it. The title stays
+			# set (Mission Control / Cmd-backtick), just not drawn.
+			window.setTitlebarAppearsTransparent_(True)
+			window.setTitleVisibility_(AppKit.NSWindowTitleHidden)
 
 			webview = WebKit.WKWebView.alloc().initWithFrame_configuration_(rect, config)
 			webview.setNavigationDelegate_(self)
