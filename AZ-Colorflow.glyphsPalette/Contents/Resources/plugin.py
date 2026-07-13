@@ -3350,10 +3350,18 @@ class AZColorflow(PalettePlugin):
 			def _add(view, width=None, height=None):
 				if is_stack:
 					view.setTranslatesAutoresizingMaskIntoConstraints_(False)
-					# Insert right after the title (index 0), BEFORE Glyphs's own
-					# disclosure chevron + "⋯" menu, so those stay to the right of our
-					# bar/report. (Appending would put our controls rightmost instead.)
-					header.insertArrangedSubview_atIndex_(view, 1)
+					# Insert immediately LEFT of Glyphs's own "⋯" menu button — matching
+					# the native Navigate section, whose extra button sits just left of
+					# "⋯" — i.e. after the title and the disclosure chevron. Recomputed
+					# per call so successive controls keep their call order, all packed
+					# right before "⋯"; falls back to appending when no menu is found.
+					arranged = header.arrangedSubviews()
+					index = len(arranged)
+					for position, sibling in enumerate(arranged):
+						if "GSMenuButton" in str(sibling.className()):
+							index = position
+							break
+					header.insertArrangedSubview_atIndex_(view, index)
 					if width is not None:
 						view.widthAnchor().constraintEqualToConstant_(width).setActive_(True)
 					if height is not None:
