@@ -181,9 +181,11 @@ def test_action_popover_builder_is_gone() -> None:
 
 def test_settings_pane_registered_once_via_app_delegate() -> None:
     body = _module_function_body("_register_preferences_pane")
-    # The pane is added through the verified GSAppDelegateProtocol API...
+    # The pane lands as a tab in the shared "AZ Toolkit" hub...
+    assert "hub.addSettingsPane_(view_controller)" in body
+    # ...with the verified GSAppDelegateProtocol API as the standalone fallback.
     assert "addViewToPreferences_(view_controller)" in body
-    # ...exactly once per app session, behind a module-level guard.
+    # Exactly once per app session, behind a module-level guard.
     assert "if _PREF_PANE_ADDED:" in body
     assert "return" in body
     assert "global _PREF_PANE_ADDED" in body
@@ -191,6 +193,54 @@ def test_settings_pane_registered_once_via_app_delegate() -> None:
     # Module-level guard flag + retained VC reference so AppKit can't deallocate it.
     assert "_PREF_PANE_ADDED = False" in PLUGIN_SOURCE
     assert "_PREF_PANE_VC = view_controller" in body
+
+
+def test_az_toolkit_hub_protocol() -> None:
+    # The shared AZ Toolkit hub: one Settings entry for the whole AZ suite,
+    # rendezvous through the main thread's threadDictionary (protocol v1).
+    assert '_HUB_KEY = "AZToolkit.SettingsHub.v1"' in PLUGIN_SOURCE
+    assert '_HUB_TITLE = "AZ Toolkit"' in PLUGIN_SOURCE
+    assert "class AZColorflowToolkitHub(AppKit.NSViewController):" in PLUGIN_SOURCE
+    # The two selectors every AZ plugin relies on must keep these exact names.
+    assert "def addSettingsPane_(self" in PLUGIN_SOURCE
+    assert "def showSettingsPaneWithIdentifier_(self" in PLUGIN_SOURCE
+    hub_finder = _module_function_body("_toolkit_hub")
+    # First plugin to load creates + parks + registers the hub; others reuse it.
+    assert "pool.objectForKey_(_HUB_KEY)" in hub_finder
+    assert "pool.setObject_forKey_(hub, _HUB_KEY)" in hub_finder
+    assert "delegate.addViewToPreferences_(hub)" in hub_finder
+    # The jump opens Settings on the HUB identifier (our tab is selected first).
+    opener = PLUGIN_SOURCE[
+        PLUGIN_SOURCE.index("def showSettingsPaneWithIdentifier_(") :
+        PLUGIN_SOURCE.index("def _recalc_preferred_size(")
+    ]
+    assert "showMainPreferencesWithIdentifier_(_HUB_TITLE)" in opener
+
+
+def test_az_toolkit_hub_popup_and_license_badge() -> None:
+    # The hub switches panes with a full-width popup over a tabless NSTabView.
+    assert "NSPopUpButton.alloc().initWithFrame_pullsDown_(" in PLUGIN_SOURCE
+    assert "setTabViewType_(AppKit.NSNoTabsNoBorder)" in PLUGIN_SOURCE
+    assert "def azToolkitPopupChanged_(self" in PLUGIN_SOURCE
+    # Licensed (bought, not trial) panes get a badge: a palette symbol image
+    # (white checkmark in an accent seal) with the monochrome glyph as fallback.
+    assert '"checkmark.seal.fill"' in PLUGIN_SOURCE
+    assert "configurationWithPaletteColors_(" in PLUGIN_SOURCE
+    assert "attributedStringWithAttachment_(" in PLUGIN_SOURCE
+    assert '_HUB_BADGE = "\\U001001FB"' in PLUGIN_SOURCE
+    assert "def azLicensed(self" in PLUGIN_SOURCE
+    # Debug override: the AZToolkitFakeLicensed defaults key badges every pane.
+    assert 'boolForKey_("AZToolkitFakeLicensed")' in PLUGIN_SOURCE
+    badge_check = _method_body("azLicensed")
+    assert '_SHARED_ENT.kind == "licensed"' in badge_check
+    add_pane = PLUGIN_SOURCE[
+        PLUGIN_SOURCE.index("def addSettingsPane_(") :
+        PLUGIN_SOURCE.index("def _pane_licensed(")
+    ]
+    assert "self._pane_licensed(pane)" in add_pane
+    assert "setAttributedTitle_(text)" in add_pane
+    licensed_probe = _module_function_body("_toolkit_hub")  # hub finder unchanged
+    assert "pool.objectForKey_(_HUB_KEY)" in licensed_probe
 
 
 def test_settings_pane_vc_title_is_color_flow() -> None:
@@ -729,3 +779,53 @@ def test_palette_eye_visibility_mode_fully_removed() -> None:
         "eyeRowClicked",
     ):
         assert symbol not in PLUGIN_SOURCE, symbol
+
+
+# --------------------------------------------------------------------------- #
+#  Native report window (WKWebView)
+# --------------------------------------------------------------------------- #
+
+
+def test_report_opens_in_native_window_with_browser_fallback() -> None:
+    body = _method_body("_finish_report_sheet")
+    # Native window first; webbrowser stays as the fallback when WebKit is out.
+    assert "_show_report_window(path)" in body
+    assert "webbrowser.open" in body
+    assert body.index("_show_report_window") < body.index("webbrowser.open")
+
+
+def test_report_window_gates_on_webkit_and_falls_back() -> None:
+    body = _module_function_body("_show_report_window")
+    assert "if WebKit is None:" in body
+    assert "return False" in body
+
+
+def test_report_window_routes_glyphsapp_links_to_the_app() -> None:
+    body = _method_body("webView_decidePolicyForNavigationAction_decisionHandler_")
+    assert '"glyphsapp"' in body
+    assert "NSWorkspace" in body
+    assert "_WK_CANCEL" in body
+    # <a download> blob exports become WKDownloads instead of navigations.
+    assert "shouldPerformDownload" in body
+    assert "_WK_DOWNLOAD" in body
+
+
+def test_report_window_breaks_message_handler_retain_cycle_on_close() -> None:
+    # WKUserContentController retains its script-message handler (the window
+    # controller). Closing the window must remove the handler and both delegates,
+    # or every closed report window leaks a webview + controller.
+    body = _method_body("windowWillClose_")
+    assert 'removeScriptMessageHandlerForName_("azcfPrint")' in body
+    assert "setNavigationDelegate_(None)" in body
+    assert "setDelegate_(None)" in body
+    assert "_REPORT_WINDOW = None" in body
+
+
+def test_report_window_maps_window_print_to_native_print_panel() -> None:
+    # The report's PDF export calls window.print(), a no-op in a bare WKWebView:
+    # a document-start user script rebinds it to the azcfPrint message, and the
+    # native side turns that into an NSPrintOperation.
+    assert "window.print = function()" in PLUGIN_SOURCE
+    assert "azcfPrint" in PLUGIN_SOURCE
+    body = _method_body("userContentController_didReceiveScriptMessage_")
+    assert "printOperationWithPrintInfo_" in body

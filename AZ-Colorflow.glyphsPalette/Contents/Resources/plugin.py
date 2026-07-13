@@ -17,11 +17,20 @@
 from __future__ import annotations
 
 import os
+import shutil
 import webbrowser
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import AppKit
+
+# WebKit hosts the report in a native window; if it's unavailable the report
+# falls back to opening in the default browser (the pre-4.x behaviour).
+try:
+	import WebKit
+except Exception:
+	WebKit = None
 import azcolorflow_filters
 
 # Shared, GlyphsApp-free colorNames logic (also embedded into the jump
@@ -270,6 +279,224 @@ _SHORTCUT_HANDLER = None
 # it entirely on that instance's __del__). So the item is installed ONCE per session
 # (module-level guard) targeting this retained singleton, which acts on Glyphs.font.
 _RAINBOW_MENU_HANDLER = None
+
+# Strong module-level reference to the native report window (one per session,
+# torn down on close). Module-level for the same weak-target reasons as above.
+_REPORT_WINDOW = None
+
+# WKNavigationActionPolicy raw values, with named constants when WebKit has them.
+_WK_CANCEL = getattr(WebKit, "WKNavigationActionPolicyCancel", 0) if WebKit else 0
+_WK_ALLOW = getattr(WebKit, "WKNavigationActionPolicyAllow", 1) if WebKit else 1
+_WK_DOWNLOAD = getattr(WebKit, "WKNavigationActionPolicyDownload", 2) if WebKit else 2
+
+# The report's own PDF export calls window.print(), which is a no-op inside a bare
+# WKWebView — rebind it to a script message the native side turns into an
+# NSPrintOperation. Injected at document start so it wins before any JS runs.
+_REPORT_PRINT_SCRIPT = (
+	"window.print = function(){"
+	" try { window.webkit.messageHandlers.azcfPrint.postMessage('print'); } catch(e){} };"
+)
+
+
+class _AZColorflowReportWindow(AppKit.NSObject):
+	"""Native window hosting the HTML report in a WKWebView.
+
+	Keeps the report byte-identical to the browser version while feeling like part
+	of Glyphs: titlebar buttons for "Save…" / "Open in Browser", glyphsapp:// heatmap
+	links routed to the app, the report's CSV/JSON blob downloads landing in
+	~/Downloads (revealed in Finder), and its PDF export (window.print) mapped to a
+	real print panel. The WKUserContentController retains its message handler (us),
+	so windowWillClose_ breaks the cycle by removing the handler and the delegates —
+	the window is rebuilt fresh on the next report."""
+
+	def showPath_(self, path) -> bool:
+		self._path = str(path)
+		if self._ensure_window() is None:
+			return False
+		try:
+			file_url = AppKit.NSURL.fileURLWithPath_(self._path)
+			read_access = AppKit.NSURL.fileURLWithPath_(str(Path(self._path).parent))
+			self._webview.loadFileURL_allowingReadAccessToURL_(file_url, read_access)
+			family = Path(self._path).stem.replace(" — AZ Colorflow", "")
+			self._window.setTitle_(f"AZ Colorflow — {family}")
+			self._window.makeKeyAndOrderFront_(None)
+			return True
+		except Exception:
+			import traceback
+			print("AZ Colorflow [report window] error:\n" + traceback.format_exc())
+			return False
+
+	@objc.python_method
+	def _ensure_window(self):
+		if getattr(self, "_window", None) is not None:
+			return self._window
+		try:
+			config = WebKit.WKWebViewConfiguration.alloc().init()
+			controller = config.userContentController()
+			script = WebKit.WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
+				_REPORT_PRINT_SCRIPT, 0, True)   # 0 = WKUserScriptInjectionTimeAtDocumentStart
+			controller.addUserScript_(script)
+			controller.addScriptMessageHandler_name_(self, "azcfPrint")
+
+			rect = AppKit.NSMakeRect(0, 0, 1180, 840)
+			mask = (AppKit.NSWindowStyleMaskTitled | AppKit.NSWindowStyleMaskClosable
+				| AppKit.NSWindowStyleMaskMiniaturizable | AppKit.NSWindowStyleMaskResizable)
+			window = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+				rect, mask, AppKit.NSBackingStoreBuffered, False)
+			window.setReleasedWhenClosed_(False)
+			window.setMinSize_(AppKit.NSMakeSize(800, 600))
+			window.setFrameAutosaveName_("AZColorflowReportWindow")
+			window.setDelegate_(self)
+
+			webview = WebKit.WKWebView.alloc().initWithFrame_configuration_(rect, config)
+			webview.setNavigationDelegate_(self)
+			window.setContentView_(webview)
+
+			save = AppKit.NSButton.buttonWithTitle_target_action_("Save…", self, "saveReport:")
+			browser = AppKit.NSButton.buttonWithTitle_target_action_("Open in Browser", self, "openInBrowser:")
+			for button in (save, browser):
+				button.setControlSize_(AppKit.NSControlSizeSmall)
+				button.setFont_(AppKit.NSFont.systemFontOfSize_(AppKit.NSFont.smallSystemFontSize()))
+			stack = AppKit.NSStackView.stackViewWithViews_([save, browser])
+			stack.setEdgeInsets_((2, 0, 2, 8))   # top, leading, bottom, trailing
+			accessory = AppKit.NSTitlebarAccessoryViewController.alloc().init()
+			accessory.setView_(stack)
+			accessory.setLayoutAttribute_(getattr(AppKit, "NSLayoutAttributeTrailing", AppKit.NSLayoutAttributeRight))
+			window.addTitlebarAccessoryViewController_(accessory)
+
+			self._window = window
+			self._webview = webview
+			self._controller = controller
+			return window
+		except Exception:
+			import traceback
+			print("AZ Colorflow [report window build] error:\n" + traceback.format_exc())
+			self._window = None
+			return None
+
+	# ---- titlebar buttons -------------------------------------------------- #
+
+	def saveReport_(self, sender) -> None:
+		try:
+			panel = AppKit.NSSavePanel.savePanel()
+			panel.setNameFieldStringValue_(Path(self._path).name)
+			if panel.runModal() == AppKit.NSModalResponseOK:
+				shutil.copyfile(self._path, panel.URL().path())
+		except Exception:
+			import traceback
+			print("AZ Colorflow [report save] error:\n" + traceback.format_exc())
+
+	def openInBrowser_(self, sender) -> None:
+		try:
+			webbrowser.open(Path(self._path).as_uri())
+		except Exception:
+			import traceback
+			print("AZ Colorflow [report browser] error:\n" + traceback.format_exc())
+
+	# ---- window.print() → native print panel ------------------------------- #
+
+	def userContentController_didReceiveScriptMessage_(self, controller, message) -> None:
+		try:
+			info = AppKit.NSPrintInfo.sharedPrintInfo().copy()
+			operation = self._webview.printOperationWithPrintInfo_(info)
+			operation.setShowsPrintPanel_(True)
+			operation.setShowsProgressPanel_(True)
+			operation.runOperationModalForWindow_delegate_didRunSelector_contextInfo_(
+				self._window, None, None, None)
+		except Exception:
+			import traceback
+			print("AZ Colorflow [report print] error:\n" + traceback.format_exc())
+
+	# ---- navigation policy -------------------------------------------------- #
+
+	def webView_decidePolicyForNavigationAction_decisionHandler_(self, webview, action, handler) -> None:
+		try:
+			url = action.request().URL()
+			scheme = (url.scheme() or "").lower() if url is not None else ""
+			if scheme == "glyphsapp":                     # heatmap deep links → Glyphs itself
+				AppKit.NSWorkspace.sharedWorkspace().openURL_(url)
+				handler(_WK_CANCEL)
+				return
+			wants_download = (action.respondsToSelector_(b"shouldPerformDownload")
+				and action.shouldPerformDownload())
+			if wants_download:                            # CSV/JSON export (<a download> blob)
+				handler(_WK_DOWNLOAD)
+				return
+			if scheme in ("http", "https"):               # anything external → default browser
+				AppKit.NSWorkspace.sharedWorkspace().openURL_(url)
+				handler(_WK_CANCEL)
+				return
+			if scheme == "blob":                          # no download support (pre-11.3): don't navigate away
+				handler(_WK_CANCEL)
+				return
+			handler(_WK_ALLOW)
+		except Exception:
+			handler(_WK_ALLOW)
+
+	# ---- WKDownload → ~/Downloads, revealed in Finder ----------------------- #
+
+	def webView_navigationAction_didBecomeDownload_(self, webview, action, download) -> None:
+		download.setDelegate_(self)
+
+	def download_decideDestinationUsingResponse_suggestedFilename_completionHandler_(
+			self, download, response, filename, handler) -> None:
+		try:
+			downloads = Path.home() / "Downloads"
+			base = downloads / (filename or "AZ Colorflow export")
+			destination = base
+			counter = 2
+			while destination.exists():
+				destination = downloads / f"{base.stem} ({counter}){base.suffix}"
+				counter += 1
+			self._lastDownload = str(destination)
+			handler(AppKit.NSURL.fileURLWithPath_(str(destination)))
+		except Exception:
+			handler(None)
+
+	def downloadDidFinish_(self, download) -> None:
+		try:
+			target = AppKit.NSURL.fileURLWithPath_(self._lastDownload)
+			AppKit.NSWorkspace.sharedWorkspace().activateFileViewerSelectingURLs_([target])
+		except Exception:
+			pass
+
+	def download_didFailWithError_resumeData_(self, download, error, data) -> None:
+		print(f"AZ Colorflow [report export] download failed: {error}")
+
+	# ---- teardown ------------------------------------------------------------ #
+
+	def windowWillClose_(self, notification) -> None:
+		# Break the WKUserContentController→handler(self)→webview retain cycle and drop
+		# the module reference; the next report rebuilds the window from scratch.
+		global _REPORT_WINDOW
+		try:
+			self._controller.removeScriptMessageHandlerForName_("azcfPrint")
+		except Exception:
+			pass
+		try:
+			self._webview.setNavigationDelegate_(None)
+			self._window.setDelegate_(None)
+		except Exception:
+			pass
+		self._window = None
+		self._webview = None
+		self._controller = None
+		_REPORT_WINDOW = None
+
+
+def _show_report_window(path) -> bool:
+	"""Open the report in the native window; False = caller should fall back to the browser."""
+	global _REPORT_WINDOW
+	if WebKit is None:
+		return False
+	try:
+		if _REPORT_WINDOW is None:
+			_REPORT_WINDOW = _AZColorflowReportWindow.alloc().init()
+		return bool(_REPORT_WINDOW.showPath_(path))
+	except Exception:
+		import traceback
+		print("AZ Colorflow [report window] error:\n" + traceback.format_exc())
+		return False
 
 # Shared bootstrap entitlement (Gate). The native "Jump to next" shortcut fires
 # the module-level handler, which has no palette instance, so the licence gate is
@@ -1405,6 +1632,241 @@ class AZColorflowPreferencesController(AppKit.NSViewController):
 				return image
 		return None
 
+	def azLicensed(self) -> bool:
+		# Protocol v1.1: the AZ Toolkit hub reads this (respondsToSelector + valueForKey)
+		# to badge our popup item when the plugin is BOUGHT — an active trial is not a
+		# licence, so it gets no badge. _SHARED_ENT is the live Gate settings() publishes.
+		try:
+			return bool(_SHARED_ENT is not None and _SHARED_ENT.kind == "licensed")
+		except Exception:
+			return False
+
+
+# ---- AZ Toolkit shared Settings hub (protocol v1) ----------------------------------------------
+# All AZ plugins share ONE "AZ Toolkit" entry in Glyphs > Settings; each plugin's pane is a tab
+# inside it. Rendezvous: the hub NSViewController is parked in the main thread's threadDictionary
+# under _HUB_KEY — whichever AZ plugin loads first creates the hub (its own uniquely-named copy of
+# this class) and registers it via addViewToPreferences:; everyone else finds it there. UI: a
+# full-width NSPopUpButton switches between the panes hosted in a tabless NSTabView below it; a
+# pane whose plugin is licensed (bought, not trial) gets an accent-colored 􀇻 after its name.
+# Keep the selectors stable across ALL AZ plugins (protocol v1.1):
+#   addSettingsPane:(NSViewController*)   pane.title = the popup item ("AZ X"),
+#                                         pane.representedObject = jump identifier;
+#                                         pane MAY expose azLicensed (BOOL)
+#   showSettingsPaneWithIdentifier:(NSString*)
+_HUB_KEY = "AZToolkit.SettingsHub.v1"
+_HUB_TITLE = "AZ Toolkit"
+_HUB_BADGE = "\U001001FB"   # SF Symbol checkmark seal, one astral codepoint
+_POPUP_BAR_H = 41.0   # 10 top + 25 popup + 6 gap
+
+
+class AZColorflowToolkitHub(AppKit.NSViewController):
+	def init(self) -> Any:
+		self = objc.super(AZColorflowToolkitHub, self).init()
+		if self is None:
+			return None
+		self._panes = []
+		self.setTitle_(_HUB_TITLE)
+		self.setRepresentedObject_(_HUB_TITLE)
+		self.setPreferredContentSize_(AppKit.NSMakeSize(360.0, 240.0))
+		return self
+
+	def loadView(self) -> None:
+		root = AppKit.NSView.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, 360, 240))
+		popup = AppKit.NSPopUpButton.alloc().initWithFrame_pullsDown_(
+			AppKit.NSMakeRect(12, 240 - 35, 360 - 24, 25), False)
+		popup.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewMinYMargin)
+		popup.setTarget_(self)
+		popup.setAction_("azToolkitPopupChanged:")
+		tabs = AppKit.NSTabView.alloc().initWithFrame_(
+			AppKit.NSMakeRect(0, 0, 360, 240 - _POPUP_BAR_H))
+		tabs.setTabViewType_(AppKit.NSNoTabsNoBorder)
+		tabs.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
+		root.addSubview_(popup)
+		root.addSubview_(tabs)
+		self._popup = popup
+		self._tabs = tabs
+		self.setView_(root)
+
+	def azToolkitPopupChanged_(self, sender: Any) -> None:
+		try:
+			self._tabs.selectTabViewItemAtIndex_(sender.indexOfSelectedItem())
+		except Exception:
+			pass
+
+	# Glyphs 4's Settings sidebar reads GSPreferenceViewControllerProtocol off each pane:
+	# required -imageName, optional -image (both respondsToSelector-guarded).
+	def imageName(self) -> str:
+		return "wrench.and.screwdriver"
+
+	def image(self) -> Any:
+		symbol_ctor = getattr(
+			AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_", None
+		)
+		if symbol_ctor is None:   # pre-macOS 11: no SF Symbols
+			return None
+		for name in ("wrench.and.screwdriver", "gearshape.2", "hammer"):
+			image = symbol_ctor(name, _HUB_TITLE)
+			if image is not None:
+				image.setTemplate_(True)
+				return image
+		return None
+
+	def addSettingsPane_(self, pane: Any) -> None:
+		try:
+			self.view()   # force loadView so _popup/_tabs exist
+			tabs = self._tabs
+			ident = pane.representedObject() or pane.title() or ""
+			for index in range(tabs.numberOfTabViewItems()):
+				if tabs.tabViewItemAtIndex_(index).identifier() == ident:
+					return   # already registered (e.g. two document windows)
+			title = pane.title() or str(ident)
+			label = title[3:] if title.startswith("AZ ") else title
+			size = pane.preferredContentSize()
+			view = pane.view()
+			if size.width < 1 or size.height < 1:
+				size = view.frame().size
+			# Pin the pane at its designed size, top-left; the flexible right/bottom
+			# margins absorb the stretch NSTabView applies to item views.
+			container = AppKit.NSView.alloc().initWithFrame_(
+				AppKit.NSMakeRect(0, 0, size.width, size.height))
+			view.setFrame_(AppKit.NSMakeRect(0, 0, size.width, size.height))
+			view.setAutoresizingMask_(AppKit.NSViewMaxXMargin | AppKit.NSViewMinYMargin)
+			container.addSubview_(view)
+			item = AppKit.NSTabViewItem.alloc().initWithIdentifier_(ident)
+			item.setLabel_(label)
+			item.setView_(container)
+			insert_at = tabs.numberOfTabViewItems()
+			for index in range(tabs.numberOfTabViewItems()):
+				if label < str(tabs.tabViewItemAtIndex_(index).label()):
+					insert_at = index
+					break
+			tabs.insertTabViewItem_atIndex_(item, insert_at)
+			# Popup shows the FULL plugin name ("AZ Colorflow"), not the stripped
+			# tab label — the sort above still uses the label.
+			self._popup.insertItemWithTitle_atIndex_(title, insert_at)
+			if self._pane_licensed(pane):
+				text = AppKit.NSMutableAttributedString.alloc().initWithString_attributes_(
+					title + "  ",
+					{AppKit.NSFontAttributeName: AppKit.NSFont.menuFontOfSize_(0)})
+				text.appendAttributedString_(self._badge_string())
+				self._popup.itemAtIndex_(insert_at).setAttributedTitle_(text)
+			self._panes.append(pane)   # retain: AppKit must not dealloc the pane
+			self._popup.selectItemAtIndex_(
+				tabs.indexOfTabViewItem_(tabs.selectedTabViewItem()))
+			self._recalc_preferred_size()
+		except Exception:
+			import traceback
+			print("AZ Colorflow [toolkit hub addPane] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def _badge_string(self) -> Any:
+		"""The licensed badge, appended after the plugin name.
+
+		Preferred: checkmark.seal.fill as a PALETTE symbol image (white checkmark
+		inside an accent-colored seal, macOS 12+) attached inline via
+		NSTextAttachment — plain text runs render SF symbols monochrome, so the
+		checkmark can't be white there. Fallback: the accent-colored 􀇻 glyph as
+		text (checkmark = knocked out)."""
+		accent = getattr(AppKit.NSColor, "controlAccentColor", None)
+		color = accent() if accent is not None else AppKit.NSColor.systemBlueColor()
+		try:
+			image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(
+				"checkmark.seal.fill", "licensed")
+			size_conf = AppKit.NSImageSymbolConfiguration.configurationWithPointSize_weight_(
+				12.0, AppKit.NSFontWeightRegular)
+			palette = AppKit.NSImageSymbolConfiguration.configurationWithPaletteColors_(
+				[AppKit.NSColor.whiteColor(), color])
+			image = image.imageWithSymbolConfiguration_(
+				size_conf.configurationByApplyingConfiguration_(palette))
+			attachment = AppKit.NSTextAttachment.alloc().init()
+			attachment.setImage_(image)
+			size = image.size()
+			font = AppKit.NSFont.menuFontOfSize_(0)
+			# center the seal on the cap height of the menu font
+			offset_y = round((font.capHeight() - size.height) / 2.0)
+			attachment.setBounds_(AppKit.NSMakeRect(0, offset_y, size.width, size.height))
+			return AppKit.NSAttributedString.attributedStringWithAttachment_(attachment)
+		except Exception:
+			pass
+		text = AppKit.NSMutableAttributedString.alloc().initWithString_attributes_(
+			_HUB_BADGE, {AppKit.NSFontAttributeName: AppKit.NSFont.menuFontOfSize_(0)})
+		text.addAttribute_value_range_(
+			AppKit.NSForegroundColorAttributeName, color,
+			AppKit.NSMakeRange(0, text.length()))
+		return text
+
+	@objc.python_method
+	def _pane_licensed(self, pane: Any) -> bool:
+		"""Protocol v1.1: a pane MAY expose azLicensed (bought, not trial).
+		Debug: the AZToolkitFakeLicensed defaults key badges EVERY pane."""
+		try:
+			if AppKit.NSUserDefaults.standardUserDefaults().boolForKey_("AZToolkitFakeLicensed"):
+				return True
+			if pane.respondsToSelector_(b"azLicensed"):
+				return bool(pane.valueForKey_("azLicensed"))
+		except Exception:
+			pass
+		return False
+
+	def showSettingsPaneWithIdentifier_(self, identifier: Any) -> None:
+		try:
+			self.view()
+			tabs = self._tabs
+			for index in range(tabs.numberOfTabViewItems()):
+				if tabs.tabViewItemAtIndex_(index).identifier() == identifier:
+					tabs.selectTabViewItemAtIndex_(index)
+					self._popup.selectItemAtIndex_(index)
+					break
+		except Exception:
+			pass
+		delegate = _app_delegate()
+		if delegate is not None and delegate.respondsToSelector_(b"showMainPreferencesWithIdentifier:"):
+			try:
+				delegate.showMainPreferencesWithIdentifier_(_HUB_TITLE)
+			except Exception:
+				pass
+
+	@objc.python_method
+	def _recalc_preferred_size(self) -> None:
+		try:
+			max_width, max_height = 300.0, 200.0
+			for pane in self._panes:
+				size = pane.preferredContentSize()
+				if size.width < 1 or size.height < 1:
+					size = pane.view().frame().size
+				max_width = max(max_width, size.width)
+				max_height = max(max_height, size.height)
+			self.setPreferredContentSize_(
+				AppKit.NSMakeSize(max_width, max_height + _POPUP_BAR_H))
+		except Exception:
+			import traceback
+			print("AZ Colorflow [toolkit hub size] error:\n" + traceback.format_exc())
+
+
+def _toolkit_hub() -> Any:
+	"""Find-or-create the shared AZ Toolkit hub (None if it can't be hosted)."""
+	try:
+		pool = AppKit.NSThread.mainThread().threadDictionary()
+		hub = pool.objectForKey_(_HUB_KEY)
+		if hub is not None:
+			return hub
+		delegate = _app_delegate()
+		# respondsToSelector_, not hasattr: hasattr on the bridged delegate scans
+		# the entire ObjC selector table when the method is missing.
+		if delegate is None or not delegate.respondsToSelector_(b"addViewToPreferences:"):
+			return None
+		hub = AZColorflowToolkitHub.alloc().init()
+		if hub is None:
+			return None
+		pool.setObject_forKey_(hub, _HUB_KEY)   # retained here for the app's lifetime
+		delegate.addViewToPreferences_(hub)
+		return hub
+	except Exception:
+		import traceback
+		print("AZ Colorflow [toolkit hub] error:\n" + traceback.format_exc())
+		return None
+
 
 def _register_preferences_pane() -> None:
 	"""Add the Color Flow pane to Glyphs > Settings exactly once per app session.
@@ -1445,7 +1907,13 @@ def _register_preferences_pane() -> None:
 	_PREF_PANE_ADDED = True
 	_PREF_PANE_CONTROLLER = controller
 	_PREF_PANE_VC = view_controller
-	delegate.addViewToPreferences_(view_controller)
+	# The pane lands as a tab in the shared "AZ Toolkit" entry; standalone fallback
+	# only if the hub can't be built.
+	hub = _toolkit_hub()
+	if hub is not None and hub.respondsToSelector_(b"addSettingsPane:"):
+		hub.addSettingsPane_(view_controller)
+	else:
+		delegate.addViewToPreferences_(view_controller)   # solo fallback
 
 
 def _open_preferences_pane() -> None:
@@ -1457,9 +1925,18 @@ def _open_preferences_pane() -> None:
 	ever throws (older Glyphs / no such item), fall back to just opening Settings so the user
 	still lands in the window and can click the Color Flow pane manually."""
 	_register_preferences_pane()
+	# Preferred path: the shared AZ Toolkit hub selects our tab and opens Settings.
+	hub = _toolkit_hub()
+	if hub is not None and hub.respondsToSelector_(b"showSettingsPaneWithIdentifier:"):
+		try:
+			hub.showSettingsPaneWithIdentifier_(COLORFLOW_PREF_IDENTIFIER)
+			return
+		except Exception:
+			pass  # fall through to the direct jump
 	delegate = _app_delegate()
 	if delegate is None:
 		return
+	# Solo-registered pane (no hub): its top-level identifier is our own.
 	# respondsToSelector_, not hasattr/getattr: those scan the entire ObjC
 	# selector table on the bridged delegate when the method is missing.
 	if delegate.respondsToSelector_(b"showMainPreferencesWithIdentifier:"):
@@ -1909,7 +2386,7 @@ class AZColorflow(PalettePlugin):
 	@objc.python_method
 	def _finish_report_sheet(self) -> None:
 		# Build finished: stop the loader, close the sheet, then ALWAYS open the report
-		# (no Open/Save prompt).
+		# (no Open/Save prompt) — in the native window, or the browser if WebKit is out.
 		loader = getattr(self, "_reportLoader", None)
 		if loader is not None:
 			try:
@@ -1920,7 +2397,8 @@ class AZColorflow(PalettePlugin):
 		self._dismiss_report_sheet()
 		if path is not None:
 			try:
-				webbrowser.open(path.as_uri())
+				if not _show_report_window(path):
+					webbrowser.open(path.as_uri())
 			except Exception:
 				import traceback
 				print("AZ Colorflow [open report] error:\n" + traceback.format_exc())
