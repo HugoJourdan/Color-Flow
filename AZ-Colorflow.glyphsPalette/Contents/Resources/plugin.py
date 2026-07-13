@@ -297,6 +297,34 @@ _REPORT_PRINT_SCRIPT = (
 	" try { window.webkit.messageHandlers.azcfPrint.postMessage('print'); } catch(e){} };"
 )
 
+# The chromeless window floats the traffic lights and the Save/Browser buttons over
+# the page, and the native drag strip owns the same band — push the report content
+# below it. Screen-only so the print/PDF export keeps its own margins.
+_REPORT_TOPBAR_HEIGHT = 40.0
+_REPORT_TOPBAR_SCRIPT = (
+	"var azcfPad = document.createElement('style');"
+	f" azcfPad.textContent = '@media screen {{ body {{ padding-top: {_REPORT_TOPBAR_HEIGHT:.0f}px"
+	" !important; } }';"
+	" document.head.appendChild(azcfPad);"
+)
+
+
+class _AZColorflowReportDragStrip(AppKit.NSView):
+	"""Transparent strip across the window's top band. WKWebView swallows mouse
+	events, so the hidden-titlebar window can't be dragged through it — this strip
+	sits above the webview, hands mouse-downs to the window drag machinery, and
+	forwards scrolls to the webview so the band doesn't create a dead scroll zone."""
+
+	def mouseDown_(self, event) -> None:
+		window = self.window()
+		if window is not None:
+			window.performWindowDragWithEvent_(event)
+
+	def scrollWheel_(self, event) -> None:
+		webview = getattr(self, "_webview", None)
+		if webview is not None:
+			webview.scrollWheel_(event)
+
 
 class _AZColorflowReportWindow(AppKit.NSObject):
 	"""Native window hosting the HTML report in a WKWebView.
@@ -336,6 +364,9 @@ class _AZColorflowReportWindow(AppKit.NSObject):
 			script = WebKit.WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
 				_REPORT_PRINT_SCRIPT, 0, True)   # 0 = WKUserScriptInjectionTimeAtDocumentStart
 			controller.addUserScript_(script)
+			pad = WebKit.WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
+				_REPORT_TOPBAR_SCRIPT, 1, True)   # 1 = WKUserScriptInjectionTimeAtDocumentEnd
+			controller.addUserScript_(pad)
 			controller.addScriptMessageHandler_name_(self, "azcfPrint")
 
 			rect = AppKit.NSMakeRect(0, 0, 1180, 840)
@@ -354,9 +385,17 @@ class _AZColorflowReportWindow(AppKit.NSObject):
 			window.setTitlebarAppearsTransparent_(True)
 			window.setTitleVisibility_(AppKit.NSWindowTitleHidden)
 
+			container = AppKit.NSView.alloc().initWithFrame_(rect)
 			webview = WebKit.WKWebView.alloc().initWithFrame_configuration_(rect, config)
 			webview.setNavigationDelegate_(self)
-			window.setContentView_(webview)
+			webview.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
+			container.addSubview_(webview)
+			strip = _AZColorflowReportDragStrip.alloc().initWithFrame_(AppKit.NSMakeRect(
+				0, rect.size.height - _REPORT_TOPBAR_HEIGHT, rect.size.width, _REPORT_TOPBAR_HEIGHT))
+			strip._webview = webview
+			strip.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewMinYMargin)
+			container.addSubview_(strip)   # above the webview: owns dragging in the top band
+			window.setContentView_(container)
 
 			# Titlebar accessory sizing is frame-driven: an auto-layout NSStackView with
 			# nothing pinning it collapses to zero and the buttons never appear. Use a

@@ -829,3 +829,17 @@ def test_report_window_maps_window_print_to_native_print_panel() -> None:
     assert "azcfPrint" in PLUGIN_SOURCE
     body = _method_body("userContentController_didReceiveScriptMessage_")
     assert "printOperationWithPrintInfo_" in body
+
+
+def test_report_window_top_band_is_draggable_and_padded() -> None:
+    # WKWebView swallows mouse events, so the chromeless window needs a native
+    # drag strip over the top band — and the page is padded (screen-only) so the
+    # floating traffic lights / buttons never overlap report UI.
+    assert "class _AZColorflowReportDragStrip(AppKit.NSView):" in PLUGIN_SOURCE
+    strip = _method_body("mouseDown_")
+    assert "performWindowDragWithEvent_" in strip
+    assert "@media screen" in PLUGIN_SOURCE
+    assert "padding-top" in PLUGIN_SOURCE
+    build = _method_body("_ensure_window")
+    assert "_AZColorflowReportDragStrip.alloc()" in build
+    assert "NSViewMinYMargin" in build
