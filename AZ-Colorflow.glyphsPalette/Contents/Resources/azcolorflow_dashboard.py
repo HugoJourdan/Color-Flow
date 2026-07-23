@@ -1154,6 +1154,22 @@ def build_coverage(font, current: dict, order: list[str]) -> dict:
     }
 
 
+def _subrows_for(current: dict, order: list[str], names: list[str],
+                 sub_of: dict[str, str], master_id: str) -> list[dict]:
+    """Sub-category coverage rows within one category's glyph names (grouped by
+    ``GSGlyph.subCategory``; blank -> ``"Other"``), largest first. Empty when the
+    category has fewer than two distinct sub-categories — nothing to expand."""
+    subgroups: dict[str, list[str]] = {}
+    for name in names:
+        subgroups.setdefault(sub_of.get(name, "Other"), []).append(name)
+    if len(subgroups) < 2:
+        return []
+    rows = _coverage_for(current, subgroups, order).get(master_id, [])
+    for row in rows:
+        row["label"] = row["key"]
+    return rows
+
+
 def coverage_rows_for_master(font, master_id: str | None = None) -> dict:
     """Category + script colour-distribution rows for ONE master — the data behind
     the native Edit-view sidebar. Lean twin of :func:`build_coverage`: a single
@@ -1164,7 +1180,9 @@ def coverage_rows_for_master(font, master_id: str | None = None) -> dict:
     Each row is ``{key, total, uncolored, dist, ...}`` (same shape as
     ``build_coverage``'s rows, largest group first). ``dist`` is
     ``{colorKey: count}`` over the *coloured* glyphs; ``order`` is the workflow
-    key order and ``labels`` maps each key to its display name."""
+    key order and ``labels`` maps each key to its display name. Category rows also
+    carry ``subRows`` — the same shape grouped by sub-category — for the sidebar's
+    collapsible category menu (empty when there is nothing to break down)."""
     meaning, none_label = _meaning_and_none(font)
     order = list(meaning.keys())
     if master_id is None:
@@ -1176,10 +1194,13 @@ def coverage_rows_for_master(font, master_id: str | None = None) -> dict:
                      glyph.layers[master_id].color if glyph.layers[master_id] is not None else None)
                  for glyph in font.glyphs} if master_id is not None else {}
     current = {master_id: per_glyph}
-    cats = _coverage_for(current, _glyph_groups(font, "category"), order).get(master_id, [])
+    category_groups = _glyph_groups(font, "category")
+    cats = _coverage_for(current, category_groups, order).get(master_id, [])
     scripts = _coverage_for(current, _glyph_groups(font, "script"), order).get(master_id, [])
+    sub_of = {glyph.name: str(getattr(glyph, "subCategory", None) or "Other") for glyph in font.glyphs}
     for row in cats:
         row["label"] = row["key"]                       # categories are already human ("Letter")
+        row["subRows"] = _subrows_for(current, order, category_groups.get(row["key"], []), sub_of, master_id)
     for row in scripts:
         row["label"] = _script_display(row["key"])      # "latin" -> "Latin"
     return {

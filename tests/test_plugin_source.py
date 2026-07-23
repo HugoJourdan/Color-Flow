@@ -887,6 +887,16 @@ def test_coverage_sidebar_follows_selected_master_live() -> None:
     assert 'performSelector_withObject_afterDelay_("coverageRebuild:", None' in block
 
 
+def test_coverage_sidebar_categories_collapse_to_subcategories() -> None:
+    # Category rows carry a sub-category breakdown (with_subs) and toggle open on
+    # click; a chevron marks the expandable rows and the view reflows its height.
+    assert "with_subs" in _sidebar_block()                          # controller attaches subRows
+    assert "def mouseDown_(self, event" in PLUGIN_SOURCE
+    assert "self._expanded" in PLUGIN_SOURCE
+    assert '"▾" if is_expanded else "▸"' in PLUGIN_SOURCE  # ▾ open / ▸ closed
+    assert "def _reflow(self" in PLUGIN_SOURCE and "self.setFrameSize_" in PLUGIN_SOURCE
+
+
 def test_hosted_report_never_spins_the_host_main_thread_needlessly() -> None:
     # Report window: spin paused whenever the window is not key or occluded.
     sync = _method_body("_sync_spin_state")

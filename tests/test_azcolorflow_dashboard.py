@@ -1052,6 +1052,7 @@ def test_coverage_rows_for_master_follows_the_selected_master() -> None:
     for glyph, script, category in ((letter_a, "latin", "Letter"), (letter_b, "latin", "Letter"),
                                     (comma, None, "Punctuation")):
         glyph.script, glyph.category = script, category
+    letter_a.subCategory, letter_b.subCategory, comma.subCategory = "Uppercase", "Lowercase", None
     font = _FakeFont([_FakeMaster("m1", "R"), _FakeMaster("m2", "B")], [letter_a, letter_b, comma])
 
     data = db.coverage_rows_for_master(font, "m1")
@@ -1062,6 +1063,14 @@ def test_coverage_rows_for_master_follows_the_selected_master() -> None:
     assert by_cat["Letter"]["label"] == "Letter"            # categories pass through
     by_script = {row["key"]: row for row in data["byScript"]}
     assert by_script["latin"]["label"] == "Latin"           # scripts prettified
+
+    # Letter breaks down into its sub-categories (Uppercase/Lowercase); a
+    # single-sub category (Punctuation) has no expandable breakdown.
+    subs = {row["key"]: row for row in by_cat["Letter"]["subRows"]}
+    assert set(subs) == {"Uppercase", "Lowercase"}
+    assert subs["Uppercase"]["total"] == 1 and subs["Uppercase"]["dist"]["2"] == 1  # A at step 2
+    assert subs["Lowercase"]["dist"]["0"] == 1                                       # B at step 0
+    assert by_cat["Punctuation"]["subRows"] == []
 
     other = db.coverage_rows_for_master(font, "m2")
     other_letter = {row["key"]: row for row in other["byCategory"]}["Letter"]
