@@ -1203,11 +1203,13 @@ def coverage_rows_for_master(font, master_id: str | None = None) -> dict:
         row["subRows"] = _subrows_for(current, order, category_groups.get(row["key"], []), sub_of, master_id)
     for row in scripts:
         row["label"] = _script_display(row["key"])      # "latin" -> "Latin"
+    global_rows = _coverage_for(current, {"All": list(per_glyph.keys())}, order).get(master_id, [])
     return {
         "master_id": master_id,
         "order": [str(key) for key in order],
         "labels": {str(key): label for key, label in meaning.items()},
         "noneLabel": none_label,
+        "global": global_rows[0] if global_rows else None,   # whole-master distribution
         "byCategory": cats,
         "byScript": scripts,
     }

@@ -1072,6 +1072,10 @@ def test_coverage_rows_for_master_follows_the_selected_master() -> None:
     assert subs["Lowercase"]["dist"]["0"] == 1                                       # B at step 0
     assert by_cat["Punctuation"]["subRows"] == []
 
+    # Global row = the whole master's distribution (all 3 glyphs on m1).
+    assert data["global"]["total"] == 3
+    assert data["global"]["dist"]["2"] == 2 and data["global"]["dist"]["0"] == 1  # A,comma=2; B=0
+
     other = db.coverage_rows_for_master(font, "m2")
     other_letter = {row["key"]: row for row in other["byCategory"]}["Letter"]
     assert other_letter["dist"]["0"] == 1 and other_letter["dist"]["2"] == 0  # A=0, B uncoloured

@@ -610,12 +610,81 @@ _COV_NAME_W = 96.0        # wider name column
 _COV_COUNT_W = 34.0       # wider value column
 _COV_GAP = 8.0
 _COV_BAR_H = 10.0
-_COV_NAME_INDENT = 14.0   # disclosure gutter — all top-level names share it
-_COV_SUB_INDENT = 26.0    # sub-category rows indent past the gutter
+_COV_NAME_INDENT = 14.0   # disclosure gutter — top-level and sub-category names share it
+_COV_GLOBAL_CAP_H = 15.0  # "OVERALL" caption above the global progress bar
+_COV_GLOBAL_BAR_H = 16.0  # the global bar is a touch taller/prominent
+_COV_GLOBAL_GAP = 12.0    # gap between the global bar and the first card
 _NS_ALIGN_LEFT = getattr(AppKit, "NSTextAlignmentLeft", 0)
 _NS_ALIGN_RIGHT = getattr(AppKit, "NSTextAlignmentRight", 2)   # 10.12+ raw value
 _NS_TRUNCATE_TAIL = getattr(AppKit, "NSLineBreakByTruncatingTail", 4)
 _NS_FONT_WEIGHT_REGULAR = getattr(AppKit, "NSFontWeightRegular", 0.0)
+
+
+def _glyph_symbol_image(codepoint: int, point_size: float = 15.0) -> Any:
+	"""Render an SF-Symbol PUA glyph (macOS substitutes it into the system font) to
+	a template NSImage — lets us use a symbol we only have the glyph for (no name)."""
+	try:
+		text = AppKit.NSAttributedString.alloc().initWithString_attributes_(
+			chr(codepoint),
+			{AppKit.NSFontAttributeName: AppKit.NSFont.systemFontOfSize_(point_size),
+			 AppKit.NSForegroundColorAttributeName: AppKit.NSColor.blackColor()})
+		size = text.size()
+		if size.width < 1.0 or size.height < 1.0:
+			return None
+		image = AppKit.NSImage.alloc().initWithSize_(size)
+		image.lockFocus()
+		text.drawAtPoint_((0.0, 0.0))
+		image.unlockFocus()
+		image.setTemplate_(True)
+		return image
+	except Exception:
+		return None
+
+
+# Glyphs' own script icons: each script maps to a "*Template.pdf" in the Glyphs
+# app bundle, resolvable from inside the app by NSImage.imageNamed_ (the same
+# images its Font-view Languages sidebar draws). Names are non-obvious (Latin ->
+# a capital G, Greek -> Omega, …); table lifted from GlyphsCore defaultLanguages.
+_SCRIPT_TO_ICON = {
+	"latin": "CapitalGTemplate", "greek": "CapitalOmegaTemplate",
+	"cyrillic": "CapitalCyrillicJaTemplate", "arabic": "ArabicTemplate",
+	"hebrew": "HebrewTemplate", "syriac": "SyriacTemplate", "elymaic": "ElymaicTemplate",
+	"armenian": "ArmenianTemplate", "georgian": "GeorgianTemplate",
+	"han": "HanTemplate", "kana": "JapanTemplate", "hangul": "HangulTemplate",
+	"devanagari": "DevanagariTemplate", "bengali": "BengaliTemplate",
+	"gujarati": "GujaratiTemplate", "gurmukhi": "GurmukhiTemplate",
+	"kannada": "KannadaTemplate", "malayalam": "MalayalamTemplate",
+	"oriya": "OriyaTemplate", "tamil": "TamilTemplate", "sinhala": "SinhalaTemplate",
+	"telugu": "TeluguTemplate", "thai": "ThaiTemplate", "lao": "LaoTemplate",
+	"khmer": "KhmerTemplate", "cham": "ChamTemplate", "myanmar": "BurmeseTemplate",
+	"tibet": "TibetanTemplate", "tham": "ThamTemplate", "ethiopic": "EthiopicTemplate",
+	"tifinagh": "TifinaghTemplate", "adlam": "AdlamTemplate", "nko": "NkoTemplate",
+	"osmanya": "OsmanyaTemplate", "yezidi": "YezidiTemplate", "brahmi": "BrahmiTemplate",
+	"balinese": "BalineseTemplate", "batak": "BatakTemplate", "buginese": "BugineseTemplate",
+	"java": "JavaneseTemplate", "kawi": "KawiTemplate", "lue": "NewTaiLueTemplate",
+	"tagalog": "TagalogTemplate", "meeteimayek": "MeeteimayekTemplate", "ogham": "OghamTemplate",
+	"runic": "RunesTemplate", "rovas": "OldHungarianTemplate", "cherokee": "CreeTemplate",
+	"canadian": "CreeTemplate", "musical": "MusicTemplate", "braille": "BrailleTemplate",
+	"math": "MathTemplate",
+}
+_SCRIPT_ICON_CACHE: dict = {}
+
+
+def _script_icon(script_id: str) -> Any:
+	"""The NSImage Glyphs uses for ``script_id`` in its sidebar, or the generic
+	OtherScripts icon. Cached; None if the app bundle can't resolve it (tests)."""
+	if script_id in _SCRIPT_ICON_CACHE:
+		return _SCRIPT_ICON_CACHE[script_id]
+	name = _SCRIPT_TO_ICON.get(script_id, "OtherScriptsTemplate")
+	image = None
+	try:
+		image = AppKit.NSImage.imageNamed_(name) or AppKit.NSImage.imageNamed_("OtherScriptsTemplate")
+		if image is not None:
+			image.setTemplate_(True)
+	except Exception:
+		image = None
+	_SCRIPT_ICON_CACHE[script_id] = image
+	return image
 
 
 def _show_group_color_layers(font: Any, kind: str, group_key: str,
@@ -632,7 +701,9 @@ def _show_group_color_layers(font: Any, kind: str, group_key: str,
 		return
 	layers = []
 	for glyph in font.glyphs:
-		if kind == "script":
+		if kind == "all":
+			pass                          # whole-master global bar: no group filter
+		elif kind == "script":
 			if str(getattr(glyph, "script", None) or "Other") != group_key:
 				continue
 		else:
@@ -669,9 +740,11 @@ class _AZCoverageBarsView(AppKit.NSView):
 		if self is None:
 			return None
 		self._sections = []
+		self._global = None                   # (count, segs) — the whole-master progress bar
 		self._expanded = set()
 		self._toggle_hits = []                # [(key, top, bottom, bar_x)] — click left of bar toggles
 		self._seg_hits = []                   # [(x0, x1, top, bottom, kind, group, sub, colorKey)]
+		self._bar_rects = []                  # bar pill rects -> pointing-hand cursor
 		return self
 
 	def isFlipped(self) -> bool:
@@ -701,6 +774,8 @@ class _AZCoverageBarsView(AppKit.NSView):
 			return 80.0
 		expanded = getattr(self, "_expanded", None) or set()
 		height = _COV_TOP
+		if getattr(self, "_global", None):
+			height += _COV_GLOBAL_CAP_H + _COV_GLOBAL_BAR_H + _COV_GLOBAL_GAP
 		for _title, rows in sections:
 			height += self._card_height(rows, expanded) + _COV_CARD_GAP
 		return height + _COV_TOP - _COV_CARD_GAP
@@ -758,6 +833,52 @@ class _AZCoverageBarsView(AppKit.NSView):
 		path.fill()
 
 	@objc.python_method
+	def _draw_icon(self, image: Any, rect: Any, color: Any) -> None:
+		# Tint a template image to `color` (via an offscreen source-atop pass) then
+		# draw it upright in this flipped view.
+		if image is None:
+			return
+		zero = AppKit.NSMakeRect(0.0, 0.0, 0.0, 0.0)
+		src_over = getattr(AppKit, "NSCompositingOperationSourceOver", 2)
+		src_atop = getattr(AppKit, "NSCompositingOperationSourceAtop", 6)
+		tinted = AppKit.NSImage.alloc().initWithSize_(rect.size)
+		tinted.lockFocus()
+		box = AppKit.NSMakeRect(0.0, 0.0, rect.size.width, rect.size.height)
+		image.drawInRect_fromRect_operation_fraction_(box, zero, src_over, 1.0)
+		color.set()
+		AppKit.NSRectFillUsingOperation(box, src_atop)
+		tinted.unlockFocus()
+		tinted.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
+			rect, zero, src_over, 1.0, True, None)
+
+	@objc.python_method
+	def _draw_global(self, y: float, width: float) -> float:
+		entry = getattr(self, "_global", None)
+		if not entry:
+			return y
+		count, segs = entry
+		self._draw_text("OVERALL", AppKit.NSMakeRect(_COV_PAD, y, width - 2 * _COV_PAD, 13.0),
+		                11.0, AppKit.NSColor.secondaryLabelColor(), bold=True)
+		y += _COV_GLOBAL_CAP_H
+		bar_x = _COV_PAD
+		bar_w = max(10.0, width - 2 * _COV_PAD - _COV_COUNT_W - _COV_GAP)
+		bar_rect = AppKit.NSMakeRect(bar_x, y, bar_w, _COV_GLOBAL_BAR_H)
+		self._draw_bar(bar_rect, segs)
+		self._bar_rects.append(bar_rect)
+		self._draw_text(str(count),
+		                AppKit.NSMakeRect(bar_x + bar_w + _COV_GAP, y + (_COV_GLOBAL_BAR_H - 14.0) / 2.0,
+		                                  _COV_COUNT_W, 14.0),
+		                11.0, AppKit.NSColor.whiteColor(), align=_NS_ALIGN_LEFT, mono=True)
+		x = bar_x
+		for fraction, _rgba, color_key in segs:
+			seg_w = fraction * bar_w
+			if seg_w <= 0.0:
+				continue
+			self._seg_hits.append((x, x + seg_w, y, y + _COV_GLOBAL_BAR_H, "all", None, None, color_key))
+			x += seg_w
+		return y + _COV_GLOBAL_BAR_H + _COV_GLOBAL_GAP
+
+	@objc.python_method
 	def _draw_bar(self, rect: Any, segs: Any) -> None:
 		radius = rect.size.height / 2.0
 		track = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, radius, radius)
@@ -799,7 +920,9 @@ class _AZCoverageBarsView(AppKit.NSView):
 		                11.0, AppKit.NSColor.whiteColor(), align=_NS_ALIGN_LEFT, mono=True)
 		bar_x = cx0 + _COV_NAME_W + _COV_GAP
 		bar_w = max(10.0, cw - _COV_NAME_W - _COV_GAP - _COV_COUNT_W - _COV_GAP)
-		self._draw_bar(AppKit.NSMakeRect(bar_x, y + (row_h - _COV_BAR_H) / 2.0, bar_w, _COV_BAR_H), segs)
+		bar_rect = AppKit.NSMakeRect(bar_x, y + (row_h - _COV_BAR_H) / 2.0, bar_w, _COV_BAR_H)
+		self._draw_bar(bar_rect, segs)
+		self._bar_rects.append(bar_rect)
 		kind, group_key, sub_key = hit_meta
 		x = bar_x
 		for fraction, _rgba, color_key in segs:
@@ -816,6 +939,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 		sections = getattr(self, "_sections", None) or []
 		self._toggle_hits = []
 		self._seg_hits = []
+		self._bar_rects = []
 		if not sections:
 			self._draw_text("No glyphs to show.",
 			                AppKit.NSMakeRect(_COV_PAD, bounds.size.height / 2.0 - 9.0,
@@ -827,7 +951,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 		card_w = width - 2 * _COV_PAD
 		cx0 = card_x + _COV_CARD_PADX
 		cw = card_w - 2 * _COV_CARD_PADX
-		y = _COV_TOP
+		y = self._draw_global(_COV_TOP, width)
 		for title, rows in sections:
 			card_h = self._card_height(rows, expanded)
 			self._draw_card(AppKit.NSMakeRect(card_x, y, card_w, card_h))
@@ -841,16 +965,29 @@ class _AZCoverageBarsView(AppKit.NSView):
 					self._draw_disclosure(cx0 + 1.0, row_y + (_COV_ROW_H - 8.0) / 2.0, 8.0,
 					                      is_expanded, AppKit.NSColor.secondaryLabelColor())
 					self._toggle_hits.append((key, row_y, row_y + _COV_ROW_H, cx0 + _COV_NAME_W + _COV_GAP))
+				elif kind == "script":        # Glyphs' own per-script sidebar icon in the gutter
+					self._draw_icon(_script_icon(key),
+					                AppKit.NSMakeRect(cx0, row_y + (_COV_ROW_H - 13.0) / 2.0, 13.0, 13.0),
+					                AppKit.NSColor.secondaryLabelColor())
 				self._draw_bar_row(row_y, _COV_ROW_H, cx0, cw, name, count, segs,
 				                   _COV_NAME_INDENT, 11.5, AppKit.NSColor.labelColor(), (kind, key, None))
 				row_y += _COV_ROW_H
 				if is_expanded:
 					for sub_name, sub_count, sub_segs, sub_key in subs:
+						# Same size + x as top-level names; only the lighter grey sets them apart.
 						self._draw_bar_row(row_y, _COV_SUB_ROW_H, cx0, cw, sub_name, sub_count, sub_segs,
-						                   _COV_SUB_INDENT, 10.5, AppKit.NSColor.secondaryLabelColor(),
+						                   _COV_NAME_INDENT, 11.5, AppKit.NSColor.secondaryLabelColor(),
 						                   ("subcategory", key, sub_key))
 						row_y += _COV_SUB_ROW_H
 			y += card_h + _COV_CARD_GAP
+		window = self.window()
+		if window is not None:                # bars just moved -> rebuild the hand-cursor rects
+			window.invalidateCursorRectsForView_(self)
+
+	def resetCursorRects(self) -> None:
+		hand = AppKit.NSCursor.pointingHandCursor()
+		for rect in getattr(self, "_bar_rects", []):
+			self.addCursorRect_cursor_(rect, hand)
 
 	def mouseDown_(self, event: Any) -> None:
 		point = self.convertPoint_fromView_(event.locationInWindow(), None)
@@ -1072,10 +1209,16 @@ try:
 			scripts = build(data.get("byScript", []), True, "script", False)    # flat; skip "Other"
 			if scripts:
 				sections.append(("Script", scripts))
-			return sections
+			global_row = data.get("global")
+			global_tuple = None
+			if global_row is not None:
+				base = segs_for(global_row)
+				if base is not None:
+					global_tuple = (base[0], base[1])                # (count, segs)
+			return sections, global_tuple
 
 		@objc.python_method
-		def _signature(self, sections: Any, colors: Any) -> tuple:
+		def _signature(self, sections: Any, global_tuple: Any, colors: Any) -> tuple:
 			def seg_sig(segs):
 				return tuple((round(fraction, 5), color_key) for fraction, _rgba, color_key in segs)
 
@@ -1086,6 +1229,7 @@ try:
 				              for sub_name, sub_count, sub_segs, _sub_key in subs))
 			return (
 				tuple(tuple(round(float(component), 4) for component in rgba) for rgba in colors),
+				(global_tuple[0], seg_sig(global_tuple[1])) if global_tuple else None,
 				tuple((title, tuple(row_sig(row) for row in rows)) for title, rows in sections),
 			)
 
@@ -1097,17 +1241,18 @@ try:
 			try:
 				font = self._sidebar_font()
 				if font is None:
-					sections, colors = [], []
+					sections, global_tuple, colors = [], None, []
 				else:
 					import azcolorflow_dashboard
 					data = azcolorflow_dashboard.coverage_rows_for_master(font)
 					self._lastMaster = data.get("master_id")
 					colors = labelcolors.read_label_colors()
-					sections = self._sections_from(data, colors)
-				signature = self._signature(sections, colors)
+					sections, global_tuple = self._sections_from(data, colors)
+				signature = self._signature(sections, global_tuple, colors)
 				if signature == getattr(self, "_sig", None):
 					return
 				self._sig = signature
+				doc._global = global_tuple
 				doc.setData_colors_(sections, colors)
 				self._resize_doc()
 			except Exception:
@@ -2248,6 +2393,12 @@ class AZColorflowPreferencesController(AppKit.NSViewController):
 		return "swatchpalette"
 
 	def image(self) -> Any:
+		# Hugo's chosen SF Symbol (U+101082, 􁂂). We only have the glyph, not the
+		# symbol name, so render it via the system font (macOS substitutes the SF
+		# Symbol) into a template image. Falls back to the named-symbol chain.
+		glyph = _glyph_symbol_image(0x101082)
+		if glyph is not None:
+			return glyph
 		symbol_ctor = getattr(
 			AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_", None
 		)

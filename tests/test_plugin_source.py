@@ -909,6 +909,45 @@ def test_coverage_sidebar_double_click_shows_layers() -> None:
     assert "_show_group_color_layers(Glyphs.font" in PLUGIN_SOURCE
 
 
+def test_coverage_sidebar_has_global_progress_bar() -> None:
+    # A whole-master "OVERALL" bar sits above the cards; double-click on it opens
+    # every glyph of that colour (kind "all", no group filter).
+    assert "def _draw_global(self" in PLUGIN_SOURCE
+    assert '"OVERALL"' in PLUGIN_SOURCE
+    assert 'self._draw_global(_COV_TOP, width)' in PLUGIN_SOURCE
+    assert '"all", None, None, color_key' in PLUGIN_SOURCE          # global seg hit meta
+    assert 'if kind == "all":' in PLUGIN_SOURCE                     # matches every glyph
+
+
+def test_coverage_sidebar_scripts_use_glyphs_icons() -> None:
+    # Script rows show Glyphs' own sidebar icon (a "*Template.pdf" via imageNamed_).
+    assert 'NSImage.imageNamed_(name)' in PLUGIN_SOURCE
+    assert '"latin": "CapitalGTemplate"' in PLUGIN_SOURCE
+    assert "def _script_icon(script_id" in PLUGIN_SOURCE
+    assert "def _draw_icon(self" in PLUGIN_SOURCE
+    assert 'elif kind == "script":' in PLUGIN_SOURCE and "_script_icon(key)" in PLUGIN_SOURCE
+
+
+def test_coverage_sidebar_bars_show_hand_cursor() -> None:
+    assert "def resetCursorRects(self" in PLUGIN_SOURCE
+    assert "NSCursor.pointingHandCursor()" in PLUGIN_SOURCE
+    assert "addCursorRect_cursor_" in PLUGIN_SOURCE
+    assert "invalidateCursorRectsForView_(self)" in PLUGIN_SOURCE
+
+
+def test_coverage_sidebar_subcategories_align_with_categories() -> None:
+    # Sub-rows share the top-level name size + x, only lighter grey distinguishes them.
+    marker = "# Same size + x as top-level names"
+    tail = PLUGIN_SOURCE[PLUGIN_SOURCE.index(marker):][:260]
+    assert "_COV_NAME_INDENT, 11.5, AppKit.NSColor.secondaryLabelColor()" in tail
+
+
+def test_settings_pane_icon_uses_chosen_sf_symbol() -> None:
+    # The Settings-pane icon renders Hugo's SF Symbol glyph (U+101082).
+    assert "def _glyph_symbol_image(codepoint" in PLUGIN_SOURCE
+    assert "_glyph_symbol_image(0x101082)" in PLUGIN_SOURCE
+
+
 def test_coverage_sidebar_tab_icon_is_the_bundled_disc() -> None:
     # Tab icon = the bundled metallic disc PDF (full colour), with a drawn ring
     # template as the fallback if the file is missing.
