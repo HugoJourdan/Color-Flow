@@ -869,9 +869,9 @@ def test_coverage_sidebar_is_g4_gated_and_native() -> None:
     # sections, white + monospaced counts, and a hairline stroke around every bar.
     assert "def _draw_separator(self" in PLUGIN_SOURCE
     assert "index > 0:" in PLUGIN_SOURCE                             # separator only between sections
-    assert "NSColor.whiteColor(), align=_NS_ALIGN_RIGHT, mono=True" in PLUGIN_SOURCE
+    assert "NSColor.whiteColor(), align=_NS_ALIGN_LEFT, mono=True" in PLUGIN_SOURCE
     assert "monospacedSystemFontOfSize_weight_" in PLUGIN_SOURCE
-    assert "track.setLineWidth_(1.0)" in PLUGIN_SOURCE and "track.stroke()" in PLUGIN_SOURCE
+    assert "track.setLineWidth_(0.75)" in PLUGIN_SOURCE and "track.stroke()" in PLUGIN_SOURCE
 
 
 def test_coverage_sidebar_follows_selected_master_live() -> None:

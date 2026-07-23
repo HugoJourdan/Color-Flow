@@ -599,7 +599,7 @@ def _show_report_window(path) -> bool:
 _COV_PAD = 12.0
 _COV_TOP = 10.0
 _COV_HEADER_H = 22.0
-_COV_ROW_H = 26.0
+_COV_ROW_H = 22.0
 _COV_SEC_GAP = 10.0
 _COV_NAME_W = 84.0
 _COV_COUNT_W = 30.0
@@ -658,7 +658,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 
 	@objc.python_method
 	def _draw_separator(self, rect: Any) -> None:
-		AppKit.NSColor.separatorColor().set()
+		AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.2).set()
 		AppKit.NSBezierPath.bezierPathWithRect_(rect).fill()
 
 	@objc.python_method
@@ -683,9 +683,9 @@ class _AZCoverageBarsView(AppKit.NSView):
 				x += width
 			context.restoreGraphicsState()
 		# Hairline outline so a bar (or a segment whose colour sits close to the
-		# sidebar background) always stays legible against it.
-		AppKit.NSColor.separatorColor().set()
-		track.setLineWidth_(1.0)
+		# sidebar background) always stays legible against it. Light + thin.
+		AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.3).set()
+		track.setLineWidth_(0.75)
 		track.stroke()
 
 	def drawRect_(self, dirtyRect: Any) -> None:
@@ -712,7 +712,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 				                11.5, AppKit.NSColor.labelColor())
 				self._draw_text(str(count),
 				                AppKit.NSMakeRect(width - _COV_PAD - _COV_COUNT_W, y + 5.0, _COV_COUNT_W, 16.0),
-				                11.0, AppKit.NSColor.whiteColor(), align=_NS_ALIGN_RIGHT, mono=True)
+				                11.0, AppKit.NSColor.whiteColor(), align=_NS_ALIGN_LEFT, mono=True)
 				bar_x = _COV_PAD + _COV_NAME_W + _COV_GAP
 				bar_w = max(10.0, width - _COV_PAD - _COV_COUNT_W - _COV_GAP - bar_x)
 				bar_y = y + (_COV_ROW_H - _COV_BAR_H) / 2.0
