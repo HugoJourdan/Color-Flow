@@ -555,6 +555,155 @@ def _show_report_window(path) -> bool:
 		print("AZ Colorflow [report window] error:\n" + traceback.format_exc())
 		return False
 
+
+# ---------------------------------------------------------------------------- #
+#  Glyphs 4 Edit-view left-sidebar tab: the report's disc tower
+# ---------------------------------------------------------------------------- #
+
+# Show ONLY the disc tower: hide every top-level sibling that doesn't contain it
+# plus the tab body beside it; the tower column then centres in the sidebar.
+_SIDEBAR_TOWER_CSS = (
+	"@media screen {"
+	" body > *:not(:has(#cfd-tower)) { display: none !important; }"
+	" #cfd-body { display: none !important; }"
+	" #cfd-main { display: block !important; }"
+	" #cfd-tower { position: static !important; width: 100% !important; flex: none !important; }"
+	" #cfd-tower canvas { margin: 0 auto; }"
+	" body { padding: 0 !important; min-width: 0 !important; }"
+	"}"
+)
+_SIDEBAR_TOWER_SCRIPT = (
+	"var azcfTower = document.createElement('style');"
+	f" azcfTower.textContent = {_SIDEBAR_TOWER_CSS!r};"
+	" document.head.appendChild(azcfTower);"
+)
+
+_SIDEBAR_REGISTERED = False
+
+
+def _register_tower_sidebar() -> None:
+	"""Register the Edit-view left-sidebar tab (Glyphs 4 only, once per session)."""
+	global _SIDEBAR_REGISTERED
+	if _SIDEBAR_REGISTERED or AZColorflowTowerSidebar is None or WebKit is None:
+		return
+	handler = objc.lookUpClass("GSCallbackHandler")
+	if not handler.respondsToSelector_(b"addEditViewLeftSidebarController:"):
+		return                                    # Glyphs 3: no left-sidebar API
+	handler.addEditViewLeftSidebarController_(AZColorflowTowerSidebar)
+	_SIDEBAR_REGISTERED = True
+
+
+# The class only exists on Glyphs 4: Glyphs' registration check is
+# conformsToProtocol:, PyObjC conformance must be declared at class creation
+# (protocols=), and protocolNamed raises where the protocol doesn't exist.
+AZColorflowTowerSidebar = None
+try:
+	_SIDEBAR_PROTOCOL = objc.protocolNamed("GSEditViewSidebarControllerProtocol")
+
+	class AZColorflowTowerSidebar(AppKit.NSViewController, protocols=[_SIDEBAR_PROTOCOL]):
+		"""Edit-view left-sidebar tab showing the report's master disc tower.
+
+		Hosts the real report HTML (built with the NoGlyphSVG light flag — the
+		tower needs no per-glyph outlines) in a WKWebView with tower-only CSS
+		injected, so the discs render exactly like the dashboard, clicks included.
+		Glyphs instantiates one controller per Edit view."""
+
+		@classmethod
+		def title(cls) -> str:
+			return "Colorflow"
+
+		@classmethod
+		def tabBarImage(cls) -> Any:
+			ctor = getattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_", None)
+			if ctor is None:
+				return None
+			for name in ("chart.pie", "circle.grid.2x2"):
+				image = ctor(name, "AZ Colorflow")
+				if image is not None:
+					image.setTemplate_(True)   # tint like the native tab icons
+					return image
+			return None
+
+		def setController_(self, controller) -> None:
+			# Glyphs hands us its edit view controller. PyObjC can't weak-store
+			# ObjC refs; the strong store leaks one edit-VC per closed tab —
+			# accepted for now (one small controller per closed Edit view).
+			self._controller = controller
+
+		def controller(self) -> Any:
+			return getattr(self, "_controller", None)
+
+		def loadView(self) -> None:
+			rect = AppKit.NSMakeRect(0, 0, 280, 600)
+			container = AppKit.NSView.alloc().initWithFrame_(rect)
+			config = WebKit.WKWebViewConfiguration.alloc().init()
+			script = WebKit.WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
+				_SIDEBAR_TOWER_SCRIPT, 1, True)   # 1 = WKUserScriptInjectionTimeAtDocumentEnd
+			config.userContentController().addUserScript_(script)
+			webview = WebKit.WKWebView.alloc().initWithFrame_configuration_(rect, config)
+			webview.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
+			container.addSubview_(webview)
+			refresh = AppKit.NSButton.buttonWithTitle_target_action_("↻", self, "refreshTower:")
+			refresh.setBezelStyle_(AppKit.NSBezelStyleCircular)
+			refresh.setFrame_(AppKit.NSMakeRect(rect.size.width - 32, rect.size.height - 32, 26, 26))
+			refresh.setAutoresizingMask_(AppKit.NSViewMinXMargin | AppKit.NSViewMinYMargin)
+			container.addSubview_(refresh)
+			self._webview = webview
+			self._loaded = False
+			self.setView_(container)
+
+		def viewDidAppear(self) -> None:
+			objc.super(AZColorflowTowerSidebar, self).viewDidAppear()
+			if not getattr(self, "_loaded", False):
+				self._build_and_load()
+
+		def refreshTower_(self, sender) -> None:
+			self._build_and_load()
+
+		@objc.python_method
+		def _sidebar_font(self) -> Any:
+			try:
+				font = self._controller.windowController().documentFont()
+				if font is not None:
+					return font
+			except Exception:
+				pass
+			return Glyphs.font
+
+		@objc.python_method
+		def _build_and_load(self) -> None:
+			try:
+				import azcolorflow_dashboard
+				font = self._sidebar_font()
+				if font is None:
+					return
+				# Light build: skip per-glyph SVG extraction — the tower doesn't
+				# need it. Restore the user's own flag state afterwards.
+				key = azcolorflow_dashboard.NO_GLYPH_SVG_KEY
+				old = Glyphs.defaults[key]
+				Glyphs.defaults[key] = True
+				try:
+					path = azcolorflow_dashboard.main(font, open_when_done=False)
+				finally:
+					try:
+						if old is None:
+							del Glyphs.defaults[key]
+						else:
+							Glyphs.defaults[key] = old
+					except Exception:
+						pass
+				if path is None:
+					return
+				file_url = AppKit.NSURL.fileURLWithPath_(str(path))
+				access = AppKit.NSURL.fileURLWithPath_(str(Path(str(path)).parent))
+				self._webview.loadFileURL_allowingReadAccessToURL_(file_url, access)
+				self._loaded = True
+			except Exception:
+				import traceback
+				print("AZ Colorflow [tower sidebar] error:\n" + traceback.format_exc())
+except Exception:
+	AZColorflowTowerSidebar = None
+
 # Shared bootstrap entitlement (Gate). The native "Jump to next" shortcut fires
 # the module-level handler, which has no palette instance, so the licence gate is
 # consulted here. settings()/_onLicenseChanged publish the live Gate so the
@@ -2298,6 +2447,14 @@ class AZColorflow(PalettePlugin):
 		except Exception:
 			import traceback
 			print("AZ Colorflow [prefs pane] error:\n" + traceback.format_exc())
+
+		# Glyphs 4 Edit-view left sidebar: the report's disc tower (module-level
+		# once-per-session guard; silently unavailable on Glyphs 3 / no WebKit).
+		try:
+			_register_tower_sidebar()
+		except Exception:
+			import traceback
+			print("AZ Colorflow [tower sidebar] error:\n" + traceback.format_exc())
 
 		# Observe edits made in the global Settings pane so THIS palette refreshes live.
 		try:

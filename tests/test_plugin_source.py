@@ -252,9 +252,9 @@ def test_settings_pane_vc_title_is_color_flow() -> None:
     reg = _module_function_body("_register_preferences_pane")
     assert "view_controller.setTitle_(COLORFLOW_PREF_IDENTIFIER)" in reg
     assert "view_controller.setRepresentedObject_(COLORFLOW_PREF_IDENTIFIER)" in reg
+    init_start = PLUGIN_SOURCE.index("def initWithSettingsView_(")
     init_body = PLUGIN_SOURCE[
-        PLUGIN_SOURCE.index("def initWithSettingsView_(") :
-        PLUGIN_SOURCE.index("def loadView(")
+        init_start : PLUGIN_SOURCE.index("def loadView(", init_start)
     ]
     assert "self.setTitle_(COLORFLOW_PREF_IDENTIFIER)" in init_body
     assert "self.setRepresentedObject_(COLORFLOW_PREF_IDENTIFIER)" in init_body
@@ -843,3 +843,21 @@ def test_report_window_top_band_is_draggable_and_padded() -> None:
     build = _method_body("_ensure_window")
     assert "_AZColorflowReportDragStrip.alloc()" in build
     assert "NSViewMinYMargin" in build
+
+
+def test_tower_sidebar_is_g4_gated_and_restores_the_light_flag() -> None:
+    # The Edit-view left-sidebar tab must declare protocol conformance at class
+    # creation (Glyphs' registration check is conformsToProtocol:), register the
+    # CLASS via GSCallbackHandler, and be a no-op on Glyphs 3.
+    assert 'objc.protocolNamed("GSEditViewSidebarControllerProtocol")' in PLUGIN_SOURCE
+    assert "protocols=[_SIDEBAR_PROTOCOL]" in PLUGIN_SOURCE
+    register = _module_function_body("_register_tower_sidebar")
+    assert 'respondsToSelector_(b"addEditViewLeftSidebarController:")' in register
+    assert "addEditViewLeftSidebarController_(AZColorflowTowerSidebar)" in register
+    # The sidebar build borrows the NoGlyphSVG light flag and must restore it.
+    build = _method_body("_build_and_load")
+    assert "NO_GLYPH_SVG_KEY" in build
+    assert "finally:" in build
+    # Tower-only CSS: the report body/tab chrome is hidden, the tower is kept.
+    assert "#cfd-tower" in PLUGIN_SOURCE
+    assert "#cfd-body { display: none" in PLUGIN_SOURCE
