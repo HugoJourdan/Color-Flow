@@ -703,11 +703,8 @@ def _show_group_color_layers(font: Any, kind: str, group_key: str,
 	for glyph in font.glyphs:
 		if kind == "all":
 			pass                          # whole-master global bar: no group filter
-		elif kind in ("script", "subscript"):
+		elif kind == "script":
 			if str(getattr(glyph, "script", None) or "Other") != group_key:
-				continue
-			# subscript = one category within a script (the collapsed sub-row).
-			if kind == "subscript" and str(getattr(glyph, "category", None) or "Other") != sub_key:
 				continue
 		else:
 			if str(getattr(glyph, "category", None) or "Other") != group_key:
@@ -1037,7 +1034,6 @@ class _AZCoverageBarsView(AppKit.NSView):
 				                   _COV_NAME_INDENT, 11.5, AppKit.NSColor.labelColor(), (kind, key, None))
 				row_y += _COV_ROW_H
 				if subs and open_frac > 0.0:  # sub-rows reveal/hide by clipping to the animated height
-					sub_kind = "subscript" if kind == "script" else "subcategory"
 					visible_h = _COV_SUB_ROW_H * len(subs) * open_frac
 					context = AppKit.NSGraphicsContext.currentContext()
 					context.saveGraphicsState()
@@ -1048,7 +1044,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 						# Same size + x as top-level names; only the lighter grey sets them apart.
 						self._draw_bar_row(sub_y, _COV_SUB_ROW_H, cx0, cw, sub_name, sub_count, sub_segs,
 						                   _COV_NAME_INDENT, 11.5, AppKit.NSColor.secondaryLabelColor(),
-						                   (sub_kind, key, sub_key))
+						                   ("subcategory", key, sub_key))
 						sub_y += _COV_SUB_ROW_H
 					context.restoreGraphicsState()
 					row_y += visible_h
@@ -1085,8 +1081,17 @@ class _AZCoverageBarsView(AppKit.NSView):
 				self._expanded.add(key) if opening else self._expanded.discard(key)
 				# Animate from the current fraction (mid-flight clicks reverse smoothly).
 				self._anim[key] = self._anim.get(key, 0.0 if opening else 1.0)
-				self._start_anim()
+				self.setNeedsDisplay_(True)     # flip the chevron immediately
+				# Beat before the slide: wait 0.1s, then start the tick timer.
+				try:
+					NSObject.cancelPreviousPerformRequestsWithTarget_selector_object_(self, "animStart:", None)
+				except Exception:
+					pass
+				self.performSelector_withObject_afterDelay_("animStart:", None, 0.1)
 				return
+
+	def animStart_(self, sender: Any) -> None:
+		self._start_anim()
 
 	@objc.python_method
 	def _start_anim(self) -> None:
@@ -1098,7 +1103,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 		self._anim_timer = timer
 
 	def animTick_(self, timer: Any) -> None:
-		step = 1.0 / 9.0                        # ~0.15s to fully open/close
+		step = 1.0 / 15.0                       # 15 frames @ 60fps ≈ 0.25s to fully open/close
 		anim = self._anim
 		for key in list(anim.keys()):
 			goal = 1.0 if key in self._expanded else 0.0
@@ -1124,6 +1129,10 @@ class _AZCoverageBarsView(AppKit.NSView):
 	def viewDidMoveToWindow(self) -> None:
 		if self.window() is None:               # off-screen -> stop the timer (breaks the retain cycle)
 			self._stop_anim()
+			try:
+				NSObject.cancelPreviousPerformRequestsWithTarget_selector_object_(self, "animStart:", None)
+			except Exception:
+				pass
 
 	@objc.python_method
 	def _reflow(self) -> None:
@@ -1598,7 +1607,7 @@ try:
 			cats = build(data.get("byCategory", []), False, "category", True)   # expand to sub-categories
 			if cats:
 				sections.append(("Category", cats))
-			scripts = build(data.get("byScript", []), True, "script", True)     # collapse to categories; skip "Other"
+			scripts = build(data.get("byScript", []), True, "script", False)    # flat; skip "Other"
 			if scripts:
 				sections.append(("Script", scripts))
 			global_row = data.get("global")

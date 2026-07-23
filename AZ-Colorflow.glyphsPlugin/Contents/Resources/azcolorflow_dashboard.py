@@ -1195,18 +1195,14 @@ def coverage_rows_for_master(font, master_id: str | None = None) -> dict:
                  for glyph in font.glyphs} if master_id is not None else {}
     current = {master_id: per_glyph}
     category_groups = _glyph_groups(font, "category")
-    script_groups = _glyph_groups(font, "script")
     cats = _coverage_for(current, category_groups, order).get(master_id, [])
-    scripts = _coverage_for(current, script_groups, order).get(master_id, [])
+    scripts = _coverage_for(current, _glyph_groups(font, "script"), order).get(master_id, [])
     sub_of = {glyph.name: str(getattr(glyph, "subCategory", None) or "Other") for glyph in font.glyphs}
-    cat_of = {glyph.name: str(getattr(glyph, "category", None) or "Other") for glyph in font.glyphs}
     for row in cats:
         row["label"] = row["key"]                       # categories are already human ("Letter")
         row["subRows"] = _subrows_for(current, order, category_groups.get(row["key"], []), sub_of, master_id)
     for row in scripts:
         row["label"] = _script_display(row["key"])      # "latin" -> "Latin"
-        # Scripts expand to their categories (Letter/Number/…), like the Edit-view sidebar.
-        row["subRows"] = _subrows_for(current, order, script_groups.get(row["key"], []), cat_of, master_id)
     global_rows = _coverage_for(current, {"All": list(per_glyph.keys())}, order).get(master_id, [])
     return {
         "master_id": master_id,

@@ -900,23 +900,20 @@ def test_coverage_sidebar_categories_collapse_to_subcategories() -> None:
 
 def test_coverage_sidebar_collapse_is_animated() -> None:
     # Expand/collapse animates: a per-key progress fraction driven by a 60fps timer,
-    # sub-rows revealed by clipping to the animated height.
+    # sub-rows revealed by clipping to the animated height, after a short pre-delay.
     assert "self._anim" in PLUGIN_SOURCE
     assert "def animTick_(self, timer" in PLUGIN_SOURCE
     assert "def _start_anim(self" in PLUGIN_SOURCE and "def _stop_anim(self" in PLUGIN_SOURCE
     assert "def _progress(self, key" in PLUGIN_SOURCE
     assert "_COV_SUB_ROW_H * len(subs) * open_frac" in PLUGIN_SOURCE   # clip height follows progress
+    assert "step = 1.0 / 15.0" in PLUGIN_SOURCE                        # ~0.25s open/close
+    assert 'performSelector_withObject_afterDelay_("animStart:", None, 0.1)' in PLUGIN_SOURCE  # 0.1s beat
 
 
-def test_coverage_sidebar_scripts_collapse_to_categories() -> None:
-    # Scripts expand to their categories (like the Edit-view sidebar): the dashboard
-    # attaches subRows-by-category, the sidebar builds scripts with_subs, and the
-    # double-click filter has a dedicated "subscript" kind (script + category).
-    dashboard_source = (RESOURCES / "azcolorflow_dashboard.py").read_text(encoding="utf-8")
-    assert 'build(data.get("byScript", []), True, "script", True)' in PLUGIN_SOURCE
-    assert 'row["subRows"] = _subrows_for(current, order, script_groups' in dashboard_source
-    assert 'kind in ("script", "subscript")' in PLUGIN_SOURCE
-    assert 'sub_kind = "subscript" if kind == "script" else "subcategory"' in PLUGIN_SOURCE
+def test_coverage_sidebar_scripts_are_flat() -> None:
+    # Scripts do NOT collapse — flat rows only (with_subs False); no subscript filter.
+    assert 'build(data.get("byScript", []), True, "script", False)' in PLUGIN_SOURCE
+    assert "subscript" not in PLUGIN_SOURCE
 
 
 def test_coverage_sidebar_value_percent_toggle() -> None:
