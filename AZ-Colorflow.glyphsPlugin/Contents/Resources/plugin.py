@@ -1082,12 +1082,12 @@ class _AZCoverageBarsView(AppKit.NSView):
 				# Animate from the current fraction (mid-flight clicks reverse smoothly).
 				self._anim[key] = self._anim.get(key, 0.0 if opening else 1.0)
 				self.setNeedsDisplay_(True)     # flip the chevron immediately
-				# Beat before the slide: wait 0.1s, then start the tick timer.
+				# Beat before the slide: wait 0.2s, then start the tick timer.
 				try:
 					NSObject.cancelPreviousPerformRequestsWithTarget_selector_object_(self, "animStart:", None)
 				except Exception:
 					pass
-				self.performSelector_withObject_afterDelay_("animStart:", None, 0.1)
+				self.performSelector_withObject_afterDelay_("animStart:", None, 0.2)
 				return
 
 	def animStart_(self, sender: Any) -> None:
@@ -1103,7 +1103,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 		self._anim_timer = timer
 
 	def animTick_(self, timer: Any) -> None:
-		step = 1.0 / 15.0                       # 15 frames @ 60fps ≈ 0.25s to fully open/close
+		step = 1.0 / 9.0                        # 9 frames @ 60fps ≈ 0.15s to fully open/close
 		anim = self._anim
 		for key in list(anim.keys()):
 			goal = 1.0 if key in self._expanded else 0.0

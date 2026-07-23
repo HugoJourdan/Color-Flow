@@ -906,8 +906,8 @@ def test_coverage_sidebar_collapse_is_animated() -> None:
     assert "def _start_anim(self" in PLUGIN_SOURCE and "def _stop_anim(self" in PLUGIN_SOURCE
     assert "def _progress(self, key" in PLUGIN_SOURCE
     assert "_COV_SUB_ROW_H * len(subs) * open_frac" in PLUGIN_SOURCE   # clip height follows progress
-    assert "step = 1.0 / 15.0" in PLUGIN_SOURCE                        # ~0.25s open/close
-    assert 'performSelector_withObject_afterDelay_("animStart:", None, 0.1)' in PLUGIN_SOURCE  # 0.1s beat
+    assert "step = 1.0 / 9.0" in PLUGIN_SOURCE                         # ~0.15s open/close
+    assert 'performSelector_withObject_afterDelay_("animStart:", None, 0.2)' in PLUGIN_SOURCE  # 0.2s beat
 
 
 def test_coverage_sidebar_scripts_are_flat() -> None:
