@@ -871,9 +871,15 @@ class _AZCoverageBarsView(AppKit.NSView):
 
 	@objc.python_method
 	def _count_label(self, count: Any, segs: Any) -> str:
-		# Segmented toggle: raw glyph count, or the % of the bar that is filled
-		# (i.e. share of the group carrying any workflow colour).
-		if getattr(self, "_show_percent", False):
+		# Toggle: raw glyph count, or % of the bar that is filled (share carrying any
+		# workflow colour). When a legend colour is focused, both narrow to JUST that
+		# colour's share of the group (its fraction * the group total / * 100).
+		percent = getattr(self, "_show_percent", False)
+		focus = getattr(self, "_focus", None)
+		if focus is not None:
+			fraction = next((f for f, _rgba, key in (segs or []) if key == focus), 0.0)
+			return f"{int(round(fraction * 100.0))}%" if percent else str(int(round(fraction * count)))
+		if percent:
 			filled = sum(fraction for fraction, _rgba, _key in (segs or []))
 			return f"{int(round(filled * 100.0))}%"
 		return str(count)

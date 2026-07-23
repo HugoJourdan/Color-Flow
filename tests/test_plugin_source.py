@@ -1005,6 +1005,17 @@ def test_coverage_sidebar_color_focus_dims_others() -> None:
     assert "focus is not None and color_key != focus" in PLUGIN_SOURCE   # per-segment dim in _draw_bar
 
 
+def test_coverage_sidebar_focus_narrows_count_label() -> None:
+    # While a colour is focused, the value/% shows only that colour's share of each
+    # group (fraction * group total, or fraction * 100) rather than the group total.
+    body = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _count_label(self"):][:700]
+    assert "focus = getattr(self, \"_focus\", None)" in body
+    assert "if focus is not None:" in body
+    assert "fraction = next((f for f, _rgba, key in (segs or []) if key == focus)" in body
+    assert "int(round(fraction * count))" in body                       # focused Total = colour's count
+    assert 'f"{int(round(fraction * 100.0))}%"' in body                 # focused % = colour's share
+
+
 def test_sidebar_has_settings_gear() -> None:
     # The Edit-view sidebar has a gear button opening the Color Flow settings pane
     # (wired through the shared _icon_button helper's setAction_(action)).
