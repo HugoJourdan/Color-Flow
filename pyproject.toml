@@ -1,7 +1,7 @@
 [project]
 name = "az-colorflow-dev"
 version = "0.0.0"
-description = "Dev tooling and tests for the Color Flow Glyphs plugin (not shipped in the .glyphsPalette bundle)."
+description = "Dev tooling and tests for the Color Flow Glyphs plugin (not shipped in the .glyphsPlugin bundle)."
 requires-python = ">=3.11"
 
 [dependency-groups]
@@ -17,7 +17,7 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true
-source = ["AZ-Colorflow.glyphsPalette/Contents/Resources"]
+source = ["AZ-Colorflow.glyphsPlugin/Contents/Resources"]
 # plugin.py is PyObjC/vanilla UI that only runs inside Glyphs; it can't be
 # exercised headlessly, so exclude it from the target.
 omit = ["*/plugin.py"]
@@ -28,9 +28,9 @@ show_missing = true
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-# The plugin source lives inside the .glyphsPalette bundle (a space-containing
+# The plugin source lives inside the .glyphsPlugin bundle (a space-containing
 # dir); list it explicitly alongside the tests.
-extend-include = ["AZ-Colorflow.glyphsPalette/Contents/Resources/*.py"]
+extend-include = ["AZ-Colorflow.glyphsPlugin/Contents/Resources/*.py"]
 
 [tool.ruff.lint]
 # A "modern Python" set (pyflakes + pycodestyle logic/syntax + import order +
@@ -42,14 +42,14 @@ select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
 # plugin.py and the shipped shortcut scripts use `from vanilla import *` /
 # `from GlyphsApp import *`; those names are runtime-only globals injected by
 # Glyphs, so star-import warnings there are expected, not actionable.
-"AZ-Colorflow.glyphsPalette/Contents/Resources/plugin.py" = ["F403", "F405", "I001"]
+"AZ-Colorflow.glyphsPlugin/Contents/Resources/plugin.py" = ["F403", "F405", "I001"]
 "Color Flow Shortcut/*.py" = ["F403", "F405", "F821"]
 
 [tool.pyright]
-include = ["AZ-Colorflow.glyphsPalette/Contents/Resources", "tests"]
+include = ["AZ-Colorflow.glyphsPlugin/Contents/Resources", "tests"]
 # Resolve the bundle's sibling modules (colornames, azcolorflow_dashboard) the way
 # Glyphs does — by adding Resources/ to the path.
-extraPaths = ["AZ-Colorflow.glyphsPalette/Contents/Resources"]
+extraPaths = ["AZ-Colorflow.glyphsPlugin/Contents/Resources"]
 # GlyphsApp / AppKit only exist inside Glyphs; the imports are guarded at runtime.
 reportMissingImports = false
 reportMissingModuleSource = false

@@ -1,5 +1,5 @@
 """Put the plugin's ``Resources/`` directory on ``sys.path`` so the pure-logic
-modules shipped inside the ``.glyphsPalette`` bundle can be imported by tests.
+modules shipped inside the ``.glyphsPlugin`` bundle can be imported by tests.
 
 The bundle directory name contains spaces; ``pathlib`` handles that fine.
 """
@@ -9,7 +9,7 @@ from pathlib import Path
 
 RESOURCES = (
     Path(__file__).resolve().parent.parent
-    / "AZ-Colorflow.glyphsPalette"
+    / "AZ-Colorflow.glyphsPlugin"
     / "Contents"
     / "Resources"
 )

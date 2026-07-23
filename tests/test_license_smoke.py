@@ -2,7 +2,7 @@
 import sys
 from pathlib import Path
 
-RES = Path(__file__).resolve().parents[1] / 'AZ-Colorflow.glyphsPalette/Contents/Resources'
+RES = Path(__file__).resolve().parents[1] / 'AZ-Colorflow.glyphsPlugin/Contents/Resources'
 sys.path.insert(0, str(RES))
 
 

@@ -20,10 +20,10 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 CANONICAL_MODULE = (
-    REPO / "AZ-Colorflow.glyphsPalette" / "Contents" / "Resources" / "colornames.py"
+    REPO / "AZ-Colorflow.glyphsPlugin" / "Contents" / "Resources" / "colornames.py"
 )
 NAV_MODULE = (
-    REPO / "AZ-Colorflow.glyphsPalette" / "Contents" / "Resources" / "colornav.py"
+    REPO / "AZ-Colorflow.glyphsPlugin" / "Contents" / "Resources" / "colornav.py"
 )
 SHORTCUT_DIR = REPO / "Color Flow Shortcut"
 

@@ -21,7 +21,7 @@ import pytest
 
 RESOURCES = (
     Path(__file__).resolve().parent.parent
-    / "AZ-Colorflow.glyphsPalette"
+    / "AZ-Colorflow.glyphsPlugin"
     / "Contents"
     / "Resources"
 )

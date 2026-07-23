@@ -3161,6 +3161,46 @@ except objc.error:
 	_CFRowHoverView = CFRowHoverView
 
 
+# ---------------------------------------------------------------------------- #
+#  ACTIVE PRINCIPAL CLASS — a lightweight GeneralPlugin.
+#  The docked palette (AZColorflow, below) is ARCHIVED: its panel is no longer
+#  shown. Every feature moved to the Edit-view left sidebar, so this loader only
+#  runs the once-per-session registrations the palette's start() used to do — it
+#  has no UI of its own (no palette section, no menu item).
+# ---------------------------------------------------------------------------- #
+class AZColorflowLoader(GeneralPlugin):
+	"""Registers the Edit-view sidebar tab, the Settings pane, the native Jump
+	shortcut, the Swap-Option routing hook and the Rainbow Font-View menu. Each
+	registrant is module-level and idempotent (its own once-per-session guard)."""
+
+	@objc.python_method
+	def settings(self) -> None:
+		self.name = "AZ Colorflow"
+
+	@objc.python_method
+	def start(self) -> None:
+		for label, register in (
+			("Rainbow menu", _install_rainbow_menu),
+			("routing hook", _install_color_routing_hook),
+			("shortcuts", _register_native_shortcuts),
+			("prefs pane", _register_preferences_pane),
+			("coverage sidebar", _register_coverage_sidebar),
+		):
+			try:
+				register()
+			except Exception:
+				import traceback
+				print(f"AZ Colorflow [{label}] error:\n" + traceback.format_exc())
+
+	@objc.python_method
+	def __file__(self) -> str:
+		return __file__
+
+
+# ARCHIVED (2026-07-23): kept for its shared module-level helpers and for tests,
+# but no longer the principal class — Glyphs never instantiates it, so its panel,
+# callbacks and title bar never load. Un-archive by pointing NSPrincipalClass back
+# here (and moving the registrations out of AZColorflowLoader.start).
 class AZColorflow(PalettePlugin):
 
 	# Body height in the license-blocked state. Not 0 — a literal-0 body strips the

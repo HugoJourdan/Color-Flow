@@ -25,7 +25,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright, HugoJourdan, 2022–2026</string>
 	<key>NSPrincipalClass</key>
-	<string>AZColorflow</string>
+	<string>AZColorflowLoader</string>
 	<key>class</key>
 	<string></string>
 </dict>

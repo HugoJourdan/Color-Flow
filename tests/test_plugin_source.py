@@ -12,7 +12,7 @@ from pathlib import Path
 
 RESOURCES = (
     Path(__file__).resolve().parent.parent
-    / "AZ-Colorflow.glyphsPalette"
+    / "AZ-Colorflow.glyphsPlugin"
     / "Contents"
     / "Resources"
 )
@@ -999,6 +999,26 @@ def test_sidebar_has_settings_gear() -> None:
     # The opener actually opens the window (selecting the tab alone won't front it).
     assert "def _open_settings_window(" in PLUGIN_SOURCE
     assert "performActionForItemAtIndex_" in PLUGIN_SOURCE
+
+
+def test_palette_archived_general_plugin_is_principal() -> None:
+    # The docked palette is archived: a lightweight GeneralPlugin loader is the
+    # principal class and runs the registrations; the palette class stays defined
+    # (its code + tests intact) but Glyphs never instantiates it.
+    assert "class AZColorflowLoader(GeneralPlugin):" in PLUGIN_SOURCE
+    assert "class AZColorflow(PalettePlugin):" in PLUGIN_SOURCE
+    loader = PLUGIN_SOURCE[
+        PLUGIN_SOURCE.index("class AZColorflowLoader(GeneralPlugin):"):
+        PLUGIN_SOURCE.index("class AZColorflow(PalettePlugin):")
+    ]
+    for register in ("_install_rainbow_menu", "_install_color_routing_hook",
+                     "_register_native_shortcuts", "_register_preferences_pane",
+                     "_register_coverage_sidebar"):
+        assert register in loader, register
+    # Info.plist points at the loader, and the bundle is a general plugin.
+    info = (RESOURCES.parent / "Info.plist").read_text(encoding="utf-8")
+    assert "<string>AZColorflowLoader</string>" in info
+    assert RESOURCES.parent.parent.name == "AZ-Colorflow.glyphsPlugin"
 
 
 def test_sidebar_has_global_report_button() -> None:
