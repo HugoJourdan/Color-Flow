@@ -1321,15 +1321,15 @@ try:
 			rect = AppKit.NSMakeRect(0, 0, 260, 600)
 			width = rect.size.width
 			container = AppKit.NSView.alloc().initWithFrame_(rect)
-			strip_h = 22.0
-			margin = 6.0
-			self._top_h = strip_h + 2 * margin
-			strip_y = rect.size.height - margin - strip_h
-			# (The Total/% toggle now lives in the Overall card header — this strip only holds icons.)
+			self._btn = 22.0
+			self._btn_pad = 6.0
+			self._strip_h = self._btn + 2 * self._btn_pad   # button footer, sits above the legend
 
-			# Icon buttons pinned top-right: [report][gear]. Both borderless, symbol at 13pt.
-			def _icon_button(x, symbol, fallback_name, fallback_text, action, tip, weight):
-				btn = AppKit.NSButton.alloc().initWithFrame_(AppKit.NSMakeRect(x, strip_y, strip_h, strip_h))
+			# Icon buttons: gear + report. Bottom-right, ABOVE the legend (repositioned in
+			# _relayout since the legend height is dynamic). Borderless, symbol at 13pt.
+			def _icon_button(symbol, fallback_name, fallback_text, action, tip, weight):
+				btn = AppKit.NSButton.alloc().initWithFrame_(
+					AppKit.NSMakeRect(0, 0, self._btn, self._btn))
 				image = None
 				if hasattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_"):
 					image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(symbol, tip)
@@ -1354,20 +1354,21 @@ try:
 				btn.setTarget_(self)
 				btn.setAction_(action)
 				btn.setToolTip_(tip)
-				btn.setAutoresizingMask_(AppKit.NSViewMinXMargin | AppKit.NSViewMinYMargin)
+				# Right-aligned, pinned to the bottom (flexible top margin) so it tracks the legend.
+				btn.setAutoresizingMask_(AppKit.NSViewMinXMargin | AppKit.NSViewMaxYMargin)
 				container.addSubview_(btn)
 				return btn
 
 			regular_w = getattr(AppKit, "NSFontWeightRegular", 0.0)
 			semibold_w = getattr(AppKit, "NSFontWeightSemibold", 0.3)
-			self._gear = _icon_button(width - margin - strip_h, "gearshape", "NSActionTemplate",
+			self._gear = _icon_button("gearshape", "NSActionTemplate",
 			                          "⚙", "openSettings:", "Color Flow settings", regular_w)
 			# Global report — same icon (list.clipboard.fill, semibold) as the palette's report button.
-			self._report = _icon_button(width - margin - 2 * strip_h - 4.0, "list.clipboard.fill", None,
+			self._report = _icon_button("list.clipboard.fill", None,
 			                            "\U0001F4CA", "openReport:", "Global report", semibold_w)
 
 			scroll = AppKit.NSScrollView.alloc().initWithFrame_(
-				AppKit.NSMakeRect(0, 0, width, rect.size.height - self._top_h))
+				AppKit.NSMakeRect(0, 0, width, rect.size.height - self._strip_h))
 			scroll.setHasVerticalScroller_(True)
 			scroll.setDrawsBackground_(False)     # let the native sidebar background show through
 			scroll.setAutohidesScrollers_(True)
@@ -1684,21 +1685,32 @@ try:
 
 		@objc.python_method
 		def _relayout(self) -> None:
-			# Pin the legend to the bottom (its height follows the colour count) and let
-			# the scroll view fill the band between the top switch strip and the legend.
+			# Bottom-up: legend (height follows the colour count), then the gear/report
+			# button strip just above it, then the scroll view filling the rest.
 			container = self.view()
 			scroll = getattr(self, "_scroll", None)
 			legend = getattr(self, "_legend", None)
 			if container is None or scroll is None:
 				return
 			cb = container.bounds().size
-			top_h = getattr(self, "_top_h", 34.0)
+			strip_h = getattr(self, "_strip_h", 34.0)
+			btn = getattr(self, "_btn", 22.0)
+			pad = getattr(self, "_btn_pad", 6.0)
 			footer_h = 0.0
 			if legend is not None:
 				footer_h = legend.heightForWidth_(cb.width)
 				legend.setFrame_(AppKit.NSMakeRect(0, 0, cb.width, footer_h))
 				legend.setHidden_(footer_h <= 0.0)
-			scroll.setFrame_(AppKit.NSMakeRect(0, footer_h, cb.width, max(0.0, cb.height - top_h - footer_h)))
+			# Buttons sit in the strip directly above the legend (report left of gear).
+			btn_y = footer_h + pad
+			gear = getattr(self, "_gear", None)
+			report = getattr(self, "_report", None)
+			if gear is not None:
+				gear.setFrame_(AppKit.NSMakeRect(cb.width - pad - btn, btn_y, btn, btn))
+			if report is not None:
+				report.setFrame_(AppKit.NSMakeRect(cb.width - pad - 2 * btn - 4.0, btn_y, btn, btn))
+			scroll.setFrame_(AppKit.NSMakeRect(0, footer_h + strip_h, cb.width,
+			                                   max(0.0, cb.height - footer_h - strip_h)))
 
 		@objc.python_method
 		def _resize_doc(self) -> None:

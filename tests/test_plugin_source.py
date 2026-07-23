@@ -1013,6 +1013,15 @@ def test_sidebar_has_settings_gear() -> None:
     assert '"openSettings:"' in block
     assert "def openSettings_(self, sender" in block
     assert "_open_preferences_pane()" in block
+
+
+def test_sidebar_buttons_sit_above_the_legend() -> None:
+    # Gear + report live in a strip ABOVE the legend (bottom-pinned), not the top:
+    # _relayout stacks legend, then the button strip, then the scroll.
+    block = _sidebar_block()
+    assert "NSViewMinXMargin | AppKit.NSViewMaxYMargin" in block   # bottom-right pinned
+    assert "btn_y = footer_h + pad" in block                      # buttons just above the legend
+    assert "cb.height - footer_h - strip_h" in block              # scroll fills above the strip
     # The opener actually opens the window (selecting the tab alone won't front it).
     assert "def _open_settings_window(" in PLUGIN_SOURCE
     assert "performActionForItemAtIndex_" in PLUGIN_SOURCE
