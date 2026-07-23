@@ -1355,6 +1355,8 @@ try:
 						pass
 					btn.setImage_(image)
 					btn.setImagePosition_(getattr(AppKit, "NSImageLeading", 7))   # icon left of text
+					if hasattr(btn, "setImageHugsTitle_"):
+						btn.setImageHugsTitle_(True)     # keep the icon next to the (possibly long) label
 				btn.setTarget_(self)
 				btn.setAction_(action)
 				btn.setToolTip_(tip)
@@ -1364,7 +1366,7 @@ try:
 			semibold_w = getattr(AppKit, "NSFontWeightSemibold", 0.3)
 			# Global report — same icon (list.clipboard.fill, semibold) as the palette's report button.
 			self._report = _text_button("list.clipboard.fill", None,
-			                            "Report", "openReport:", "Global report", semibold_w)
+			                            "Global Overview", "openReport:", "Global overview", semibold_w)
 			self._gear = _text_button("gearshape", "NSActionTemplate",
 			                          "Settings", "openSettings:", "Color Flow settings", regular_w)
 			button_row = AppKit.NSStackView.alloc().initWithFrame_(
@@ -1711,10 +1713,12 @@ try:
 				footer_h = legend.heightForWidth_(cb.width)
 				legend.setFrame_(AppKit.NSMakeRect(0, 0, cb.width, footer_h))
 				legend.setHidden_(footer_h <= 0.0)
-			# Full-width two-column button row, directly above the legend.
+			# Full-width two-column button row, directly above the legend. Inset to
+			# _COV_PAD so the row's edges line up with the cards/legend, not wider.
 			row = getattr(self, "_button_row", None)
 			if row is not None:
-				row.setFrame_(AppKit.NSMakeRect(pad, footer_h + pad, max(0.0, cb.width - 2 * pad), btn_h))
+				row.setFrame_(AppKit.NSMakeRect(_COV_PAD, footer_h + pad,
+				                                max(0.0, cb.width - 2 * _COV_PAD), btn_h))
 			scroll.setFrame_(AppKit.NSMakeRect(0, footer_h + strip_h, cb.width,
 			                                   max(0.0, cb.height - footer_h - strip_h)))
 
@@ -1919,6 +1923,61 @@ def _install_rainbow_menu() -> None:
 	if submenu is not None:
 		for item in list(submenu.itemArray()):
 			if item.title() == title:
+				submenu.removeItem_(item)
+		submenu.addItem_(menu_item)
+	else:
+		bar_item.append(menu_item)
+
+
+# ---- View-menu "Global Overview" (builds + opens the Color Flow report) ------------------------
+_REPORT_MENU_TITLE = "AZ Colorflow: Global Overview"
+_REPORT_MENU_HANDLER = None
+
+
+def _open_global_overview() -> None:
+	"""Build and open the global Color Flow report (the "Global Overview"). Blocking —
+	no loader sheet on this path (a menu action has no host window); the sidebar's own
+	Global Overview button shows the rainbow sheet."""
+	if _shared_gate_blocked():
+		return
+	font = Glyphs.font
+	if font is None:
+		Message("Open a font first.", title="AZ Colorflow")
+		return
+	import azcolorflow_dashboard
+	azcolorflow_dashboard.main(font, open_when_done=True)
+
+
+class AZColorflowReportMenuHandler(NSObject):
+	"""Long-lived target for the View-menu Global Overview item (one per session)."""
+
+	def validateMenuItem_(self, menuItem) -> bool:
+		return Glyphs.font is not None
+
+	def openGlobalOverview_(self, sender) -> None:
+		try:
+			_open_global_overview()
+		except Exception:
+			import traceback
+			print("AZ Colorflow [global overview menu] error:\n" + traceback.format_exc())
+
+
+def _install_report_menu() -> None:
+	"""Add the "Global Overview" item to the View menu once per session, targeting a
+	retained singleton (mirrors the Rainbow File-menu installer)."""
+	global _REPORT_MENU_HANDLER
+	if _REPORT_MENU_HANDLER is not None:
+		return
+	handler = AZColorflowReportMenuHandler.alloc().init()
+	_REPORT_MENU_HANDLER = handler
+	menu_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+		_REPORT_MENU_TITLE, "openGlobalOverview:", "")
+	menu_item.setTarget_(handler)
+	bar_item = Glyphs.menu[VIEW_MENU]
+	submenu = bar_item.submenu() if bar_item.respondsToSelector_(b"submenu") else None
+	if submenu is not None:
+		for item in list(submenu.itemArray()):
+			if item.title() == _REPORT_MENU_TITLE:
 				submenu.removeItem_(item)
 		submenu.addItem_(menu_item)
 	else:
@@ -3319,6 +3378,7 @@ class AZColorflowLoader(GeneralPlugin):
 	def start(self) -> None:
 		for label, register in (
 			("Rainbow menu", _install_rainbow_menu),
+			("report menu", _install_report_menu),
 			("routing hook", _install_color_routing_hook),
 			("shortcuts", _register_native_shortcuts),
 			("prefs pane", _register_preferences_pane),

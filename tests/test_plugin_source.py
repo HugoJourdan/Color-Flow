@@ -1036,7 +1036,8 @@ def test_sidebar_buttons_are_full_width_two_columns_above_the_legend() -> None:
     assert "NSImageLeading" in block                              # icon left of text
     assert 'btn.setTitle_(title)' in block                        # text label
     assert "addArrangedSubview_(self._report)" in block and "addArrangedSubview_(self._gear)" in block
-    assert "row.setFrame_(AppKit.NSMakeRect(pad, footer_h + pad" in block   # above the legend
+    assert "row.setFrame_(AppKit.NSMakeRect(_COV_PAD, footer_h + pad" in block   # card-aligned margin
+    assert "cb.width - 2 * _COV_PAD" in block                      # same inset as the cards/legend
     assert "cb.height - footer_h - strip_h" in block              # scroll fills above the strip
     # The opener actually opens the window (selecting the tab alone won't front it).
     assert "def _open_settings_window(" in PLUGIN_SOURCE
@@ -1089,18 +1090,31 @@ def test_palette_archived_general_plugin_is_principal() -> None:
 
 
 def test_sidebar_has_global_report_button() -> None:
-    # A sidebar report button builds the global report behind the rainbow loading
+    # A sidebar "Global Overview" button builds the report behind the rainbow loading
     # sheet (the same _AZColorflowLoaderBar the palette used), reusing the palette's
     # report icon (list.clipboard.fill) and the shared dashboard entry point.
     block = _sidebar_block()
     assert '"openReport:"' in block
+    assert '"Global Overview", "openReport:"' in block              # renamed from "Report"
     assert "def openReport_(self, sender" in block
     assert '"list.clipboard.fill"' in block
+    assert "setImageHugsTitle_(True)" in block                      # icon stays next to the label
     assert "_AZColorflowLoaderBar.alloc()" in block                 # the loading window
     assert "beginSheet_completionHandler_" in block
     assert "def sidebarRunReport_(self, sender" in block
     assert "def sidebarFinishReport_(self, sender" in block
     assert "progress=_on_progress, open_when_done=False" in block   # bar tracks real build progress
+
+
+def test_view_menu_has_global_overview_entry() -> None:
+    # A View-menu item triggers the same report; registered once by the loader,
+    # targeting a retained singleton handler (mirrors the Rainbow File-menu item).
+    assert "def _install_report_menu(" in PLUGIN_SOURCE
+    assert "Glyphs.menu[VIEW_MENU]" in PLUGIN_SOURCE
+    assert 'initWithTitle_action_keyEquivalent_(\n\t\t_REPORT_MENU_TITLE, "openGlobalOverview:"' in PLUGIN_SOURCE
+    assert "def openGlobalOverview_(self, sender" in PLUGIN_SOURCE
+    assert "def _open_global_overview(" in PLUGIN_SOURCE
+    assert '("report menu", _install_report_menu)' in PLUGIN_SOURCE   # registered by the loader
 
 
 def test_settings_pane_has_no_behaviour_section() -> None:
