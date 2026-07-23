@@ -668,6 +668,12 @@ _NS_TRUNCATE_TAIL = getattr(AppKit, "NSLineBreakByTruncatingTail", 4)
 _NS_FONT_WEIGHT_REGULAR = getattr(AppKit, "NSFontWeightRegular", 0.0)
 
 
+def _card_fill_color() -> Any:
+	# Fixed dark-grey card fill matching the Glyphs palette (RGB 46,46,46), instead
+	# of the theme's translucent quaternaryLabelColor.
+	return AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(46 / 255.0, 46 / 255.0, 46 / 255.0, 1.0)
+
+
 def _glyph_symbol_image(codepoint: int, point_size: float = 15.0) -> Any:
 	"""Render an SF-Symbol PUA glyph (macOS substitutes it into the system font) to
 	a template NSImage — lets us use a symbol we only have the glyph for (no name)."""
@@ -865,7 +871,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 	def _draw_card(self, rect: Any) -> None:
 		card = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
 			rect, _COV_CARD_RADIUS, _COV_CARD_RADIUS)
-		AppKit.NSColor.quaternaryLabelColor().set()
+		_card_fill_color().set()
 		card.fill()
 		context = AppKit.NSGraphicsContext.currentContext()
 		context.saveGraphicsState()
@@ -992,8 +998,8 @@ class _AZCoverageBarsView(AppKit.NSView):
 	def _draw_bar(self, rect: Any, segs: Any) -> None:
 		radius = rect.size.height / 2.0
 		track = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, radius, radius)
-		# Track a shade off the card fill (which is quaternary) so an empty/partly
-		# filled bar reads as a groove rather than blending into the card.
+		# Track a shade off the fixed card fill so an empty/partly filled bar reads
+		# as a groove rather than blending into the card.
 		AppKit.NSColor.tertiaryLabelColor().set()
 		track.fill()
 		if segs:
@@ -1246,7 +1252,7 @@ class _AZLegendView(AppKit.NSView):
 		                              bounds.size.height - _COV_CARD_GAP - _COV_LEGEND_BOTTOM)
 		card = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
 			card_rect, _COV_CARD_RADIUS, _COV_CARD_RADIUS)
-		AppKit.NSColor.quaternaryLabelColor().set()
+		_card_fill_color().set()
 		card.fill()
 		AppKit.NSColor.separatorColor().set()
 		card.setLineWidth_(1.0)

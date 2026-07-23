@@ -1172,3 +1172,12 @@ def test_hosted_report_never_spins_the_host_main_thread_needlessly() -> None:
     for selector in ("windowDidBecomeKey_", "windowDidResignKey_", "windowDidChangeOcclusionState_"):
         assert f"def {selector}(self, notification)" in PLUGIN_SOURCE
     assert "window.__cfdSpinPause && window.__cfdSpinPause(" in PLUGIN_SOURCE
+
+
+def test_coverage_cards_use_fixed_grey_fill() -> None:
+    # Cards use a fixed RGB 46,46,46 fill (matching the palette), not the theme's
+    # translucent quaternaryLabelColor.
+    assert "def _card_fill_color()" in PLUGIN_SOURCE
+    assert "46 / 255.0" in PLUGIN_SOURCE
+    assert PLUGIN_SOURCE.count("_card_fill_color().set()") >= 2
+    assert "quaternaryLabelColor()" not in PLUGIN_SOURCE
