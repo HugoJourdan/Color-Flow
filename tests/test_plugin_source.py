@@ -879,3 +879,15 @@ def test_tower_sidebar_disc_click_switches_the_glyphs_master() -> None:
     handler = PLUGIN_SOURCE[handler_start : PLUGIN_SOURCE.index("def _sidebar_font", handler_start)]
     assert "font.masterIndex = index" in handler
     assert build is not None
+
+
+def test_hosted_report_never_spins_the_host_main_thread_needlessly() -> None:
+    # Sidebar: reduced-motion flag injected at document START (read once at init).
+    assert 'window.__cfdNoAnim = true;", 0, True' in PLUGIN_SOURCE
+    # Report window: spin paused whenever the window is not key or occluded.
+    sync = _method_body("_sync_spin_state")
+    assert "occlusionState" in sync
+    assert "isKeyWindow" in sync
+    for selector in ("windowDidBecomeKey_", "windowDidResignKey_", "windowDidChangeOcclusionState_"):
+        assert f"def {selector}(self, notification)" in PLUGIN_SOURCE
+    assert "window.__cfdSpinPause && window.__cfdSpinPause(" in PLUGIN_SOURCE

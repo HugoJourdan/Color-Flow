@@ -489,7 +489,7 @@ def test_tower_spin_pauses_when_tab_hidden() -> None:
     continue, so there is no time-jump. A pending-frame guard prevents double loops."""
     tower = assets.DASHBOARD_JS.split("function initTower(", 1)[1]
     assert 'document.addEventListener("visibilitychange"' in tower
-    assert "if (rafId!=null || document.hidden) return" in tower   # hidden: never schedule
+    assert "if (rafId!=null || document.hidden || PAUSED) return" in tower   # hidden: never schedule
     assert "cancelAnimationFrame(rafId)" in tower                  # hide: drop the pending frame
     assert "else schedule();" in tower                             # visible: resume
     assert "rafId = requestAnimationFrame(loop)" in tower          # single tracked handle
@@ -1990,3 +1990,10 @@ def test_tower_notifies_native_host_of_master_picks() -> None:
     assert "messageHandlers.azcfMaster.postMessage" in js
     # Both tower master-pick paths (disc click + arrow keys) notify the host.
     assert js.count("notifyMaster(state.master)") == 2
+
+def test_tower_spin_has_a_native_pause_hook() -> None:
+    # __cfdSpinPause lets a Glyphs-hosted webview stop the rAF spin while its
+    # window is not key/visible; schedule() must respect the pause flag.
+    js = assets.DASHBOARD_JS
+    assert "window.__cfdSpinPause = function(paused)" in js
+    assert "document.hidden || PAUSED" in js

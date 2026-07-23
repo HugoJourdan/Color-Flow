@@ -3686,14 +3686,24 @@ DASHBOARD_JS = r"""
       }
       schedule();
     }
+    var PAUSED = false;
     function schedule(){
-      if (rafId!=null || document.hidden) return;            // hidden tab: stop scheduling rAF entirely
+      if (rafId!=null || document.hidden || PAUSED) return;  // hidden tab / host pause: stop scheduling rAF
       rafId = requestAnimationFrame(loop);
     }
     document.addEventListener("visibilitychange", function(){
       if (document.hidden){ if (rafId!=null){ cancelAnimationFrame(rafId); rafId=null; } }
       else schedule();                                       // visible again: resume where we left off
     });
+    // Native host hook: the Glyphs report window pauses the spin while it is not
+    // the key window / is occluded — a continuously-spinning canvas forces a
+    // compositor commit through the HOST app's main thread every frame, which is
+    // what made the report feel laggy inside Glyphs. Browsers never call this.
+    window.__cfdSpinPause = function(paused){
+      PAUSED = !!paused;
+      if (PAUSED){ if (rafId!=null){ cancelAnimationFrame(rafId); rafId=null; } }
+      else schedule();
+    };
     cv.addEventListener("wheel", function(e){ e.preventDefault();
       vt += e.deltaY*0.02; vt=Math.max(0, Math.min(Math.max(0,H.masters.length-VISIBLE), vt));
     }, {passive:false});

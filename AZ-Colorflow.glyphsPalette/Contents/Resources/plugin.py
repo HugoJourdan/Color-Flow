@@ -520,6 +520,41 @@ class _AZColorflowReportWindow(AppKit.NSObject):
 	def download_didFailWithError_resumeData_(self, download, error, data) -> None:
 		print(f"AZ Colorflow [report export] download failed: {error}")
 
+	# ---- spin pause: don't force 60fps compositor commits through Glyphs' ----- #
+	# ---- main thread while the report window isn't the one being used --------- #
+
+	@objc.python_method
+	def _set_spin_paused(self, paused: bool) -> None:
+		webview = getattr(self, "_webview", None)
+		if webview is None:
+			return
+		try:
+			flag = "true" if paused else "false"
+			webview.evaluateJavaScript_completionHandler_(
+				f"window.__cfdSpinPause && window.__cfdSpinPause({flag});", None)
+		except Exception:
+			pass
+
+	@objc.python_method
+	def _sync_spin_state(self) -> None:
+		window = getattr(self, "_window", None)
+		if window is None:
+			return
+		try:
+			visible = bool(window.occlusionState() & AppKit.NSWindowOcclusionStateVisible)
+			self._set_spin_paused(not (visible and window.isKeyWindow()))
+		except Exception:
+			pass
+
+	def windowDidBecomeKey_(self, notification) -> None:
+		self._sync_spin_state()
+
+	def windowDidResignKey_(self, notification) -> None:
+		self._sync_spin_state()
+
+	def windowDidChangeOcclusionState_(self, notification) -> None:
+		self._sync_spin_state()
+
 	# ---- teardown ------------------------------------------------------------ #
 
 	def windowWillClose_(self, notification) -> None:
@@ -644,6 +679,13 @@ try:
 			rect = AppKit.NSMakeRect(0, 0, 280, 600)
 			container = AppKit.NSView.alloc().initWithFrame_(rect)
 			config = WebKit.WKWebViewConfiguration.alloc().init()
+			# The sidebar lives on screen all day: run the report in reduced-motion
+			# mode (no disc spin, no intro sweeps) so it never forces continuous
+			# compositor commits through Glyphs' main thread. Document START — the
+			# page reads the flag once at init.
+			calm = WebKit.WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
+				"window.__cfdNoAnim = true;", 0, True)
+			config.userContentController().addUserScript_(calm)
 			script = WebKit.WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
 				_SIDEBAR_TOWER_SCRIPT, 1, True)   # 1 = WKUserScriptInjectionTimeAtDocumentEnd
 			config.userContentController().addUserScript_(script)
