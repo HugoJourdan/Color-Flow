@@ -1017,21 +1017,26 @@ def test_coverage_sidebar_focus_narrows_count_label() -> None:
 
 
 def test_sidebar_has_settings_gear() -> None:
-    # The Edit-view sidebar has a gear button opening the Color Flow settings pane
-    # (wired through the shared _icon_button helper's setAction_(action)).
+    # The Edit-view sidebar has a Settings button opening the Color Flow settings pane
+    # (wired through the shared _text_button helper's setAction_(action)).
     block = _sidebar_block()
     assert "btn.setAction_(action)" in block
     assert '"openSettings:"' in block
+    assert '"Settings", "openSettings:"' in block                 # icon + text label
     assert "def openSettings_(self, sender" in block
     assert "_open_preferences_pane()" in block
 
 
-def test_sidebar_buttons_sit_above_the_legend() -> None:
-    # Gear + report live in a strip ABOVE the legend (bottom-pinned), not the top:
-    # _relayout stacks legend, then the button strip, then the scroll.
+def test_sidebar_buttons_are_full_width_two_columns_above_the_legend() -> None:
+    # Report + Settings are full-width icon+text buttons in an equal-split two-column
+    # row, directly above the legend; _relayout stacks legend, button row, then scroll.
     block = _sidebar_block()
-    assert "NSViewMinXMargin | AppKit.NSViewMaxYMargin" in block   # bottom-right pinned
-    assert "btn_y = footer_h + pad" in block                      # buttons just above the legend
+    assert "NSStackView.alloc()" in block
+    assert "NSStackViewDistributionFillEqually" in block          # two equal columns
+    assert "NSImageLeading" in block                              # icon left of text
+    assert 'btn.setTitle_(title)' in block                        # text label
+    assert "addArrangedSubview_(self._report)" in block and "addArrangedSubview_(self._gear)" in block
+    assert "row.setFrame_(AppKit.NSMakeRect(pad, footer_h + pad" in block   # above the legend
     assert "cb.height - footer_h - strip_h" in block              # scroll fills above the strip
     # The opener actually opens the window (selecting the tab alone won't front it).
     assert "def _open_settings_window(" in PLUGIN_SOURCE

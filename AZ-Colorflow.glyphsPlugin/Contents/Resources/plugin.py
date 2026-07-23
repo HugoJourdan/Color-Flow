@@ -1327,24 +1327,26 @@ try:
 			rect = AppKit.NSMakeRect(0, 0, 260, 600)
 			width = rect.size.width
 			container = AppKit.NSView.alloc().initWithFrame_(rect)
-			self._btn = 22.0
+			self._btn_h = 26.0
 			self._btn_pad = 6.0
-			self._strip_h = self._btn + 2 * self._btn_pad   # button footer, sits above the legend
+			self._strip_h = self._btn_h + 2 * self._btn_pad   # button footer, sits above the legend
 
-			# Icon buttons: gear + report. Bottom-right, ABOVE the legend (repositioned in
-			# _relayout since the legend height is dynamic). Borderless, symbol at 13pt.
-			def _icon_button(symbol, fallback_name, fallback_text, action, tip, weight):
-				btn = AppKit.NSButton.alloc().initWithFrame_(
-					AppKit.NSMakeRect(0, 0, self._btn, self._btn))
+			# Full-width icon+text buttons: [Report] [Settings], two equal columns above
+			# the legend (an equal-split NSStackView; frame set in _relayout).
+			def _text_button(symbol, fallback_name, title, action, tip, weight):
+				btn = AppKit.NSButton.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, 100, self._btn_h))
+				btn.setTitle_(title)
+				btn.setBezelStyle_(getattr(AppKit, "NSBezelStyleRounded", 1))
+				btn.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
 				image = None
 				if hasattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_"):
 					image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(symbol, tip)
 				if image is None and fallback_name:
 					image = AppKit.NSImage.imageNamed_(fallback_name)
 				if image is not None:
-					try:                          # render the glyph at a legible 13pt
+					try:                          # render the glyph at a legible 12pt
 						cfg = AppKit.NSImageSymbolConfiguration.configurationWithPointSize_weight_scale_(
-							13.0, weight, getattr(AppKit, "NSImageSymbolScaleMedium", 2))
+							12.0, weight, getattr(AppKit, "NSImageSymbolScaleSmall", 1))
 						if hasattr(image, "imageWithSymbolConfiguration_"):
 							configured = image.imageWithSymbolConfiguration_(cfg)
 							if configured is not None:
@@ -1352,26 +1354,28 @@ try:
 					except Exception:
 						pass
 					btn.setImage_(image)
-					btn.setImagePosition_(getattr(AppKit, "NSImageOnly", 1))
-					btn.setImageScaling_(getattr(AppKit, "NSImageScaleProportionallyDown", 3))
-				else:
-					btn.setTitle_(fallback_text)
-				btn.setBordered_(False)
+					btn.setImagePosition_(getattr(AppKit, "NSImageLeading", 7))   # icon left of text
 				btn.setTarget_(self)
 				btn.setAction_(action)
 				btn.setToolTip_(tip)
-				# Right-aligned, pinned to the bottom (flexible top margin) so it tracks the legend.
-				btn.setAutoresizingMask_(AppKit.NSViewMinXMargin | AppKit.NSViewMaxYMargin)
-				container.addSubview_(btn)
 				return btn
 
 			regular_w = getattr(AppKit, "NSFontWeightRegular", 0.0)
 			semibold_w = getattr(AppKit, "NSFontWeightSemibold", 0.3)
-			self._gear = _icon_button("gearshape", "NSActionTemplate",
-			                          "⚙", "openSettings:", "Color Flow settings", regular_w)
 			# Global report — same icon (list.clipboard.fill, semibold) as the palette's report button.
-			self._report = _icon_button("list.clipboard.fill", None,
-			                            "\U0001F4CA", "openReport:", "Global report", semibold_w)
+			self._report = _text_button("list.clipboard.fill", None,
+			                            "Report", "openReport:", "Global report", semibold_w)
+			self._gear = _text_button("gearshape", "NSActionTemplate",
+			                          "Settings", "openSettings:", "Color Flow settings", regular_w)
+			button_row = AppKit.NSStackView.alloc().initWithFrame_(
+				AppKit.NSMakeRect(0, 0, width, self._btn_h))
+			button_row.setOrientation_(getattr(AppKit, "NSUserInterfaceLayoutOrientationHorizontal", 0))
+			button_row.setDistribution_(getattr(AppKit, "NSStackViewDistributionFillEqually", 1))
+			button_row.setSpacing_(6.0)
+			button_row.addArrangedSubview_(self._report)
+			button_row.addArrangedSubview_(self._gear)
+			button_row.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewMaxYMargin)
+			self._button_row = button_row
 
 			scroll = AppKit.NSScrollView.alloc().initWithFrame_(
 				AppKit.NSMakeRect(0, 0, width, rect.size.height - self._strip_h))
@@ -1388,9 +1392,9 @@ try:
 			legend._owner = self
 			legend.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewMaxYMargin)
 
-			# (gear + report already added to the container inside _icon_button.)
 			container.addSubview_(scroll)
 			container.addSubview_(legend)
+			container.addSubview_(button_row)
 			self._doc = doc
 			self._scroll = scroll
 			self._legend = legend
@@ -1699,22 +1703,18 @@ try:
 			if container is None or scroll is None:
 				return
 			cb = container.bounds().size
-			strip_h = getattr(self, "_strip_h", 34.0)
-			btn = getattr(self, "_btn", 22.0)
+			strip_h = getattr(self, "_strip_h", 38.0)
+			btn_h = getattr(self, "_btn_h", 26.0)
 			pad = getattr(self, "_btn_pad", 6.0)
 			footer_h = 0.0
 			if legend is not None:
 				footer_h = legend.heightForWidth_(cb.width)
 				legend.setFrame_(AppKit.NSMakeRect(0, 0, cb.width, footer_h))
 				legend.setHidden_(footer_h <= 0.0)
-			# Buttons sit in the strip directly above the legend (report left of gear).
-			btn_y = footer_h + pad
-			gear = getattr(self, "_gear", None)
-			report = getattr(self, "_report", None)
-			if gear is not None:
-				gear.setFrame_(AppKit.NSMakeRect(cb.width - pad - btn, btn_y, btn, btn))
-			if report is not None:
-				report.setFrame_(AppKit.NSMakeRect(cb.width - pad - 2 * btn - 4.0, btn_y, btn, btn))
+			# Full-width two-column button row, directly above the legend.
+			row = getattr(self, "_button_row", None)
+			if row is not None:
+				row.setFrame_(AppKit.NSMakeRect(pad, footer_h + pad, max(0.0, cb.width - 2 * pad), btn_h))
 			scroll.setFrame_(AppKit.NSMakeRect(0, footer_h + strip_h, cb.width,
 			                                   max(0.0, cb.height - footer_h - strip_h)))
 
