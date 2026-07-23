@@ -989,11 +989,26 @@ def test_coverage_sidebar_color_focus_dims_others() -> None:
 
 
 def test_sidebar_has_settings_gear() -> None:
-    # The Edit-view sidebar has a gear button opening the Color Flow settings pane.
+    # The Edit-view sidebar has a gear button opening the Color Flow settings pane
+    # (wired through the shared _icon_button helper's setAction_(action)).
     block = _sidebar_block()
-    assert 'setAction_("openSettings:")' in block
+    assert "btn.setAction_(action)" in block
+    assert '"openSettings:"' in block
     assert "def openSettings_(self, sender" in block
     assert "_open_preferences_pane()" in block
+    # The opener actually opens the window (selecting the tab alone won't front it).
+    assert "def _open_settings_window(" in PLUGIN_SOURCE
+    assert "performActionForItemAtIndex_" in PLUGIN_SOURCE
+
+
+def test_sidebar_has_global_report_button() -> None:
+    # A sidebar report button builds the global report, reusing the palette's report
+    # icon (list.clipboard.fill) and the shared dashboard entry point.
+    block = _sidebar_block()
+    assert '"openReport:"' in block
+    assert "def openReport_(self, sender" in block
+    assert '"list.clipboard.fill"' in block
+    assert "azcolorflow_dashboard.main(font, open_when_done=True)" in block
 
 
 def test_settings_pane_has_no_behaviour_section() -> None:

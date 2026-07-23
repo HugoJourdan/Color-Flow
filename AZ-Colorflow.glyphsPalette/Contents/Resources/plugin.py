@@ -1268,32 +1268,45 @@ try:
 				container.addSubview_(switch)
 				self._switch = switch
 			pct_label = _label("%", switch_x + switch_w + 6.0, 14.0)
-			# Gear -> Color Flow settings pane, pinned top-right.
-			gear = AppKit.NSButton.alloc().initWithFrame_(
-				AppKit.NSMakeRect(width - margin - strip_h, strip_y, strip_h, strip_h))
-			gear_image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(
-				"gearshape", "Color Flow settings") if hasattr(
-				AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_") else None
-			if gear_image is None:
-				gear_image = AppKit.NSImage.imageNamed_("NSActionTemplate")
-			try:                                  # render the gear at a legible 13pt
-				cfg = AppKit.NSImageSymbolConfiguration.configurationWithPointSize_weight_scale_(
-					13.0, getattr(AppKit, "NSFontWeightRegular", 0.0),
-					getattr(AppKit, "NSImageSymbolScaleMedium", 2))
-				if gear_image is not None and hasattr(gear_image, "imageWithSymbolConfiguration_"):
-					configured = gear_image.imageWithSymbolConfiguration_(cfg)
-					if configured is not None:
-						gear_image = configured
-			except Exception:
-				pass
-			gear.setImage_(gear_image)
-			gear.setImagePosition_(getattr(AppKit, "NSImageOnly", 1))
-			gear.setImageScaling_(getattr(AppKit, "NSImageScaleProportionallyDown", 3))
-			gear.setBordered_(False)
-			gear.setTarget_(self)
-			gear.setAction_("openSettings:")
-			gear.setToolTip_("Color Flow settings")
-			gear.setAutoresizingMask_(AppKit.NSViewMinXMargin | AppKit.NSViewMinYMargin)
+
+			# Icon buttons pinned top-right: [report][gear]. Both borderless, symbol at 13pt.
+			def _icon_button(x, symbol, fallback_name, fallback_text, action, tip, weight):
+				btn = AppKit.NSButton.alloc().initWithFrame_(AppKit.NSMakeRect(x, strip_y, strip_h, strip_h))
+				image = None
+				if hasattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_"):
+					image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(symbol, tip)
+				if image is None and fallback_name:
+					image = AppKit.NSImage.imageNamed_(fallback_name)
+				if image is not None:
+					try:                          # render the glyph at a legible 13pt
+						cfg = AppKit.NSImageSymbolConfiguration.configurationWithPointSize_weight_scale_(
+							13.0, weight, getattr(AppKit, "NSImageSymbolScaleMedium", 2))
+						if hasattr(image, "imageWithSymbolConfiguration_"):
+							configured = image.imageWithSymbolConfiguration_(cfg)
+							if configured is not None:
+								image = configured
+					except Exception:
+						pass
+					btn.setImage_(image)
+					btn.setImagePosition_(getattr(AppKit, "NSImageOnly", 1))
+					btn.setImageScaling_(getattr(AppKit, "NSImageScaleProportionallyDown", 3))
+				else:
+					btn.setTitle_(fallback_text)
+				btn.setBordered_(False)
+				btn.setTarget_(self)
+				btn.setAction_(action)
+				btn.setToolTip_(tip)
+				btn.setAutoresizingMask_(AppKit.NSViewMinXMargin | AppKit.NSViewMinYMargin)
+				container.addSubview_(btn)
+				return btn
+
+			regular_w = getattr(AppKit, "NSFontWeightRegular", 0.0)
+			semibold_w = getattr(AppKit, "NSFontWeightSemibold", 0.3)
+			self._gear = _icon_button(width - margin - strip_h, "gearshape", "NSActionTemplate",
+			                          "⚙", "openSettings:", "Color Flow settings", regular_w)
+			# Global report — same icon (list.clipboard.fill, semibold) as the palette's report button.
+			self._report = _icon_button(width - margin - 2 * strip_h - 4.0, "list.clipboard.fill", None,
+			                            "\U0001F4CA", "openReport:", "Global report", semibold_w)
 
 			scroll = AppKit.NSScrollView.alloc().initWithFrame_(
 				AppKit.NSMakeRect(0, 0, width, rect.size.height - self._top_h))
@@ -1393,6 +1406,23 @@ try:
 					Message("Open Glyphs › Settings › Color Flow.", title="AZ Colorflow")
 				except Exception:
 					pass
+
+		def openReport_(self, sender) -> None:
+			# Build + open the global Color Flow report (same flow as the palette's
+			# report button). ponytail: builds on the main thread — add a progress
+			# sheet if big fonts stall.
+			try:
+				if _shared_gate_blocked():
+					return
+				font = Glyphs.font
+				if font is None:
+					Message("Open a font first.", title="AZ Colorflow")
+					return
+				import azcolorflow_dashboard
+				azcolorflow_dashboard.main(font, open_when_done=True)
+			except Exception:
+				import traceback
+				print("AZ Colorflow [global report] error:\n" + traceback.format_exc())
 
 		def focusColor_(self, color_key) -> None:
 			# Toggle the spotlight colour (click a legend swatch): the bars dim every
@@ -2975,44 +3005,84 @@ def _register_preferences_pane() -> None:
 		delegate.addViewToPreferences_(view_controller)   # solo fallback
 
 
-def _open_preferences_pane() -> None:
-	"""Open Glyphs > Settings to the Color Flow pane (registering it first if needed).
+def _open_settings_window() -> bool:
+	"""Open Glyphs' Settings window the way its menu does (version-agnostic): find the
+	app-menu "Settings…"/"Preferences…" item and perform its action. Selecting a pane
+	tab alone does NOT front the window, so this is what actually makes it appear."""
+	try:
+		app = AppKit.NSApplication.sharedApplication()
+		main_menu = app.mainMenu() if app is not None else None
+	except Exception:
+		main_menu = None
+	if main_menu is None:
+		return False
+	for i in range(main_menu.numberOfItems()):
+		submenu = main_menu.itemAtIndex_(i).submenu()
+		if submenu is None:
+			continue
+		for j in range(submenu.numberOfItems()):
+			title = submenu.itemAtIndex_(j).title() or ""
+			if title.startswith("Settings") or title.startswith("Preferences"):
+				try:
+					submenu.performActionForItemAtIndex_(j)
+					return True
+				except Exception:
+					return False
+	return False
+
+
+def _front_settings_window() -> None:
+	"""Bring whatever window hosts our registered pane to the front (it can open behind)."""
+	try:
+		vc = _PREF_PANE_VC
+		window = vc.view().window() if vc is not None else None
+		if window is not None:
+			window.makeKeyAndOrderFront_(None)
+	except Exception:
+		pass
+
+
+def _open_preferences_pane() -> bool:
+	"""Open Glyphs > Settings to the Color Flow pane (registering it first if needed);
+	True when an opener fired. Order matters: open + front the window like the menu
+	(_open_settings_window) — selecting the tab alone leaves the window closed — THEN
+	select our pane and bring it forward.
 
 	showMainPreferencesWithIdentifier: -> GSPreferencesController -showPrefpaneWithIdentifier:
-	-> [mainTabView selectTabViewItemWithIdentifier: ident]. Our tab's identifier is the VC's
-	representedObject, which we set to COLORFLOW_PREF_IDENTIFIER — so the jump matches. If it
-	ever throws (older Glyphs / no such item), fall back to just opening Settings so the user
-	still lands in the window and can click the Color Flow pane manually."""
+	-> [mainTabView selectTabViewItemWithIdentifier: ident]; our tab identifier is the VC's
+	representedObject (COLORFLOW_PREF_IDENTIFIER)."""
 	_register_preferences_pane()
-	# Preferred path: the shared AZ Toolkit hub selects our tab and opens Settings.
+	opened = _open_settings_window()          # actually opens + fronts the Settings window
+	# Preferred path: the shared AZ Toolkit hub selects our tab.
 	hub = _toolkit_hub()
 	if hub is not None and hub.respondsToSelector_(b"showSettingsPaneWithIdentifier:"):
 		try:
 			hub.showSettingsPaneWithIdentifier_(COLORFLOW_PREF_IDENTIFIER)
-			return True
+			opened = True
 		except Exception:
 			pass  # fall through to the direct jump
-	delegate = _app_delegate()
-	if delegate is None:
-		return False
-	# Solo-registered pane (no hub): its top-level identifier is our own.
-	# respondsToSelector_, not hasattr/getattr: those scan the entire ObjC
-	# selector table on the bridged delegate when the method is missing.
-	if delegate.respondsToSelector_(b"showMainPreferencesWithIdentifier:"):
-		try:
-			delegate.showMainPreferencesWithIdentifier_(COLORFLOW_PREF_IDENTIFIER)
-			return True
-		except Exception:
-			pass  # fall through to a plain Settings open
-	for selector in (b"showMainPreferences:", b"showPreferencesPanel:",
-			b"showPreferences:", b"openPreferences:"):
-		try:
-			if delegate.respondsToSelector_(selector):
-				delegate.performSelector_withObject_(selector, None)
-				return True
-		except Exception:
-			continue
-	return False
+	else:
+		delegate = _app_delegate()
+		# respondsToSelector_, not hasattr/getattr: those scan the entire ObjC
+		# selector table on the bridged delegate when the method is missing.
+		if delegate is not None and delegate.respondsToSelector_(b"showMainPreferencesWithIdentifier:"):
+			try:
+				delegate.showMainPreferencesWithIdentifier_(COLORFLOW_PREF_IDENTIFIER)
+				opened = True
+			except Exception:
+				pass
+		elif delegate is not None:
+			for selector in (b"showMainPreferences:", b"showPreferencesPanel:",
+					b"showPreferences:", b"openPreferences:"):
+				try:
+					if delegate.respondsToSelector_(selector):
+						delegate.performSelector_withObject_(selector, None)
+						opened = True
+						break
+				except Exception:
+					continue
+	_front_settings_window()
+	return opened
 
 
 # Borderless layer-backed button with a hover effect — brightens its fill while
