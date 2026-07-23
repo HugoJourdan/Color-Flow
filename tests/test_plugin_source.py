@@ -910,11 +910,12 @@ def test_coverage_sidebar_double_click_shows_layers() -> None:
 
 
 def test_coverage_sidebar_has_global_progress_bar() -> None:
-    # A whole-master "OVERALL" bar sits above the cards; double-click on it opens
-    # every glyph of that colour (kind "all", no group filter).
+    # A whole-master card (its header the master name) sits above the cards;
+    # double-click on its bar opens every glyph of that colour (kind "all").
     assert "def _draw_global(self" in PLUGIN_SOURCE
-    assert '"OVERALL"' in PLUGIN_SOURCE
     assert 'self._draw_global(_COV_TOP, width)' in PLUGIN_SOURCE
+    assert '(title or "Overall").upper()' in PLUGIN_SOURCE          # master-named card header
+    assert "font.selectedFontMaster.name" in PLUGIN_SOURCE          # title = the master
     assert '"all", None, None, color_key' in PLUGIN_SOURCE          # global seg hit meta
     assert 'if kind == "all":' in PLUGIN_SOURCE                     # matches every glyph
 
@@ -948,14 +949,39 @@ def test_settings_pane_icon_uses_chosen_sf_symbol() -> None:
     assert "_glyph_symbol_image(0x101082)" in PLUGIN_SOURCE
 
 
-def test_coverage_sidebar_tab_icon_is_the_bundled_disc() -> None:
-    # Tab icon = the bundled metallic disc PDF (full colour), with a drawn ring
-    # template as the fallback if the file is missing.
-    assert (RESOURCES / "sidebar-disc.pdf").exists()
-    assert 'Path(__file__).parent / "sidebar-disc.pdf"' in PLUGIN_SOURCE
-    assert "initWithContentsOfFile_" in PLUGIN_SOURCE
+def test_coverage_sidebar_tab_icon_uses_sf_symbol() -> None:
+    # Tab icon = Hugo's SF Symbol glyph (U+101082), rendered to a template image;
+    # a drawn ring template is the fallback.
+    block = _sidebar_block()
+    assert "def tabBarImage(cls" in block
+    assert "_glyph_symbol_image(0x101082)" in block
     assert "def _drawn_ring_icon(cls" in PLUGIN_SOURCE      # fallback
     assert "bezierPathWithOvalInRect_" in PLUGIN_SOURCE
+
+
+def test_coverage_sidebar_value_percent_toggle() -> None:
+    # A segmented switch flips bar labels between the raw count and the % filled.
+    block = _sidebar_block()
+    assert "NSSegmentedControl" in block
+    assert 'seg.setAction_("toggleValueMode:")' in block
+    assert "def toggleValueMode_(self, sender" in block
+    assert "self._show_percent" in PLUGIN_SOURCE
+    assert "def _count_label(self" in PLUGIN_SOURCE
+
+
+def test_coverage_sidebar_has_color_legend() -> None:
+    # The bottom of the sidebar lists each workflow colour: a swatch + its name.
+    assert "def _draw_legend(self" in PLUGIN_SOURCE
+    assert '"COLORS"' in PLUGIN_SOURCE
+    assert "self._draw_legend(y, width)" in PLUGIN_SOURCE
+    assert "self._legend" in PLUGIN_SOURCE
+
+
+def test_coverage_sidebar_disclosure_is_a_chevron() -> None:
+    # Collapse marker is a thin stroked chevron (Hugo's icon), not a filled triangle.
+    marker = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_disclosure(self"):][:1000]
+    assert "setLineCapStyle_" in marker and "path.stroke()" in marker
+    assert "path.fill()" not in marker
 
 
 def test_hosted_report_never_spins_the_host_main_thread_needlessly() -> None:

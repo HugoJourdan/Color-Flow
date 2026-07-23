@@ -602,7 +602,7 @@ _COV_TOP = 10.0
 _COV_BAND_H = 24.0        # card header band (holds the section title)
 _COV_ROW_H = 22.0
 _COV_SUB_ROW_H = 20.0
-_COV_CARD_GAP = 10.0      # vertical gap between cards
+_COV_CARD_GAP = 6.0       # vertical gap between cards
 _COV_CARD_PADX = 8.0      # inner horizontal padding inside a card
 _COV_CARD_PADY = 6.0      # inner vertical padding (below band / above bottom)
 _COV_CARD_RADIUS = 8.0
@@ -610,10 +610,9 @@ _COV_NAME_W = 96.0        # wider name column
 _COV_COUNT_W = 34.0       # wider value column
 _COV_GAP = 8.0
 _COV_BAR_H = 10.0
-_COV_NAME_INDENT = 14.0   # disclosure gutter — top-level and sub-category names share it
-_COV_GLOBAL_CAP_H = 15.0  # "OVERALL" caption above the global progress bar
-_COV_GLOBAL_BAR_H = 16.0  # the global bar is a touch taller/prominent
-_COV_GLOBAL_GAP = 12.0    # gap between the global bar and the first card
+_COV_NAME_INDENT = 20.0   # disclosure/icon gutter — top-level and sub-category names share it
+_COV_GLOBAL_BAR_H = 16.0  # the whole-master bar in the master-named card is a touch taller
+_COV_LEGEND_ROW_H = 18.0  # a swatch + colour name, one per row in the bottom legend card
 _NS_ALIGN_LEFT = getattr(AppKit, "NSTextAlignmentLeft", 0)
 _NS_ALIGN_RIGHT = getattr(AppKit, "NSTextAlignmentRight", 2)   # 10.12+ raw value
 _NS_TRUNCATE_TAIL = getattr(AppKit, "NSLineBreakByTruncatingTail", 4)
@@ -740,7 +739,9 @@ class _AZCoverageBarsView(AppKit.NSView):
 		if self is None:
 			return None
 		self._sections = []
-		self._global = None                   # (count, segs) — the whole-master progress bar
+		self._global = None                   # (masterName, count, segs) — the whole-master card
+		self._legend = []                     # [(rgba, name)] — colour key at the bottom
+		self._show_percent = False            # value <-> % of the bar filled (segmented toggle)
 		self._expanded = set()
 		self._toggle_hits = []                # [(key, top, bottom, bar_x)] — click left of bar toggles
 		self._seg_hits = []                   # [(x0, x1, top, bottom, kind, group, sub, colorKey)]
@@ -775,9 +776,12 @@ class _AZCoverageBarsView(AppKit.NSView):
 		expanded = getattr(self, "_expanded", None) or set()
 		height = _COV_TOP
 		if getattr(self, "_global", None):
-			height += _COV_GLOBAL_CAP_H + _COV_GLOBAL_BAR_H + _COV_GLOBAL_GAP
+			height += self._global_card_height() + _COV_CARD_GAP
 		for _title, rows in sections:
 			height += self._card_height(rows, expanded) + _COV_CARD_GAP
+		legend = getattr(self, "_legend", None) or []
+		if legend:
+			height += _COV_BAND_H + _COV_CARD_PADY + _COV_LEGEND_ROW_H * len(legend) + _COV_CARD_PADY + _COV_CARD_GAP
 		return height + _COV_TOP - _COV_CARD_GAP
 
 	@objc.python_method
@@ -819,18 +823,23 @@ class _AZCoverageBarsView(AppKit.NSView):
 
 	@objc.python_method
 	def _draw_disclosure(self, x: float, y: float, size: float, expanded: bool, color: Any) -> None:
+		# Thin stroked chevron (SF "chevron.right"/"chevron.down"), like the icon Hugo
+		# supplied — not a filled triangle.
 		color.set()
 		path = AppKit.NSBezierPath.bezierPath()
-		if expanded:                          # ▼ apex at the bottom (flipped: larger y)
-			path.moveToPoint_((x, y))
-			path.lineToPoint_((x + size, y))
-			path.lineToPoint_((x + size / 2.0, y + size))
-		else:                                 # ▸ apex to the right
-			path.moveToPoint_((x, y))
-			path.lineToPoint_((x, y + size))
-			path.lineToPoint_((x + size, y + size / 2.0))
-		path.closePath()
-		path.fill()
+		path.setLineWidth_(1.4)
+		path.setLineCapStyle_(getattr(AppKit, "NSLineCapStyleRound", 1))
+		path.setLineJoinStyle_(getattr(AppKit, "NSLineJoinStyleRound", 1))
+		inset = size * 0.24
+		if expanded:                          # ⌄ chevron down (flipped: apex at larger y)
+			path.moveToPoint_((x, y + inset))
+			path.lineToPoint_((x + size / 2.0, y + size - inset))
+			path.lineToPoint_((x + size, y + inset))
+		else:                                 # › chevron right
+			path.moveToPoint_((x + inset, y))
+			path.lineToPoint_((x + size - inset, y + size / 2.0))
+			path.lineToPoint_((x + inset, y + size))
+		path.stroke()
 
 	@objc.python_method
 	def _draw_icon(self, image: Any, rect: Any, color: Any) -> None:
@@ -852,21 +861,41 @@ class _AZCoverageBarsView(AppKit.NSView):
 			rect, zero, src_over, 1.0, True, None)
 
 	@objc.python_method
+	def _count_label(self, count: Any, segs: Any) -> str:
+		# Segmented toggle: raw glyph count, or the % of the bar that is filled
+		# (i.e. share of the group carrying any workflow colour).
+		if getattr(self, "_show_percent", False):
+			filled = sum(fraction for fraction, _rgba, _key in (segs or []))
+			return f"{int(round(filled * 100.0))}%"
+		return str(count)
+
+	@objc.python_method
+	def _global_card_height(self) -> float:
+		return _COV_BAND_H + _COV_CARD_PADY + _COV_GLOBAL_BAR_H + _COV_CARD_PADY
+
+	@objc.python_method
 	def _draw_global(self, y: float, width: float) -> float:
 		entry = getattr(self, "_global", None)
 		if not entry:
 			return y
-		count, segs = entry
-		self._draw_text("OVERALL", AppKit.NSMakeRect(_COV_PAD, y, width - 2 * _COV_PAD, 13.0),
+		title, count, segs = entry
+		card_x = _COV_PAD
+		card_w = width - 2 * _COV_PAD
+		cx0 = card_x + _COV_CARD_PADX
+		cw = card_w - 2 * _COV_CARD_PADX
+		card_h = self._global_card_height()
+		self._draw_card(AppKit.NSMakeRect(card_x, y, card_w, card_h))
+		self._draw_text((title or "Overall").upper(),
+		                AppKit.NSMakeRect(cx0, y + (_COV_BAND_H - 13.0) / 2.0, cw, 13.0),
 		                11.0, AppKit.NSColor.secondaryLabelColor(), bold=True)
-		y += _COV_GLOBAL_CAP_H
-		bar_x = _COV_PAD
-		bar_w = max(10.0, width - 2 * _COV_PAD - _COV_COUNT_W - _COV_GAP)
-		bar_rect = AppKit.NSMakeRect(bar_x, y, bar_w, _COV_GLOBAL_BAR_H)
+		bar_y = y + _COV_BAND_H + _COV_CARD_PADY
+		bar_x = cx0
+		bar_w = max(10.0, cw - _COV_COUNT_W - _COV_GAP)
+		bar_rect = AppKit.NSMakeRect(bar_x, bar_y, bar_w, _COV_GLOBAL_BAR_H)
 		self._draw_bar(bar_rect, segs)
 		self._bar_rects.append(bar_rect)
-		self._draw_text(str(count),
-		                AppKit.NSMakeRect(bar_x + bar_w + _COV_GAP, y + (_COV_GLOBAL_BAR_H - 14.0) / 2.0,
+		self._draw_text(self._count_label(count, segs),
+		                AppKit.NSMakeRect(bar_x + bar_w + _COV_GAP, bar_y + (_COV_GLOBAL_BAR_H - 14.0) / 2.0,
 		                                  _COV_COUNT_W, 14.0),
 		                11.0, AppKit.NSColor.whiteColor(), align=_NS_ALIGN_LEFT, mono=True)
 		x = bar_x
@@ -874,9 +903,37 @@ class _AZCoverageBarsView(AppKit.NSView):
 			seg_w = fraction * bar_w
 			if seg_w <= 0.0:
 				continue
-			self._seg_hits.append((x, x + seg_w, y, y + _COV_GLOBAL_BAR_H, "all", None, None, color_key))
+			self._seg_hits.append((x, x + seg_w, bar_y, bar_y + _COV_GLOBAL_BAR_H, "all", None, None, color_key))
 			x += seg_w
-		return y + _COV_GLOBAL_BAR_H + _COV_GLOBAL_GAP
+		return y + card_h + _COV_CARD_GAP
+
+	@objc.python_method
+	def _draw_legend(self, y: float, width: float) -> float:
+		legend = getattr(self, "_legend", None) or []
+		if not legend:
+			return y
+		card_x = _COV_PAD
+		card_w = width - 2 * _COV_PAD
+		cx0 = card_x + _COV_CARD_PADX
+		cw = card_w - 2 * _COV_CARD_PADX
+		card_h = _COV_BAND_H + _COV_CARD_PADY + _COV_LEGEND_ROW_H * len(legend) + _COV_CARD_PADY
+		self._draw_card(AppKit.NSMakeRect(card_x, y, card_w, card_h))
+		self._draw_text("COLORS", AppKit.NSMakeRect(cx0, y + (_COV_BAND_H - 13.0) / 2.0, cw, 13.0),
+		                11.0, AppKit.NSColor.secondaryLabelColor(), bold=True)
+		row_y = y + _COV_BAND_H + _COV_CARD_PADY
+		for rgba, name in legend:
+			swatch = AppKit.NSMakeRect(cx0, row_y + (_COV_LEGEND_ROW_H - 12.0) / 2.0, 12.0, 12.0)
+			chip = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(swatch, 3.0, 3.0)
+			AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(rgba[0], rgba[1], rgba[2], 1.0).set()
+			chip.fill()
+			AppKit.NSColor.blackColor().colorWithAlphaComponent_(0.35).set()
+			chip.setLineWidth_(0.75)
+			chip.stroke()
+			self._draw_text(name, AppKit.NSMakeRect(cx0 + 12.0 + _COV_GAP, row_y + (_COV_LEGEND_ROW_H - 14.0) / 2.0,
+			                                        cw - 12.0 - _COV_GAP, 14.0),
+			                11.0, AppKit.NSColor.labelColor())
+			row_y += _COV_LEGEND_ROW_H
+		return y + card_h + _COV_CARD_GAP
 
 	@objc.python_method
 	def _draw_bar(self, rect: Any, segs: Any) -> None:
@@ -915,7 +972,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 		name_x = cx0 + name_indent
 		self._draw_text(name, AppKit.NSMakeRect(name_x, text_y, _COV_NAME_W - name_indent, 14.0),
 		                name_size, name_color)
-		self._draw_text(str(count),
+		self._draw_text(self._count_label(count, segs),
 		                AppKit.NSMakeRect(cx0 + cw - _COV_COUNT_W, text_y, _COV_COUNT_W, 14.0),
 		                11.0, AppKit.NSColor.whiteColor(), align=_NS_ALIGN_LEFT, mono=True)
 		bar_x = cx0 + _COV_NAME_W + _COV_GAP
@@ -980,6 +1037,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 						                   ("subcategory", key, sub_key))
 						row_y += _COV_SUB_ROW_H
 			y += card_h + _COV_CARD_GAP
+		self._draw_legend(y, width)
 		window = self.window()
 		if window is not None:                # bars just moved -> rebuild the hand-cursor rects
 			window.invalidateCursorRectsForView_(self)
@@ -1050,18 +1108,14 @@ try:
 
 		@classmethod
 		def tabBarImage(cls) -> Any:
-			# The metallic disc-with-a-hole from the bundle (Hugo's favicon), kept in
-			# full colour (not a template) so its gradient shows. Falls back to a
-			# drawn ring template if the file is missing/unreadable.
-			try:
-				path = Path(__file__).parent / "sidebar-disc.pdf"
-				if path.exists():
-					image = AppKit.NSImage.alloc().initWithContentsOfFile_(str(path))
-					if image is not None:
-						image.setSize_(AppKit.NSMakeSize(18.0, 18.0))
-						return image
-			except Exception:
-				pass
+			# Hugo's SF Symbol glyph (U+101082, 􁂂), rendered to a template image so it
+			# tints like the native sidebar tabs. Falls back to a drawn ring template.
+			# (Glyphs reads this once at registration — a running app needs a restart
+			# to pick up a changed icon.)
+			image = _glyph_symbol_image(0x101082)
+			if image is not None:
+				image.setSize_(AppKit.NSMakeSize(18.0, 18.0))
+				return image
 			return cls._drawn_ring_icon()
 
 		@classmethod
@@ -1091,7 +1145,23 @@ try:
 
 		def loadView(self) -> None:
 			rect = AppKit.NSMakeRect(0, 0, 260, 600)
-			scroll = AppKit.NSScrollView.alloc().initWithFrame_(rect)
+			container = AppKit.NSView.alloc().initWithFrame_(rect)
+			seg_h = 22.0
+			margin = 6.0
+			# Value <-> % switch, pinned above the scroll view (always visible).
+			seg = AppKit.NSSegmentedControl.alloc().initWithFrame_(
+				AppKit.NSMakeRect(margin, rect.size.height - margin - seg_h,
+				                  rect.size.width - 2 * margin, seg_h))
+			seg.setSegmentCount_(2)
+			seg.setLabel_forSegment_("Value", 0)
+			seg.setLabel_forSegment_("%", 1)
+			seg.setSelectedSegment_(0)
+			seg.setSegmentStyle_(getattr(AppKit, "NSSegmentStyleRounded", 1))
+			seg.setTarget_(self)
+			seg.setAction_("toggleValueMode:")
+			seg.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewMinYMargin)
+			scroll = AppKit.NSScrollView.alloc().initWithFrame_(
+				AppKit.NSMakeRect(0, 0, rect.size.width, rect.size.height - seg_h - 2 * margin))
 			scroll.setHasVerticalScroller_(True)
 			scroll.setDrawsBackground_(False)     # let the native sidebar background show through
 			scroll.setAutohidesScrollers_(True)
@@ -1100,12 +1170,15 @@ try:
 				AppKit.NSMakeRect(0, 0, rect.size.width, rect.size.height))
 			doc.setAutoresizingMask_(AppKit.NSViewWidthSizable)   # follow the clip width; height set on data
 			scroll.setDocumentView_(doc)
+			container.addSubview_(scroll)
+			container.addSubview_(seg)
 			self._doc = doc
 			self._scroll = scroll
+			self._seg = seg
 			self._sig = None
 			self._lastMaster = None
 			self._registered = False
-			self.setView_(scroll)
+			self.setView_(container)
 
 		def viewDidAppear(self) -> None:
 			objc.super(AZColorflowCoverageSidebar, self).viewDidAppear()
@@ -1152,6 +1225,16 @@ try:
 
 		def coverageRebuild_(self, sender) -> None:
 			self._rebuild()
+
+		def toggleValueMode_(self, sender) -> None:
+			doc = getattr(self, "_doc", None)
+			if doc is None:
+				return
+			try:
+				doc._show_percent = (sender.selectedSegment() == 1)
+			except Exception:
+				doc._show_percent = not getattr(doc, "_show_percent", False)
+			doc.setNeedsDisplay_(True)
 
 		@objc.python_method
 		def _sidebar_font(self) -> Any:
@@ -1214,11 +1297,17 @@ try:
 			if global_row is not None:
 				base = segs_for(global_row)
 				if base is not None:
-					global_tuple = (base[0], base[1])                # (count, segs)
-			return sections, global_tuple
+					global_tuple = (base[0], base[1])                # (count, segs); title added in _rebuild
+			labels = data.get("labels", {})
+			legend = []                                              # [(rgba, name)] bottom colour key
+			for color_key in order:
+				index = int(color_key)
+				if 0 <= index < len(colors):
+					legend.append((tuple(colors[index]), labels.get(color_key) or color_key))
+			return sections, global_tuple, legend
 
 		@objc.python_method
-		def _signature(self, sections: Any, global_tuple: Any, colors: Any) -> tuple:
+		def _signature(self, sections: Any, global_tuple: Any, legend: Any, colors: Any) -> tuple:
 			def seg_sig(segs):
 				return tuple((round(fraction, 5), color_key) for fraction, _rgba, color_key in segs)
 
@@ -1229,7 +1318,8 @@ try:
 				              for sub_name, sub_count, sub_segs, _sub_key in subs))
 			return (
 				tuple(tuple(round(float(component), 4) for component in rgba) for rgba in colors),
-				(global_tuple[0], seg_sig(global_tuple[1])) if global_tuple else None,
+				(global_tuple[0], global_tuple[1], seg_sig(global_tuple[2])) if global_tuple else None,
+				tuple((name for _rgba, name in (legend or []))),
 				tuple((title, tuple(row_sig(row) for row in rows)) for title, rows in sections),
 			)
 
@@ -1241,18 +1331,25 @@ try:
 			try:
 				font = self._sidebar_font()
 				if font is None:
-					sections, global_tuple, colors = [], None, []
+					sections, global_tuple, legend, colors = [], None, [], []
 				else:
 					import azcolorflow_dashboard
 					data = azcolorflow_dashboard.coverage_rows_for_master(font)
 					self._lastMaster = data.get("master_id")
 					colors = labelcolors.read_label_colors()
-					sections, global_tuple = self._sections_from(data, colors)
-				signature = self._signature(sections, global_tuple, colors)
+					sections, global_tuple, legend = self._sections_from(data, colors)
+					if global_tuple is not None:                     # title the Overall card with the master name
+						try:
+							title = font.selectedFontMaster.name or "Overall"
+						except Exception:
+							title = "Overall"
+						global_tuple = (title, global_tuple[0], global_tuple[1])
+				signature = self._signature(sections, global_tuple, legend, colors)
 				if signature == getattr(self, "_sig", None):
 					return
 				self._sig = signature
 				doc._global = global_tuple
+				doc._legend = legend
 				doc.setData_colors_(sections, colors)
 				self._resize_doc()
 			except Exception:
