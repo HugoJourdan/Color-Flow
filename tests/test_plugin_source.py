@@ -280,11 +280,10 @@ def test_settings_changed_selector_reloads_palette() -> None:
 
 
 def test_settings_entry_points_removed() -> None:
-    # The settings gear and the Edit-menu "Color Flow settings…" / "Backfill timeline"
-    # items are gone; the pane is reached only via Glyphs > Settings now.
-    assert "def openSettings_(" not in PLUGIN_SOURCE
+    # The Edit-menu "Color Flow settings…" / "Backfill timeline" items and the old
+    # palette-header gear stay gone; settings are reached via Glyphs > Settings or the
+    # sidebar gear (see test_sidebar_has_settings_gear).
     assert "def _install_settings_menu(" not in PLUGIN_SOURCE
-    assert '"openSettings:"' not in PLUGIN_SOURCE
     assert "def backfillTimeline_(" not in PLUGIN_SOURCE
     assert "def _install_backfill_menu(" not in PLUGIN_SOURCE
     assert "_BACKFILL_TITLE" not in PLUGIN_SOURCE
@@ -960,21 +959,45 @@ def test_coverage_sidebar_tab_icon_uses_sf_symbol() -> None:
 
 
 def test_coverage_sidebar_value_percent_toggle() -> None:
-    # A segmented switch flips bar labels between the raw count and the % filled.
+    # A real ON/OFF switch (NSSwitch) flips bar labels between total and % filled.
     block = _sidebar_block()
-    assert "NSSegmentedControl" in block
-    assert 'seg.setAction_("toggleValueMode:")' in block
+    assert "NSSwitch" in block
+    assert 'switch.setAction_("toggleValueMode:")' in block
     assert "def toggleValueMode_(self, sender" in block
+    assert "sender.state() == on_state" in block
     assert "self._show_percent" in PLUGIN_SOURCE
     assert "def _count_label(self" in PLUGIN_SOURCE
 
 
 def test_coverage_sidebar_has_color_legend() -> None:
-    # The bottom of the sidebar lists each workflow colour: a swatch + its name.
-    assert "def _draw_legend(self" in PLUGIN_SOURCE
-    assert '"COLORS"' in PLUGIN_SOURCE
-    assert "self._draw_legend(y, width)" in PLUGIN_SOURCE
-    assert "self._legend" in PLUGIN_SOURCE
+    # A bottom-pinned, titleless 3-column legend grid lists each workflow colour.
+    assert "class _AZLegendView(AppKit.NSView)" in PLUGIN_SOURCE
+    assert "_COV_LEGEND_COLS = 3" in PLUGIN_SOURCE
+    assert "def heightForWidth_(self" in PLUGIN_SOURCE
+    assert "NSViewMaxYMargin" in _sidebar_block()          # legend pinned to the bottom
+    assert '"COLORS"' not in PLUGIN_SOURCE                 # no title on the legend card
+
+
+def test_coverage_sidebar_color_focus_dims_others() -> None:
+    # Clicking a legend swatch focuses that colour; the bars fade every other colour.
+    assert "def focusColor_(self, color_key" in PLUGIN_SOURCE
+    assert "owner.focusColor_(str(color_key))" in PLUGIN_SOURCE          # legend click -> controller
+    assert "focus is not None and color_key != focus" in PLUGIN_SOURCE   # per-segment dim in _draw_bar
+
+
+def test_sidebar_has_settings_gear() -> None:
+    # The Edit-view sidebar has a gear button opening the Color Flow settings pane.
+    block = _sidebar_block()
+    assert 'setAction_("openSettings:")' in block
+    assert "def openSettings_(self, sender" in block
+    assert "_open_preferences_pane()" in block
+
+
+def test_settings_pane_has_no_behaviour_section() -> None:
+    # The "Behaviour" section (the swap-routing toggle) is gone from the settings pane.
+    assert "Behaviour" not in PLUGIN_SOURCE
+    assert "group.swapRouting" not in PLUGIN_SOURCE
+    assert "group.behLabel" not in PLUGIN_SOURCE
 
 
 def test_coverage_sidebar_disclosure_is_a_chevron() -> None:
