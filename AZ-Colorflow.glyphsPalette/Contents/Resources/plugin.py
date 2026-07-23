@@ -608,6 +608,7 @@ _COV_BAR_H = 10.0
 _NS_ALIGN_LEFT = getattr(AppKit, "NSTextAlignmentLeft", 0)
 _NS_ALIGN_RIGHT = getattr(AppKit, "NSTextAlignmentRight", 2)   # 10.12+ raw value
 _NS_TRUNCATE_TAIL = getattr(AppKit, "NSLineBreakByTruncatingTail", 4)
+_NS_FONT_WEIGHT_REGULAR = getattr(AppKit, "NSFontWeightRegular", 0.0)
 
 
 class _AZCoverageBarsView(AppKit.NSView):
@@ -637,11 +638,17 @@ class _AZCoverageBarsView(AppKit.NSView):
 
 	@objc.python_method
 	def _draw_text(self, text: str, rect: Any, size: float, color: Any,
-	               bold: bool = False, align: int = _NS_ALIGN_LEFT) -> None:
+	               bold: bool = False, align: int = _NS_ALIGN_LEFT, mono: bool = False) -> None:
 		style = AppKit.NSMutableParagraphStyle.alloc().init()
 		style.setAlignment_(align)
 		style.setLineBreakMode_(_NS_TRUNCATE_TAIL)
-		font = AppKit.NSFont.boldSystemFontOfSize_(size) if bold else AppKit.NSFont.systemFontOfSize_(size)
+		if mono:
+			ctor = getattr(AppKit.NSFont, "monospacedSystemFontOfSize_weight_", None)
+			font = ctor(size, _NS_FONT_WEIGHT_REGULAR) if ctor is not None else AppKit.NSFont.systemFontOfSize_(size)
+		elif bold:
+			font = AppKit.NSFont.boldSystemFontOfSize_(size)
+		else:
+			font = AppKit.NSFont.systemFontOfSize_(size)
 		attrs = {
 			AppKit.NSFontAttributeName: font,
 			AppKit.NSForegroundColorAttributeName: color,
@@ -650,27 +657,36 @@ class _AZCoverageBarsView(AppKit.NSView):
 		AppKit.NSAttributedString.alloc().initWithString_attributes_(text, attrs).drawInRect_(rect)
 
 	@objc.python_method
+	def _draw_separator(self, rect: Any) -> None:
+		AppKit.NSColor.separatorColor().set()
+		AppKit.NSBezierPath.bezierPathWithRect_(rect).fill()
+
+	@objc.python_method
 	def _draw_bar(self, rect: Any, segs: Any) -> None:
 		radius = rect.size.height / 2.0
 		track = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, radius, radius)
 		AppKit.NSColor.quaternaryLabelColor().set()
 		track.fill()
-		if not segs:
-			return
-		context = AppKit.NSGraphicsContext.currentContext()
-		context.saveGraphicsState()
-		track.addClip()                       # rounds the outer corners; segments fill flat inside
-		x = rect.origin.x
-		for fraction, rgba in segs:
-			width = fraction * rect.size.width
-			if width <= 0.0:
-				continue
-			AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(rgba[0], rgba[1], rgba[2], 1.0).set()
-			# +0.5 overlap so neighbouring segments leave no hairline seam.
-			AppKit.NSBezierPath.bezierPathWithRect_(
-				AppKit.NSMakeRect(x, rect.origin.y, width + 0.5, rect.size.height)).fill()
-			x += width
-		context.restoreGraphicsState()
+		if segs:
+			context = AppKit.NSGraphicsContext.currentContext()
+			context.saveGraphicsState()
+			track.addClip()                   # rounds the outer corners; segments fill flat inside
+			x = rect.origin.x
+			for fraction, rgba in segs:
+				width = fraction * rect.size.width
+				if width <= 0.0:
+					continue
+				AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(rgba[0], rgba[1], rgba[2], 1.0).set()
+				# +0.5 overlap so neighbouring segments leave no hairline seam.
+				AppKit.NSBezierPath.bezierPathWithRect_(
+					AppKit.NSMakeRect(x, rect.origin.y, width + 0.5, rect.size.height)).fill()
+				x += width
+			context.restoreGraphicsState()
+		# Hairline outline so a bar (or a segment whose colour sits close to the
+		# sidebar background) always stays legible against it.
+		AppKit.NSColor.separatorColor().set()
+		track.setLineWidth_(1.0)
+		track.stroke()
 
 	def drawRect_(self, dirtyRect: Any) -> None:
 		bounds = self.bounds()
@@ -683,7 +699,10 @@ class _AZCoverageBarsView(AppKit.NSView):
 			                12.0, AppKit.NSColor.secondaryLabelColor())
 			return
 		y = _COV_TOP
-		for title, rows in sections:
+		for index, (title, rows) in enumerate(sections):
+			if index > 0:                     # divider between sections (Category | Script)
+				self._draw_separator(AppKit.NSMakeRect(_COV_PAD, y - _COV_SEC_GAP / 2.0,
+				                                       width - 2 * _COV_PAD, 1.0))
 			self._draw_text(title.upper(),
 			                AppKit.NSMakeRect(_COV_PAD, y + 4.0, width - 2 * _COV_PAD, _COV_HEADER_H),
 			                11.0, AppKit.NSColor.secondaryLabelColor(), bold=True)
@@ -693,7 +712,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 				                11.5, AppKit.NSColor.labelColor())
 				self._draw_text(str(count),
 				                AppKit.NSMakeRect(width - _COV_PAD - _COV_COUNT_W, y + 5.0, _COV_COUNT_W, 16.0),
-				                11.0, AppKit.NSColor.tertiaryLabelColor(), align=_NS_ALIGN_RIGHT)
+				                11.0, AppKit.NSColor.whiteColor(), align=_NS_ALIGN_RIGHT, mono=True)
 				bar_x = _COV_PAD + _COV_NAME_W + _COV_GAP
 				bar_w = max(10.0, width - _COV_PAD - _COV_COUNT_W - _COV_GAP - bar_x)
 				bar_y = y + (_COV_ROW_H - _COV_BAR_H) / 2.0

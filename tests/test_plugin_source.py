@@ -865,6 +865,13 @@ def test_coverage_sidebar_is_g4_gated_and_native() -> None:
     assert "def drawRect_(self, dirtyRect" in PLUGIN_SOURCE
     assert "NSScrollView" in block
     assert "WebKit" not in block and "WKWebView" not in block
+    # Visual polish on the custom view: a divider between the Category and Script
+    # sections, white + monospaced counts, and a hairline stroke around every bar.
+    assert "def _draw_separator(self" in PLUGIN_SOURCE
+    assert "index > 0:" in PLUGIN_SOURCE                             # separator only between sections
+    assert "NSColor.whiteColor(), align=_NS_ALIGN_RIGHT, mono=True" in PLUGIN_SOURCE
+    assert "monospacedSystemFontOfSize_weight_" in PLUGIN_SOURCE
+    assert "track.setLineWidth_(1.0)" in PLUGIN_SOURCE and "track.stroke()" in PLUGIN_SOURCE
 
 
 def test_coverage_sidebar_follows_selected_master_live() -> None:
