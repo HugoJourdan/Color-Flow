@@ -890,12 +890,44 @@ def test_coverage_sidebar_follows_selected_master_live() -> None:
 
 def test_coverage_sidebar_categories_collapse_to_subcategories() -> None:
     # Category rows carry a sub-category breakdown (with_subs) and toggle open on
-    # click; a disclosure triangle marks expandable rows, the view reflows height.
+    # click; a disclosure chevron marks expandable rows, the view reflows height.
     assert "with_subs" in _sidebar_block()                          # controller attaches subRows
     assert "def mouseDown_(self, event" in PLUGIN_SOURCE
     assert "self._expanded" in PLUGIN_SOURCE
-    assert "def _draw_disclosure(self" in PLUGIN_SOURCE and "is_expanded" in PLUGIN_SOURCE
+    assert "def _draw_disclosure(self" in PLUGIN_SOURCE and "is_open" in PLUGIN_SOURCE
     assert "def _reflow(self" in PLUGIN_SOURCE and "self.setFrameSize_" in PLUGIN_SOURCE
+
+
+def test_coverage_sidebar_collapse_is_animated() -> None:
+    # Expand/collapse animates: a per-key progress fraction driven by a 60fps timer,
+    # sub-rows revealed by clipping to the animated height.
+    assert "self._anim" in PLUGIN_SOURCE
+    assert "def animTick_(self, timer" in PLUGIN_SOURCE
+    assert "def _start_anim(self" in PLUGIN_SOURCE and "def _stop_anim(self" in PLUGIN_SOURCE
+    assert "def _progress(self, key" in PLUGIN_SOURCE
+    assert "_COV_SUB_ROW_H * len(subs) * open_frac" in PLUGIN_SOURCE   # clip height follows progress
+
+
+def test_coverage_sidebar_scripts_collapse_to_categories() -> None:
+    # Scripts expand to their categories (like the Edit-view sidebar): the dashboard
+    # attaches subRows-by-category, the sidebar builds scripts with_subs, and the
+    # double-click filter has a dedicated "subscript" kind (script + category).
+    dashboard_source = (RESOURCES / "azcolorflow_dashboard.py").read_text(encoding="utf-8")
+    assert 'build(data.get("byScript", []), True, "script", True)' in PLUGIN_SOURCE
+    assert 'row["subRows"] = _subrows_for(current, order, script_groups' in dashboard_source
+    assert 'kind in ("script", "subscript")' in PLUGIN_SOURCE
+    assert 'sub_kind = "subscript" if kind == "script" else "subcategory"' in PLUGIN_SOURCE
+
+
+def test_coverage_sidebar_value_percent_toggle() -> None:
+    # Total/% toggle is a small switch drawn in the Overall card header (on the master's
+    # line), hit-tested via _pct_hit — no stray NSSwitch machinery remains.
+    assert "self._pct_hit" in PLUGIN_SOURCE
+    assert "controlAccentColor" in PLUGIN_SOURCE            # the ON track colour
+    assert "self._show_percent" in PLUGIN_SOURCE
+    assert "def _count_label(self" in PLUGIN_SOURCE
+    assert "NSSwitch" not in PLUGIN_SOURCE
+    assert "toggleValueMode" not in PLUGIN_SOURCE
 
 
 def test_coverage_sidebar_double_click_shows_layers() -> None:
@@ -956,18 +988,6 @@ def test_coverage_sidebar_tab_icon_uses_sf_symbol() -> None:
     assert "_glyph_symbol_image(0x101082)" in block
     assert "def _drawn_ring_icon(cls" in PLUGIN_SOURCE      # fallback
     assert "bezierPathWithOvalInRect_" in PLUGIN_SOURCE
-
-
-def test_coverage_sidebar_value_percent_toggle() -> None:
-    # A real, small ON/OFF switch (NSSwitch, mini) flips labels between total and %.
-    block = _sidebar_block()
-    assert "NSSwitch" in block
-    assert "NSControlSizeMini" in block                    # shrunk
-    assert 'switch.setAction_("toggleValueMode:")' in block
-    assert "def toggleValueMode_(self, sender" in block
-    assert "sender.state() == on_state" in block
-    assert "self._show_percent" in PLUGIN_SOURCE
-    assert "def _count_label(self" in PLUGIN_SOURCE
 
 
 def test_coverage_sidebar_has_color_legend() -> None:
@@ -1047,13 +1067,18 @@ def test_palette_archived_general_plugin_is_principal() -> None:
 
 
 def test_sidebar_has_global_report_button() -> None:
-    # A sidebar report button builds the global report, reusing the palette's report
-    # icon (list.clipboard.fill) and the shared dashboard entry point.
+    # A sidebar report button builds the global report behind the rainbow loading
+    # sheet (the same _AZColorflowLoaderBar the palette used), reusing the palette's
+    # report icon (list.clipboard.fill) and the shared dashboard entry point.
     block = _sidebar_block()
     assert '"openReport:"' in block
     assert "def openReport_(self, sender" in block
     assert '"list.clipboard.fill"' in block
-    assert "azcolorflow_dashboard.main(font, open_when_done=True)" in block
+    assert "_AZColorflowLoaderBar.alloc()" in block                 # the loading window
+    assert "beginSheet_completionHandler_" in block
+    assert "def sidebarRunReport_(self, sender" in block
+    assert "def sidebarFinishReport_(self, sender" in block
+    assert "progress=_on_progress, open_when_done=False" in block   # bar tracks real build progress
 
 
 def test_settings_pane_has_no_behaviour_section() -> None:

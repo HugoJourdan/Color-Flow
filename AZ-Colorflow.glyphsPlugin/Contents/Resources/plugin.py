@@ -703,8 +703,11 @@ def _show_group_color_layers(font: Any, kind: str, group_key: str,
 	for glyph in font.glyphs:
 		if kind == "all":
 			pass                          # whole-master global bar: no group filter
-		elif kind == "script":
+		elif kind in ("script", "subscript"):
 			if str(getattr(glyph, "script", None) or "Other") != group_key:
+				continue
+			# subscript = one category within a script (the collapsed sub-row).
+			if kind == "subscript" and str(getattr(glyph, "category", None) or "Other") != sub_key:
 				continue
 		else:
 			if str(getattr(glyph, "category", None) or "Other") != group_key:
@@ -742,11 +745,14 @@ class _AZCoverageBarsView(AppKit.NSView):
 		self._sections = []
 		self._global = None                   # (masterName, count, segs) — the whole-master card
 		self._focus = None                    # colorKey to spotlight (others dim) — set from the legend
-		self._show_percent = False            # value <-> % of the bar filled (ON/OFF switch)
-		self._expanded = set()
+		self._show_percent = False            # value <-> % of the bar filled (header toggle)
+		self._expanded = set()                # TARGET open set; _anim animates toward it
+		self._anim = {}                       # {key: progress 0..1} for cards mid-expand/collapse
+		self._anim_timer = None               # NSTimer driving the collapse animation
 		self._toggle_hits = []                # [(key, top, bottom, bar_x)] — click left of bar toggles
 		self._seg_hits = []                   # [(x0, x1, top, bottom, kind, group, sub, colorKey)]
 		self._bar_rects = []                  # bar pill rects -> pointing-hand cursor
+		self._pct_hit = None                  # (x0, x1, y0, y1) — the Overall-card Total/% toggle
 		return self
 
 	def isFlipped(self) -> bool:
@@ -761,12 +767,21 @@ class _AZCoverageBarsView(AppKit.NSView):
 		self.setNeedsDisplay_(True)
 
 	@objc.python_method
-	def _card_height(self, rows: Any, expanded: Any) -> float:
+	def _progress(self, key: Any) -> float:
+		# Effective open fraction: mid-animation value if animating, else the settled
+		# target (1 open / 0 closed). Sub-rows reveal/hide proportionally.
+		anim = getattr(self, "_anim", None) or {}
+		if key in anim:
+			return anim[key]
+		return 1.0 if key in (getattr(self, "_expanded", None) or set()) else 0.0
+
+	@objc.python_method
+	def _card_height(self, rows: Any, expanded: Any = None) -> float:
 		rows_h = 0.0
 		for _name, _count, _segs, key, subs, _kind in rows:
 			rows_h += _COV_ROW_H
-			if subs and key in expanded:
-				rows_h += _COV_SUB_ROW_H * len(subs)
+			if subs:
+				rows_h += _COV_SUB_ROW_H * len(subs) * self._progress(key)
 		return _COV_BAND_H + _COV_CARD_PADY + rows_h + _COV_CARD_PADY
 
 	@objc.python_method
@@ -774,12 +789,11 @@ class _AZCoverageBarsView(AppKit.NSView):
 		sections = getattr(self, "_sections", None) or []
 		if not sections:
 			return 80.0
-		expanded = getattr(self, "_expanded", None) or set()
 		height = _COV_TOP
 		if getattr(self, "_global", None):
 			height += self._global_card_height() + _COV_CARD_GAP
 		for _title, rows in sections:
-			height += self._card_height(rows, expanded) + _COV_CARD_GAP
+			height += self._card_height(rows) + _COV_CARD_GAP
 		return height + _COV_TOP - _COV_CARD_GAP
 
 	@objc.python_method
@@ -883,9 +897,26 @@ class _AZCoverageBarsView(AppKit.NSView):
 		cw = card_w - 2 * _COV_CARD_PADX
 		card_h = self._global_card_height()
 		self._draw_card(AppKit.NSMakeRect(card_x, y, card_w, card_h))
+		# Total/% toggle: a small switch right-aligned in the header, on the master's line.
+		sw_w, sw_h = 24.0, 12.0
+		sw_x = cx0 + cw - sw_w
+		sw_y = y + (_COV_BAND_H - sw_h) / 2.0
 		self._draw_text((title or "Overall").upper(),
-		                AppKit.NSMakeRect(cx0, y + (_COV_BAND_H - 13.0) / 2.0, cw, 13.0),
+		                AppKit.NSMakeRect(cx0, y + (_COV_BAND_H - 13.0) / 2.0, cw - sw_w - 20.0, 13.0),
 		                11.0, AppKit.NSColor.secondaryLabelColor(), bold=True)
+		self._draw_text("%", AppKit.NSMakeRect(sw_x - 15.0, y + (_COV_BAND_H - 13.0) / 2.0, 12.0, 13.0),
+		                10.5, AppKit.NSColor.secondaryLabelColor(), align=_NS_ALIGN_RIGHT)
+		on = bool(getattr(self, "_show_percent", False))
+		track = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+			AppKit.NSMakeRect(sw_x, sw_y, sw_w, sw_h), sw_h / 2.0, sw_h / 2.0)
+		(AppKit.NSColor.controlAccentColor() if on else AppKit.NSColor.tertiaryLabelColor()).set()
+		track.fill()
+		knob_d = sw_h - 3.0
+		knob_x = sw_x + (sw_w - knob_d - 1.5 if on else 1.5)
+		AppKit.NSColor.whiteColor().set()
+		AppKit.NSBezierPath.bezierPathWithOvalInRect_(
+			AppKit.NSMakeRect(knob_x, sw_y + 1.5, knob_d, knob_d)).fill()
+		self._pct_hit = (sw_x - 17.0, sw_x + sw_w, y, y + _COV_BAND_H)
 		row_y = y + _COV_BAND_H + _COV_CARD_PADY
 		bar_x = cx0
 		bar_w = max(10.0, cw - _COV_COUNT_W - _COV_GAP)
@@ -971,30 +1002,32 @@ class _AZCoverageBarsView(AppKit.NSView):
 		self._toggle_hits = []
 		self._seg_hits = []
 		self._bar_rects = []
+		self._pct_hit = None
 		if not sections:
 			self._draw_text("No glyphs to show.",
 			                AppKit.NSMakeRect(_COV_PAD, bounds.size.height / 2.0 - 9.0,
 			                                  width - 2 * _COV_PAD, 18.0),
 			                12.0, AppKit.NSColor.secondaryLabelColor())
 			return
-		expanded = getattr(self, "_expanded", None) or set()
+		target = getattr(self, "_expanded", None) or set()
 		card_x = _COV_PAD
 		card_w = width - 2 * _COV_PAD
 		cx0 = card_x + _COV_CARD_PADX
 		cw = card_w - 2 * _COV_CARD_PADX
 		y = self._draw_global(_COV_TOP, width)
 		for title, rows in sections:
-			card_h = self._card_height(rows, expanded)
+			card_h = self._card_height(rows)
 			self._draw_card(AppKit.NSMakeRect(card_x, y, card_w, card_h))
 			self._draw_text(title.upper(),
 			                AppKit.NSMakeRect(cx0, y + (_COV_BAND_H - 13.0) / 2.0, cw, 13.0),
 			                11.0, AppKit.NSColor.secondaryLabelColor(), bold=True)
 			row_y = y + _COV_BAND_H + _COV_CARD_PADY
 			for name, count, segs, key, subs, kind in rows:
-				is_expanded = bool(subs) and key in expanded
+				is_open = bool(subs) and key in target
+				open_frac = self._progress(key) if subs else 0.0
 				if subs:                      # disclosure chevron + toggle region (left of the bar)
 					self._draw_disclosure(cx0 + 1.5, row_y + (_COV_ROW_H - 7.0) / 2.0, 7.0,
-					                      is_expanded, AppKit.NSColor.secondaryLabelColor())
+					                      is_open, AppKit.NSColor.secondaryLabelColor())
 					self._toggle_hits.append((key, row_y, row_y + _COV_ROW_H, cx0 + _COV_NAME_W + _COV_GAP))
 				elif kind == "script":        # Glyphs' own per-script sidebar icon in the gutter
 					self._draw_icon(_script_icon(key),
@@ -1003,13 +1036,22 @@ class _AZCoverageBarsView(AppKit.NSView):
 				self._draw_bar_row(row_y, _COV_ROW_H, cx0, cw, name, count, segs,
 				                   _COV_NAME_INDENT, 11.5, AppKit.NSColor.labelColor(), (kind, key, None))
 				row_y += _COV_ROW_H
-				if is_expanded:
+				if subs and open_frac > 0.0:  # sub-rows reveal/hide by clipping to the animated height
+					sub_kind = "subscript" if kind == "script" else "subcategory"
+					visible_h = _COV_SUB_ROW_H * len(subs) * open_frac
+					context = AppKit.NSGraphicsContext.currentContext()
+					context.saveGraphicsState()
+					AppKit.NSBezierPath.bezierPathWithRect_(
+						AppKit.NSMakeRect(card_x, row_y, card_w, visible_h)).addClip()
+					sub_y = row_y
 					for sub_name, sub_count, sub_segs, sub_key in subs:
 						# Same size + x as top-level names; only the lighter grey sets them apart.
-						self._draw_bar_row(row_y, _COV_SUB_ROW_H, cx0, cw, sub_name, sub_count, sub_segs,
+						self._draw_bar_row(sub_y, _COV_SUB_ROW_H, cx0, cw, sub_name, sub_count, sub_segs,
 						                   _COV_NAME_INDENT, 11.5, AppKit.NSColor.secondaryLabelColor(),
-						                   ("subcategory", key, sub_key))
-						row_y += _COV_SUB_ROW_H
+						                   (sub_kind, key, sub_key))
+						sub_y += _COV_SUB_ROW_H
+					context.restoreGraphicsState()
+					row_y += visible_h
 			y += card_h + _COV_CARD_GAP
 		window = self.window()
 		if window is not None:                # bars just moved -> rebuild the hand-cursor rects
@@ -1032,12 +1074,56 @@ class _AZCoverageBarsView(AppKit.NSView):
 						print("AZ Colorflow [show layers] error:\n" + traceback.format_exc())
 					return
 			return
+		hit = getattr(self, "_pct_hit", None)   # Overall-card Total/% toggle (on the master's line)
+		if hit is not None and hit[0] <= point.x <= hit[1] and hit[2] <= point.y <= hit[3]:
+			self._show_percent = not getattr(self, "_show_percent", False)
+			self.setNeedsDisplay_(True)
+			return
 		for key, top, bottom, bar_x in getattr(self, "_toggle_hits", []):   # single click left of bar toggles
 			if top <= point.y <= bottom and point.x <= bar_x:
-				expanded = self._expanded
-				expanded.discard(key) if key in expanded else expanded.add(key)
-				self._reflow()
+				opening = key not in self._expanded
+				self._expanded.add(key) if opening else self._expanded.discard(key)
+				# Animate from the current fraction (mid-flight clicks reverse smoothly).
+				self._anim[key] = self._anim.get(key, 0.0 if opening else 1.0)
+				self._start_anim()
 				return
+
+	@objc.python_method
+	def _start_anim(self) -> None:
+		if getattr(self, "_anim_timer", None) is not None:
+			return
+		timer = AppKit.NSTimer.timerWithTimeInterval_target_selector_userInfo_repeats_(
+			1.0 / 60.0, self, "animTick:", None, True)
+		NSRunLoop.currentRunLoop().addTimer_forMode_(timer, NSRunLoopCommonModes)
+		self._anim_timer = timer
+
+	def animTick_(self, timer: Any) -> None:
+		step = 1.0 / 9.0                        # ~0.15s to fully open/close
+		anim = self._anim
+		for key in list(anim.keys()):
+			goal = 1.0 if key in self._expanded else 0.0
+			cur = anim[key]
+			cur = min(goal, cur + step) if cur < goal else max(goal, cur - step)
+			anim[key] = cur
+			if abs(cur - goal) < 1e-6:
+				del anim[key]
+		self._reflow()
+		if not anim:
+			self._stop_anim()
+
+	@objc.python_method
+	def _stop_anim(self) -> None:
+		timer = getattr(self, "_anim_timer", None)
+		if timer is not None:
+			try:
+				timer.invalidate()
+			except Exception:
+				pass
+		self._anim_timer = None
+
+	def viewDidMoveToWindow(self) -> None:
+		if self.window() is None:               # off-screen -> stop the timer (breaks the retain cycle)
+			self._stop_anim()
 
 	@objc.python_method
 	def _reflow(self) -> None:
@@ -1230,44 +1316,7 @@ try:
 			margin = 6.0
 			self._top_h = strip_h + 2 * margin
 			strip_y = rect.size.height - margin - strip_h
-			mid = strip_y + (strip_h - 14.0) / 2.0
-
-			def _label(text, x, wide):
-				field = AppKit.NSTextField.alloc().initWithFrame_(AppKit.NSMakeRect(x, mid, wide, 14.0))
-				field.setStringValue_(text)
-				field.setBezeled_(False)
-				field.setDrawsBackground_(False)
-				field.setEditable_(False)
-				field.setSelectable_(False)
-				field.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
-				field.setTextColor_(AppKit.NSColor.secondaryLabelColor())
-				field.setAutoresizingMask_(AppKit.NSViewMinYMargin)
-				return field
-
-			# ON/OFF switch: OFF = totals, ON = percentages. "Total" and "%" flank it.
-			# NSSwitch has a fixed size; controlSize mini + a layer scale shrink it hard.
-			total_label = _label("Total", margin, 30.0)
-			switch_cls = getattr(AppKit, "NSSwitch", None)
-			switch_x = margin + 32.0
-			switch_w = 30.0
-			if switch_cls is not None:
-				switch = switch_cls.alloc().initWithFrame_(
-					AppKit.NSMakeRect(switch_x, strip_y, switch_w, strip_h))
-				switch.setControlSize_(getattr(AppKit, "NSControlSizeMini", 2))
-				switch.setTarget_(self)
-				switch.setAction_("toggleValueMode:")
-				switch.setAutoresizingMask_(AppKit.NSViewMinYMargin)
-				try:
-					from Quartz import CATransform3DMakeScale
-					switch.setWantsLayer_(True)
-					sw_layer = switch.layer()
-					if sw_layer is not None:
-						sw_layer.setTransform_(CATransform3DMakeScale(0.7, 0.7, 1.0))
-				except Exception:
-					pass
-				container.addSubview_(switch)
-				self._switch = switch
-			pct_label = _label("%", switch_x + switch_w + 6.0, 14.0)
+			# (The Total/% toggle now lives in the Overall card header — this strip only holds icons.)
 
 			# Icon buttons pinned top-right: [report][gear]. Both borderless, symbol at 13pt.
 			def _icon_button(x, symbol, fallback_name, fallback_text, action, tip, weight):
@@ -1326,8 +1375,6 @@ try:
 			# (gear + report already added to the container inside _icon_button.)
 			container.addSubview_(scroll)
 			container.addSubview_(legend)
-			container.addSubview_(total_label)
-			container.addSubview_(pct_label)
 			self._doc = doc
 			self._scroll = scroll
 			self._legend = legend
@@ -1383,17 +1430,6 @@ try:
 		def coverageRebuild_(self, sender) -> None:
 			self._rebuild()
 
-		def toggleValueMode_(self, sender) -> None:
-			doc = getattr(self, "_doc", None)
-			if doc is None:
-				return
-			on_state = getattr(AppKit, "NSControlStateValueOn", 1)
-			try:
-				doc._show_percent = (sender.state() == on_state)
-			except Exception:
-				doc._show_percent = not getattr(doc, "_show_percent", False)
-			doc.setNeedsDisplay_(True)
-
 		def openSettings_(self, sender) -> None:
 			opened = False
 			try:
@@ -1408,9 +1444,9 @@ try:
 					pass
 
 		def openReport_(self, sender) -> None:
-			# Build + open the global Color Flow report (same flow as the palette's
-			# report button). ponytail: builds on the main thread — add a progress
-			# sheet if big fonts stall.
+			# Build the global Color Flow report behind a rainbow loading sheet (the same
+			# _AZColorflowLoaderBar the palette used), then open it. Falls back to a plain
+			# blocking build if there's no window to host the sheet.
 			try:
 				if _shared_gate_blocked():
 					return
@@ -1418,11 +1454,86 @@ try:
 				if font is None:
 					Message("Open a font first.", title="AZ Colorflow")
 					return
-				import azcolorflow_dashboard
-				azcolorflow_dashboard.main(font, open_when_done=True)
+				if getattr(self, "_reportPanel", None) is not None:
+					return                        # a build is already running
+				parent = None
+				try:
+					parent = self.view().window()
+				except Exception:
+					parent = None
+				if parent is None:                # no host window -> just build + open, blocking
+					import azcolorflow_dashboard
+					azcolorflow_dashboard.main(font, open_when_done=True)
+					return
+				panel = AppKit.NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+					AppKit.NSMakeRect(0, 0, 256, 84), AppKit.NSWindowStyleMaskTitled,
+					AppKit.NSBackingStoreBuffered, False)
+				panel.setTitle_("AZ Colorflow")
+				content = panel.contentView()
+				label = AppKit.NSTextField.labelWithString_("Generating AZ Colorflow report…")
+				label.setFrame_(AppKit.NSMakeRect(16, 52, 224, 16))
+				content.addSubview_(label)
+				loader = _AZColorflowLoaderBar.alloc().initWithFrame_(AppKit.NSMakeRect(16, 16, 224, 30))
+				loader.configure(labelcolors.read_label_colors())
+				content.addSubview_(loader)
+				self._reportLoader = loader
+				self._reportPanel = panel
+				self._reportPath = None
+				parent.beginSheet_completionHandler_(panel, None)
+				# Let the sheet paint once, then build on the next run-loop hop (the build
+				# drives the bar via a progress callback and pumps the run loop).
+				self.performSelector_withObject_afterDelay_("sidebarRunReport:", None, 0.08)
 			except Exception:
 				import traceback
 				print("AZ Colorflow [global report] error:\n" + traceback.format_exc())
+
+		def sidebarRunReport_(self, sender) -> None:
+			loader = getattr(self, "_reportLoader", None)
+
+			def _on_progress(frac: float) -> None:
+				if loader is not None:
+					loader.set_progress(frac)
+				_pump_runloop()
+
+			path = None
+			try:
+				import azcolorflow_dashboard
+				path = azcolorflow_dashboard.main(Glyphs.font, progress=_on_progress, open_when_done=False)
+			finally:
+				if loader is not None:
+					try:
+						loader.set_progress(1.0)
+					except Exception:
+						pass
+				self._reportPath = path
+				self.performSelector_withObject_afterDelay_("sidebarFinishReport:", None, 0.3)
+
+		def sidebarFinishReport_(self, sender) -> None:
+			loader = getattr(self, "_reportLoader", None)
+			if loader is not None:
+				try:
+					loader.stop()
+				except Exception:
+					pass
+			panel = getattr(self, "_reportPanel", None)
+			if panel is not None:
+				try:
+					parent = self.view().window()
+					if parent is not None:
+						parent.endSheet_(panel)
+					panel.orderOut_(None)
+				except Exception:
+					pass
+			self._reportPanel = None
+			self._reportLoader = None
+			path = getattr(self, "_reportPath", None)
+			if path is not None:
+				try:
+					if not _show_report_window(path):
+						webbrowser.open(path.as_uri())
+				except Exception:
+					import traceback
+					print("AZ Colorflow [open report] error:\n" + traceback.format_exc())
 
 		def focusColor_(self, color_key) -> None:
 			# Toggle the spotlight colour (click a legend swatch): the bars dim every
@@ -1487,7 +1598,7 @@ try:
 			cats = build(data.get("byCategory", []), False, "category", True)   # expand to sub-categories
 			if cats:
 				sections.append(("Category", cats))
-			scripts = build(data.get("byScript", []), True, "script", False)    # flat; skip "Other"
+			scripts = build(data.get("byScript", []), True, "script", True)     # collapse to categories; skip "Other"
 			if scripts:
 				sections.append(("Script", scripts))
 			global_row = data.get("global")
