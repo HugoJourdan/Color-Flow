@@ -611,8 +611,9 @@ _COV_COUNT_W = 34.0       # wider value column
 _COV_GAP = 8.0
 _COV_BAR_H = 10.0
 _COV_NAME_INDENT = 20.0   # disclosure/icon gutter — top-level and sub-category names share it
-_COV_LEGEND_ROW_H = 17.0  # a swatch + colour name; the bottom legend grid's row height
-_COV_LEGEND_COLS = 3      # the bottom legend is a 3-column grid
+_COV_LEGEND_ROW_H = 18.0  # a swatch + colour name; the bottom legend grid's row height
+_COV_LEGEND_COLS = 2      # the bottom legend is a 2-column grid
+_COV_LEGEND_BOTTOM = 8.0  # margin below the legend card, at the sidebar's bottom edge
 _NS_ALIGN_LEFT = getattr(AppKit, "NSTextAlignmentLeft", 0)
 _NS_ALIGN_RIGHT = getattr(AppKit, "NSTextAlignmentRight", 2)   # 10.12+ raw value
 _NS_TRUNCATE_TAIL = getattr(AppKit, "NSLineBreakByTruncatingTail", 4)
@@ -1084,7 +1085,7 @@ class _AZLegendView(AppKit.NSView):
 		rows = self._row_count()
 		if rows <= 0:
 			return 0.0
-		return _COV_CARD_PADY + rows * _COV_LEGEND_ROW_H + _COV_CARD_PADY + _COV_CARD_GAP
+		return _COV_CARD_GAP + _COV_CARD_PADY + rows * _COV_LEGEND_ROW_H + _COV_CARD_PADY + _COV_LEGEND_BOTTOM
 
 	def drawRect_(self, dirtyRect: Any) -> None:
 		self._cell_hits = []
@@ -1093,7 +1094,7 @@ class _AZLegendView(AppKit.NSView):
 			return
 		bounds = self.bounds()
 		card_rect = AppKit.NSMakeRect(_COV_PAD, _COV_CARD_GAP, bounds.size.width - 2 * _COV_PAD,
-		                              bounds.size.height - _COV_CARD_GAP)
+		                              bounds.size.height - _COV_CARD_GAP - _COV_LEGEND_BOTTOM)
 		card = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
 			card_rect, _COV_CARD_RADIUS, _COV_CARD_RADIUS)
 		AppKit.NSColor.quaternaryLabelColor().set()
@@ -1113,8 +1114,11 @@ class _AZLegendView(AppKit.NSView):
 			x = cx0 + col * col_w
 			y = card_rect.origin.y + _COV_CARD_PADY + row * _COV_LEGEND_ROW_H
 			dim = focus is not None and color_key != focus
-			swatch = AppKit.NSMakeRect(x, y + (_COV_LEGEND_ROW_H - 10.0) / 2.0, 10.0, 10.0)
-			chip = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(swatch, 2.5, 2.5)
+			sw_w, sw_h = 16.0, 10.0
+			swatch = AppKit.NSMakeRect(x, y + (_COV_LEGEND_ROW_H - sw_h) / 2.0, sw_w, sw_h)
+			# Pill (fully rounded) swatch to match the bars.
+			chip = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+				swatch, sw_h / 2.0, sw_h / 2.0)
 			AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(
 				rgba[0], rgba[1], rgba[2], 0.22 if dim else 1.0).set()
 			chip.fill()
@@ -1123,13 +1127,13 @@ class _AZLegendView(AppKit.NSView):
 			chip.stroke()
 			name_color = AppKit.NSColor.tertiaryLabelColor() if dim else AppKit.NSColor.labelColor()
 			attrs = {
-				AppKit.NSFontAttributeName: AppKit.NSFont.systemFontOfSize_(10.5),
+				AppKit.NSFontAttributeName: AppKit.NSFont.systemFontOfSize_(11.5),
 				AppKit.NSForegroundColorAttributeName: name_color,
 				AppKit.NSParagraphStyleAttributeName: style,
 			}
 			AppKit.NSAttributedString.alloc().initWithString_attributes_(name, attrs).drawInRect_(
-				AppKit.NSMakeRect(x + 10.0 + 5.0, y + (_COV_LEGEND_ROW_H - 13.0) / 2.0,
-				                  col_w - 10.0 - 8.0, 13.0))
+				AppKit.NSMakeRect(x + sw_w + 6.0, y + (_COV_LEGEND_ROW_H - 14.0) / 2.0,
+				                  col_w - sw_w - 10.0, 14.0))
 			self._cell_hits.append((x, x + col_w, y, y + _COV_LEGEND_ROW_H, color_key))
 		window = self.window()
 		if window is not None:
@@ -1241,18 +1245,29 @@ try:
 				return field
 
 			# ON/OFF switch: OFF = totals, ON = percentages. "Total" and "%" flank it.
-			total_label = _label("Total", margin, 32.0)
+			# NSSwitch has a fixed size; controlSize mini + a layer scale shrink it hard.
+			total_label = _label("Total", margin, 30.0)
 			switch_cls = getattr(AppKit, "NSSwitch", None)
-			switch_x = margin + 34.0
+			switch_x = margin + 32.0
+			switch_w = 30.0
 			if switch_cls is not None:
 				switch = switch_cls.alloc().initWithFrame_(
-					AppKit.NSMakeRect(switch_x, strip_y, 38.0, strip_h))
+					AppKit.NSMakeRect(switch_x, strip_y, switch_w, strip_h))
+				switch.setControlSize_(getattr(AppKit, "NSControlSizeMini", 2))
 				switch.setTarget_(self)
 				switch.setAction_("toggleValueMode:")
 				switch.setAutoresizingMask_(AppKit.NSViewMinYMargin)
+				try:
+					from Quartz import CATransform3DMakeScale
+					switch.setWantsLayer_(True)
+					sw_layer = switch.layer()
+					if sw_layer is not None:
+						sw_layer.setTransform_(CATransform3DMakeScale(0.7, 0.7, 1.0))
+				except Exception:
+					pass
 				container.addSubview_(switch)
 				self._switch = switch
-			pct_label = _label("%", switch_x + 42.0, 14.0)
+			pct_label = _label("%", switch_x + switch_w + 6.0, 14.0)
 			# Gear -> Color Flow settings pane, pinned top-right.
 			gear = AppKit.NSButton.alloc().initWithFrame_(
 				AppKit.NSMakeRect(width - margin - strip_h, strip_y, strip_h, strip_h))
@@ -1261,8 +1276,19 @@ try:
 				AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_") else None
 			if gear_image is None:
 				gear_image = AppKit.NSImage.imageNamed_("NSActionTemplate")
+			try:                                  # render the gear at a legible 13pt
+				cfg = AppKit.NSImageSymbolConfiguration.configurationWithPointSize_weight_scale_(
+					13.0, getattr(AppKit, "NSFontWeightRegular", 0.0),
+					getattr(AppKit, "NSImageSymbolScaleMedium", 2))
+				if gear_image is not None and hasattr(gear_image, "imageWithSymbolConfiguration_"):
+					configured = gear_image.imageWithSymbolConfiguration_(cfg)
+					if configured is not None:
+						gear_image = configured
+			except Exception:
+				pass
 			gear.setImage_(gear_image)
 			gear.setImagePosition_(getattr(AppKit, "NSImageOnly", 1))
+			gear.setImageScaling_(getattr(AppKit, "NSImageScaleProportionallyDown", 3))
 			gear.setBordered_(False)
 			gear.setTarget_(self)
 			gear.setAction_("openSettings:")
@@ -1356,11 +1382,17 @@ try:
 			doc.setNeedsDisplay_(True)
 
 		def openSettings_(self, sender) -> None:
+			opened = False
 			try:
-				_open_preferences_pane()
+				opened = bool(_open_preferences_pane())
 			except Exception:
 				import traceback
 				print("AZ Colorflow [open settings] error:\n" + traceback.format_exc())
+			if not opened:                        # never leave the click with no feedback
+				try:
+					Message("Open Glyphs › Settings › Color Flow.", title="AZ Colorflow")
+				except Exception:
+					pass
 
 		def focusColor_(self, color_key) -> None:
 			# Toggle the spotlight colour (click a legend swatch): the bars dim every
@@ -2957,19 +2989,19 @@ def _open_preferences_pane() -> None:
 	if hub is not None and hub.respondsToSelector_(b"showSettingsPaneWithIdentifier:"):
 		try:
 			hub.showSettingsPaneWithIdentifier_(COLORFLOW_PREF_IDENTIFIER)
-			return
+			return True
 		except Exception:
 			pass  # fall through to the direct jump
 	delegate = _app_delegate()
 	if delegate is None:
-		return
+		return False
 	# Solo-registered pane (no hub): its top-level identifier is our own.
 	# respondsToSelector_, not hasattr/getattr: those scan the entire ObjC
 	# selector table on the bridged delegate when the method is missing.
 	if delegate.respondsToSelector_(b"showMainPreferencesWithIdentifier:"):
 		try:
 			delegate.showMainPreferencesWithIdentifier_(COLORFLOW_PREF_IDENTIFIER)
-			return
+			return True
 		except Exception:
 			pass  # fall through to a plain Settings open
 	for selector in (b"showMainPreferences:", b"showPreferencesPanel:",
@@ -2977,9 +3009,10 @@ def _open_preferences_pane() -> None:
 		try:
 			if delegate.respondsToSelector_(selector):
 				delegate.performSelector_withObject_(selector, None)
-				return
+				return True
 		except Exception:
 			continue
+	return False
 
 
 # Borderless layer-backed button with a hover effect — brightens its fill while

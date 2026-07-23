@@ -959,9 +959,10 @@ def test_coverage_sidebar_tab_icon_uses_sf_symbol() -> None:
 
 
 def test_coverage_sidebar_value_percent_toggle() -> None:
-    # A real ON/OFF switch (NSSwitch) flips bar labels between total and % filled.
+    # A real, small ON/OFF switch (NSSwitch, mini) flips labels between total and %.
     block = _sidebar_block()
     assert "NSSwitch" in block
+    assert "NSControlSizeMini" in block                    # shrunk
     assert 'switch.setAction_("toggleValueMode:")' in block
     assert "def toggleValueMode_(self, sender" in block
     assert "sender.state() == on_state" in block
@@ -970,9 +971,11 @@ def test_coverage_sidebar_value_percent_toggle() -> None:
 
 
 def test_coverage_sidebar_has_color_legend() -> None:
-    # A bottom-pinned, titleless 3-column legend grid lists each workflow colour.
+    # A bottom-pinned, titleless 2-column legend grid of pill swatches, with a bottom margin.
     assert "class _AZLegendView(AppKit.NSView)" in PLUGIN_SOURCE
-    assert "_COV_LEGEND_COLS = 3" in PLUGIN_SOURCE
+    assert "_COV_LEGEND_COLS = 2" in PLUGIN_SOURCE
+    assert "_COV_LEGEND_BOTTOM" in PLUGIN_SOURCE            # margin below the legend card
+    assert "swatch, sw_h / 2.0, sw_h / 2.0" in PLUGIN_SOURCE   # pill swatch
     assert "def heightForWidth_(self" in PLUGIN_SOURCE
     assert "NSViewMaxYMargin" in _sidebar_block()          # legend pinned to the bottom
     assert '"COLORS"' not in PLUGIN_SOURCE                 # no title on the legend card
