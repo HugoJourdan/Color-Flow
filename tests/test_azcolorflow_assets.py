@@ -152,20 +152,6 @@ def test_build_html_has_tower_master_navigator() -> None:
     assert '"wheel"' in html                          # scroll reveals the rest
 
 
-def test_sidebar_coverage_render_path() -> None:
-    # window.__cfdSidebar (set by the Edit-view left tab at document start) makes
-    # init() render a coverage-only view: category + script stacked colour bars.
-    js = assets.DASHBOARD_JS
-    assert 'if (window.__cfdSidebar === "coverage"){ renderSidebarCoverage(); return; }' in js
-    assert "function renderSidebarCoverage(" in js
-    assert "function scriptCoverageBody(" in js          # scripts reuse the cov-bar, not the blend grid
-    assert 'covStacked(r)' in js.split("function scriptCoverageBody(", 1)[1][:800]
-    # Both sections built from the shared coverage row helpers.
-    body = js.split("function renderSidebarCoverage(", 1)[1][:600]
-    assert "categoryCoverageBody()" in body and "scriptCoverageBody()" in body
-    assert 'id="cfd-cover"' in body
-
-
 def test_dashboard_js_tower_is_hidpi_aware() -> None:
     js = assets.DASHBOARD_JS
     assert "devicePixelRatio" in js                       # supersample by the display's DPR

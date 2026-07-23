@@ -592,64 +592,142 @@ def _show_report_window(path) -> bool:
 
 
 # ---------------------------------------------------------------------------- #
-#  Glyphs 4 Edit-view left-sidebar tab: category + script colour bars
+#  Glyphs 4 Edit-view left-sidebar tab: native category + script colour bars
 # ---------------------------------------------------------------------------- #
 
-# The report itself renders a coverage-only view (category + script colour bars,
-# nothing else) when window.__cfdSidebar is set at document start; this CSS just
-# fits that #cfd-cover block to the narrow sidebar — kill the page's centred
-# max-width wrapper and body padding, fill height, scroll, and rein in the row
-# name column so the bars get the width.
-_SIDEBAR_COVERAGE_CSS = (
-	"@media screen {"
-	" html, body { height: 100%; margin: 0; padding: 0 !important; min-width: 0 !important;"
-	" overflow: hidden !important; }"
-	" #cfd-app { max-width: none !important; height: 100% !important; margin: 0 !important;"
-	" padding: 0 !important; display: block !important; }"
-	" #cfd-cover { box-sizing: border-box; height: 100%; overflow-y: auto; padding: 10px 12px; }"
-	" #cfd-cover .cov-sec { margin: 0 0 14px; }"
-	" #cfd-cover .cov-h { margin: 4px 0; }"
-	" #cfd-cover .cov-title { text-transform: uppercase; letter-spacing: .08em; font-size: var(--fs-xs); }"
-	" #cfd-cover .cov-row { gap: 8px; }"
-	" #cfd-cover .cov-name { width: auto; max-width: 42%; }"
-	" #cfd-cover .num { min-width: 0; }"
-	"}"
-)
-_SIDEBAR_COVERAGE_SCRIPT = (
-	"var azcfCover = document.createElement('style');"
-	f" azcfCover.textContent = {_SIDEBAR_COVERAGE_CSS!r};"
-	" document.head.appendChild(azcfCover);"
-)
+# Layout metrics for the custom-drawn coverage list (points).
+_COV_PAD = 12.0
+_COV_TOP = 10.0
+_COV_HEADER_H = 22.0
+_COV_ROW_H = 26.0
+_COV_SEC_GAP = 10.0
+_COV_NAME_W = 84.0
+_COV_COUNT_W = 30.0
+_COV_GAP = 8.0
+_COV_BAR_H = 10.0
+_NS_ALIGN_LEFT = getattr(AppKit, "NSTextAlignmentLeft", 0)
+_NS_ALIGN_RIGHT = getattr(AppKit, "NSTextAlignmentRight", 2)   # 10.12+ raw value
+_NS_TRUNCATE_TAIL = getattr(AppKit, "NSLineBreakByTruncatingTail", 4)
+
+
+class _AZCoverageBarsView(AppKit.NSView):
+	"""Flipped, custom-drawn list: a section header per grouping and, per group,
+	a name + a stacked colour bar (each label colour proportional to how many of
+	the group's glyphs carry it, the remainder left as the track = uncoloured) +
+	a glyph count. Semantic NSColors so it tracks the sidebar's light/dark theme.
+	Data is a list of ``(title, [(name, count, [(fraction, rgba), ...]), ...])``."""
+
+	def isFlipped(self) -> bool:
+		return True
+
+	@objc.python_method
+	def setData_colors_(self, sections: Any, colors: Any) -> None:
+		self._sections = sections or []
+		self.setNeedsDisplay_(True)
+
+	@objc.python_method
+	def contentHeight(self) -> float:
+		sections = getattr(self, "_sections", None) or []
+		if not sections:
+			return 80.0
+		height = _COV_TOP
+		for _title, rows in sections:
+			height += _COV_HEADER_H + _COV_ROW_H * len(rows) + _COV_SEC_GAP
+		return height + _COV_PAD
+
+	@objc.python_method
+	def _draw_text(self, text: str, rect: Any, size: float, color: Any,
+	               bold: bool = False, align: int = _NS_ALIGN_LEFT) -> None:
+		style = AppKit.NSMutableParagraphStyle.alloc().init()
+		style.setAlignment_(align)
+		style.setLineBreakMode_(_NS_TRUNCATE_TAIL)
+		font = AppKit.NSFont.boldSystemFontOfSize_(size) if bold else AppKit.NSFont.systemFontOfSize_(size)
+		attrs = {
+			AppKit.NSFontAttributeName: font,
+			AppKit.NSForegroundColorAttributeName: color,
+			AppKit.NSParagraphStyleAttributeName: style,
+		}
+		AppKit.NSAttributedString.alloc().initWithString_attributes_(text, attrs).drawInRect_(rect)
+
+	@objc.python_method
+	def _draw_bar(self, rect: Any, segs: Any) -> None:
+		radius = rect.size.height / 2.0
+		track = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, radius, radius)
+		AppKit.NSColor.quaternaryLabelColor().set()
+		track.fill()
+		if not segs:
+			return
+		context = AppKit.NSGraphicsContext.currentContext()
+		context.saveGraphicsState()
+		track.addClip()                       # rounds the outer corners; segments fill flat inside
+		x = rect.origin.x
+		for fraction, rgba in segs:
+			width = fraction * rect.size.width
+			if width <= 0.0:
+				continue
+			AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(rgba[0], rgba[1], rgba[2], 1.0).set()
+			# +0.5 overlap so neighbouring segments leave no hairline seam.
+			AppKit.NSBezierPath.bezierPathWithRect_(
+				AppKit.NSMakeRect(x, rect.origin.y, width + 0.5, rect.size.height)).fill()
+			x += width
+		context.restoreGraphicsState()
+
+	def drawRect_(self, dirtyRect: Any) -> None:
+		bounds = self.bounds()
+		width = bounds.size.width
+		sections = getattr(self, "_sections", None) or []
+		if not sections:
+			self._draw_text("No glyphs to show.",
+			                AppKit.NSMakeRect(_COV_PAD, bounds.size.height / 2.0 - 9.0,
+			                                  width - 2 * _COV_PAD, 18.0),
+			                12.0, AppKit.NSColor.secondaryLabelColor())
+			return
+		y = _COV_TOP
+		for title, rows in sections:
+			self._draw_text(title.upper(),
+			                AppKit.NSMakeRect(_COV_PAD, y + 4.0, width - 2 * _COV_PAD, _COV_HEADER_H),
+			                11.0, AppKit.NSColor.secondaryLabelColor(), bold=True)
+			y += _COV_HEADER_H
+			for name, count, segs in rows:
+				self._draw_text(name, AppKit.NSMakeRect(_COV_PAD, y + 5.0, _COV_NAME_W, 16.0),
+				                11.5, AppKit.NSColor.labelColor())
+				self._draw_text(str(count),
+				                AppKit.NSMakeRect(width - _COV_PAD - _COV_COUNT_W, y + 5.0, _COV_COUNT_W, 16.0),
+				                11.0, AppKit.NSColor.tertiaryLabelColor(), align=_NS_ALIGN_RIGHT)
+				bar_x = _COV_PAD + _COV_NAME_W + _COV_GAP
+				bar_w = max(10.0, width - _COV_PAD - _COV_COUNT_W - _COV_GAP - bar_x)
+				bar_y = y + (_COV_ROW_H - _COV_BAR_H) / 2.0
+				self._draw_bar(AppKit.NSMakeRect(bar_x, bar_y, bar_w, _COV_BAR_H), segs)
+				y += _COV_ROW_H
+			y += _COV_SEC_GAP
+
 
 _SIDEBAR_REGISTERED = False
 
 
-def _register_tower_sidebar() -> None:
+def _register_coverage_sidebar() -> None:
 	"""Register the Edit-view left-sidebar tab (Glyphs 4 only, once per session)."""
 	global _SIDEBAR_REGISTERED
-	if _SIDEBAR_REGISTERED or AZColorflowTowerSidebar is None or WebKit is None:
+	if _SIDEBAR_REGISTERED or AZColorflowCoverageSidebar is None:
 		return
 	handler = objc.lookUpClass("GSCallbackHandler")
 	if not handler.respondsToSelector_(b"addEditViewLeftSidebarController:"):
 		return                                    # Glyphs 3: no left-sidebar API
-	handler.addEditViewLeftSidebarController_(AZColorflowTowerSidebar)
+	handler.addEditViewLeftSidebarController_(AZColorflowCoverageSidebar)
 	_SIDEBAR_REGISTERED = True
 
 
 # The class only exists on Glyphs 4: Glyphs' registration check is
 # conformsToProtocol:, PyObjC conformance must be declared at class creation
 # (protocols=), and protocolNamed raises where the protocol doesn't exist.
-AZColorflowTowerSidebar = None
+AZColorflowCoverageSidebar = None
 try:
 	_SIDEBAR_PROTOCOL = objc.protocolNamed("GSEditViewSidebarControllerProtocol")
 
-	class AZColorflowTowerSidebar(AppKit.NSViewController, protocols=[_SIDEBAR_PROTOCOL]):
-		"""Edit-view left-sidebar tab showing colour bars per category and script.
-
-		Hosts the real report HTML (built with the NoGlyphSVG light flag — the
-		bars need no per-glyph outlines) in a WKWebView; window.__cfdSidebar makes
-		the report render a coverage-only view (category + script stacked colour
-		bars, nothing else). Glyphs instantiates one controller per Edit view."""
+	class AZColorflowCoverageSidebar(AppKit.NSViewController, protocols=[_SIDEBAR_PROTOCOL]):
+		"""Edit-view left-sidebar tab: native colour bars per category and per
+		script for the SELECTED master, refreshed live as the master or a glyph
+		colour changes. Pure AppKit — no WebView. One controller per Edit view."""
 
 		@classmethod
 		def title(cls) -> str:
@@ -660,7 +738,7 @@ try:
 			ctor = getattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_", None)
 			if ctor is None:
 				return None
-			for name in ("chart.pie", "circle.grid.2x2"):
+			for name in ("chart.bar.fill", "chart.pie", "circle.grid.2x2"):
 				image = ctor(name, "AZ Colorflow")
 				if image is not None:
 					image.setTemplate_(True)   # tint like the native tab icons
@@ -677,38 +755,68 @@ try:
 			return getattr(self, "_controller", None)
 
 		def loadView(self) -> None:
-			rect = AppKit.NSMakeRect(0, 0, 280, 600)
-			container = AppKit.NSView.alloc().initWithFrame_(rect)
-			config = WebKit.WKWebViewConfiguration.alloc().init()
-			# Document START flags, both read once at boot: reduced-motion (the
-			# sidebar lives on screen all day — no animation ever forces continuous
-			# compositor commits through Glyphs' main thread) and the coverage-only
-			# render mode (category + script colour bars, nothing else).
-			calm = WebKit.WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
-				"window.__cfdNoAnim = true; window.__cfdSidebar = 'coverage';", 0, True)
-			config.userContentController().addUserScript_(calm)
-			script = WebKit.WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
-				_SIDEBAR_COVERAGE_SCRIPT, 1, True)   # 1 = WKUserScriptInjectionTimeAtDocumentEnd
-			config.userContentController().addUserScript_(script)
-			webview = WebKit.WKWebView.alloc().initWithFrame_configuration_(rect, config)
-			webview.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
-			container.addSubview_(webview)
-			refresh = AppKit.NSButton.buttonWithTitle_target_action_("↻", self, "refreshTower:")
-			refresh.setBezelStyle_(AppKit.NSBezelStyleCircular)
-			refresh.setFrame_(AppKit.NSMakeRect(rect.size.width - 32, rect.size.height - 32, 26, 26))
-			refresh.setAutoresizingMask_(AppKit.NSViewMinXMargin | AppKit.NSViewMinYMargin)
-			container.addSubview_(refresh)
-			self._webview = webview
-			self._loaded = False
-			self.setView_(container)
+			rect = AppKit.NSMakeRect(0, 0, 260, 600)
+			scroll = AppKit.NSScrollView.alloc().initWithFrame_(rect)
+			scroll.setHasVerticalScroller_(True)
+			scroll.setDrawsBackground_(False)     # let the native sidebar background show through
+			scroll.setAutohidesScrollers_(True)
+			scroll.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
+			doc = _AZCoverageBarsView.alloc().initWithFrame_(
+				AppKit.NSMakeRect(0, 0, rect.size.width, rect.size.height))
+			doc.setAutoresizingMask_(AppKit.NSViewWidthSizable)   # follow the clip width; height set on data
+			scroll.setDocumentView_(doc)
+			self._doc = doc
+			self._scroll = scroll
+			self._sig = None
+			self._lastMaster = None
+			self._registered = False
+			self.setView_(scroll)
 
 		def viewDidAppear(self) -> None:
-			objc.super(AZColorflowTowerSidebar, self).viewDidAppear()
-			if not getattr(self, "_loaded", False):
-				self._build_and_load()
+			objc.super(AZColorflowCoverageSidebar, self).viewDidAppear()
+			if not getattr(self, "_registered", False):
+				try:
+					Glyphs.addCallback(self.refreshInterface, UPDATEINTERFACE)
+					self._registered = True
+				except Exception:
+					pass
+			self._rebuild()
 
-		def refreshTower_(self, sender) -> None:
-			self._build_and_load()
+		def viewDidDisappear(self) -> None:
+			objc.super(AZColorflowCoverageSidebar, self).viewDidDisappear()
+			if getattr(self, "_registered", False):
+				try:
+					Glyphs.removeCallback(self.refreshInterface, UPDATEINTERFACE)
+				except Exception:
+					pass
+				self._registered = False
+			try:
+				NSObject.cancelPreviousPerformRequestsWithTarget_selector_object_(self, "coverageRebuild:", None)
+			except Exception:
+				pass
+
+		# UPDATEINTERFACE fires constantly. A master switch is cheap to detect
+		# (no glyph walk) -> refresh instantly; anything else (a colour edit)
+		# coalesces into one debounced rebuild after the churn settles.
+		@objc.python_method
+		def refreshInterface(self, sender) -> None:
+			try:
+				font = self._sidebar_font()
+				master_id = str(font.selectedFontMaster.id) if font is not None else None
+			except Exception:
+				master_id = None
+			if master_id != getattr(self, "_lastMaster", None):
+				self._lastMaster = master_id
+				self._rebuild()
+				return
+			try:
+				NSObject.cancelPreviousPerformRequestsWithTarget_selector_object_(self, "coverageRebuild:", None)
+				self.performSelector_withObject_afterDelay_("coverageRebuild:", None, 0.12)
+			except Exception:
+				self._rebuild()
+
+		def coverageRebuild_(self, sender) -> None:
+			self._rebuild()
 
 		@objc.python_method
 		def _sidebar_font(self) -> Any:
@@ -721,38 +829,83 @@ try:
 			return Glyphs.font
 
 		@objc.python_method
-		def _build_and_load(self) -> None:
+		def _sections_from(self, data: dict, colors: Any) -> list:
+			order = data.get("order", [])
+
+			def build(coverage, drop_other):
+				rows = []
+				for row in coverage:
+					if drop_other and row.get("key") == "Other":
+						continue
+					total = row.get("total") or 0
+					if total <= 0:
+						continue
+					dist = row.get("dist") or {}
+					segs = []
+					for color_key in order:
+						count = dist.get(color_key, 0)
+						if not count:
+							continue
+						index = int(color_key)
+						if 0 <= index < len(colors):
+							segs.append((count / total, tuple(colors[index])))
+					rows.append((row.get("label") or row.get("key") or "?", total, segs))
+				return rows
+
+			sections = []
+			cats = build(data.get("byCategory", []), False)
+			if cats:
+				sections.append(("Category", cats))
+			scripts = build(data.get("byScript", []), True)   # skip the "Other" catch-all bucket
+			if scripts:
+				sections.append(("Script", scripts))
+			return sections
+
+		@objc.python_method
+		def _signature(self, sections: Any, colors: Any) -> tuple:
+			return (
+				tuple(tuple(round(float(component), 4) for component in rgba) for rgba in colors),
+				tuple((title, tuple((name, count, tuple(round(fraction, 5) for fraction, _ in segs))
+				                    for name, count, segs in rows))
+				      for title, rows in sections),
+			)
+
+		@objc.python_method
+		def _rebuild(self) -> None:
+			doc = getattr(self, "_doc", None)
+			if doc is None:
+				return
 			try:
-				import azcolorflow_dashboard
 				font = self._sidebar_font()
 				if font is None:
+					sections, colors = [], []
+				else:
+					import azcolorflow_dashboard
+					data = azcolorflow_dashboard.coverage_rows_for_master(font)
+					self._lastMaster = data.get("master_id")
+					colors = labelcolors.read_label_colors()
+					sections = self._sections_from(data, colors)
+				signature = self._signature(sections, colors)
+				if signature == getattr(self, "_sig", None):
 					return
-				# Light build: skip per-glyph SVG extraction — the tower doesn't
-				# need it. Restore the user's own flag state afterwards.
-				key = azcolorflow_dashboard.NO_GLYPH_SVG_KEY
-				old = Glyphs.defaults[key]
-				Glyphs.defaults[key] = True
-				try:
-					path = azcolorflow_dashboard.main(font, open_when_done=False)
-				finally:
-					try:
-						if old is None:
-							del Glyphs.defaults[key]
-						else:
-							Glyphs.defaults[key] = old
-					except Exception:
-						pass
-				if path is None:
-					return
-				file_url = AppKit.NSURL.fileURLWithPath_(str(path))
-				access = AppKit.NSURL.fileURLWithPath_(str(Path(str(path)).parent))
-				self._webview.loadFileURL_allowingReadAccessToURL_(file_url, access)
-				self._loaded = True
+				self._sig = signature
+				doc.setData_colors_(sections, colors)
+				self._resize_doc()
 			except Exception:
 				import traceback
-				print("AZ Colorflow [tower sidebar] error:\n" + traceback.format_exc())
+				print("AZ Colorflow [coverage sidebar] error:\n" + traceback.format_exc())
+
+		@objc.python_method
+		def _resize_doc(self) -> None:
+			doc = getattr(self, "_doc", None)
+			scroll = getattr(self, "_scroll", None)
+			if doc is None or scroll is None:
+				return
+			clip = scroll.contentView().bounds().size
+			height = max(doc.contentHeight(), clip.height)   # fill at least the clip so the bg is clean
+			doc.setFrame_(AppKit.NSMakeRect(0, 0, clip.width, height))
 except Exception:
-	AZColorflowTowerSidebar = None
+	AZColorflowCoverageSidebar = None
 
 # Shared bootstrap entitlement (Gate). The native "Jump to next" shortcut fires
 # the module-level handler, which has no palette instance, so the licence gate is
@@ -2498,13 +2651,13 @@ class AZColorflow(PalettePlugin):
 			import traceback
 			print("AZ Colorflow [prefs pane] error:\n" + traceback.format_exc())
 
-		# Glyphs 4 Edit-view left sidebar: the report's disc tower (module-level
-		# once-per-session guard; silently unavailable on Glyphs 3 / no WebKit).
+		# Glyphs 4 Edit-view left sidebar: native category + script colour bars
+		# (module-level once-per-session guard; silently unavailable on Glyphs 3).
 		try:
-			_register_tower_sidebar()
+			_register_coverage_sidebar()
 		except Exception:
 			import traceback
-			print("AZ Colorflow [tower sidebar] error:\n" + traceback.format_exc())
+			print("AZ Colorflow [coverage sidebar] error:\n" + traceback.format_exc())
 
 		# Observe edits made in the global Settings pane so THIS palette refreshes live.
 		try:

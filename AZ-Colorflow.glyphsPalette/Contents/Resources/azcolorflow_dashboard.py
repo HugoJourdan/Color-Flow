@@ -1154,6 +1154,44 @@ def build_coverage(font, current: dict, order: list[str]) -> dict:
     }
 
 
+def coverage_rows_for_master(font, master_id: str | None = None) -> dict:
+    """Category + script colour-distribution rows for ONE master — the data behind
+    the native Edit-view sidebar. Lean twin of :func:`build_coverage`: a single
+    master's snapshot, no history, no ``scriptMeta`` (no per-glyph outline walk),
+    so it is cheap enough to recompute when the selected master or a colour
+    changes. ``master_id`` ``None`` -> the font's selected master.
+
+    Each row is ``{key, total, uncolored, dist, ...}`` (same shape as
+    ``build_coverage``'s rows, largest group first). ``dist`` is
+    ``{colorKey: count}`` over the *coloured* glyphs; ``order`` is the workflow
+    key order and ``labels`` maps each key to its display name."""
+    meaning, none_label = _meaning_and_none(font)
+    order = list(meaning.keys())
+    if master_id is None:
+        try:
+            master_id = font.selectedFontMaster.id
+        except Exception:
+            master_id = font.masters[0].id if font.masters else None
+    per_glyph = {glyph.name: color_to_key(
+                     glyph.layers[master_id].color if glyph.layers[master_id] is not None else None)
+                 for glyph in font.glyphs} if master_id is not None else {}
+    current = {master_id: per_glyph}
+    cats = _coverage_for(current, _glyph_groups(font, "category"), order).get(master_id, [])
+    scripts = _coverage_for(current, _glyph_groups(font, "script"), order).get(master_id, [])
+    for row in cats:
+        row["label"] = row["key"]                       # categories are already human ("Letter")
+    for row in scripts:
+        row["label"] = _script_display(row["key"])      # "latin" -> "Latin"
+    return {
+        "master_id": master_id,
+        "order": [str(key) for key in order],
+        "labels": {str(key): label for key, label in meaning.items()},
+        "noneLabel": none_label,
+        "byCategory": cats,
+        "byScript": scripts,
+    }
+
+
 def _glyph_journeys(history: dict, dates: list, current: dict, glyph_names: list,
                     order: list, cap: int = 400) -> dict:
     """Per-master ``{glyph_name: [key_per_date]}`` for the heatmap drill-down

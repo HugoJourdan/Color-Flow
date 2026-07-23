@@ -845,47 +845,42 @@ def test_report_window_top_band_is_draggable_and_padded() -> None:
     assert "NSViewMinYMargin" in build
 
 
-def test_tower_sidebar_is_g4_gated_and_restores_the_light_flag() -> None:
+def _sidebar_block() -> str:
+    start = PLUGIN_SOURCE.index("class AZColorflowCoverageSidebar")
+    return PLUGIN_SOURCE[start : PLUGIN_SOURCE.index("\nexcept Exception:", start)]
+
+
+def test_coverage_sidebar_is_g4_gated_and_native() -> None:
     # The Edit-view left-sidebar tab must declare protocol conformance at class
     # creation (Glyphs' registration check is conformsToProtocol:), register the
     # CLASS via GSCallbackHandler, and be a no-op on Glyphs 3.
     assert 'objc.protocolNamed("GSEditViewSidebarControllerProtocol")' in PLUGIN_SOURCE
     assert "protocols=[_SIDEBAR_PROTOCOL]" in PLUGIN_SOURCE
-    register = _module_function_body("_register_tower_sidebar")
+    register = _module_function_body("_register_coverage_sidebar")
     assert 'respondsToSelector_(b"addEditViewLeftSidebarController:")' in register
-    assert "addEditViewLeftSidebarController_(AZColorflowTowerSidebar)" in register
-    # The sidebar build borrows the NoGlyphSVG light flag and must restore it.
-    build = _method_body("_build_and_load")
-    assert "NO_GLYPH_SVG_KEY" in build
-    assert "finally:" in build
-    # Coverage-only CSS fits the report's #cfd-cover block to the narrow sidebar.
-    assert "#cfd-cover" in _SIDEBAR_CSS_SOURCE()
-    assert "height: 100%" in _SIDEBAR_CSS_SOURCE()
+    assert "addEditViewLeftSidebarController_(AZColorflowCoverageSidebar)" in register
+    # Native, no WebView: a custom-drawn NSView + an NSScrollView, no WebKit.
+    block = _sidebar_block()
+    assert "class _AZCoverageBarsView(AppKit.NSView)" in PLUGIN_SOURCE
+    assert "def drawRect_(self, dirtyRect" in PLUGIN_SOURCE
+    assert "NSScrollView" in block
+    assert "WebKit" not in block and "WKWebView" not in block
 
 
-def _SIDEBAR_CSS_SOURCE() -> str:
-    start = PLUGIN_SOURCE.index("_SIDEBAR_COVERAGE_CSS")
-    return PLUGIN_SOURCE[start : PLUGIN_SOURCE.index("_SIDEBAR_REGISTERED", start)]
-
-
-def test_tower_sidebar_renders_coverage_only() -> None:
-    # The sidebar sets the coverage flag at document START; the report renders
-    # just the category + script colour bars (init() returns early on the flag).
-    assert "window.__cfdSidebar = 'coverage';" in PLUGIN_SOURCE
-    assert "_SIDEBAR_COVERAGE_SCRIPT" in PLUGIN_SOURCE
-    # No tower in the sidebar any more → the disc-click master handler is gone.
-    assert 'addScriptMessageHandler_name_(self, "azcfMaster")' not in PLUGIN_SOURCE
-    assert "def userContentController_didReceiveScriptMessage_" not in _method_sidebar_block()
-
-
-def _method_sidebar_block() -> str:
-    start = PLUGIN_SOURCE.index("class AZColorflowTowerSidebar")
-    return PLUGIN_SOURCE[start : PLUGIN_SOURCE.index("\nexcept Exception:", start)]
+def test_coverage_sidebar_follows_selected_master_live() -> None:
+    # Bars track the selected master: rebuild on UPDATEINTERFACE, master read from
+    # selectedFontMaster, data from the lean per-master helper; teardown removes
+    # the callback so a closed Edit view stops walking glyphs.
+    block = _sidebar_block()
+    assert "Glyphs.addCallback(self.refreshInterface, UPDATEINTERFACE)" in block
+    assert "Glyphs.removeCallback(self.refreshInterface, UPDATEINTERFACE)" in block
+    assert "selectedFontMaster.id" in block
+    assert "coverage_rows_for_master(font)" in block
+    # A master switch skips the debounce (instant); other churn coalesces.
+    assert 'performSelector_withObject_afterDelay_("coverageRebuild:", None' in block
 
 
 def test_hosted_report_never_spins_the_host_main_thread_needlessly() -> None:
-    # Sidebar: reduced-motion flag injected at document START (read once at init).
-    assert "window.__cfdNoAnim = true; window.__cfdSidebar = 'coverage';\", 0, True" in PLUGIN_SOURCE
     # Report window: spin paused whenever the window is not key or occluded.
     sync = _method_body("_sync_spin_state")
     assert "occlusionState" in sync

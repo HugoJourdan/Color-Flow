@@ -1043,6 +1043,32 @@ def test_build_coverage_emits_script_meta_with_representative_glyph() -> None:
     assert meta["Other"] == {"name": "Other", "glyph": "comma"}  # non-letter group falls to min cp
 
 
+def test_coverage_rows_for_master_follows_the_selected_master() -> None:
+    # The native sidebar's data source: one master's category + script bars, with
+    # prettified script labels — and a DIFFERENT master gives different bars.
+    letter_a = _FakeGlyph("A", {"m1": _FakeLayerColor(2), "m2": _FakeLayerColor(0)})
+    letter_b = _FakeGlyph("B", {"m1": _FakeLayerColor(0), "m2": _FakeLayerColor(None)})
+    comma = _FakeGlyph("comma", {"m1": _FakeLayerColor(2), "m2": _FakeLayerColor(2)})
+    for glyph, script, category in ((letter_a, "latin", "Letter"), (letter_b, "latin", "Letter"),
+                                    (comma, None, "Punctuation")):
+        glyph.script, glyph.category = script, category
+    font = _FakeFont([_FakeMaster("m1", "R"), _FakeMaster("m2", "B")], [letter_a, letter_b, comma])
+
+    data = db.coverage_rows_for_master(font, "m1")
+    assert data["master_id"] == "m1"
+    by_cat = {row["key"]: row for row in data["byCategory"]}
+    assert by_cat["Letter"]["total"] == 2
+    assert by_cat["Letter"]["dist"]["2"] == 1 and by_cat["Letter"]["dist"]["0"] == 1
+    assert by_cat["Letter"]["label"] == "Letter"            # categories pass through
+    by_script = {row["key"]: row for row in data["byScript"]}
+    assert by_script["latin"]["label"] == "Latin"           # scripts prettified
+
+    other = db.coverage_rows_for_master(font, "m2")
+    other_letter = {row["key"]: row for row in other["byCategory"]}["Letter"]
+    assert other_letter["dist"]["0"] == 1 and other_letter["dist"]["2"] == 0  # A=0, B uncoloured
+    assert other_letter["uncolored"] == 1
+
+
 class _FakeLayerColor:
     def __init__(self, color: int | None, width: float = 500.0) -> None:
         self.color = color
