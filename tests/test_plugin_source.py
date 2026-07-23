@@ -858,32 +858,34 @@ def test_tower_sidebar_is_g4_gated_and_restores_the_light_flag() -> None:
     build = _method_body("_build_and_load")
     assert "NO_GLYPH_SVG_KEY" in build
     assert "finally:" in build
-    # Tower-only CSS: everything except the tower chain is hidden, ancestors are
-    # stretched to full height, and fit() is re-run against the new layout.
-    assert ":not(:has(#cfd-tower)):not(#cfd-tower):not(#cfd-tower *)" in PLUGIN_SOURCE
+    # Coverage-only CSS fits the report's #cfd-cover block to the narrow sidebar.
+    assert "#cfd-cover" in _SIDEBAR_CSS_SOURCE()
     assert "height: 100%" in _SIDEBAR_CSS_SOURCE()
-    assert "window.dispatchEvent(new Event('resize'))" in PLUGIN_SOURCE
 
 
 def _SIDEBAR_CSS_SOURCE() -> str:
-    start = PLUGIN_SOURCE.index("_SIDEBAR_TOWER_CSS")
+    start = PLUGIN_SOURCE.index("_SIDEBAR_COVERAGE_CSS")
     return PLUGIN_SOURCE[start : PLUGIN_SOURCE.index("_SIDEBAR_REGISTERED", start)]
 
 
-def test_tower_sidebar_disc_click_switches_the_glyphs_master() -> None:
-    # The tower's notifyMaster hook posts the picked master id; the sidebar
-    # controller receives it and moves font.masterIndex to the matching master.
-    build = _method_body("loadView")
-    assert 'addScriptMessageHandler_name_(self, "azcfMaster")' in PLUGIN_SOURCE
-    handler_start = PLUGIN_SOURCE.index("azcfMaster: a disc was picked")
-    handler = PLUGIN_SOURCE[handler_start : PLUGIN_SOURCE.index("def _sidebar_font", handler_start)]
-    assert "font.masterIndex = index" in handler
-    assert build is not None
+def test_tower_sidebar_renders_coverage_only() -> None:
+    # The sidebar sets the coverage flag at document START; the report renders
+    # just the category + script colour bars (init() returns early on the flag).
+    assert "window.__cfdSidebar = 'coverage';" in PLUGIN_SOURCE
+    assert "_SIDEBAR_COVERAGE_SCRIPT" in PLUGIN_SOURCE
+    # No tower in the sidebar any more → the disc-click master handler is gone.
+    assert 'addScriptMessageHandler_name_(self, "azcfMaster")' not in PLUGIN_SOURCE
+    assert "def userContentController_didReceiveScriptMessage_" not in _method_sidebar_block()
+
+
+def _method_sidebar_block() -> str:
+    start = PLUGIN_SOURCE.index("class AZColorflowTowerSidebar")
+    return PLUGIN_SOURCE[start : PLUGIN_SOURCE.index("\nexcept Exception:", start)]
 
 
 def test_hosted_report_never_spins_the_host_main_thread_needlessly() -> None:
     # Sidebar: reduced-motion flag injected at document START (read once at init).
-    assert 'window.__cfdNoAnim = true;", 0, True' in PLUGIN_SOURCE
+    assert "window.__cfdNoAnim = true; window.__cfdSidebar = 'coverage';\", 0, True" in PLUGIN_SOURCE
     # Report window: spin paused whenever the window is not key or occluded.
     sync = _method_body("_sync_spin_state")
     assert "occlusionState" in sync

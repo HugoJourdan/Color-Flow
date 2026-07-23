@@ -592,32 +592,33 @@ def _show_report_window(path) -> bool:
 
 
 # ---------------------------------------------------------------------------- #
-#  Glyphs 4 Edit-view left-sidebar tab: the report's disc tower
+#  Glyphs 4 Edit-view left-sidebar tab: category + script colour bars
 # ---------------------------------------------------------------------------- #
 
-# Show ONLY the disc tower, full height: hide everything that is not the tower,
-# its subtree, or an ancestor of it, and stretch the surviving ancestor chain to
-# 100% so the tower's own fit() sizes the canvas to the whole sidebar (fit()
-# reads the aside's clientWidth + #cfd-main's clientHeight, supersamples for
-# HiDPI, and shows as many discs as fit — wheel scrolls the rest).
-_SIDEBAR_TOWER_CSS = (
+# The report itself renders a coverage-only view (category + script colour bars,
+# nothing else) when window.__cfdSidebar is set at document start; this CSS just
+# fits that #cfd-cover block to the narrow sidebar — kill the page's centred
+# max-width wrapper and body padding, fill height, scroll, and rein in the row
+# name column so the bars get the width.
+_SIDEBAR_COVERAGE_CSS = (
 	"@media screen {"
-	" body :not(:has(#cfd-tower)):not(#cfd-tower):not(#cfd-tower *) { display: none !important; }"
 	" html, body { height: 100%; margin: 0; padding: 0 !important; min-width: 0 !important;"
 	" overflow: hidden !important; }"
-	" body :has(#cfd-tower) { height: 100% !important; max-height: none !important;"
-	" padding: 0 !important; margin: 0 !important; }"
-	" #cfd-main { display: block !important; }"
-	" #cfd-tower { position: static !important; width: 100% !important; flex: none !important;"
-	" height: 100% !important; }"
+	" #cfd-app { max-width: none !important; height: 100% !important; margin: 0 !important;"
+	" padding: 0 !important; display: block !important; }"
+	" #cfd-cover { box-sizing: border-box; height: 100%; overflow-y: auto; padding: 10px 12px; }"
+	" #cfd-cover .cov-sec { margin: 0 0 14px; }"
+	" #cfd-cover .cov-h { margin: 4px 0; }"
+	" #cfd-cover .cov-title { text-transform: uppercase; letter-spacing: .08em; font-size: var(--fs-xs); }"
+	" #cfd-cover .cov-row { gap: 8px; }"
+	" #cfd-cover .cov-name { width: auto; max-width: 42%; }"
+	" #cfd-cover .num { min-width: 0; }"
 	"}"
 )
-_SIDEBAR_TOWER_SCRIPT = (
-	"var azcfTower = document.createElement('style');"
-	f" azcfTower.textContent = {_SIDEBAR_TOWER_CSS!r};"
-	" document.head.appendChild(azcfTower);"
-	# The tower's fit() already ran against the un-styled layout — re-run it.
-	" window.dispatchEvent(new Event('resize'));"
+_SIDEBAR_COVERAGE_SCRIPT = (
+	"var azcfCover = document.createElement('style');"
+	f" azcfCover.textContent = {_SIDEBAR_COVERAGE_CSS!r};"
+	" document.head.appendChild(azcfCover);"
 )
 
 _SIDEBAR_REGISTERED = False
@@ -643,12 +644,12 @@ try:
 	_SIDEBAR_PROTOCOL = objc.protocolNamed("GSEditViewSidebarControllerProtocol")
 
 	class AZColorflowTowerSidebar(AppKit.NSViewController, protocols=[_SIDEBAR_PROTOCOL]):
-		"""Edit-view left-sidebar tab showing the report's master disc tower.
+		"""Edit-view left-sidebar tab showing colour bars per category and script.
 
 		Hosts the real report HTML (built with the NoGlyphSVG light flag — the
-		tower needs no per-glyph outlines) in a WKWebView with tower-only CSS
-		injected, so the discs render exactly like the dashboard, clicks included.
-		Glyphs instantiates one controller per Edit view."""
+		bars need no per-glyph outlines) in a WKWebView; window.__cfdSidebar makes
+		the report render a coverage-only view (category + script stacked colour
+		bars, nothing else). Glyphs instantiates one controller per Edit view."""
 
 		@classmethod
 		def title(cls) -> str:
@@ -679,20 +680,16 @@ try:
 			rect = AppKit.NSMakeRect(0, 0, 280, 600)
 			container = AppKit.NSView.alloc().initWithFrame_(rect)
 			config = WebKit.WKWebViewConfiguration.alloc().init()
-			# The sidebar lives on screen all day: run the report in reduced-motion
-			# mode (no disc spin, no intro sweeps) so it never forces continuous
-			# compositor commits through Glyphs' main thread. Document START — the
-			# page reads the flag once at init.
+			# Document START flags, both read once at boot: reduced-motion (the
+			# sidebar lives on screen all day — no animation ever forces continuous
+			# compositor commits through Glyphs' main thread) and the coverage-only
+			# render mode (category + script colour bars, nothing else).
 			calm = WebKit.WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
-				"window.__cfdNoAnim = true;", 0, True)
+				"window.__cfdNoAnim = true; window.__cfdSidebar = 'coverage';", 0, True)
 			config.userContentController().addUserScript_(calm)
 			script = WebKit.WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
-				_SIDEBAR_TOWER_SCRIPT, 1, True)   # 1 = WKUserScriptInjectionTimeAtDocumentEnd
+				_SIDEBAR_COVERAGE_SCRIPT, 1, True)   # 1 = WKUserScriptInjectionTimeAtDocumentEnd
 			config.userContentController().addUserScript_(script)
-			# Disc picks post the master id (the tower's notifyMaster hook) — we
-			# switch the Glyphs master to match. Retains self via the controller;
-			# same accepted per-closed-Edit-view leak as the controller ref above.
-			config.userContentController().addScriptMessageHandler_name_(self, "azcfMaster")
 			webview = WebKit.WKWebView.alloc().initWithFrame_configuration_(rect, config)
 			webview.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
 			container.addSubview_(webview)
@@ -712,24 +709,6 @@ try:
 
 		def refreshTower_(self, sender) -> None:
 			self._build_and_load()
-
-		def userContentController_didReceiveScriptMessage_(self, controller, message) -> None:
-			# azcfMaster: a disc was picked in the tower — switch Glyphs' selected
-			# master for this font. Empty body = focus cleared, nothing to do.
-			try:
-				master_id = str(message.body() or "")
-				if not master_id:
-					return
-				font = self._sidebar_font()
-				if font is None:
-					return
-				for index, master in enumerate(font.masters):
-					if str(master.id) == master_id:
-						font.masterIndex = index
-						return
-			except Exception:
-				import traceback
-				print("AZ Colorflow [tower sidebar master] error:\n" + traceback.format_exc())
 
 		@objc.python_method
 		def _sidebar_font(self) -> Any:

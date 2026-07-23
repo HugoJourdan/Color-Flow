@@ -1598,6 +1598,33 @@ DASHBOARD_JS = r"""
     if (scripts.length <= 1) return "";
     return '<div class="ov-catcov"><div class="cov-h"><span class="cov-title">Colours set by script</span></div>'+scriptGrid()+'</div>';
   }
+  // ----- Sidebar-only view: category + script colour bars, nothing else.
+  //       The Edit-view left tab sets window.__cfdSidebar="coverage" at document
+  //       start; init() then renders just this instead of the full report. Scripts
+  //       reuse the SAME stacked cov-bar as categories (not the blend-card grid).
+  function scriptCoverageBody(){
+    var rows = scriptRows().filter(function(r){ return r.key !== "Other"; });
+    if (!rows.length) return '<p class="empty">No glyphs.</p>';
+    var meta = (H.coverage && H.coverage.scriptMeta) || {};
+    return rows.map(function(r){
+      var mm = meta[r.key] || {}, raw = mm.name || prettyScript(r.key);
+      var name = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : raw;
+      var count = (r.glyphs != null ? r.glyphs : r.total);
+      return '<div class="cov-row"><span class="cov-name" title="'+esc(name)+'">'+esc(name)+'</span>'
+        + covStacked(r) + '<span class="num">'+count+'</span></div>';
+    }).join("");
+  }
+  function renderSidebarCoverage(){
+    function sec(title, body){
+      return '<div class="cov-sec"><div class="cov-h"><span class="cov-title">'+title+'</span></div>'
+        + '<div class="cov-rows">'+body+'</div></div>';
+    }
+    var out = sec("Category", categoryCoverageBody());
+    if (scriptRows().filter(function(r){ return r.key !== "Other"; }).length) out += sec("Script", scriptCoverageBody());
+    document.getElementById("cfd-app").innerHTML = '<div id="cfd-cover">'+out+'</div>';
+    document.documentElement.setAttribute("data-theme", state.theme);
+    document.body.classList.add("ready");
+  }
   // ----- Timeline: completion over time, one line per master -----
   function masterHue(i){ return Math.round((i*137.508) % 360); }
   // ISO date "YYYY-MM-DD" -> short "D Mon" axis label (e.g. "7 Jun"). UTC-parsed
@@ -3735,6 +3762,7 @@ DASHBOARD_JS = r"""
   }
 
   function init(){
+    if (window.__cfdSidebar === "coverage"){ renderSidebarCoverage(); return; }
     document.getElementById("cfd-app").innerHTML =
       header() + toolbar()
       + '<div id="cfd-main"><aside id="cfd-tower" aria-label="Masters"><canvas id="cfd-tower-cv" width="240" height="560"></canvas></aside><div id="cfd-body"></div></div>'
