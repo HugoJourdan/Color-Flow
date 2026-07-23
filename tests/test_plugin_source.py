@@ -865,12 +865,14 @@ def test_coverage_sidebar_is_g4_gated_and_native() -> None:
     assert "def drawRect_(self, dirtyRect" in PLUGIN_SOURCE
     assert "NSScrollView" in block
     assert "WebKit" not in block and "WKWebView" not in block
-    # Visual polish on the custom view: a divider between the Category and Script
-    # sections, white + monospaced counts, and a hairline stroke around every bar.
-    assert "def _draw_separator(self" in PLUGIN_SOURCE
-    assert "index > 0:" in PLUGIN_SOURCE                             # separator only between sections
+    # Each section is an AZ-Dock-style card (rounded fill + border + darker band),
+    # with white + monospaced counts and a dark hairline stroke around every bar.
+    assert "def _draw_card(self" in PLUGIN_SOURCE
+    assert "_COV_CARD_RADIUS" in PLUGIN_SOURCE
+    assert "NSColor.blackColor().colorWithAlphaComponent_(0.15)" in PLUGIN_SOURCE   # darker header band
     assert "NSColor.whiteColor(), align=_NS_ALIGN_LEFT, mono=True" in PLUGIN_SOURCE
     assert "monospacedSystemFontOfSize_weight_" in PLUGIN_SOURCE
+    assert "NSColor.blackColor().colorWithAlphaComponent_(0.35)" in PLUGIN_SOURCE   # darker bar stroke
     assert "track.setLineWidth_(0.75)" in PLUGIN_SOURCE and "track.stroke()" in PLUGIN_SOURCE
 
 
@@ -889,12 +891,29 @@ def test_coverage_sidebar_follows_selected_master_live() -> None:
 
 def test_coverage_sidebar_categories_collapse_to_subcategories() -> None:
     # Category rows carry a sub-category breakdown (with_subs) and toggle open on
-    # click; a chevron marks the expandable rows and the view reflows its height.
+    # click; a disclosure triangle marks expandable rows, the view reflows height.
     assert "with_subs" in _sidebar_block()                          # controller attaches subRows
     assert "def mouseDown_(self, event" in PLUGIN_SOURCE
     assert "self._expanded" in PLUGIN_SOURCE
-    assert '"▾" if is_expanded else "▸"' in PLUGIN_SOURCE  # ▾ open / ▸ closed
+    assert "def _draw_disclosure(self" in PLUGIN_SOURCE and "is_expanded" in PLUGIN_SOURCE
     assert "def _reflow(self" in PLUGIN_SOURCE and "self.setFrameSize_" in PLUGIN_SOURCE
+
+
+def test_coverage_sidebar_double_click_shows_layers() -> None:
+    # Double-clicking a colour segment opens that group+colour's glyphs into the
+    # current tab; single click (left of the bar) still toggles the collapse.
+    assert "def _show_group_color_layers(" in PLUGIN_SOURCE
+    assert "tab.layers = layers" in PLUGIN_SOURCE
+    assert "event.clickCount() >= 2" in PLUGIN_SOURCE
+    assert "self._seg_hits" in PLUGIN_SOURCE
+    assert "_show_group_color_layers(Glyphs.font" in PLUGIN_SOURCE
+
+
+def test_coverage_sidebar_tab_icon_is_a_disc_ring() -> None:
+    # The tab icon is a drawn disc-with-hole (ring) template, echoing the tower disc.
+    tab_image = _method_body("tabBarImage")
+    assert "bezierPathWithOvalInRect_" in tab_image
+    assert "setTemplate_(True)" in tab_image
 
 
 def test_hosted_report_never_spins_the_host_main_thread_needlessly() -> None:

@@ -595,18 +595,22 @@ def _show_report_window(path) -> bool:
 #  Glyphs 4 Edit-view left-sidebar tab: native category + script colour bars
 # ---------------------------------------------------------------------------- #
 
-# Layout metrics for the custom-drawn coverage list (points).
-_COV_PAD = 12.0
+# Layout metrics for the custom-drawn coverage list (points). Each section is an
+# AZ-Dock-style card: rounded fill + border, a darker header band, rows inside.
+_COV_PAD = 12.0           # outer margin around the cards
 _COV_TOP = 10.0
-_COV_HEADER_H = 22.0
+_COV_BAND_H = 24.0        # card header band (holds the section title)
 _COV_ROW_H = 22.0
 _COV_SUB_ROW_H = 20.0
-_COV_SEC_GAP = 10.0
-_COV_NAME_W = 84.0
-_COV_COUNT_W = 30.0
+_COV_CARD_GAP = 10.0      # vertical gap between cards
+_COV_CARD_PADX = 8.0      # inner horizontal padding inside a card
+_COV_CARD_PADY = 6.0      # inner vertical padding (below band / above bottom)
+_COV_CARD_RADIUS = 8.0
+_COV_NAME_W = 96.0        # wider name column
+_COV_COUNT_W = 34.0       # wider value column
 _COV_GAP = 8.0
 _COV_BAR_H = 10.0
-_COV_NAME_INDENT = 14.0   # chevron gutter — all top-level names share it, expandable or not
+_COV_NAME_INDENT = 14.0   # disclosure gutter — all top-level names share it
 _COV_SUB_INDENT = 26.0    # sub-category rows indent past the gutter
 _NS_ALIGN_LEFT = getattr(AppKit, "NSTextAlignmentLeft", 0)
 _NS_ALIGN_RIGHT = getattr(AppKit, "NSTextAlignmentRight", 2)   # 10.12+ raw value
@@ -614,14 +618,51 @@ _NS_TRUNCATE_TAIL = getattr(AppKit, "NSLineBreakByTruncatingTail", 4)
 _NS_FONT_WEIGHT_REGULAR = getattr(AppKit, "NSFontWeightRegular", 0.0)
 
 
+def _show_group_color_layers(font: Any, kind: str, group_key: str,
+                             sub_key: Any, color_key: Any) -> None:
+	"""Double-click action: open every glyph in ``group_key`` (a category, one of
+	its sub-categories, or a script) whose SELECTED-master layer carries
+	``color_key`` into the current Edit tab. No-op when nothing matches."""
+	if font is None:
+		return
+	try:
+		master_id = font.selectedFontMaster.id
+		target = int(color_key)
+	except (AttributeError, TypeError, ValueError):
+		return
+	layers = []
+	for glyph in font.glyphs:
+		if kind == "script":
+			if str(getattr(glyph, "script", None) or "Other") != group_key:
+				continue
+		else:
+			if str(getattr(glyph, "category", None) or "Other") != group_key:
+				continue
+			if kind == "subcategory" and str(getattr(glyph, "subCategory", None) or "Other") != sub_key:
+				continue
+		layer = glyph.layers[master_id]
+		color = layer.color if layer is not None else None
+		if (-1 if color is None else int(color)) == target and layer is not None:
+			layers.append(layer)
+	if not layers:
+		return
+	tab = font.currentTab or font.newTab()
+	try:
+		tab.layers = layers
+	except Exception:
+		tab.text = "/" + "/".join(layer.parent.name for layer in layers if layer.parent is not None)
+
+
 class _AZCoverageBarsView(AppKit.NSView):
-	"""Flipped, custom-drawn coverage list. A section header per grouping and, per
-	group, a name + a stacked colour bar (each label colour proportional to how
-	many of the group's glyphs carry it, the remainder = track = uncoloured) + a
-	glyph count. Category rows that have a sub-category breakdown are collapsible:
-	a chevron, and clicking the row toggles its indented sub-rows. Each row is
-	``(name, count, segs, key, subrows)`` where ``subrows`` is
-	``[(name, count, segs), ...]`` (empty -> not expandable)."""
+	"""Flipped, custom-drawn coverage list. Each grouping is an AZ-Dock-style card
+	(rounded fill + border + a darker header band) holding, per group, a name + a
+	stacked colour bar (each label colour proportional to how many of the group's
+	glyphs carry it; remainder = track = uncoloured) + a glyph count. Category rows
+	with a sub-category breakdown collapse: a disclosure triangle, click the left
+	of the row to toggle its indented sub-rows. Double-click a colour segment to
+	open its glyphs in the current tab. Rows are
+	``(name, count, segs, key, subrows, kind)``; segs are ``(fraction, rgba, colorKey)``;
+	subrows are ``(name, count, segs, subKey)``."""
 
 	def initWithFrame_(self, frame: Any) -> Any:
 		self = objc.super(_AZCoverageBarsView, self).initWithFrame_(frame)
@@ -629,19 +670,29 @@ class _AZCoverageBarsView(AppKit.NSView):
 			return None
 		self._sections = []
 		self._expanded = set()
-		self._hits = []                       # [(key, top, bottom)] for expandable category rows
+		self._toggle_hits = []                # [(key, top, bottom, bar_x)] — click left of bar toggles
+		self._seg_hits = []                   # [(x0, x1, top, bottom, kind, group, sub, colorKey)]
 		return self
 
 	def isFlipped(self) -> bool:
 		return True
 
 	def acceptsFirstMouse_(self, event: Any) -> bool:
-		return True                           # toggle even when the sidebar isn't the key view
+		return True                           # act even when the sidebar isn't the key view
 
 	@objc.python_method
 	def setData_colors_(self, sections: Any, colors: Any) -> None:
 		self._sections = sections or []
 		self.setNeedsDisplay_(True)
+
+	@objc.python_method
+	def _card_height(self, rows: Any, expanded: Any) -> float:
+		rows_h = 0.0
+		for _name, _count, _segs, key, subs, _kind in rows:
+			rows_h += _COV_ROW_H
+			if subs and key in expanded:
+				rows_h += _COV_SUB_ROW_H * len(subs)
+		return _COV_BAND_H + _COV_CARD_PADY + rows_h + _COV_CARD_PADY
 
 	@objc.python_method
 	def contentHeight(self) -> float:
@@ -651,13 +702,8 @@ class _AZCoverageBarsView(AppKit.NSView):
 		expanded = getattr(self, "_expanded", None) or set()
 		height = _COV_TOP
 		for _title, rows in sections:
-			height += _COV_HEADER_H
-			for _name, _count, _segs, key, subs in rows:
-				height += _COV_ROW_H
-				if subs and key in expanded:
-					height += _COV_SUB_ROW_H * len(subs)
-			height += _COV_SEC_GAP
-		return height + _COV_PAD
+			height += self._card_height(rows, expanded) + _COV_CARD_GAP
+		return height + _COV_TOP - _COV_CARD_GAP
 
 	@objc.python_method
 	def _draw_text(self, text: str, rect: Any, size: float, color: Any,
@@ -680,22 +726,51 @@ class _AZCoverageBarsView(AppKit.NSView):
 		AppKit.NSAttributedString.alloc().initWithString_attributes_(text, attrs).drawInRect_(rect)
 
 	@objc.python_method
-	def _draw_separator(self, rect: Any) -> None:
-		AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.2).set()
-		AppKit.NSBezierPath.bezierPathWithRect_(rect).fill()
+	def _draw_card(self, rect: Any) -> None:
+		card = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+			rect, _COV_CARD_RADIUS, _COV_CARD_RADIUS)
+		AppKit.NSColor.quaternaryLabelColor().set()
+		card.fill()
+		context = AppKit.NSGraphicsContext.currentContext()
+		context.saveGraphicsState()
+		card.addClip()                        # darker header band, top corners rounded by the clip
+		AppKit.NSColor.blackColor().colorWithAlphaComponent_(0.15).set()
+		AppKit.NSBezierPath.bezierPathWithRect_(
+			AppKit.NSMakeRect(rect.origin.x, rect.origin.y, rect.size.width, _COV_BAND_H)).fill()
+		context.restoreGraphicsState()
+		AppKit.NSColor.separatorColor().set()
+		card.setLineWidth_(1.0)
+		card.stroke()
+
+	@objc.python_method
+	def _draw_disclosure(self, x: float, y: float, size: float, expanded: bool, color: Any) -> None:
+		color.set()
+		path = AppKit.NSBezierPath.bezierPath()
+		if expanded:                          # ▼ apex at the bottom (flipped: larger y)
+			path.moveToPoint_((x, y))
+			path.lineToPoint_((x + size, y))
+			path.lineToPoint_((x + size / 2.0, y + size))
+		else:                                 # ▸ apex to the right
+			path.moveToPoint_((x, y))
+			path.lineToPoint_((x, y + size))
+			path.lineToPoint_((x + size, y + size / 2.0))
+		path.closePath()
+		path.fill()
 
 	@objc.python_method
 	def _draw_bar(self, rect: Any, segs: Any) -> None:
 		radius = rect.size.height / 2.0
 		track = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, radius, radius)
-		AppKit.NSColor.quaternaryLabelColor().set()
+		# Track a shade off the card fill (which is quaternary) so an empty/partly
+		# filled bar reads as a groove rather than blending into the card.
+		AppKit.NSColor.tertiaryLabelColor().set()
 		track.fill()
 		if segs:
 			context = AppKit.NSGraphicsContext.currentContext()
 			context.saveGraphicsState()
 			track.addClip()                   # rounds the outer corners; segments fill flat inside
 			x = rect.origin.x
-			for fraction, rgba in segs:
+			for fraction, rgba, _color_key in segs:
 				width = fraction * rect.size.width
 				if width <= 0.0:
 					continue
@@ -705,30 +780,42 @@ class _AZCoverageBarsView(AppKit.NSView):
 					AppKit.NSMakeRect(x, rect.origin.y, width + 0.5, rect.size.height)).fill()
 				x += width
 			context.restoreGraphicsState()
-		# Hairline outline so a bar (or a segment whose colour sits close to the
-		# sidebar background) always stays legible against it. Light + thin.
-		AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.18).set()
+		# Dark hairline outline so a bar (or a segment whose colour sits close to
+		# the card fill) always stays legible against it.
+		AppKit.NSColor.blackColor().colorWithAlphaComponent_(0.35).set()
 		track.setLineWidth_(0.75)
 		track.stroke()
 
 	@objc.python_method
-	def _draw_bar_row(self, y: float, row_h: float, width: float, name: str, count: Any,
-	                  segs: Any, name_x: float, name_size: float, name_color: Any) -> None:
-		text_y = y + (row_h - 15.0) / 2.0
-		self._draw_text(name, AppKit.NSMakeRect(name_x, text_y, _COV_PAD + _COV_NAME_W - name_x, 15.0),
+	def _draw_bar_row(self, y: float, row_h: float, cx0: float, cw: float, name: str, count: Any,
+	                  segs: Any, name_indent: float, name_size: float, name_color: Any,
+	                  hit_meta: Any) -> float:
+		text_y = y + (row_h - 14.0) / 2.0
+		name_x = cx0 + name_indent
+		self._draw_text(name, AppKit.NSMakeRect(name_x, text_y, _COV_NAME_W - name_indent, 14.0),
 		                name_size, name_color)
 		self._draw_text(str(count),
-		                AppKit.NSMakeRect(width - _COV_PAD - _COV_COUNT_W, text_y, _COV_COUNT_W, 15.0),
+		                AppKit.NSMakeRect(cx0 + cw - _COV_COUNT_W, text_y, _COV_COUNT_W, 14.0),
 		                11.0, AppKit.NSColor.whiteColor(), align=_NS_ALIGN_LEFT, mono=True)
-		bar_x = _COV_PAD + _COV_NAME_W + _COV_GAP
-		bar_w = max(10.0, width - _COV_PAD - _COV_COUNT_W - _COV_GAP - bar_x)
+		bar_x = cx0 + _COV_NAME_W + _COV_GAP
+		bar_w = max(10.0, cw - _COV_NAME_W - _COV_GAP - _COV_COUNT_W - _COV_GAP)
 		self._draw_bar(AppKit.NSMakeRect(bar_x, y + (row_h - _COV_BAR_H) / 2.0, bar_w, _COV_BAR_H), segs)
+		kind, group_key, sub_key = hit_meta
+		x = bar_x
+		for fraction, _rgba, color_key in segs:
+			seg_w = fraction * bar_w
+			if seg_w <= 0.0:
+				continue
+			self._seg_hits.append((x, x + seg_w, y, y + row_h, kind, group_key, sub_key, color_key))
+			x += seg_w
+		return bar_x
 
 	def drawRect_(self, dirtyRect: Any) -> None:
 		bounds = self.bounds()
 		width = bounds.size.width
 		sections = getattr(self, "_sections", None) or []
-		self._hits = []
+		self._toggle_hits = []
+		self._seg_hits = []
 		if not sections:
 			self._draw_text("No glyphs to show.",
 			                AppKit.NSMakeRect(_COV_PAD, bounds.size.height / 2.0 - 9.0,
@@ -736,36 +823,49 @@ class _AZCoverageBarsView(AppKit.NSView):
 			                12.0, AppKit.NSColor.secondaryLabelColor())
 			return
 		expanded = getattr(self, "_expanded", None) or set()
+		card_x = _COV_PAD
+		card_w = width - 2 * _COV_PAD
+		cx0 = card_x + _COV_CARD_PADX
+		cw = card_w - 2 * _COV_CARD_PADX
 		y = _COV_TOP
-		for index, (title, rows) in enumerate(sections):
-			if index > 0:                     # divider between sections (Category | Script)
-				self._draw_separator(AppKit.NSMakeRect(_COV_PAD, y - _COV_SEC_GAP / 2.0,
-				                                       width - 2 * _COV_PAD, 1.0))
+		for title, rows in sections:
+			card_h = self._card_height(rows, expanded)
+			self._draw_card(AppKit.NSMakeRect(card_x, y, card_w, card_h))
 			self._draw_text(title.upper(),
-			                AppKit.NSMakeRect(_COV_PAD, y + 4.0, width - 2 * _COV_PAD, _COV_HEADER_H),
+			                AppKit.NSMakeRect(cx0, y + (_COV_BAND_H - 13.0) / 2.0, cw, 13.0),
 			                11.0, AppKit.NSColor.secondaryLabelColor(), bold=True)
-			y += _COV_HEADER_H
-			for name, count, segs, key, subs in rows:
+			row_y = y + _COV_BAND_H + _COV_CARD_PADY
+			for name, count, segs, key, subs, kind in rows:
 				is_expanded = bool(subs) and key in expanded
-				if subs:                      # chevron in the gutter + clickable region
-					self._draw_text("▾" if is_expanded else "▸",
-					                AppKit.NSMakeRect(_COV_PAD, y + (_COV_ROW_H - 15.0) / 2.0, 12.0, 15.0),
-					                10.0, AppKit.NSColor.secondaryLabelColor())
-					self._hits.append((key, y, y + _COV_ROW_H))
-				self._draw_bar_row(y, _COV_ROW_H, width, name, count, segs,
-				                   _COV_PAD + _COV_NAME_INDENT, 11.5, AppKit.NSColor.labelColor())
-				y += _COV_ROW_H
+				if subs:                      # disclosure triangle + toggle region (left of the bar)
+					self._draw_disclosure(cx0 + 1.0, row_y + (_COV_ROW_H - 8.0) / 2.0, 8.0,
+					                      is_expanded, AppKit.NSColor.secondaryLabelColor())
+					self._toggle_hits.append((key, row_y, row_y + _COV_ROW_H, cx0 + _COV_NAME_W + _COV_GAP))
+				self._draw_bar_row(row_y, _COV_ROW_H, cx0, cw, name, count, segs,
+				                   _COV_NAME_INDENT, 11.5, AppKit.NSColor.labelColor(), (kind, key, None))
+				row_y += _COV_ROW_H
 				if is_expanded:
-					for sub_name, sub_count, sub_segs in subs:
-						self._draw_bar_row(y, _COV_SUB_ROW_H, width, sub_name, sub_count, sub_segs,
-						                   _COV_PAD + _COV_SUB_INDENT, 10.5, AppKit.NSColor.secondaryLabelColor())
-						y += _COV_SUB_ROW_H
-			y += _COV_SEC_GAP
+					for sub_name, sub_count, sub_segs, sub_key in subs:
+						self._draw_bar_row(row_y, _COV_SUB_ROW_H, cx0, cw, sub_name, sub_count, sub_segs,
+						                   _COV_SUB_INDENT, 10.5, AppKit.NSColor.secondaryLabelColor(),
+						                   ("subcategory", key, sub_key))
+						row_y += _COV_SUB_ROW_H
+			y += card_h + _COV_CARD_GAP
 
 	def mouseDown_(self, event: Any) -> None:
 		point = self.convertPoint_fromView_(event.locationInWindow(), None)
-		for key, top, bottom in getattr(self, "_hits", []):
-			if top <= point.y <= bottom:
+		if event.clickCount() >= 2:           # double-click a colour segment -> show its glyphs
+			for x0, x1, top, bottom, kind, group_key, sub_key, color_key in getattr(self, "_seg_hits", []):
+				if x0 <= point.x <= x1 and top <= point.y <= bottom:
+					try:
+						_show_group_color_layers(Glyphs.font, kind, group_key, sub_key, color_key)
+					except Exception:
+						import traceback
+						print("AZ Colorflow [show layers] error:\n" + traceback.format_exc())
+					return
+			return
+		for key, top, bottom, bar_x in getattr(self, "_toggle_hits", []):   # single click left of bar toggles
+			if top <= point.y <= bottom and point.x <= bar_x:
 				expanded = self._expanded
 				expanded.discard(key) if key in expanded else expanded.add(key)
 				self._reflow()
@@ -813,15 +913,21 @@ try:
 
 		@classmethod
 		def tabBarImage(cls) -> Any:
-			ctor = getattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_", None)
-			if ctor is None:
-				return None
-			for name in ("chart.bar.fill", "chart.pie", "circle.grid.2x2"):
-				image = ctor(name, "AZ Colorflow")
-				if image is not None:
-					image.setTemplate_(True)   # tint like the native tab icons
-					return image
-			return None
+			# A disc-with-a-hole (ring), echoing the report's tower disc — drawn as a
+			# template so the tab bar tints it like the native icons.
+			size = 18.0
+			image = AppKit.NSImage.alloc().initWithSize_(AppKit.NSMakeSize(size, size))
+			image.lockFocus()
+			ring = AppKit.NSBezierPath.bezierPathWithOvalInRect_(AppKit.NSMakeRect(1.0, 1.0, size - 2.0, size - 2.0))
+			hole = 4.6
+			ring.appendBezierPath_(AppKit.NSBezierPath.bezierPathWithOvalInRect_(
+				AppKit.NSMakeRect((size - hole) / 2.0, (size - hole) / 2.0, hole, hole)))
+			ring.setWindingRule_(getattr(AppKit, "NSEvenOddWindingRule", 1))   # punch the centre
+			AppKit.NSColor.blackColor().set()
+			ring.fill()
+			image.unlockFocus()
+			image.setTemplate_(True)          # tint like the native tab icons
+			return image
 
 		def setController_(self, controller) -> None:
 			# Glyphs hands us its edit view controller. PyObjC can't weak-store
@@ -922,10 +1028,10 @@ try:
 						continue
 					index = int(color_key)
 					if 0 <= index < len(colors):
-						segs.append((count / total, tuple(colors[index])))
+						segs.append((count / total, tuple(colors[index]), color_key))
 				return total, segs
 
-			def build(coverage, drop_other, with_subs):
+			def build(coverage, drop_other, kind, with_subs):
 				rows = []
 				for row in coverage:
 					key = row.get("key")
@@ -940,26 +1046,30 @@ try:
 							sub_base = segs_for(sub)
 							if sub_base is None:
 								continue
-							subs.append((sub.get("label") or sub.get("key") or "?", sub_base[0], sub_base[1]))
-					rows.append((row.get("label") or key or "?", base[0], base[1], key, subs))
+							subs.append((sub.get("label") or sub.get("key") or "?",
+							             sub_base[0], sub_base[1], sub.get("key")))
+					rows.append((row.get("label") or key or "?", base[0], base[1], key, subs, kind))
 				return rows
 
 			sections = []
-			cats = build(data.get("byCategory", []), False, True)     # categories expand to sub-categories
+			cats = build(data.get("byCategory", []), False, "category", True)   # expand to sub-categories
 			if cats:
 				sections.append(("Category", cats))
-			scripts = build(data.get("byScript", []), True, False)    # scripts flat; skip "Other" bucket
+			scripts = build(data.get("byScript", []), True, "script", False)    # flat; skip "Other"
 			if scripts:
 				sections.append(("Script", scripts))
 			return sections
 
 		@objc.python_method
 		def _signature(self, sections: Any, colors: Any) -> tuple:
+			def seg_sig(segs):
+				return tuple((round(fraction, 5), color_key) for fraction, _rgba, color_key in segs)
+
 			def row_sig(row):
-				name, count, segs, _key, subs = row
-				return (name, count, tuple(round(fraction, 5) for fraction, _ in segs),
-				        tuple((sub_name, sub_count, tuple(round(fraction, 5) for fraction, _ in sub_segs))
-				              for sub_name, sub_count, sub_segs in subs))
+				name, count, segs, _key, subs, _kind = row
+				return (name, count, seg_sig(segs),
+				        tuple((sub_name, sub_count, seg_sig(sub_segs))
+				              for sub_name, sub_count, sub_segs, _sub_key in subs))
 			return (
 				tuple(tuple(round(float(component), 4) for component in rgba) for rgba in colors),
 				tuple((title, tuple(row_sig(row) for row in rows)) for title, rows in sections),
