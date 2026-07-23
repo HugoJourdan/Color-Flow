@@ -1082,6 +1082,28 @@ def test_coverage_rows_for_master_follows_the_selected_master() -> None:
     assert other_letter["uncolored"] == 1
 
 
+def test_report_path_for_is_deterministic_per_font_and_day() -> None:
+    # The report path is stable for a given font + date (so callers can detect an
+    # already-generated report and reopen it) and derives its name from the font.
+    from pathlib import Path
+
+    class _Font:
+        filepath = "/tmp/fonts/ABCDiatype-Bold.glyphs"
+        familyName = "ABC Diatype"
+
+    when = datetime(2026, 7, 23)
+    path = db.report_path_for(_Font(), when)
+    assert path == db.report_path_for(_Font(), when)                 # deterministic
+    assert isinstance(path, Path) and path.suffix == ".html"
+    assert "ABCDiatype-Bold" in path.name and "20260723" in path.name
+    assert db.report_path_for(None) is None                          # no font -> no path
+    # No filepath -> falls back to the family name (sanitised).
+    class _Unsaved:
+        filepath = None
+        familyName = "My/Family"
+    assert "My-Family" in db.report_path_for(_Unsaved(), when).name
+
+
 class _FakeLayerColor:
     def __init__(self, color: int | None, width: float = 500.0) -> None:
         self.color = color

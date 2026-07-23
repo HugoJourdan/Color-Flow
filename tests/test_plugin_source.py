@@ -1106,11 +1106,29 @@ def test_sidebar_has_global_report_button() -> None:
     assert "progress=_on_progress, open_when_done=False" in block   # bar tracks real build progress
 
 
-def test_view_menu_has_global_overview_entry() -> None:
-    # A View-menu item triggers the same report; registered once by the loader,
-    # targeting a retained singleton handler (mirrors the Rainbow File-menu item).
+def test_report_reopens_existing_before_rebuilding() -> None:
+    # Both the sidebar button and the Window-menu action reopen a report already
+    # generated for this font today (if it exists) instead of rebuilding.
+    assert "def _existing_report_path(font" in PLUGIN_SOURCE
+    assert "def _open_report_path(path" in PLUGIN_SOURCE
+    assert "azcolorflow_dashboard.report_path_for(font)" in PLUGIN_SOURCE
+    assert "path if path is not None and path.exists() else None" in PLUGIN_SOURCE
+    # Sidebar button: existing -> open, no sheet.
+    block = _sidebar_block()
+    assert "existing = _existing_report_path(font)" in block
+    assert "_open_report_path(existing)   # already generated -> just open it" in block
+    # Window-menu handler: same reuse-then-build.
+    overview = _module_function_body("_open_global_overview")
+    assert "existing = _existing_report_path(font)" in overview
+    assert "_open_report_path(existing)" in overview
+
+
+def test_window_menu_has_az_colorflow_entry() -> None:
+    # A Window-menu "AZ Colorflow" item triggers the report; registered once by the
+    # loader, targeting a retained singleton handler (mirrors the Rainbow File item).
     assert "def _install_report_menu(" in PLUGIN_SOURCE
-    assert "Glyphs.menu[VIEW_MENU]" in PLUGIN_SOURCE
+    assert "Glyphs.menu[WINDOW_MENU]" in PLUGIN_SOURCE
+    assert '_REPORT_MENU_TITLE = "AZ Colorflow"' in PLUGIN_SOURCE
     assert 'initWithTitle_action_keyEquivalent_(\n\t\t_REPORT_MENU_TITLE, "openGlobalOverview:"' in PLUGIN_SOURCE
     assert "def openGlobalOverview_(self, sender" in PLUGIN_SOURCE
     assert "def _open_global_overview(" in PLUGIN_SOURCE

@@ -1486,6 +1486,19 @@ def build_model(font, now: datetime, current: dict, previous: dict, progress=Non
 # Entry point
 # --------------------------------------------------------------------------- #
 
+def report_path_for(font, when=None) -> Path | None:
+    """Deterministic output path for ``font``'s report (temp dir, keyed by the font
+    name + date). Same path :func:`main` writes, so a caller can check whether a
+    report was already generated today and reopen it instead of rebuilding. ``None``
+    when there is no font."""
+    if font is None:
+        return None
+    when = when or datetime.now()
+    base = Path(font.filepath).stem if font.filepath else (font.familyName or "font")
+    base = re.sub(r"[/\\:]+", "-", base)   # family names may contain path separators
+    return Path(tempfile.gettempdir()) / f"{when.strftime('%Y%m%d')} {base} — AZ Colorflow.html"
+
+
 def main(font=None, progress=None, open_when_done: bool = True) -> Path | None:
     """Build the report, write it to a temp file, and (when ``open_when_done``)
     open it in the browser. ``progress`` (optional ``Callable[[float], None]``)
@@ -1539,9 +1552,7 @@ def main(font=None, progress=None, open_when_done: bool = True) -> Path | None:
     # report still shows today via the in-memory fold above.
     _emit(0.96)
 
-    base = Path(font.filepath).stem if font.filepath else (font.familyName or "font")
-    base = re.sub(r"[/\\:]+", "-", base)   # family names may contain path separators
-    out_path = Path(tempfile.gettempdir()) / f"{now.strftime('%Y%m%d')} {base} — AZ Colorflow.html"
+    out_path = report_path_for(font, now)
     try:
         out_path.write_text(html, encoding="utf-8")
     except OSError as error:

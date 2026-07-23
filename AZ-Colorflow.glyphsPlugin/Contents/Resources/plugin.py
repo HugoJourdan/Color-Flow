@@ -591,6 +591,29 @@ def _show_report_window(path) -> bool:
 		return False
 
 
+def _open_report_path(path) -> None:
+	"""Open an already-written report: native window, else the browser."""
+	if path is None:
+		return
+	try:
+		if not _show_report_window(path):
+			webbrowser.open(path.as_uri())
+	except Exception:
+		import traceback
+		print("AZ Colorflow [open report] error:\n" + traceback.format_exc())
+
+
+def _existing_report_path(font):
+	"""The path to a report already generated for ``font`` today, if it exists on
+	disk; else None. Lets callers reopen instead of rebuilding."""
+	try:
+		import azcolorflow_dashboard
+		path = azcolorflow_dashboard.report_path_for(font)
+		return path if path is not None and path.exists() else None
+	except Exception:
+		return None
+
+
 # ---------------------------------------------------------------------------- #
 #  Glyphs 4 Edit-view left-sidebar tab: native category + script colour bars
 # ---------------------------------------------------------------------------- #
@@ -1466,15 +1489,20 @@ try:
 					pass
 
 		def openReport_(self, sender) -> None:
-			# Build the global Color Flow report behind a rainbow loading sheet (the same
-			# _AZColorflowLoaderBar the palette used), then open it. Falls back to a plain
-			# blocking build if there's no window to host the sheet.
+			# Reopen the report already generated for this font today if it exists; else
+			# build a fresh one behind the rainbow loading sheet (the same
+			# _AZColorflowLoaderBar the palette used). Falls back to a plain blocking
+			# build if there's no window to host the sheet.
 			try:
 				if _shared_gate_blocked():
 					return
 				font = Glyphs.font
 				if font is None:
 					Message("Open a font first.", title="AZ Colorflow")
+					return
+				existing = _existing_report_path(font)
+				if existing is not None:
+					_open_report_path(existing)   # already generated -> just open it
 					return
 				if getattr(self, "_reportPanel", None) is not None:
 					return                        # a build is already running
@@ -1548,14 +1576,7 @@ try:
 					pass
 			self._reportPanel = None
 			self._reportLoader = None
-			path = getattr(self, "_reportPath", None)
-			if path is not None:
-				try:
-					if not _show_report_window(path):
-						webbrowser.open(path.as_uri())
-				except Exception:
-					import traceback
-					print("AZ Colorflow [open report] error:\n" + traceback.format_exc())
+			_open_report_path(getattr(self, "_reportPath", None))
 
 		def focusColor_(self, color_key) -> None:
 			# Toggle the spotlight colour (click a legend swatch): the bars dim every
@@ -1929,27 +1950,32 @@ def _install_rainbow_menu() -> None:
 		bar_item.append(menu_item)
 
 
-# ---- View-menu "Global Overview" (builds + opens the Color Flow report) ------------------------
-_REPORT_MENU_TITLE = "AZ Colorflow: Global Overview"
+# ---- Window-menu "AZ Colorflow" (builds + opens the Color Flow report) -------------------------
+_REPORT_MENU_TITLE = "AZ Colorflow"
 _REPORT_MENU_HANDLER = None
 
 
 def _open_global_overview() -> None:
-	"""Build and open the global Color Flow report (the "Global Overview"). Blocking —
-	no loader sheet on this path (a menu action has no host window); the sidebar's own
-	Global Overview button shows the rainbow sheet."""
+	"""Open the global Color Flow report (the "Global Overview"): reopen the one
+	already generated for this font today if it exists, else build a fresh one.
+	Blocking build — no loader sheet on this path (a menu action has no host window);
+	the sidebar's own Global Overview button shows the rainbow sheet when it builds."""
 	if _shared_gate_blocked():
 		return
 	font = Glyphs.font
 	if font is None:
 		Message("Open a font first.", title="AZ Colorflow")
 		return
+	existing = _existing_report_path(font)
+	if existing is not None:
+		_open_report_path(existing)
+		return
 	import azcolorflow_dashboard
-	azcolorflow_dashboard.main(font, open_when_done=True)
+	_open_report_path(azcolorflow_dashboard.main(font, open_when_done=False))
 
 
 class AZColorflowReportMenuHandler(NSObject):
-	"""Long-lived target for the View-menu Global Overview item (one per session)."""
+	"""Long-lived target for the Window-menu "AZ Colorflow" item (one per session)."""
 
 	def validateMenuItem_(self, menuItem) -> bool:
 		return Glyphs.font is not None
@@ -1963,7 +1989,7 @@ class AZColorflowReportMenuHandler(NSObject):
 
 
 def _install_report_menu() -> None:
-	"""Add the "Global Overview" item to the View menu once per session, targeting a
+	"""Add the "AZ Colorflow" item to the Window menu once per session, targeting a
 	retained singleton (mirrors the Rainbow File-menu installer)."""
 	global _REPORT_MENU_HANDLER
 	if _REPORT_MENU_HANDLER is not None:
@@ -1973,7 +1999,7 @@ def _install_report_menu() -> None:
 	menu_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
 		_REPORT_MENU_TITLE, "openGlobalOverview:", "")
 	menu_item.setTarget_(handler)
-	bar_item = Glyphs.menu[VIEW_MENU]
+	bar_item = Glyphs.menu[WINDOW_MENU]
 	submenu = bar_item.submenu() if bar_item.respondsToSelector_(b"submenu") else None
 	if submenu is not None:
 		for item in list(submenu.itemArray()):
