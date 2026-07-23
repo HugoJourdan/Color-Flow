@@ -1001,6 +1001,31 @@ def test_sidebar_has_settings_gear() -> None:
     assert "performActionForItemAtIndex_" in PLUGIN_SOURCE
 
 
+def test_sidebar_loadview_has_no_undefined_addsubview() -> None:
+    # Regression guard: a refactor once left `container.addSubview_(gear)` after the
+    # `gear` local was folded into a helper — a NameError crash on sidebar load that
+    # neither ruff (blind to it behind `from ... import *`) nor the string tests caught.
+    # Every name added to the container must be assigned somewhere in loadView.
+    import ast
+    load_view = next(
+        node for node in ast.walk(ast.parse(PLUGIN_SOURCE))
+        if isinstance(node, ast.FunctionDef) and node.name == "loadView"
+        and any(getattr(call.func, "attr", "") == "setDocumentView_"
+                for call in ast.walk(node) if isinstance(call, ast.Call))
+    )
+    assigned = {
+        node.id for node in ast.walk(load_view)
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    }
+    added = [
+        call.args[0].id for call in ast.walk(load_view)
+        if isinstance(call, ast.Call) and getattr(call.func, "attr", "") == "addSubview_"
+        and call.args and isinstance(call.args[0], ast.Name)
+    ]
+    undefined = sorted(name for name in added if name not in assigned)
+    assert not undefined, f"container.addSubview_ of undefined local(s): {undefined}"
+
+
 def test_palette_archived_general_plugin_is_principal() -> None:
     # The docked palette is archived: a lightweight GeneralPlugin loader is the
     # principal class and runs the registrations; the palette class stays defined

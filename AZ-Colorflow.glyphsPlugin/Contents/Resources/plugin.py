@@ -1318,16 +1318,16 @@ try:
 				AppKit.NSMakeRect(0, 0, width, rect.size.height))
 			doc.setAutoresizingMask_(AppKit.NSViewWidthSizable)   # follow the clip width; height set on data
 			scroll.setDocumentView_(doc)
-			# Colour legend, pinned to the bottom of the sidebar (a 3-column grid).
+			# Colour legend, pinned to the bottom of the sidebar (a 2-column grid).
 			legend = _AZLegendView.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, width, 0))
 			legend._owner = self
 			legend.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewMaxYMargin)
 
+			# (gear + report already added to the container inside _icon_button.)
 			container.addSubview_(scroll)
 			container.addSubview_(legend)
 			container.addSubview_(total_label)
 			container.addSubview_(pct_label)
-			container.addSubview_(gear)
 			self._doc = doc
 			self._scroll = scroll
 			self._legend = legend
