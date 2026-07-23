@@ -1036,9 +1036,13 @@ def test_sidebar_buttons_are_full_width_two_columns_above_the_legend() -> None:
     assert "NSImageLeading" in block                              # icon left of text
     assert 'btn.setTitle_(title)' in block                        # text label
     assert "addArrangedSubview_(self._report)" in block and "addArrangedSubview_(self._gear)" in block
-    assert "row.setFrame_(AppKit.NSMakeRect(_COV_PAD, footer_h + pad" in block   # card-aligned margin
+    assert "row.setFrame_(AppKit.NSMakeRect(_COV_PAD, footer_h" in block   # card-aligned margin, flush
     assert "cb.width - 2 * _COV_PAD" in block                      # same inset as the cards/legend
     assert "cb.height - footer_h - strip_h" in block              # scroll fills above the strip
+    # Uniform gaps: strip = one pad, spacing = the card gap, both = _COV_CARD_GAP.
+    assert "self._strip_h = self._btn_h + self._btn_pad" in block
+    assert "button_row.setSpacing_(_COV_CARD_GAP)" in block
+    assert "self._btn_pad = _COV_CARD_GAP" in block
     # The opener actually opens the window (selecting the tab alone won't front it).
     assert "def _open_settings_window(" in PLUGIN_SOURCE
     assert "performActionForItemAtIndex_" in PLUGIN_SOURCE
@@ -1104,6 +1108,17 @@ def test_sidebar_has_global_report_button() -> None:
     assert "def sidebarRunReport_(self, sender" in block
     assert "def sidebarFinishReport_(self, sender" in block
     assert "progress=_on_progress, open_when_done=False" in block   # bar tracks real build progress
+
+
+def test_report_window_has_update_button() -> None:
+    # The report window has an "Update" titlebar button that rebuilds the report for
+    # the font it's about (captured at show time) and reloads the page.
+    assert 'buttonWithTitle_target_action_("Update", self, "updateReport:")' in PLUGIN_SOURCE
+    assert "def updateReport_(self, sender" in PLUGIN_SOURCE
+    assert "self._font = Glyphs.font" in PLUGIN_SOURCE                # captured when shown
+    update = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def updateReport_(self, sender"):][:1000]
+    assert "azcolorflow_dashboard.main(font, open_when_done=False)" in update   # fresh build
+    assert "loadFileURL_allowingReadAccessToURL_" in update                     # reload the page
 
 
 def test_report_reopens_existing_before_rebuilding() -> None:

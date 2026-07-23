@@ -339,6 +339,7 @@ class _AZColorflowReportWindow(AppKit.NSObject):
 
 	def showPath_(self, path) -> bool:
 		self._path = str(path)
+		self._font = Glyphs.font          # the font this report is about -> what "Update" rebuilds
 		if self._ensure_window() is None:
 			return False
 		try:
@@ -400,22 +401,24 @@ class _AZColorflowReportWindow(AppKit.NSObject):
 			# Titlebar accessory sizing is frame-driven: an auto-layout NSStackView with
 			# nothing pinning it collapses to zero and the buttons never appear. Use a
 			# plain container with explicit frames instead.
+			update = AppKit.NSButton.buttonWithTitle_target_action_("Update", self, "updateReport:")
 			save = AppKit.NSButton.buttonWithTitle_target_action_("Save…", self, "saveReport:")
 			browser = AppKit.NSButton.buttonWithTitle_target_action_("Open in Browser", self, "openInBrowser:")
-			for button in (save, browser):
+			buttons = (update, save, browser)
+			for button in buttons:
 				button.setControlSize_(AppKit.NSControlSizeSmall)
 				button.setFont_(AppKit.NSFont.systemFontOfSize_(AppKit.NSFont.smallSystemFontSize()))
 				button.setTranslatesAutoresizingMaskIntoConstraints_(True)
 				button.sizeToFit()
 			gap, margin, height = 8.0, 10.0, 24.0
-			save_size = save.frame().size
-			browser_size = browser.frame().size
-			container = AppKit.NSView.alloc().initWithFrame_(AppKit.NSMakeRect(
-				0, 0, save_size.width + gap + browser_size.width + margin, height))
-			save.setFrameOrigin_((0.0, (height - save_size.height) / 2.0))
-			browser.setFrameOrigin_((save_size.width + gap, (height - browser_size.height) / 2.0))
-			container.addSubview_(save)
-			container.addSubview_(browser)
+			total_w = sum(button.frame().size.width for button in buttons) + gap * (len(buttons) - 1)
+			container = AppKit.NSView.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, total_w + margin, height))
+			x = 0.0
+			for button in buttons:                       # [Update] [Save…] [Open in Browser]
+				size = button.frame().size
+				button.setFrameOrigin_((x, (height - size.height) / 2.0))
+				container.addSubview_(button)
+				x += size.width + gap
 			accessory = AppKit.NSTitlebarAccessoryViewController.alloc().init()
 			accessory.setView_(container)
 			accessory.setLayoutAttribute_(getattr(AppKit, "NSLayoutAttributeTrailing", AppKit.NSLayoutAttributeRight))
@@ -432,6 +435,28 @@ class _AZColorflowReportWindow(AppKit.NSObject):
 			return None
 
 	# ---- titlebar buttons -------------------------------------------------- #
+
+	def updateReport_(self, sender) -> None:
+		# Regenerate the report for the font it's about (overwrites the same dated
+		# file) and reload the page. ponytail: blocking rebuild, no progress bar in
+		# the window — add one if big fonts make this feel frozen.
+		try:
+			if _shared_gate_blocked():
+				return
+			font = getattr(self, "_font", None) or Glyphs.font
+			if font is None:
+				return
+			import azcolorflow_dashboard
+			path = azcolorflow_dashboard.main(font, open_when_done=False)
+			if path is None:
+				return
+			self._path = str(path)
+			file_url = AppKit.NSURL.fileURLWithPath_(self._path)
+			read_access = AppKit.NSURL.fileURLWithPath_(str(Path(self._path).parent))
+			self._webview.loadFileURL_allowingReadAccessToURL_(file_url, read_access)
+		except Exception:
+			import traceback
+			print("AZ Colorflow [report update] error:\n" + traceback.format_exc())
 
 	def saveReport_(self, sender) -> None:
 		try:
@@ -1351,8 +1376,10 @@ try:
 			width = rect.size.width
 			container = AppKit.NSView.alloc().initWithFrame_(rect)
 			self._btn_h = 26.0
-			self._btn_pad = 6.0
-			self._strip_h = self._btn_h + 2 * self._btn_pad   # button footer, sits above the legend
+			self._btn_pad = _COV_CARD_GAP                     # one uniform gap around the strip
+			# Only ONE pad in the strip height: the gap BELOW comes from the legend's own
+			# top inset (also _COV_CARD_GAP), so top and bottom gaps match.
+			self._strip_h = self._btn_h + self._btn_pad       # button footer, sits above the legend
 
 			# Full-width icon+text buttons: [Report] [Settings], two equal columns above
 			# the legend (an equal-split NSStackView; frame set in _relayout).
@@ -1396,7 +1423,7 @@ try:
 				AppKit.NSMakeRect(0, 0, width, self._btn_h))
 			button_row.setOrientation_(getattr(AppKit, "NSUserInterfaceLayoutOrientationHorizontal", 0))
 			button_row.setDistribution_(getattr(AppKit, "NSStackViewDistributionFillEqually", 1))
-			button_row.setSpacing_(6.0)
+			button_row.setSpacing_(_COV_CARD_GAP)   # same gap between buttons as around the strip
 			button_row.addArrangedSubview_(self._report)
 			button_row.addArrangedSubview_(self._gear)
 			button_row.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewMaxYMargin)
@@ -1726,9 +1753,8 @@ try:
 			if container is None or scroll is None:
 				return
 			cb = container.bounds().size
-			strip_h = getattr(self, "_strip_h", 38.0)
+			strip_h = getattr(self, "_strip_h", 32.0)
 			btn_h = getattr(self, "_btn_h", 26.0)
-			pad = getattr(self, "_btn_pad", 6.0)
 			footer_h = 0.0
 			if legend is not None:
 				footer_h = legend.heightForWidth_(cb.width)
@@ -1738,7 +1764,8 @@ try:
 			# _COV_PAD so the row's edges line up with the cards/legend, not wider.
 			row = getattr(self, "_button_row", None)
 			if row is not None:
-				row.setFrame_(AppKit.NSMakeRect(_COV_PAD, footer_h + pad,
+				# Bottom flush with the legend view; its internal top inset is the gap.
+				row.setFrame_(AppKit.NSMakeRect(_COV_PAD, footer_h,
 				                                max(0.0, cb.width - 2 * _COV_PAD), btn_h))
 			scroll.setFrame_(AppKit.NSMakeRect(0, footer_h + strip_h, cb.width,
 			                                   max(0.0, cb.height - footer_h - strip_h)))
