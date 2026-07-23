@@ -1980,3 +1980,13 @@ def test_glyph_cell_size_slider_allows_smaller_cells() -> None:
     # the switch happens live while dragging the slider (no full re-render needed)
     inp = js.split('addEventListener("input"', 1)[1].split("});", 1)[0]
     assert 'classList.toggle("heat-2col"' in inp
+
+
+def test_tower_notifies_native_host_of_master_picks() -> None:
+    # Glyphs-hosted webviews register azcfMaster and switch the app's selected
+    # master on disc picks; in a browser the hook is a silent no-op (try/catch).
+    js = assets.DASHBOARD_JS
+    assert "function notifyMaster(mid)" in js
+    assert "messageHandlers.azcfMaster.postMessage" in js
+    # Both tower master-pick paths (disc click + arrow keys) notify the host.
+    assert js.count("notifyMaster(state.master)") == 2

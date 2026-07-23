@@ -858,6 +858,24 @@ def test_tower_sidebar_is_g4_gated_and_restores_the_light_flag() -> None:
     build = _method_body("_build_and_load")
     assert "NO_GLYPH_SVG_KEY" in build
     assert "finally:" in build
-    # Tower-only CSS: the report body/tab chrome is hidden, the tower is kept.
-    assert "#cfd-tower" in PLUGIN_SOURCE
-    assert "#cfd-body { display: none" in PLUGIN_SOURCE
+    # Tower-only CSS: everything except the tower chain is hidden, ancestors are
+    # stretched to full height, and fit() is re-run against the new layout.
+    assert ":not(:has(#cfd-tower)):not(#cfd-tower):not(#cfd-tower *)" in PLUGIN_SOURCE
+    assert "height: 100%" in _SIDEBAR_CSS_SOURCE()
+    assert "window.dispatchEvent(new Event('resize'))" in PLUGIN_SOURCE
+
+
+def _SIDEBAR_CSS_SOURCE() -> str:
+    start = PLUGIN_SOURCE.index("_SIDEBAR_TOWER_CSS")
+    return PLUGIN_SOURCE[start : PLUGIN_SOURCE.index("_SIDEBAR_REGISTERED", start)]
+
+
+def test_tower_sidebar_disc_click_switches_the_glyphs_master() -> None:
+    # The tower's notifyMaster hook posts the picked master id; the sidebar
+    # controller receives it and moves font.masterIndex to the matching master.
+    build = _method_body("loadView")
+    assert 'addScriptMessageHandler_name_(self, "azcfMaster")' in PLUGIN_SOURCE
+    handler_start = PLUGIN_SOURCE.index("azcfMaster: a disc was picked")
+    handler = PLUGIN_SOURCE[handler_start : PLUGIN_SOURCE.index("def _sidebar_font", handler_start)]
+    assert "font.masterIndex = index" in handler
+    assert build is not None

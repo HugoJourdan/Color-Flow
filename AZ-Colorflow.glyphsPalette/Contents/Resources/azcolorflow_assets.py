@@ -3697,6 +3697,9 @@ DASHBOARD_JS = r"""
     cv.addEventListener("wheel", function(e){ e.preventDefault();
       vt += e.deltaY*0.02; vt=Math.max(0, Math.min(Math.max(0,H.masters.length-VISIBLE), vt));
     }, {passive:false});
+    // Native host hook: a Glyphs-hosted webview registers azcfMaster and switches
+    // the app's selected master on disc picks; in a browser this is a silent no-op.
+    function notifyMaster(mid){ try{ window.webkit.messageHandlers.azcfMaster.postMessage(mid==null?"":String(mid)); }catch(e){} }
     cv.addEventListener("click", function(e){
       var rect=cv.getBoundingClientRect();
       var px=(e.clientX-rect.left)*(W/rect.width), py=(e.clientY-rect.top)*(Hc/rect.height);
@@ -3705,6 +3708,7 @@ DASHBOARD_JS = r"""
         var ex=(px-geo.cx)/geo.rx, ey=(py-cy)/geo.ry;
         if (ex*ex+ey*ey<=1){ var id=H.masters[i].id;
           state.master = (state.master===id) ? null : id;   // click the selected disc -> clear focus
+          notifyMaster(state.master);
           laneSparkShouldAnim = true; update(); return; } }  // keep the current view (tabs/coverage/...)
     });
     // up/down arrows switch the focused master (up = toward the top disc)
@@ -3715,7 +3719,7 @@ DASHBOARD_JS = r"""
       var cur=selIndex(), step=(e.key==="ArrowDown")?1:-1;
       var ni = cur<0 ? (step>0?0:M-1) : Math.max(0, Math.min(M-1, cur+step));
       e.preventDefault();
-      state.master=H.masters[ni].id; laneSparkShouldAnim = true; update();   // keep the current view
+      state.master=H.masters[ni].id; notifyMaster(state.master); laneSparkShouldAnim = true; update();   // keep the current view
     });
     loop();
   }
