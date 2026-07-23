@@ -909,11 +909,14 @@ def test_coverage_sidebar_double_click_shows_layers() -> None:
     assert "_show_group_color_layers(Glyphs.font" in PLUGIN_SOURCE
 
 
-def test_coverage_sidebar_tab_icon_is_a_disc_ring() -> None:
-    # The tab icon is a drawn disc-with-hole (ring) template, echoing the tower disc.
-    tab_image = _method_body("tabBarImage")
-    assert "bezierPathWithOvalInRect_" in tab_image
-    assert "setTemplate_(True)" in tab_image
+def test_coverage_sidebar_tab_icon_is_the_bundled_disc() -> None:
+    # Tab icon = the bundled metallic disc PDF (full colour), with a drawn ring
+    # template as the fallback if the file is missing.
+    assert (RESOURCES / "sidebar-disc.pdf").exists()
+    assert 'Path(__file__).parent / "sidebar-disc.pdf"' in PLUGIN_SOURCE
+    assert "initWithContentsOfFile_" in PLUGIN_SOURCE
+    assert "def _drawn_ring_icon(cls" in PLUGIN_SOURCE      # fallback
+    assert "bezierPathWithOvalInRect_" in PLUGIN_SOURCE
 
 
 def test_hosted_report_never_spins_the_host_main_thread_needlessly() -> None:

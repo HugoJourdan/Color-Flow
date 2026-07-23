@@ -913,8 +913,22 @@ try:
 
 		@classmethod
 		def tabBarImage(cls) -> Any:
-			# A disc-with-a-hole (ring), echoing the report's tower disc — drawn as a
-			# template so the tab bar tints it like the native icons.
+			# The metallic disc-with-a-hole from the bundle (Hugo's favicon), kept in
+			# full colour (not a template) so its gradient shows. Falls back to a
+			# drawn ring template if the file is missing/unreadable.
+			try:
+				path = Path(__file__).parent / "sidebar-disc.pdf"
+				if path.exists():
+					image = AppKit.NSImage.alloc().initWithContentsOfFile_(str(path))
+					if image is not None:
+						image.setSize_(AppKit.NSMakeSize(18.0, 18.0))
+						return image
+			except Exception:
+				pass
+			return cls._drawn_ring_icon()
+
+		@classmethod
+		def _drawn_ring_icon(cls) -> Any:
 			size = 18.0
 			image = AppKit.NSImage.alloc().initWithSize_(AppKit.NSMakeSize(size, size))
 			image.lockFocus()
