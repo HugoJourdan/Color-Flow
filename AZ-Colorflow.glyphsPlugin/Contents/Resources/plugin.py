@@ -1180,9 +1180,9 @@ class _AZCoverageBarsView(AppKit.NSView):
 						AppKit.NSMakeRect(card_x, row_y, card_w, visible_h)).addClip()
 					sub_y = row_y
 					for sub_name, sub_count, sub_segs, sub_key in subs:
-						# Same size + x as top-level names; only the lighter grey sets them apart.
+						# Lighter grey + a 6pt deeper indent than top-level names (nesting cue).
 						self._draw_bar_row(sub_y, _COV_SUB_ROW_H, cx0, cw, sub_name, sub_count, sub_segs,
-						                   _COV_NAME_INDENT, 11.5, AppKit.NSColor.secondaryLabelColor(),
+						                   _COV_NAME_INDENT + 6.0, 11.5, AppKit.NSColor.secondaryLabelColor(),
 						                   ("subcategory", key, sub_key))
 						sub_y += _COV_SUB_ROW_H
 					context.restoreGraphicsState()

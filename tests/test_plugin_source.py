@@ -964,11 +964,11 @@ def test_coverage_sidebar_bars_show_hand_cursor() -> None:
     assert "invalidateCursorRectsForView_(self)" in PLUGIN_SOURCE
 
 
-def test_coverage_sidebar_subcategories_align_with_categories() -> None:
-    # Sub-rows share the top-level name size + x, only lighter grey distinguishes them.
-    marker = "# Same size + x as top-level names"
+def test_coverage_sidebar_subcategories_indent_deeper() -> None:
+    # Sub-rows sit 6pt deeper than top-level names (nesting cue) + lighter grey.
+    marker = "# Lighter grey + a 6pt deeper indent"
     tail = PLUGIN_SOURCE[PLUGIN_SOURCE.index(marker):][:260]
-    assert "_COV_NAME_INDENT, 11.5, AppKit.NSColor.secondaryLabelColor()" in tail
+    assert "_COV_NAME_INDENT + 6.0, 11.5, AppKit.NSColor.secondaryLabelColor()" in tail
 
 
 def test_settings_pane_icon_uses_chosen_sf_symbol() -> None:
