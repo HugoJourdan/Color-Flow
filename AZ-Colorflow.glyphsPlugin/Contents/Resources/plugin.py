@@ -675,6 +675,34 @@ def _card_fill_color() -> Any:
 	return AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(46 / 255.0, 46 / 255.0, 46 / 255.0, 1.0)
 
 
+def _draw_glass_border(rect: Any, radius: float) -> None:
+	# macOS-Glass-like rim: a 1pt border ring filled with a top-lit white gradient —
+	# a bright specular highlight along the top edge fading to a faint hairline below.
+	# Flip-aware via the context so it reads "lit from above" in flipped views (cards)
+	# and non-flipped ones (buttons) alike.
+	outer = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, radius, radius)
+	inner = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+		AppKit.NSInsetRect(rect, 1.0, 1.0), max(0.0, radius - 1.0), max(0.0, radius - 1.0))
+	ring = AppKit.NSBezierPath.bezierPath()
+	ring.appendBezierPath_(outer)
+	ring.appendBezierPath_(inner)
+	ring.setWindingRule_(getattr(AppKit, "NSWindingRuleEvenOdd",
+	                             getattr(AppKit, "NSEvenOddWindingRule", 1)))
+	context = AppKit.NSGraphicsContext.currentContext()
+	context.saveGraphicsState()
+	ring.addClip()
+	max_y = rect.origin.y + rect.size.height
+	flipped = bool(context.isFlipped())
+	top_y = rect.origin.y if flipped else max_y          # visual top edge
+	bottom_y = max_y if flipped else rect.origin.y
+	mid_x = AppKit.NSMidX(rect)
+	AppKit.NSGradient.alloc().initWithStartingColor_endingColor_(
+		AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.42),
+		AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.06)).drawFromPoint_toPoint_options_(
+			AppKit.NSMakePoint(mid_x, top_y), AppKit.NSMakePoint(mid_x, bottom_y), 0)
+	context.restoreGraphicsState()
+
+
 _COV_BTN_INSET = (22.0, 8.0)   # (dx, dy) internal padding for the flat sidebar buttons
 
 
@@ -690,6 +718,10 @@ class _AZPaddedButtonCell(AppKit.NSButtonCell):
 class _AZFlatButton(AppKit.NSButton):
 	# Flat sidebar button: pointing-hand cursor + dim-on-hover, since the borderless
 	# card-coloured bezel gives no hover/press feedback of its own.
+	def drawRect_(self, rect: Any) -> None:
+		objc.super(_AZFlatButton, self).drawRect_(rect)
+		_draw_glass_border(self.bounds(), _COV_CARD_RADIUS)   # glass rim, matching the cards
+
 	def resetCursorRects(self) -> None:
 		self.addCursorRect_cursor_(self.bounds(), AppKit.NSCursor.pointingHandCursor())
 
@@ -926,9 +958,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 			AppKit.NSBezierPath.bezierPathWithRect_(
 				AppKit.NSMakeRect(rect.origin.x, rect.origin.y, rect.size.width, _COV_BAND_H)).fill()
 			context.restoreGraphicsState()
-		AppKit.NSColor.separatorColor().set()
-		card.setLineWidth_(1.0)
-		card.stroke()
+		_draw_glass_border(rect, _COV_CARD_RADIUS)
 
 	@objc.python_method
 	def _draw_disclosure(self, x: float, y: float, size: float, expanded: bool, color: Any) -> None:
@@ -1305,9 +1335,7 @@ class _AZLegendView(AppKit.NSView):
 			card_rect, _COV_CARD_RADIUS, _COV_CARD_RADIUS)
 		_card_fill_color().set()
 		card.fill()
-		AppKit.NSColor.separatorColor().set()
-		card.setLineWidth_(1.0)
-		card.stroke()
+		_draw_glass_border(card_rect, _COV_CARD_RADIUS)
 		focus = getattr(self, "_focus", None)
 		cx0 = card_rect.origin.x + _COV_CARD_PADX
 		cw = card_rect.size.width - 2 * _COV_CARD_PADX
@@ -1453,8 +1481,7 @@ try:
 				layer = btn.layer()
 				layer.setBackgroundColor_(_card_fill_color().CGColor())
 				layer.setCornerRadius_(_COV_CARD_RADIUS)
-				layer.setBorderWidth_(1.0)
-				layer.setBorderColor_(AppKit.NSColor.separatorColor().CGColor())
+				# The border is the glass rim drawn in _AZFlatButton.drawRect_ (top-lit gradient).
 				btn.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
 				image = None
 				if hasattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_"):

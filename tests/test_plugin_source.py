@@ -1237,3 +1237,19 @@ def test_sidebar_buttons_hover_cursor_and_white_text() -> None:
 def test_sidebar_buttons_space_icon_from_label() -> None:
     button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:1000]
     assert 'btn.setTitle_("  " + title)' in button
+
+
+def test_cards_and_buttons_have_glass_rim() -> None:
+    # Cards, legend and buttons share a macOS-Glass-like top-lit gradient rim helper
+    # instead of a flat separator stroke.
+    assert "def _draw_glass_border(rect: Any, radius: float)" in PLUGIN_SOURCE
+    helper = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_glass_border("):][:1600]
+    assert "NSGradient" in helper and "drawFromPoint_toPoint_options_" in helper
+    assert "isFlipped()" in helper                                 # lit-from-above in flipped views too
+    assert "WindingRuleEvenOdd" in helper or "EvenOddWindingRule" in helper
+    # Used by both card drawers and the flat button, and the old flat strokes are gone.
+    assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 4         # def + card + legend + button
+    assert "card.stroke()" not in PLUGIN_SOURCE
+    assert "layer.setBorderColor_(AppKit.NSColor.separatorColor().CGColor())" not in PLUGIN_SOURCE
+    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:1700]
+    assert "_draw_glass_border(self.bounds(), _COV_CARD_RADIUS)" in flat
