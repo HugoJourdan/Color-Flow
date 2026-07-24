@@ -660,7 +660,7 @@ _COV_COUNT_W = 34.0       # wider value column
 _COV_GAP = 8.0
 _COV_BAR_H = 10.0
 _COV_NAME_INDENT = 20.0   # disclosure/icon gutter for top-level names
-_COV_SUB_INDENT = _COV_NAME_INDENT + 12.0   # sub-category labels sit 12pt further right
+_COV_SUB_INDENT = _COV_NAME_INDENT + 10.0   # sub-category labels sit 10pt further right
 _COV_LEGEND_ROW_H = 18.0  # a swatch + colour name; the bottom legend grid's row height
 _COV_LEGEND_COLS = 2      # the bottom legend is a 2-column grid
 _COV_LEGEND_BOTTOM = 8.0  # margin below the legend card, at the sidebar's bottom edge
@@ -1182,7 +1182,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 						AppKit.NSMakeRect(card_x, row_y, card_w, visible_h)).addClip()
 					sub_y = row_y
 					for sub_name, sub_count, sub_segs, sub_key in subs:
-						# Same size as top-level names, indented 12pt further right (lighter grey too).
+						# Same size as top-level names, indented 10pt further right (lighter grey too).
 						self._draw_bar_row(sub_y, _COV_SUB_ROW_H, cx0, cw, sub_name, sub_count, sub_segs,
 						                   _COV_SUB_INDENT, 11.5, AppKit.NSColor.secondaryLabelColor(),
 						                   ("subcategory", key, sub_key))

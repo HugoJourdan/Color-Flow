@@ -965,8 +965,8 @@ def test_coverage_sidebar_bars_show_hand_cursor() -> None:
 
 
 def test_coverage_sidebar_subcategories_are_indented() -> None:
-    # Sub-rows are indented 12pt further right than the top-level names (lighter grey too).
-    assert "_COV_SUB_INDENT = _COV_NAME_INDENT + 12.0" in PLUGIN_SOURCE
+    # Sub-rows are indented 10pt further right than the top-level names (lighter grey too).
+    assert "_COV_SUB_INDENT = _COV_NAME_INDENT + 10.0" in PLUGIN_SOURCE
     marker = "# Same size as top-level names, indented"
     tail = PLUGIN_SOURCE[PLUGIN_SOURCE.index(marker):][:260]
     assert "_COV_SUB_INDENT, 11.5, AppKit.NSColor.secondaryLabelColor()" in tail
