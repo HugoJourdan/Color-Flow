@@ -1393,7 +1393,7 @@ try:
 			rect = AppKit.NSMakeRect(0, 0, 260, 600)
 			width = rect.size.width
 			container = AppKit.NSView.alloc().initWithFrame_(rect)
-			self._btn_h = 22.0
+			self._btn_h = 30.0
 			self._btn_pad = _COV_CARD_GAP                     # one uniform gap around the strip
 			# Only ONE pad in the strip height: the gap BELOW comes from the legend's own
 			# top inset (also _COV_CARD_GAP), so top and bottom gaps match.
