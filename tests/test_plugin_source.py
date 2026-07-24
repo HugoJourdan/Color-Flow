@@ -1253,7 +1253,7 @@ def test_cards_and_buttons_have_glass_rim() -> None:
     helper = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_glass_border("):][:2400]
     assert "initWithColors_atLocations_colorSpace_" in helper       # 3-stop diagonal gradient
     assert "[light, dark, dark, light]" in helper and "[0.0, 0.375, 0.625, 1.0]" in helper
-    assert "drawInRect_angle_(rect, 45.0 if bool(context.isFlipped()) else 135.0)" in helper
+    assert "drawInRect_angle_(rect, 90.0)" in helper               # vertical: lights top & bottom
     assert "WindingRuleEvenOdd" in helper or "EvenOddWindingRule" in helper
     # Used by the card drawers (Overall + sections card + legend); old flat strokes gone.
     # Buttons intentionally omit the rim (their dark layer bg must render in every state).

@@ -691,17 +691,16 @@ def _draw_glass_border(rect: Any, radius: float) -> None:
 	context = AppKit.NSGraphicsContext.currentContext()
 	context.saveGraphicsState()
 	ring.addClip()
-	light = AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.32)
+	light = AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.42)
 	dark = _card_fill_color()   # card colour, not black -> the dark stops blend into the card
-	# White dominates (~75%): a narrow card-coloured band (~25%) centred on the TR/BL
-	# diagonal, white ramping out to the lit TL/BR corners.
+	# Liquid-Glass rim: the light catches the TOP and BOTTOM edges. A vertical
+	# light -> card -> light gradient (light at both ends, a card-coloured band through
+	# the vertical middle) lights the top and bottom borders and fades on the sides.
 	gradient = AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
 		[light, dark, dark, light], [0.0, 0.375, 0.625, 1.0], AppKit.NSColorSpace.genericRGBColorSpace())
-	# A FIXED 45° lighting angle, not the corner-to-corner diagonal (whose angle would
-	# tilt with each card's aspect ratio and look inconsistent). The gradient's extremes
-	# still land exactly on the top-left & bottom-right corners for any rect. Flipped
-	# views (cards) want 45°, non-flipped (buttons) 135°, for the same visual result.
-	gradient.drawInRect_angle_(rect, 45.0 if bool(context.isFlipped()) else 135.0)
+	# 90° = vertical; the gradient is symmetric (light at both ends) so it lights top and
+	# bottom identically regardless of the view's flip.
+	gradient.drawInRect_angle_(rect, 90.0)
 	context.restoreGraphicsState()
 
 
