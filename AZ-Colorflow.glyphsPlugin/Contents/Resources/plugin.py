@@ -700,11 +700,12 @@ def _draw_glass_border(rect: Any, radius: float) -> None:
 	#    (symmetric, so flip-independent).
 	AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
 		[light, dark, dark, light], [0.0, 0.375, 0.625, 1.0], space).drawInRect_angle_(rect, 90.0)
-	# 2) horizontal card -> clear -> card: fade the highlight back to the card colour toward
-	#    the left/right ends, so the corners (top-left, top-right, and the bottom pair) stay
-	#    dark while the centres of the top/bottom edges stay lit.
+	# 2) diagonal card -> clear -> card along the TR<->BL axis: darken ONLY the top-right and
+	#    bottom-left corners, leaving the top-left & bottom-right corners (and the top/bottom
+	#    edge centres) lit. Flipped views want 135°, non-flipped 45°, for that same axis.
 	AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
-		[dark, card_clear, card_clear, dark], [0.0, 0.22, 0.78, 1.0], space).drawInRect_angle_(rect, 0.0)
+		[dark, card_clear, card_clear, dark], [0.0, 0.30, 0.70, 1.0], space).drawInRect_angle_(
+			rect, 135.0 if bool(context.isFlipped()) else 45.0)
 	context.restoreGraphicsState()
 
 
