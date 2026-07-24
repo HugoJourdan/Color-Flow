@@ -1198,14 +1198,17 @@ def test_category_and_script_share_one_card() -> None:
 
 
 def test_sidebar_buttons_have_card_coloured_background() -> None:
-    # Global Overview / Settings buttons drop the system bezel for a flat card-coloured
-    # fill (RGB 46,46,46) with a separator border, matching the cards above.
+    # Global Overview / Settings buttons drop the system bezel; _AZFlatButton.drawRect_
+    # paints a flat card-coloured fill (RGB 46,46,46) so they match the cards above.
     button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:900]
     assert "btn.setBordered_(False)" in button
-    assert "btn.setWantsLayer_(True)" in button
-    assert "_card_fill_color().CGColor()" in button
-    assert "setCornerRadius_(_COV_CARD_RADIUS)" in button
     assert "setBezelStyle_" not in button
+    assert "setWantsLayer_" not in button                          # no layer bg; drawn directly
+    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:2200]
+    assert "def drawRect_(self" in flat
+    assert "_card_fill_color().set()" in flat and "fill.fill()" in flat
+    assert "drawInteriorWithFrame_inView_(bounds, self)" in flat   # cell content, no bezel
+    assert "objc.super(_AZFlatButton, self).drawRect_" not in flat  # super would repaint light
 
 
 def test_sidebar_buttons_have_internal_padding() -> None:
@@ -1222,7 +1225,7 @@ def test_sidebar_buttons_hover_cursor_and_white_text() -> None:
     # Flat buttons show a pointing-hand cursor and brighten the label to white on hover
     # (background unchanged — no native bezel state).
     assert "class _AZFlatButton(AppKit.NSButton)" in PLUGIN_SOURCE
-    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:1700]
+    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:2400]
     assert "addCursorRect_cursor_(self.bounds(), AppKit.NSCursor.pointingHandCursor())" in flat
     assert "def updateTrackingAreas(self)" in flat
     assert "NSTrackingMouseEnteredAndExited" in flat
@@ -1253,5 +1256,5 @@ def test_cards_and_buttons_have_glass_rim() -> None:
     assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 4         # def + card + legend + button
     assert "card.stroke()" not in PLUGIN_SOURCE
     assert "layer.setBorderColor_(AppKit.NSColor.separatorColor().CGColor())" not in PLUGIN_SOURCE
-    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:1700]
-    assert "_draw_glass_border(self.bounds(), _COV_CARD_RADIUS)" in flat
+    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:2400]
+    assert "_draw_glass_border(bounds, _COV_CARD_RADIUS)" in flat

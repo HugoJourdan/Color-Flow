@@ -699,8 +699,8 @@ def _draw_glass_border(rect: Any, radius: float) -> None:
 	else:
 		top_left = AppKit.NSMakePoint(min_x, max_y)
 		bottom_right = AppKit.NSMakePoint(max_x, min_y)
-	light = AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.20)
-	dark = AppKit.NSColor.blackColor().colorWithAlphaComponent_(0.14)
+	light = AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.45)
+	dark = AppKit.NSColor.blackColor().colorWithAlphaComponent_(0.35)
 	gradient = AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
 		[light, dark, light], [0.0, 0.5, 1.0], AppKit.NSColorSpace.genericRGBColorSpace())
 	both_ends = (getattr(AppKit, "NSGradientDrawsBeforeStartingLocation", 1)
@@ -725,8 +725,15 @@ class _AZFlatButton(AppKit.NSButton):
 	# Flat sidebar button: pointing-hand cursor + dim-on-hover, since the borderless
 	# card-coloured bezel gives no hover/press feedback of its own.
 	def drawRect_(self, rect: Any) -> None:
-		objc.super(_AZFlatButton, self).drawRect_(rect)
-		_draw_glass_border(self.bounds(), _COV_CARD_RADIUS)   # glass rim, matching the cards
+		# Draw the whole button ourselves so the fill always matches the cards; calling
+		# super would repaint the default (light) button face over it.
+		bounds = self.bounds()
+		fill = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+			bounds, _COV_CARD_RADIUS, _COV_CARD_RADIUS)
+		_card_fill_color().set()
+		fill.fill()
+		_draw_glass_border(bounds, _COV_CARD_RADIUS)          # glass rim, matching the cards
+		self.cell().drawInteriorWithFrame_inView_(bounds, self)   # icon + title only, no bezel
 
 	def resetCursorRects(self) -> None:
 		self.addCursorRect_cursor_(self.bounds(), AppKit.NSCursor.pointingHandCursor())
@@ -1480,14 +1487,9 @@ try:
 				cell.setButtonType_(getattr(AppKit, "NSButtonTypeMomentaryPushIn", 7))
 				btn.setCell_(cell)
 				btn.setTitle_("  " + title)                        # gap between the icon and the label
-				# Flat card-coloured background (RGB 46,46,46 + separator border) instead of the
-				# system bezel, so the buttons match the coverage cards above them.
+				# Flat card-coloured fill + glass rim, both drawn in _AZFlatButton.drawRect_,
+				# so the buttons match the coverage cards above them (no system bezel).
 				btn.setBordered_(False)
-				btn.setWantsLayer_(True)
-				layer = btn.layer()
-				layer.setBackgroundColor_(_card_fill_color().CGColor())
-				layer.setCornerRadius_(_COV_CARD_RADIUS)
-				# The border is the glass rim drawn in _AZFlatButton.drawRect_ (top-lit gradient).
 				btn.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
 				image = None
 				if hasattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_"):
