@@ -1263,3 +1263,10 @@ def test_cards_and_buttons_have_glass_rim() -> None:
     assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 3         # def + card + legend
     assert "card.stroke()" not in PLUGIN_SOURCE
     assert "layer.setBorderColor_(AppKit.NSColor.separatorColor().CGColor())" not in PLUGIN_SOURCE
+
+
+def test_card_margins_are_uniform_8() -> None:
+    # 8pt margin on every side around the cards (sides, top, and below the legend).
+    assert "_COV_PAD = 8.0" in PLUGIN_SOURCE
+    assert "_COV_TOP = 8.0" in PLUGIN_SOURCE
+    assert "_COV_LEGEND_BOTTOM = 8.0" in PLUGIN_SOURCE

@@ -645,8 +645,8 @@ def _existing_report_path(font):
 
 # Layout metrics for the custom-drawn coverage list (points). Each section is an
 # AZ-Dock-style card: rounded fill + border, a darker header band, rows inside.
-_COV_PAD = 12.0           # outer margin around the cards
-_COV_TOP = 10.0
+_COV_PAD = 8.0            # outer margin around the cards
+_COV_TOP = 8.0            # top margin above the first card — matches _COV_PAD
 _COV_BAND_H = 24.0        # card header band (holds the section title)
 _COV_ROW_H = 22.0
 _COV_SUB_ROW_H = 20.0
