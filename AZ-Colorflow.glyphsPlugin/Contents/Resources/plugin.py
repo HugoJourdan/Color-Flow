@@ -675,15 +675,11 @@ def _card_fill_color() -> Any:
 	return AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(46 / 255.0, 46 / 255.0, 46 / 255.0, 1.0)
 
 
-_GLASS_CORNER_R = 40.0   # fixed radius (pt) of the TR/BL corner-darkening fade
-
-
 def _draw_glass_border(rect: Any, radius: float) -> None:
-	# Liquid-Glass rim on a 1pt ring: light catches the TOP and BOTTOM edges and the
-	# top-left / bottom-right corners; the top-right & bottom-left corners stay dark.
-	# Corner darkening uses a FIXED-radius radial fade so the rim looks identical on every
-	# card regardless of aspect ratio (a rect-normalised linear pass made the highlight's
-	# reach depend on the card's proportions — only the tall card looked right).
+	# macOS-Glass-like rim: a subtle 1pt ring lit diagonally — brighter at the top-left
+	# and bottom-right corners, darker at top-right and bottom-left. A 3-stop gradient
+	# (light -> dark -> light) along the TL->BR diagonal lands both off-diagonal corners
+	# on the dark midpoint. Flip-aware via the context (cards flipped, buttons not).
 	outer = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, radius, radius)
 	inner = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
 		AppKit.NSInsetRect(rect, 1.0, 1.0), max(0.0, radius - 1.0), max(0.0, radius - 1.0))
@@ -695,29 +691,17 @@ def _draw_glass_border(rect: Any, radius: float) -> None:
 	context = AppKit.NSGraphicsContext.currentContext()
 	context.saveGraphicsState()
 	ring.addClip()
-	light = AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.42)
-	dark = _card_fill_color()                        # opaque card colour, not black
-	card_clear = dark.colorWithAlphaComponent_(0.0)  # transparent card colour
-	space = AppKit.NSColorSpace.genericRGBColorSpace()
-	# Liquid-Glass rim in two passes, both clipped to the 1pt ring:
-	# 1) vertical light -> card -> light: the light catches the TOP and BOTTOM edges
-	#    (symmetric, so flip-independent).
-	AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
-		[light, dark, dark, light], [0.0, 0.375, 0.625, 1.0], space).drawInRect_angle_(rect, 90.0)
-	# 2) fixed-radius radial card -> clear fades centred on the top-right and bottom-left
-	#    corners: darken ONLY those two corners, leaving TL/BR and the top/bottom edge
-	#    centres lit. Fixed radius => identical corner shading on every card.
-	min_x, min_y = rect.origin.x, rect.origin.y
-	max_x, max_y = min_x + rect.size.width, min_y + rect.size.height
-	if bool(context.isFlipped()):                    # visual top-right / bottom-left
-		top_right = AppKit.NSMakePoint(max_x, min_y)
-		bottom_left = AppKit.NSMakePoint(min_x, max_y)
-	else:
-		top_right = AppKit.NSMakePoint(max_x, max_y)
-		bottom_left = AppKit.NSMakePoint(min_x, min_y)
-	corner = AppKit.NSGradient.alloc().initWithStartingColor_endingColor_(dark, card_clear)
-	corner.drawFromCenter_radius_toCenter_radius_options_(top_right, 0.0, top_right, _GLASS_CORNER_R, 0)
-	corner.drawFromCenter_radius_toCenter_radius_options_(bottom_left, 0.0, bottom_left, _GLASS_CORNER_R, 0)
+	light = AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.32)
+	dark = _card_fill_color()   # card colour, not black -> the dark stops blend into the card
+	# White dominates (~75%): a narrow card-coloured band (~25%) centred on the TR/BL
+	# diagonal, white ramping out to the lit TL/BR corners.
+	gradient = AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
+		[light, dark, dark, light], [0.0, 0.375, 0.625, 1.0], AppKit.NSColorSpace.genericRGBColorSpace())
+	# A FIXED 45° lighting angle, not the corner-to-corner diagonal (whose angle would
+	# tilt with each card's aspect ratio and look inconsistent). The gradient's extremes
+	# still land exactly on the top-left & bottom-right corners for any rect. Flipped
+	# views (cards) want 45°, non-flipped (buttons) 135°, for the same visual result.
+	gradient.drawInRect_angle_(rect, 45.0 if bool(context.isFlipped()) else 135.0)
 	context.restoreGraphicsState()
 
 
@@ -760,21 +744,6 @@ class _AZFlatButton(AppKit.NSButton):
 
 	def mouseExited_(self, event: Any) -> None:
 		self.setTitle_(self.title())   # drop the attributed title -> back to default label colour
-
-
-class _AZGlassOverlay(AppKit.NSView):
-	# Non-interactive overlay that draws the glass rim on top of a flat button, so the
-	# buttons get the same rim as the cards. A plain NSView renders via drawRect_ reliably
-	# (no NSButton CoreUI/updateLayer bezel weirdness); hitTest_ returns nil so clicks pass
-	# straight through to the button underneath.
-	def drawRect_(self, rect: Any) -> None:
-		_draw_glass_border(self.bounds(), _COV_CARD_RADIUS)
-
-	def hitTest_(self, point: Any) -> Any:
-		return None
-
-	def isFlipped(self) -> bool:
-		return False
 
 
 def _glyph_symbol_image(codepoint: int, point_size: float = 15.0) -> Any:
@@ -1212,9 +1181,9 @@ class _AZCoverageBarsView(AppKit.NSView):
 						AppKit.NSMakeRect(card_x, row_y, card_w, visible_h)).addClip()
 					sub_y = row_y
 					for sub_name, sub_count, sub_segs, sub_key in subs:
-						# Lighter grey + a 10pt deeper indent than top-level names (nesting cue).
+						# Same size + x as top-level names; only the lighter grey sets them apart.
 						self._draw_bar_row(sub_y, _COV_SUB_ROW_H, cx0, cw, sub_name, sub_count, sub_segs,
-						                   _COV_NAME_INDENT + 10.0, 11.5, AppKit.NSColor.secondaryLabelColor(),
+						                   _COV_NAME_INDENT, 11.5, AppKit.NSColor.secondaryLabelColor(),
 						                   ("subcategory", key, sub_key))
 						sub_y += _COV_SUB_ROW_H
 					context.restoreGraphicsState()
@@ -1512,6 +1481,11 @@ try:
 				btn.setWantsLayer_(True)
 				btn.layer().setBackgroundColor_(_card_fill_color().CGColor())
 				btn.layer().setCornerRadius_(_COV_CARD_RADIUS)
+				# Subtle light border (drawn by the layer, so it shows in every state). Not the
+				# cards' diagonal gradient rim — a CA sublayer would be needed for that.
+				btn.layer().setBorderWidth_(1.0)
+				btn.layer().setBorderColor_(
+					AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.22).CGColor())
 				btn.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
 				image = None
 				if hasattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_"):
@@ -1535,11 +1509,6 @@ try:
 				btn.setTarget_(self)
 				btn.setAction_(action)
 				btn.setToolTip_(tip)
-				# Glass rim on top (same as the cards), via a click-through overlay that
-				# resizes with the button.
-				overlay = _AZGlassOverlay.alloc().initWithFrame_(btn.bounds())
-				overlay.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
-				btn.addSubview_(overlay)
 				return btn
 
 			regular_w = getattr(AppKit, "NSFontWeightRegular", 0.0)

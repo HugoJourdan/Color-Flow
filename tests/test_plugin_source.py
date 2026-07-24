@@ -964,11 +964,11 @@ def test_coverage_sidebar_bars_show_hand_cursor() -> None:
     assert "invalidateCursorRectsForView_(self)" in PLUGIN_SOURCE
 
 
-def test_coverage_sidebar_subcategories_indent_deeper() -> None:
-    # Sub-rows sit 10pt deeper than top-level names (nesting cue) + lighter grey.
-    marker = "# Lighter grey + a 10pt deeper indent"
+def test_coverage_sidebar_subcategories_align_with_categories() -> None:
+    # Sub-rows share the top-level name size + x, only lighter grey distinguishes them.
+    marker = "# Same size + x as top-level names"
     tail = PLUGIN_SOURCE[PLUGIN_SOURCE.index(marker):][:260]
-    assert "_COV_NAME_INDENT + 10.0, 11.5, AppKit.NSColor.secondaryLabelColor()" in tail
+    assert "_COV_NAME_INDENT, 11.5, AppKit.NSColor.secondaryLabelColor()" in tail
 
 
 def test_settings_pane_icon_uses_chosen_sf_symbol() -> None:
@@ -1201,12 +1201,14 @@ def test_sidebar_buttons_have_card_coloured_background() -> None:
     # Global Overview / Settings buttons drop the system bezel for a dark card-coloured
     # fill. The layer background (updateLayer path) guarantees dark even where Glyphs'
     # layer-backed sidebar bypasses drawRect_; the rim is drawn on top in drawRect_.
-    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:900]
+    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:1300]
     assert "btn.setBordered_(False)" in button
     assert "setBezelStyle_" not in button
     assert "btn.setWantsLayer_(True)" in button
     assert "btn.layer().setBackgroundColor_(_card_fill_color().CGColor())" in button
     assert "btn.layer().setCornerRadius_(_COV_CARD_RADIUS)" in button
+    assert "btn.layer().setBorderWidth_(1.0)" in button             # visible border in every state
+    assert "setBorderColor_" in button
     # No custom drawRect_ on the button: a drawRect_ override only won the initial paint
     # on hover, so the default state showed the light system bezel. The dark layer bg
     # renders in every state via updateLayer.
@@ -1250,29 +1252,13 @@ def test_cards_and_buttons_have_glass_rim() -> None:
     # Cards, legend and buttons share a macOS-Glass-like top-lit gradient rim helper
     # instead of a flat separator stroke.
     assert "def _draw_glass_border(rect: Any, radius: float)" in PLUGIN_SOURCE
-    helper = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_glass_border("):][:3200]
+    helper = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_glass_border("):][:2400]
     assert "initWithColors_atLocations_colorSpace_" in helper       # 3-stop diagonal gradient
     assert "[light, dark, dark, light]" in helper and "[0.0, 0.375, 0.625, 1.0]" in helper
-    assert "drawInRect_angle_(rect, 90.0)" in helper               # pass 1 vertical: top & bottom
-    # Pass 2 darkens TR & BL corners with a FIXED-radius radial fade (aspect-independent).
-    assert "initWithStartingColor_endingColor_(dark, card_clear)" in helper
-    assert helper.count("drawFromCenter_radius_toCenter_radius_options_(") >= 2   # TR + BL
-    assert "_GLASS_CORNER_R" in helper
+    assert "drawInRect_angle_(rect, 45.0 if bool(context.isFlipped()) else 135.0)" in helper
     assert "WindingRuleEvenOdd" in helper or "EvenOddWindingRule" in helper
-    # Used by the card drawers (Overall + sections card + legend) AND the button overlay.
-    assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 4         # def + card + legend + overlay
+    # Used by the card drawers (Overall + sections card + legend); old flat strokes gone.
+    # Buttons intentionally omit the rim (their dark layer bg must render in every state).
+    assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 3         # def + card + legend
     assert "card.stroke()" not in PLUGIN_SOURCE
     assert "layer.setBorderColor_(AppKit.NSColor.separatorColor().CGColor())" not in PLUGIN_SOURCE
-
-
-def test_buttons_get_glass_rim_via_clickthrough_overlay() -> None:
-    # Buttons wear the same rim as the cards through a non-interactive overlay NSView
-    # (a plain NSView draws via drawRect_ reliably; hitTest_ nil clicks through). The
-    # button itself keeps NO drawRect_ so its dark layer bg renders in every state.
-    assert "class _AZGlassOverlay(AppKit.NSView)" in PLUGIN_SOURCE
-    overlay = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZGlassOverlay(AppKit.NSView)"):][:700]
-    assert "_draw_glass_border(self.bounds(), _COV_CARD_RADIUS)" in overlay
-    assert "def hitTest_(self, point" in overlay and "return None" in overlay
-    assert "_AZGlassOverlay.alloc().initWithFrame_(btn.bounds())" in PLUGIN_SOURCE
-    assert "overlay.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)" in PLUGIN_SOURCE
-    assert "btn.addSubview_(overlay)" in PLUGIN_SOURCE
