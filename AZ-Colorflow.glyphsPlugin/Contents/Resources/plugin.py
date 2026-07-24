@@ -691,21 +691,15 @@ def _draw_glass_border(rect: Any, radius: float) -> None:
 	context = AppKit.NSGraphicsContext.currentContext()
 	context.saveGraphicsState()
 	ring.addClip()
-	min_x, min_y = rect.origin.x, rect.origin.y
-	max_x, max_y = min_x + rect.size.width, min_y + rect.size.height
-	if bool(context.isFlipped()):                        # visual top-left -> bottom-right
-		top_left = AppKit.NSMakePoint(min_x, min_y)
-		bottom_right = AppKit.NSMakePoint(max_x, max_y)
-	else:
-		top_left = AppKit.NSMakePoint(min_x, max_y)
-		bottom_right = AppKit.NSMakePoint(max_x, min_y)
 	light = AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.45)
 	dark = AppKit.NSColor.blackColor().colorWithAlphaComponent_(0.35)
 	gradient = AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
 		[light, dark, light], [0.0, 0.5, 1.0], AppKit.NSColorSpace.genericRGBColorSpace())
-	both_ends = (getattr(AppKit, "NSGradientDrawsBeforeStartingLocation", 1)
-	             | getattr(AppKit, "NSGradientDrawsAfterEndingLocation", 2))
-	gradient.drawFromPoint_toPoint_options_(top_left, bottom_right, both_ends)
+	# A FIXED 45° lighting angle, not the corner-to-corner diagonal (whose angle would
+	# tilt with each card's aspect ratio and look inconsistent). The gradient's extremes
+	# still land exactly on the top-left & bottom-right corners for any rect. Flipped
+	# views (cards) want 45°, non-flipped (buttons) 135°, for the same visual result.
+	gradient.drawInRect_angle_(rect, 45.0 if bool(context.isFlipped()) else 135.0)
 	context.restoreGraphicsState()
 
 
@@ -722,8 +716,13 @@ class _AZPaddedButtonCell(AppKit.NSButtonCell):
 
 
 class _AZFlatButton(AppKit.NSButton):
-	# Flat sidebar button: pointing-hand cursor + dim-on-hover, since the borderless
-	# card-coloured bezel gives no hover/press feedback of its own.
+	# Flat sidebar button: pointing-hand cursor + hover feedback, drawn entirely in
+	# drawRect_ so the fill matches the cards.
+	def wantsUpdateLayer(self) -> bool:
+		# Inside Glyphs' (layer-backed) sidebar an NSButton would render via updateLayer
+		# / CoreUI and ignore drawRect_ — forcing False keeps our custom drawRect_.
+		return False
+
 	def drawRect_(self, rect: Any) -> None:
 		# Draw the whole button ourselves so the fill always matches the cards; calling
 		# super would repaint the default (light) button face over it.

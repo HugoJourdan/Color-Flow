@@ -1204,7 +1204,8 @@ def test_sidebar_buttons_have_card_coloured_background() -> None:
     assert "btn.setBordered_(False)" in button
     assert "setBezelStyle_" not in button
     assert "setWantsLayer_" not in button                          # no layer bg; drawn directly
-    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:2200]
+    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:2600]
+    assert "def wantsUpdateLayer(self)" in flat and "return False" in flat  # force drawRect_ path
     assert "def drawRect_(self" in flat
     assert "_card_fill_color().set()" in flat and "fill.fill()" in flat
     assert "drawInteriorWithFrame_inView_(bounds, self)" in flat   # cell content, no bezel
@@ -1249,8 +1250,7 @@ def test_cards_and_buttons_have_glass_rim() -> None:
     helper = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_glass_border("):][:2400]
     assert "initWithColors_atLocations_colorSpace_" in helper       # 3-stop diagonal gradient
     assert "[light, dark, light]" in helper and "[0.0, 0.5, 1.0]" in helper
-    assert "drawFromPoint_toPoint_options_(top_left, bottom_right" in helper
-    assert "isFlipped()" in helper                                  # diagonal lit-from-top-left in both
+    assert "drawInRect_angle_(rect, 45.0 if bool(context.isFlipped()) else 135.0)" in helper
     assert "WindingRuleEvenOdd" in helper or "EvenOddWindingRule" in helper
     # Used by both card drawers and the flat button, and the old flat strokes are gone.
     assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 4         # def + card + legend + button
