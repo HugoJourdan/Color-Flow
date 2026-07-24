@@ -675,6 +675,18 @@ def _card_fill_color() -> Any:
 	return AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(46 / 255.0, 46 / 255.0, 46 / 255.0, 1.0)
 
 
+_COV_BTN_INSET = (14.0, 5.0)   # (dx, dy) internal padding for the flat sidebar buttons
+
+
+class _AZPaddedButtonCell(AppKit.NSButtonCell):
+	# Flat sidebar buttons (bordered=False): inset the icon+title from the pill edges
+	# so a near-full-width label like "Global Overview" doesn't kiss the rounded ends.
+	def drawingRectForBounds_(self, rect: Any) -> Any:
+		dx, dy = _COV_BTN_INSET
+		inset = AppKit.NSInsetRect(rect, dx, dy)
+		return objc.super(_AZPaddedButtonCell, self).drawingRectForBounds_(inset)
+
+
 def _glyph_symbol_image(codepoint: int, point_size: float = 15.0) -> Any:
 	"""Render an SF-Symbol PUA glyph (macOS substitutes it into the system font) to
 	a template NSImage — lets us use a symbol we only have the glyph for (no name)."""
@@ -1403,6 +1415,9 @@ try:
 			# the legend (an equal-split NSStackView; frame set in _relayout).
 			def _text_button(symbol, fallback_name, title, action, tip, weight):
 				btn = AppKit.NSButton.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, 100, self._btn_h))
+				cell = _AZPaddedButtonCell.alloc().init()          # inset icon+title from the edges
+				cell.setButtonType_(getattr(AppKit, "NSButtonTypeMomentaryPushIn", 7))
+				btn.setCell_(cell)
 				btn.setTitle_(title)
 				# Flat card-coloured background (RGB 46,46,46 + separator border) instead of the
 				# system bezel, so the buttons match the coverage cards above them.

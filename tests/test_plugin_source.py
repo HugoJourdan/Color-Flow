@@ -1206,3 +1206,13 @@ def test_sidebar_buttons_have_card_coloured_background() -> None:
     assert "_card_fill_color().CGColor()" in button
     assert "setCornerRadius_(_COV_CARD_RADIUS)" in button
     assert "setBezelStyle_" not in button
+
+
+def test_sidebar_buttons_have_internal_padding() -> None:
+    # Flat buttons inset icon+title from the pill edges via a custom NSButtonCell.
+    assert "class _AZPaddedButtonCell(AppKit.NSButtonCell)" in PLUGIN_SOURCE
+    assert "def drawingRectForBounds_(self" in PLUGIN_SOURCE
+    assert "AppKit.NSInsetRect(rect, dx, dy)" in PLUGIN_SOURCE
+    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:1000]
+    assert "_AZPaddedButtonCell.alloc().init()" in button
+    assert "btn.setCell_(cell)" in button
