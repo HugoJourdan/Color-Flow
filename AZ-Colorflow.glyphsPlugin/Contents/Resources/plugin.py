@@ -703,10 +703,15 @@ class _AZFlatButton(AppKit.NSButton):
 			self.bounds(), opts, self, None))
 
 	def mouseEntered_(self, event: Any) -> None:
-		self.setAlphaValue_(0.65)
+		# Hover: brighten the label to full white (background stays put).
+		font = self.font() or AppKit.NSFont.systemFontOfSize_(11.0)
+		attrs = {AppKit.NSFontAttributeName: font,
+		         AppKit.NSForegroundColorAttributeName: AppKit.NSColor.whiteColor()}
+		self.setAttributedTitle_(
+			AppKit.NSAttributedString.alloc().initWithString_attributes_(self.title(), attrs))
 
 	def mouseExited_(self, event: Any) -> None:
-		self.setAlphaValue_(1.0)
+		self.setTitle_(self.title())   # drop the attributed title -> back to default label colour
 
 
 def _glyph_symbol_image(codepoint: int, point_size: float = 15.0) -> Any:

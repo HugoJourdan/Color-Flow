@@ -1218,15 +1218,18 @@ def test_sidebar_buttons_have_internal_padding() -> None:
     assert "btn.setCell_(cell)" in button
 
 
-def test_sidebar_buttons_hover_cursor_and_dim() -> None:
-    # Flat buttons show a pointing-hand cursor and dim on hover (no native bezel state).
+def test_sidebar_buttons_hover_cursor_and_white_text() -> None:
+    # Flat buttons show a pointing-hand cursor and brighten the label to white on hover
+    # (background unchanged — no native bezel state).
     assert "class _AZFlatButton(AppKit.NSButton)" in PLUGIN_SOURCE
-    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:900]
+    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:1700]
     assert "addCursorRect_cursor_(self.bounds(), AppKit.NSCursor.pointingHandCursor())" in flat
     assert "def updateTrackingAreas(self)" in flat
     assert "NSTrackingMouseEnteredAndExited" in flat
-    assert "def mouseEntered_(self" in flat and "self.setAlphaValue_(0.65)" in flat
-    assert "def mouseExited_(self" in flat and "self.setAlphaValue_(1.0)" in flat
+    assert "def mouseEntered_(self" in flat and "NSColor.whiteColor()" in flat
+    assert "setAttributedTitle_" in flat
+    assert "def mouseExited_(self" in flat and "self.setTitle_(self.title())" in flat
+    assert "setAlphaValue_" not in flat
     button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:1000]
     assert "_AZFlatButton.alloc().initWithFrame_" in button
 
