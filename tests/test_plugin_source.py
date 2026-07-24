@@ -1250,12 +1250,14 @@ def test_cards_and_buttons_have_glass_rim() -> None:
     # Cards, legend and buttons share a macOS-Glass-like top-lit gradient rim helper
     # instead of a flat separator stroke.
     assert "def _draw_glass_border(rect: Any, radius: float)" in PLUGIN_SOURCE
-    helper = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_glass_border("):][:2400]
+    helper = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_glass_border("):][:3200]
     assert "initWithColors_atLocations_colorSpace_" in helper       # 3-stop diagonal gradient
     assert "[light, dark, dark, light]" in helper and "[0.0, 0.375, 0.625, 1.0]" in helper
     assert "drawInRect_angle_(rect, 90.0)" in helper               # pass 1 vertical: top & bottom
-    assert "[dark, card_clear, card_clear, dark]" in helper and "[0.0, 0.30, 0.70, 1.0]" in helper
-    assert "rect, 135.0 if bool(context.isFlipped()) else 45.0" in helper  # pass 2: darken TR & BL only
+    # Pass 2 darkens TR & BL corners with a FIXED-radius radial fade (aspect-independent).
+    assert "initWithStartingColor_endingColor_(dark, card_clear)" in helper
+    assert helper.count("drawFromCenter_radius_toCenter_radius_options_(") >= 2   # TR + BL
+    assert "_GLASS_CORNER_R" in helper
     assert "WindingRuleEvenOdd" in helper or "EvenOddWindingRule" in helper
     # Used by the card drawers (Overall + sections card + legend) AND the button overlay.
     assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 4         # def + card + legend + overlay

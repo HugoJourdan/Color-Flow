@@ -675,11 +675,15 @@ def _card_fill_color() -> Any:
 	return AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(46 / 255.0, 46 / 255.0, 46 / 255.0, 1.0)
 
 
+_GLASS_CORNER_R = 40.0   # fixed radius (pt) of the TR/BL corner-darkening fade
+
+
 def _draw_glass_border(rect: Any, radius: float) -> None:
-	# macOS-Glass-like rim: a subtle 1pt ring lit diagonally — brighter at the top-left
-	# and bottom-right corners, darker at top-right and bottom-left. A 3-stop gradient
-	# (light -> dark -> light) along the TL->BR diagonal lands both off-diagonal corners
-	# on the dark midpoint. Flip-aware via the context (cards flipped, buttons not).
+	# Liquid-Glass rim on a 1pt ring: light catches the TOP and BOTTOM edges and the
+	# top-left / bottom-right corners; the top-right & bottom-left corners stay dark.
+	# Corner darkening uses a FIXED-radius radial fade so the rim looks identical on every
+	# card regardless of aspect ratio (a rect-normalised linear pass made the highlight's
+	# reach depend on the card's proportions — only the tall card looked right).
 	outer = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, radius, radius)
 	inner = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
 		AppKit.NSInsetRect(rect, 1.0, 1.0), max(0.0, radius - 1.0), max(0.0, radius - 1.0))
@@ -700,12 +704,20 @@ def _draw_glass_border(rect: Any, radius: float) -> None:
 	#    (symmetric, so flip-independent).
 	AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
 		[light, dark, dark, light], [0.0, 0.375, 0.625, 1.0], space).drawInRect_angle_(rect, 90.0)
-	# 2) diagonal card -> clear -> card along the TR<->BL axis: darken ONLY the top-right and
-	#    bottom-left corners, leaving the top-left & bottom-right corners (and the top/bottom
-	#    edge centres) lit. Flipped views want 135°, non-flipped 45°, for that same axis.
-	AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
-		[dark, card_clear, card_clear, dark], [0.0, 0.30, 0.70, 1.0], space).drawInRect_angle_(
-			rect, 135.0 if bool(context.isFlipped()) else 45.0)
+	# 2) fixed-radius radial card -> clear fades centred on the top-right and bottom-left
+	#    corners: darken ONLY those two corners, leaving TL/BR and the top/bottom edge
+	#    centres lit. Fixed radius => identical corner shading on every card.
+	min_x, min_y = rect.origin.x, rect.origin.y
+	max_x, max_y = min_x + rect.size.width, min_y + rect.size.height
+	if bool(context.isFlipped()):                    # visual top-right / bottom-left
+		top_right = AppKit.NSMakePoint(max_x, min_y)
+		bottom_left = AppKit.NSMakePoint(min_x, max_y)
+	else:
+		top_right = AppKit.NSMakePoint(max_x, max_y)
+		bottom_left = AppKit.NSMakePoint(min_x, min_y)
+	corner = AppKit.NSGradient.alloc().initWithStartingColor_endingColor_(dark, card_clear)
+	corner.drawFromCenter_radius_toCenter_radius_options_(top_right, 0.0, top_right, _GLASS_CORNER_R, 0)
+	corner.drawFromCenter_radius_toCenter_radius_options_(bottom_left, 0.0, bottom_left, _GLASS_CORNER_R, 0)
 	context.restoreGraphicsState()
 
 
