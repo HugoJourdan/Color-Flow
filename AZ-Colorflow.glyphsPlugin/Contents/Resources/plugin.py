@@ -645,8 +645,8 @@ def _existing_report_path(font):
 
 # Layout metrics for the custom-drawn coverage list (points). Each section is an
 # AZ-Dock-style card: rounded fill + border, a darker header band, rows inside.
-_COV_PAD = 8.0            # outer margin around the cards
-_COV_TOP = 8.0            # top margin above the first card — matches _COV_PAD
+_COV_PAD = 10.0           # outer margin around the cards
+_COV_TOP = 10.0           # top margin above the first card — matches _COV_PAD
 _COV_BAND_H = 24.0        # card header band (holds the section title)
 _COV_ROW_H = 22.0
 _COV_SUB_ROW_H = 20.0
@@ -663,7 +663,7 @@ _COV_NAME_INDENT = 20.0   # disclosure/icon gutter for top-level names
 _COV_SUB_INDENT = _COV_NAME_INDENT + 10.0   # sub-category labels sit 10pt further right
 _COV_LEGEND_ROW_H = 18.0  # a swatch + colour name; the bottom legend grid's row height
 _COV_LEGEND_COLS = 2      # the bottom legend is a 2-column grid
-_COV_LEGEND_BOTTOM = 8.0  # margin below the legend card, at the sidebar's bottom edge
+_COV_LEGEND_BOTTOM = 10.0  # margin below the legend card, at the sidebar's bottom edge
 _NS_ALIGN_LEFT = getattr(AppKit, "NSTextAlignmentLeft", 0)
 _NS_ALIGN_RIGHT = getattr(AppKit, "NSTextAlignmentRight", 2)   # 10.12+ raw value
 _NS_TRUNCATE_TAIL = getattr(AppKit, "NSLineBreakByTruncatingTail", 4)
