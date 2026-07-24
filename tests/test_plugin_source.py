@@ -992,7 +992,7 @@ def test_coverage_sidebar_has_color_legend() -> None:
     # A bottom-pinned, titleless 2-column legend grid of pill swatches, with a bottom margin.
     assert "class _AZLegendView(AppKit.NSView)" in PLUGIN_SOURCE
     assert "_COV_LEGEND_COLS = 2" in PLUGIN_SOURCE
-    assert "_COV_LEGEND_BOTTOM" in PLUGIN_SOURCE            # margin below the legend card
+    assert "_COV_FOOTER_INSET_Y" in PLUGIN_SOURCE           # panel content inset
     assert "swatch, sw_h / 2.0, sw_h / 2.0" in PLUGIN_SOURCE   # pill swatch
     assert "def heightForWidth_(self" in PLUGIN_SOURCE
     assert "NSViewMaxYMargin" in _sidebar_block()          # legend pinned to the bottom
@@ -1038,17 +1038,29 @@ def test_sidebar_buttons_and_legend_share_one_footer_card() -> None:
     assert "NSImageLeading" in block                              # icon left of text
     assert 'btn.setTitle_("  " + title)' in block                 # text label (spaced from icon)
     assert "addArrangedSubview_(self._report)" in block and "addArrangedSubview_(self._gear)" in block
-    assert "legend.addSubview_(button_row)" in block              # buttons live in the card
+    assert "legend.addSubview_(button_row)" in block              # buttons live in the panel
     assert "container.addSubview_(button_row)" not in block       # ...not beside it
-    assert "inset = _COV_PAD + _COV_CARD_PADX" in block           # inset to the card's padding
-    assert "NSMakeRect(inset, _COV_CARD_GAP + _COV_CARD_PADY" in block  # top of the (flipped) card
+    assert "inset = _COV_FOOTER_INSET_X" in block                 # panel content inset
+    assert "NSMakeRect(inset, _COV_FOOTER_INSET_Y" in block       # top of the (flipped) panel
     assert "cb.width - 2 * inset), _COV_BTN_H))" in block
-    assert "cb.height - footer_h" in block                        # scroll fills above the card
+    assert "cb.height - footer_h" in block                        # scroll fills above the panel
     assert "strip_h" not in block                                 # no separate button strip
     assert "button_row.setSpacing_(_COV_CARD_GAP)" in block
-    # The legend view sizes the shared card: buttons on top, grid below.
+    # The legend view sizes the shared panel: buttons on top, grid below.
     assert "def legendTop(self)" in PLUGIN_SOURCE
-    assert "_COV_CARD_GAP + _COV_CARD_PADY + _COV_BTN_H + _COV_CARD_GAP" in PLUGIN_SOURCE
+    assert "_COV_FOOTER_INSET_Y + _COV_BTN_H + _COV_CARD_GAP" in PLUGIN_SOURCE
+
+
+def test_bottom_panel_is_full_bleed() -> None:
+    # AZ-Argus pins its settings panel flush to the sidebar edges: full width, no
+    # margins, no rounded card, no rim — just an inset for its contents.
+    assert "_COV_FOOTER_INSET_X = 14.0" in PLUGIN_SOURCE
+    assert "_COV_FOOTER_INSET_Y = 12.0" in PLUGIN_SOURCE
+    draw = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZLegendView(AppKit.NSView)"):]
+    draw = draw[draw.index("def drawRect_(self"):][:900]
+    assert "bezierPathWithRect_(bounds).fill()" in draw           # fills the whole view
+    assert "_draw_glass_border" not in draw                       # no card rim
+    assert "_COV_CARD_RADIUS" not in draw                         # no rounded card
     # The opener actually opens the window (selecting the tab alone won't front it).
     assert "def _open_settings_window(" in PLUGIN_SOURCE
     assert "performActionForItemAtIndex_" in PLUGIN_SOURCE
@@ -1263,9 +1275,9 @@ def test_cards_and_buttons_have_glass_rim() -> None:
     assert "[light, dark, dark, light]" in helper and "[0.0, 0.375, 0.625, 1.0]" in helper
     assert "drawInRect_angle_(rect, 45.0 if bool(context.isFlipped()) else 135.0)" in helper
     assert "WindingRuleEvenOdd" in helper or "EvenOddWindingRule" in helper
-    # Used by the card drawers (Overall + sections card + legend); old flat strokes gone.
-    # Buttons intentionally omit the rim (their dark layer bg must render in every state).
-    assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 3         # def + card + legend
+    # Used by the scrolling cards (_draw_card); the full-bleed bottom panel and the
+    # buttons intentionally omit the rim.
+    assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 2         # def + _draw_card
     assert "card.stroke()" not in PLUGIN_SOURCE
     assert "layer.setBorderColor_(AppKit.NSColor.separatorColor().CGColor())" not in PLUGIN_SOURCE
 
@@ -1277,7 +1289,8 @@ def test_card_margins_are_uniform_10() -> None:
     assert "AZ_SIDE_MARGIN = 10.0" in PLUGIN_SOURCE
     assert "_COV_PAD = AZ_SIDE_MARGIN" in PLUGIN_SOURCE
     assert "_COV_TOP = AZ_SIDE_MARGIN" in PLUGIN_SOURCE
-    assert "_COV_LEGEND_BOTTOM = 10.0" in PLUGIN_SOURCE
+    # The pinned bottom panel is the exception: full-bleed, so it has no margin at all.
+    assert "_COV_LEGEND_BOTTOM" not in PLUGIN_SOURCE
 
 
 def test_sidebar_tab_identity_follows_suite_convention() -> None:

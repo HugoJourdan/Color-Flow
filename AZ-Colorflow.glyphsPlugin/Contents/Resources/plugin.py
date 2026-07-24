@@ -692,8 +692,12 @@ _COV_NAME_INDENT = 20.0   # disclosure/icon gutter for top-level names
 _COV_SUB_INDENT = _COV_NAME_INDENT + 10.0   # sub-category labels sit 10pt further right
 _COV_LEGEND_ROW_H = 18.0  # a swatch + colour name; the bottom legend grid's row height
 _COV_LEGEND_COLS = 2      # the bottom legend is a 2-column grid
-_COV_LEGEND_BOTTOM = 10.0  # margin below the footer card, at the sidebar's bottom edge
-_COV_BTN_H = 30.0         # sidebar button height (buttons live inside the footer card)
+_COV_BTN_H = 30.0         # sidebar button height (buttons live in the footer panel)
+# Pinned bottom panel (buttons + legend), AZ-Argus style: FULL-BLEED — flush to the
+# sidebar's left/right/bottom edges, no margins and no rounded card, just an inset for
+# its contents.
+_COV_FOOTER_INSET_X = 14.0
+_COV_FOOTER_INSET_Y = 12.0
 _NS_ALIGN_LEFT = getattr(AppKit, "NSTextAlignmentLeft", 0)
 _NS_ALIGN_RIGHT = getattr(AppKit, "NSTextAlignmentRight", 2)   # 10.12+ raw value
 _NS_TRUNCATE_TAIL = getattr(AppKit, "NSLineBreakByTruncatingTail", 4)
@@ -1350,37 +1354,34 @@ class _AZLegendView(AppKit.NSView):
 	@objc.python_method
 	def legendTop(self) -> float:
 		# y (in this flipped view) of the first legend row: below the button row that
-		# shares this card.
-		return _COV_CARD_GAP + _COV_CARD_PADY + _COV_BTN_H + _COV_CARD_GAP
+		# shares this panel.
+		return _COV_FOOTER_INSET_Y + _COV_BTN_H + _COV_CARD_GAP
 
 	@objc.python_method
 	def heightForWidth_(self, width: float) -> float:
-		# One footer card holding the button row on top and the legend grid below it
-		# (AZ-Argus style). Kept > 0 even with no colours so the buttons stay visible.
+		# Pinned bottom panel: button row on top, legend grid below it. Kept > 0 even
+		# with no colours so the buttons stay visible.
 		rows = self._row_count()
 		height = self.legendTop()
 		if rows > 0:
 			height += rows * _COV_LEGEND_ROW_H
 		else:
 			height -= _COV_CARD_GAP          # no grid -> no gap under the buttons
-		return height + _COV_CARD_PADY + _COV_LEGEND_BOTTOM
+		return height + _COV_FOOTER_INSET_Y
 
 	def drawRect_(self, dirtyRect: Any) -> None:
 		self._cell_hits = []
 		entries = getattr(self, "_entries", None) or []
 		bounds = self.bounds()
-		card_rect = AppKit.NSMakeRect(_COV_PAD, _COV_CARD_GAP, bounds.size.width - 2 * _COV_PAD,
-		                              bounds.size.height - _COV_CARD_GAP - _COV_LEGEND_BOTTOM)
-		card = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
-			card_rect, _COV_CARD_RADIUS, _COV_CARD_RADIUS)
+		# Full-bleed panel: fill the whole view, no inset card and no rounded rim, so it
+		# sits flush against the sidebar's edges (AZ-Argus' pinned settings panel).
 		_card_fill_color().set()
-		card.fill()
-		_draw_glass_border(card_rect, _COV_CARD_RADIUS)
-		if not entries:                       # card (with the buttons in it) still shows
+		AppKit.NSBezierPath.bezierPathWithRect_(bounds).fill()
+		if not entries:                       # panel (with the buttons in it) still shows
 			return
 		focus = getattr(self, "_focus", None)
-		cx0 = card_rect.origin.x + _COV_CARD_PADX
-		cw = card_rect.size.width - 2 * _COV_CARD_PADX
+		cx0 = _COV_FOOTER_INSET_X
+		cw = bounds.size.width - 2 * _COV_FOOTER_INSET_X
 		col_w = cw / _COV_LEGEND_COLS
 		style = AppKit.NSMutableParagraphStyle.alloc().init()
 		style.setLineBreakMode_(_NS_TRUNCATE_TAIL)
@@ -1915,12 +1916,12 @@ try:
 				footer_h = legend.heightForWidth_(cb.width)
 				legend.setFrame_(AppKit.NSMakeRect(0, 0, cb.width, footer_h))
 				legend.setHidden_(footer_h <= 0.0)
-				# Two equal columns at the top of the card, inset to the card's padding
-				# (the legend view is flipped, so this y is its top).
+				# Two equal columns at the top of the panel, on its content inset (the
+				# legend view is flipped, so this y is its top).
 				row = getattr(self, "_button_row", None)
 				if row is not None:
-					inset = _COV_PAD + _COV_CARD_PADX
-					row.setFrame_(AppKit.NSMakeRect(inset, _COV_CARD_GAP + _COV_CARD_PADY,
+					inset = _COV_FOOTER_INSET_X
+					row.setFrame_(AppKit.NSMakeRect(inset, _COV_FOOTER_INSET_Y,
 					                                max(0.0, cb.width - 2 * inset), _COV_BTN_H))
 			scroll.setFrame_(AppKit.NSMakeRect(0, footer_h, cb.width,
 			                                   max(0.0, cb.height - footer_h)))
