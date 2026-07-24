@@ -692,9 +692,9 @@ def _draw_glass_border(rect: Any, radius: float) -> None:
 	context.saveGraphicsState()
 	ring.addClip()
 	light = AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.32)
-	dark = AppKit.NSColor.blackColor().colorWithAlphaComponent_(0.35)
-	# White dominates (~75%): a narrow black band (~25%) centred on the TR/BL diagonal,
-	# white ramping out to the lit TL/BR corners.
+	dark = _card_fill_color()   # card colour, not black -> the dark stops blend into the card
+	# White dominates (~75%): a narrow card-coloured band (~25%) centred on the TR/BL
+	# diagonal, white ramping out to the lit TL/BR corners.
 	gradient = AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
 		[light, dark, dark, light], [0.0, 0.375, 0.625, 1.0], AppKit.NSColorSpace.genericRGBColorSpace())
 	# A FIXED 45° lighting angle, not the corner-to-corner diagonal (whose angle would
@@ -1488,9 +1488,13 @@ try:
 				cell.setButtonType_(getattr(AppKit, "NSButtonTypeMomentaryPushIn", 7))
 				btn.setCell_(cell)
 				btn.setTitle_("  " + title)                        # gap between the icon and the label
-				# Flat card-coloured fill + glass rim, both drawn in _AZFlatButton.drawRect_,
-				# so the buttons match the coverage cards above them (no system bezel).
+				# Dark card-coloured fill via the layer (renders through updateLayer even when
+				# Glyphs' layer-backed sidebar bypasses drawRect_); the glass rim is drawn on
+				# top in _AZFlatButton.drawRect_. No system bezel.
 				btn.setBordered_(False)
+				btn.setWantsLayer_(True)
+				btn.layer().setBackgroundColor_(_card_fill_color().CGColor())
+				btn.layer().setCornerRadius_(_COV_CARD_RADIUS)
 				btn.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
 				image = None
 				if hasattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_"):

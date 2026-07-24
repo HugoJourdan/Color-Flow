@@ -1198,14 +1198,16 @@ def test_category_and_script_share_one_card() -> None:
 
 
 def test_sidebar_buttons_have_card_coloured_background() -> None:
-    # Global Overview / Settings buttons drop the system bezel; _AZFlatButton.drawRect_
-    # paints a flat card-coloured fill (RGB 46,46,46) so they match the cards above.
+    # Global Overview / Settings buttons drop the system bezel for a dark card-coloured
+    # fill. The layer background (updateLayer path) guarantees dark even where Glyphs'
+    # layer-backed sidebar bypasses drawRect_; the rim is drawn on top in drawRect_.
     button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:900]
     assert "btn.setBordered_(False)" in button
     assert "setBezelStyle_" not in button
-    assert "setWantsLayer_" not in button                          # no layer bg; drawn directly
+    assert "btn.setWantsLayer_(True)" in button
+    assert "btn.layer().setBackgroundColor_(_card_fill_color().CGColor())" in button
+    assert "btn.layer().setCornerRadius_(_COV_CARD_RADIUS)" in button
     flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:2600]
-    assert "def wantsUpdateLayer(self)" in flat and "return False" in flat  # force drawRect_ path
     assert "def drawRect_(self" in flat
     assert "_card_fill_color().set()" in flat and "fill.fill()" in flat
     assert "drawInteriorWithFrame_inView_(bounds, self)" in flat   # cell content, no bezel
