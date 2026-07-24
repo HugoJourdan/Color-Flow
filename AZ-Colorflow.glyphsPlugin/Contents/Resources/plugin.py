@@ -676,10 +676,10 @@ def _card_fill_color() -> Any:
 
 
 def _draw_glass_border(rect: Any, radius: float) -> None:
-	# macOS-Glass-like rim: a 1pt border ring filled with a top-lit white gradient —
-	# a bright specular highlight along the top edge fading to a faint hairline below.
-	# Flip-aware via the context so it reads "lit from above" in flipped views (cards)
-	# and non-flipped ones (buttons) alike.
+	# macOS-Glass-like rim: a subtle 1pt ring lit diagonally — brighter at the top-left
+	# and bottom-right corners, darker at top-right and bottom-left. A 3-stop gradient
+	# (light -> dark -> light) along the TL->BR diagonal lands both off-diagonal corners
+	# on the dark midpoint. Flip-aware via the context (cards flipped, buttons not).
 	outer = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, radius, radius)
 	inner = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
 		AppKit.NSInsetRect(rect, 1.0, 1.0), max(0.0, radius - 1.0), max(0.0, radius - 1.0))
@@ -691,15 +691,21 @@ def _draw_glass_border(rect: Any, radius: float) -> None:
 	context = AppKit.NSGraphicsContext.currentContext()
 	context.saveGraphicsState()
 	ring.addClip()
-	max_y = rect.origin.y + rect.size.height
-	flipped = bool(context.isFlipped())
-	top_y = rect.origin.y if flipped else max_y          # visual top edge
-	bottom_y = max_y if flipped else rect.origin.y
-	mid_x = AppKit.NSMidX(rect)
-	AppKit.NSGradient.alloc().initWithStartingColor_endingColor_(
-		AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.42),
-		AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.06)).drawFromPoint_toPoint_options_(
-			AppKit.NSMakePoint(mid_x, top_y), AppKit.NSMakePoint(mid_x, bottom_y), 0)
+	min_x, min_y = rect.origin.x, rect.origin.y
+	max_x, max_y = min_x + rect.size.width, min_y + rect.size.height
+	if bool(context.isFlipped()):                        # visual top-left -> bottom-right
+		top_left = AppKit.NSMakePoint(min_x, min_y)
+		bottom_right = AppKit.NSMakePoint(max_x, max_y)
+	else:
+		top_left = AppKit.NSMakePoint(min_x, max_y)
+		bottom_right = AppKit.NSMakePoint(max_x, min_y)
+	light = AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.20)
+	dark = AppKit.NSColor.blackColor().colorWithAlphaComponent_(0.14)
+	gradient = AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
+		[light, dark, light], [0.0, 0.5, 1.0], AppKit.NSColorSpace.genericRGBColorSpace())
+	both_ends = (getattr(AppKit, "NSGradientDrawsBeforeStartingLocation", 1)
+	             | getattr(AppKit, "NSGradientDrawsAfterEndingLocation", 2))
+	gradient.drawFromPoint_toPoint_options_(top_left, bottom_right, both_ends)
 	context.restoreGraphicsState()
 
 
