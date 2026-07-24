@@ -1028,22 +1028,27 @@ def test_sidebar_has_settings_gear() -> None:
     assert "_open_preferences_pane()" in block
 
 
-def test_sidebar_buttons_are_full_width_two_columns_above_the_legend() -> None:
+def test_sidebar_buttons_and_legend_share_one_footer_card() -> None:
     # Report + Settings are full-width icon+text buttons in an equal-split two-column
-    # row, directly above the legend; _relayout stacks legend, button row, then scroll.
+    # row INSIDE the footer card, above the legend grid (AZ-Argus style); the scroll
+    # view fills everything above that card.
     block = _sidebar_block()
     assert "NSStackView.alloc()" in block
     assert "NSStackViewDistributionFillEqually" in block          # two equal columns
     assert "NSImageLeading" in block                              # icon left of text
     assert 'btn.setTitle_("  " + title)' in block                 # text label (spaced from icon)
     assert "addArrangedSubview_(self._report)" in block and "addArrangedSubview_(self._gear)" in block
-    assert "row.setFrame_(AppKit.NSMakeRect(_COV_PAD, footer_h" in block   # card-aligned margin, flush
-    assert "cb.width - 2 * _COV_PAD" in block                      # same inset as the cards/legend
-    assert "cb.height - footer_h - strip_h" in block              # scroll fills above the strip
-    # Uniform gaps: strip = one pad, spacing = the card gap, both = _COV_CARD_GAP.
-    assert "self._strip_h = self._btn_h + self._btn_pad" in block
+    assert "legend.addSubview_(button_row)" in block              # buttons live in the card
+    assert "container.addSubview_(button_row)" not in block       # ...not beside it
+    assert "inset = _COV_PAD + _COV_CARD_PADX" in block           # inset to the card's padding
+    assert "NSMakeRect(inset, _COV_CARD_GAP + _COV_CARD_PADY" in block  # top of the (flipped) card
+    assert "cb.width - 2 * inset), _COV_BTN_H))" in block
+    assert "cb.height - footer_h" in block                        # scroll fills above the card
+    assert "strip_h" not in block                                 # no separate button strip
     assert "button_row.setSpacing_(_COV_CARD_GAP)" in block
-    assert "self._btn_pad = _COV_CARD_GAP" in block
+    # The legend view sizes the shared card: buttons on top, grid below.
+    assert "def legendTop(self)" in PLUGIN_SOURCE
+    assert "_COV_CARD_GAP + _COV_CARD_PADY + _COV_BTN_H + _COV_CARD_GAP" in PLUGIN_SOURCE
     # The opener actually opens the window (selecting the tab alone won't front it).
     assert "def _open_settings_window(" in PLUGIN_SOURCE
     assert "performActionForItemAtIndex_" in PLUGIN_SOURCE
@@ -1176,10 +1181,10 @@ def test_hosted_report_never_spins_the_host_main_thread_needlessly() -> None:
 
 
 def test_coverage_cards_use_fixed_grey_fill() -> None:
-    # Cards use a fixed RGB 46,46,46 fill (matching the palette), not the theme's
+    # Cards use a fixed RGB 40,40,40 fill (matching the palette), not the theme's
     # translucent quaternaryLabelColor.
     assert "def _card_fill_color()" in PLUGIN_SOURCE
-    assert "46 / 255.0" in PLUGIN_SOURCE
+    assert "40 / 255.0" in PLUGIN_SOURCE
     assert PLUGIN_SOURCE.count("_card_fill_color().set()") >= 2
     assert "quaternaryLabelColor()" not in PLUGIN_SOURCE
 
@@ -1267,6 +1272,38 @@ def test_cards_and_buttons_have_glass_rim() -> None:
 
 def test_card_margins_are_uniform_10() -> None:
     # 10pt margin on every side around the cards (sides, top, and below the legend).
-    assert "_COV_PAD = 10.0" in PLUGIN_SOURCE
-    assert "_COV_TOP = 10.0" in PLUGIN_SOURCE
+    # The side/top margins now come from the shared AZ suite token rather than a
+    # local literal, so assert the token's value plus the wiring.
+    assert "AZ_SIDE_MARGIN = 10.0" in PLUGIN_SOURCE
+    assert "_COV_PAD = AZ_SIDE_MARGIN" in PLUGIN_SOURCE
+    assert "_COV_TOP = AZ_SIDE_MARGIN" in PLUGIN_SOURCE
     assert "_COV_LEGEND_BOTTOM = 10.0" in PLUGIN_SOURCE
+
+
+def test_sidebar_tab_identity_follows_suite_convention() -> None:
+    # Every AZ sidebar tab: "AZ "-prefixed title and one cached 17.6pt template icon.
+    assert '_TAB_TITLE = "AZ Colorflow"' in PLUGIN_SOURCE
+    assert "AZ_TAB_ICON_H = 17.6" in PLUGIN_SOURCE
+    assert "_TAB_IMAGE_CACHE" in PLUGIN_SOURCE
+
+
+def test_sidebar_sets_instance_title_for_the_hover_tooltip() -> None:
+    # Glyphs builds the tab bar itself and sets each segment's tooltip from the
+    # controller INSTANCE's -title (GlyphsApp, editViewLeftSidebarControllers
+    # loop). +title is only the tab label, so the instance title must be set or
+    # the segment tooltip is nil and hovering shows nothing.
+    assert "self.setTitle_(_TAB_TITLE)" in PLUGIN_SOURCE
+    # ...and we must NOT hand-poke the segmented control any more.
+    assert "setToolTip_forSegment_" not in PLUGIN_SOURCE
+    assert "_az_install_tab_tooltip" not in PLUGIN_SOURCE
+
+
+def test_sidebar_scrollview_kills_the_macos26_pocket() -> None:
+    assert "setAllowedPocketEdges_(0)" in PLUGIN_SOURCE
+
+
+def test_card_grey_is_declared_in_srgb_only() -> None:
+    # A calibrated 40 paints as sRGB ~53 and breaks the suite-wide card grey.
+    assert "colorWithCalibrated" not in PLUGIN_SOURCE.split("_az_card_fill")[0][-4000:]
+    assert "def _az_card_fill(" in PLUGIN_SOURCE
+    assert "colorWithSRGBRed_green_blue_alpha_(\n\t\tAZ_CARD_RGB" in PLUGIN_SOURCE

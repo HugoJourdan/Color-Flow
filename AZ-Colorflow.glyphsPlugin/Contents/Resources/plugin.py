@@ -643,18 +643,47 @@ def _existing_report_path(font):
 #  Glyphs 4 Edit-view left-sidebar tab: native category + script colour bars
 # ---------------------------------------------------------------------------- #
 
+# ---------------------------------------------------------------------------- #
+#  AZ suite — shared sidebar style tokens (CANONICAL COPY).
+#  Every AZ plugin with a Glyphs 4 left-sidebar tab carries this block verbatim.
+#  `glyphs-licensing`'s consistency check compares the copies, so edit this one
+#  and propagate — don't diverge a single value locally.
+# ---------------------------------------------------------------------------- #
+AZ_CARD_RADIUS = 8.0     # rounded corner of a sidebar card
+AZ_CHIP_RADIUS = 6.0     # inner chips, pills and grid cells
+AZ_SIDE_MARGIN = 10.0    # sidebar edge -> card
+AZ_CARD_PAD_X = 8.0      # card edge -> content, horizontal
+AZ_CARD_PAD_Y = 6.0      # card edge -> content, vertical
+AZ_CARD_GAP = 6.0        # between stacked cards
+AZ_BAND_H = 24.0         # card header band height
+AZ_TEXT_PT = 11.0        # body and (bold) header type
+AZ_METRIC_PT = 9.0       # monospaced metric / caption type
+AZ_TAB_ICON_H = 17.6     # sidebar tab-bar icon height (16 + 10%)
+AZ_CARD_RGB = 40 / 255.0  # house card grey, ALWAYS declared in sRGB
+
+
+def _az_card_fill() -> Any:
+	"""The house card grey (RGB 40,40,40) in sRGB.
+
+	Must never be `colorWithCalibratedRed_`: the calibrated space is gamma 1.8,
+	so a calibrated 40 paints as sRGB ~53 and the card reads visibly lighter
+	than its neighbours in other AZ plugins."""
+	return AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(
+		AZ_CARD_RGB, AZ_CARD_RGB, AZ_CARD_RGB, 1.0)
+
+
 # Layout metrics for the custom-drawn coverage list (points). Each section is an
 # AZ-Dock-style card: rounded fill + border, a darker header band, rows inside.
-_COV_PAD = 10.0           # outer margin around the cards
-_COV_TOP = 10.0           # top margin above the first card — matches _COV_PAD
-_COV_BAND_H = 24.0        # card header band (holds the section title)
+_COV_PAD = AZ_SIDE_MARGIN      # outer margin around the cards
+_COV_TOP = AZ_SIDE_MARGIN      # top margin above the first card — matches _COV_PAD
+_COV_BAND_H = AZ_BAND_H        # card header band (holds the section title)
 _COV_ROW_H = 22.0
 _COV_SUB_ROW_H = 20.0
-_COV_CARD_GAP = 6.0       # vertical gap between cards
+_COV_CARD_GAP = AZ_CARD_GAP    # vertical gap between cards
 _COV_SECTION_GAP = 16.0   # bigger gap between the Category and Script groups inside one card
-_COV_CARD_PADX = 8.0      # inner horizontal padding inside a card
-_COV_CARD_PADY = 6.0      # inner vertical padding (below band / above bottom)
-_COV_CARD_RADIUS = 8.0
+_COV_CARD_PADX = AZ_CARD_PAD_X  # inner horizontal padding inside a card
+_COV_CARD_PADY = AZ_CARD_PAD_Y  # inner vertical padding (below band / above bottom)
+_COV_CARD_RADIUS = AZ_CARD_RADIUS
 _COV_NAME_W = 96.0        # wider name column
 _COV_COUNT_W = 34.0       # wider value column
 _COV_GAP = 8.0
@@ -663,7 +692,8 @@ _COV_NAME_INDENT = 20.0   # disclosure/icon gutter for top-level names
 _COV_SUB_INDENT = _COV_NAME_INDENT + 10.0   # sub-category labels sit 10pt further right
 _COV_LEGEND_ROW_H = 18.0  # a swatch + colour name; the bottom legend grid's row height
 _COV_LEGEND_COLS = 2      # the bottom legend is a 2-column grid
-_COV_LEGEND_BOTTOM = 10.0  # margin below the legend card, at the sidebar's bottom edge
+_COV_LEGEND_BOTTOM = 10.0  # margin below the footer card, at the sidebar's bottom edge
+_COV_BTN_H = 30.0         # sidebar button height (buttons live inside the footer card)
 _NS_ALIGN_LEFT = getattr(AppKit, "NSTextAlignmentLeft", 0)
 _NS_ALIGN_RIGHT = getattr(AppKit, "NSTextAlignmentRight", 2)   # 10.12+ raw value
 _NS_TRUNCATE_TAIL = getattr(AppKit, "NSLineBreakByTruncatingTail", 4)
@@ -671,9 +701,9 @@ _NS_FONT_WEIGHT_REGULAR = getattr(AppKit, "NSFontWeightRegular", 0.0)
 
 
 def _card_fill_color() -> Any:
-	# Fixed dark-grey card fill matching the Glyphs palette (RGB 46,46,46), instead
+	# Fixed dark-grey card fill matching the Glyphs palette (RGB 40,40,40), instead
 	# of the theme's translucent quaternaryLabelColor.
-	return AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(46 / 255.0, 46 / 255.0, 46 / 255.0, 1.0)
+	return _az_card_fill()
 
 
 def _draw_glass_border(rect: Any, radius: float) -> None:
@@ -1318,17 +1348,26 @@ class _AZLegendView(AppKit.NSView):
 		return (count + _COV_LEGEND_COLS - 1) // _COV_LEGEND_COLS if count else 0
 
 	@objc.python_method
+	def legendTop(self) -> float:
+		# y (in this flipped view) of the first legend row: below the button row that
+		# shares this card.
+		return _COV_CARD_GAP + _COV_CARD_PADY + _COV_BTN_H + _COV_CARD_GAP
+
+	@objc.python_method
 	def heightForWidth_(self, width: float) -> float:
+		# One footer card holding the button row on top and the legend grid below it
+		# (AZ-Argus style). Kept > 0 even with no colours so the buttons stay visible.
 		rows = self._row_count()
-		if rows <= 0:
-			return 0.0
-		return _COV_CARD_GAP + _COV_CARD_PADY + rows * _COV_LEGEND_ROW_H + _COV_CARD_PADY + _COV_LEGEND_BOTTOM
+		height = self.legendTop()
+		if rows > 0:
+			height += rows * _COV_LEGEND_ROW_H
+		else:
+			height -= _COV_CARD_GAP          # no grid -> no gap under the buttons
+		return height + _COV_CARD_PADY + _COV_LEGEND_BOTTOM
 
 	def drawRect_(self, dirtyRect: Any) -> None:
 		self._cell_hits = []
 		entries = getattr(self, "_entries", None) or []
-		if not entries:
-			return
 		bounds = self.bounds()
 		card_rect = AppKit.NSMakeRect(_COV_PAD, _COV_CARD_GAP, bounds.size.width - 2 * _COV_PAD,
 		                              bounds.size.height - _COV_CARD_GAP - _COV_LEGEND_BOTTOM)
@@ -1337,6 +1376,8 @@ class _AZLegendView(AppKit.NSView):
 		_card_fill_color().set()
 		card.fill()
 		_draw_glass_border(card_rect, _COV_CARD_RADIUS)
+		if not entries:                       # card (with the buttons in it) still shows
+			return
 		focus = getattr(self, "_focus", None)
 		cx0 = card_rect.origin.x + _COV_CARD_PADX
 		cw = card_rect.size.width - 2 * _COV_CARD_PADX
@@ -1347,7 +1388,7 @@ class _AZLegendView(AppKit.NSView):
 			col = index % _COV_LEGEND_COLS
 			row = index // _COV_LEGEND_COLS
 			x = cx0 + col * col_w
-			y = card_rect.origin.y + _COV_CARD_PADY + row * _COV_LEGEND_ROW_H
+			y = self.legendTop() + row * _COV_LEGEND_ROW_H
 			dim = focus is not None and color_key != focus
 			sw_w, sw_h = 16.0, 10.0
 			swatch = AppKit.NSMakeRect(x, y + (_COV_LEGEND_ROW_H - sw_h) / 2.0, sw_w, sw_h)
@@ -1391,6 +1432,12 @@ class _AZLegendView(AppKit.NSView):
 
 _SIDEBAR_REGISTERED = False
 
+_TAB_TITLE = "AZ Colorflow"
+# The NSImage handed to Glyphs for the tab bar, built once and reused: Glyphs
+# asks each registered class for +tabBarImage per Edit view. Module-level, not a
+# class attribute (PyObjC classes reject arbitrary Python attrs).
+_TAB_IMAGE_CACHE: list = []
+
 
 def _register_coverage_sidebar() -> None:
 	"""Register the Edit-view left-sidebar tab (Glyphs 4 only, once per session)."""
@@ -1418,7 +1465,7 @@ try:
 
 		@classmethod
 		def title(cls) -> str:
-			return "Colorflow"
+			return _TAB_TITLE
 
 		@classmethod
 		def tabBarImage(cls) -> Any:
@@ -1426,15 +1473,22 @@ try:
 			# tints like the native sidebar tabs. Falls back to a drawn ring template.
 			# (Glyphs reads this once at registration — a running app needs a restart
 			# to pick up a changed icon.)
+			# Built ONCE and cached: Glyphs asks for +tabBarImage per Edit view.
+			if _TAB_IMAGE_CACHE:
+				return _TAB_IMAGE_CACHE[0]
 			image = _glyph_symbol_image(0x101082)
 			if image is not None:
-				image.setSize_(AppKit.NSMakeSize(18.0, 18.0))
-				return image
-			return cls._drawn_ring_icon()
+				image.setSize_(AppKit.NSMakeSize(AZ_TAB_ICON_H, AZ_TAB_ICON_H))
+			else:
+				image = cls._drawn_ring_icon()
+			if image is not None and image.respondsToSelector_(b"setAccessibilityDescription:"):
+				image.setAccessibilityDescription_(_TAB_TITLE)
+			_TAB_IMAGE_CACHE.append(image)
+			return image
 
 		@classmethod
 		def _drawn_ring_icon(cls) -> Any:
-			size = 18.0
+			size = AZ_TAB_ICON_H
 			image = AppKit.NSImage.alloc().initWithSize_(AppKit.NSMakeSize(size, size))
 			image.lockFocus()
 			ring = AppKit.NSBezierPath.bezierPathWithOvalInRect_(AppKit.NSMakeRect(1.0, 1.0, size - 2.0, size - 2.0))
@@ -1449,6 +1503,10 @@ try:
 			return image
 
 		def setController_(self, controller) -> None:
+			# Glyphs reads the INSTANCE -title for the sidebar tab's hover
+			# tooltip (see GlyphsApp, editViewLeftSidebarControllers loop);
+			# +title is only the tab label, so set the instance one too.
+			self.setTitle_(_TAB_TITLE)
 			# Glyphs hands us its edit view controller. PyObjC can't weak-store
 			# ObjC refs; the strong store leaks one edit-VC per closed tab —
 			# accepted for now (one small controller per closed Edit view).
@@ -1461,16 +1519,13 @@ try:
 			rect = AppKit.NSMakeRect(0, 0, 260, 600)
 			width = rect.size.width
 			container = AppKit.NSView.alloc().initWithFrame_(rect)
-			self._btn_h = 30.0
-			self._btn_pad = _COV_CARD_GAP                     # one uniform gap around the strip
-			# Only ONE pad in the strip height: the gap BELOW comes from the legend's own
-			# top inset (also _COV_CARD_GAP), so top and bottom gaps match.
-			self._strip_h = self._btn_h + self._btn_pad       # button footer, sits above the legend
+			self._btn_h = _COV_BTN_H
 
-			# Full-width icon+text buttons: [Report] [Settings], two equal columns above
-			# the legend (an equal-split NSStackView; frame set in _relayout).
+			# Full-width icon+text buttons: [Report] [Settings], two equal columns at the
+			# top of the footer card, above the legend (equal-split NSStackView; frame in
+			# _relayout).
 			def _text_button(symbol, fallback_name, title, action, tip, weight):
-				btn = _AZFlatButton.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, 100, self._btn_h))
+				btn = _AZFlatButton.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, 100, _COV_BTN_H))
 				cell = _AZPaddedButtonCell.alloc().init()          # inset icon+title from the edges
 				cell.setButtonType_(getattr(AppKit, "NSButtonTypeMomentaryPushIn", 7))
 				btn.setCell_(cell)
@@ -1530,23 +1585,26 @@ try:
 			self._button_row = button_row
 
 			scroll = AppKit.NSScrollView.alloc().initWithFrame_(
-				AppKit.NSMakeRect(0, 0, width, rect.size.height - self._strip_h))
+				AppKit.NSMakeRect(0, 0, width, rect.size.height - _COV_BTN_H))
 			scroll.setHasVerticalScroller_(True)
 			scroll.setDrawsBackground_(False)     # let the native sidebar background show through
 			scroll.setAutohidesScrollers_(True)
+			if scroll.respondsToSelector_(b"setAllowedPocketEdges:"):
+				scroll.setAllowedPocketEdges_(0)  # macOS 26 frosted scroll pocket blurs the top cards
 			scroll.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
 			doc = _AZCoverageBarsView.alloc().initWithFrame_(
 				AppKit.NSMakeRect(0, 0, width, rect.size.height))
 			doc.setAutoresizingMask_(AppKit.NSViewWidthSizable)   # follow the clip width; height set on data
 			scroll.setDocumentView_(doc)
-			# Colour legend, pinned to the bottom of the sidebar (a 2-column grid).
+			# Footer card pinned to the bottom of the sidebar: the button row on top and
+			# the colour legend (2-column grid) below it, sharing one card (AZ-Argus style).
 			legend = _AZLegendView.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, width, 0))
 			legend._owner = self
 			legend.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewMaxYMargin)
+			legend.addSubview_(button_row)    # buttons live INSIDE the footer card
 
 			container.addSubview_(scroll)
 			container.addSubview_(legend)
-			container.addSubview_(button_row)
 			self._doc = doc
 			self._scroll = scroll
 			self._legend = legend
@@ -1845,30 +1903,28 @@ try:
 
 		@objc.python_method
 		def _relayout(self) -> None:
-			# Bottom-up: legend (height follows the colour count), then the gear/report
-			# button strip just above it, then the scroll view filling the rest.
+			# Bottom-up: the footer card (buttons + legend, height follows the colour
+			# count), then the scroll view filling the rest.
 			container = self.view()
 			scroll = getattr(self, "_scroll", None)
 			legend = getattr(self, "_legend", None)
 			if container is None or scroll is None:
 				return
 			cb = container.bounds().size
-			strip_h = getattr(self, "_strip_h", 32.0)
-			btn_h = getattr(self, "_btn_h", 26.0)
 			footer_h = 0.0
 			if legend is not None:
 				footer_h = legend.heightForWidth_(cb.width)
 				legend.setFrame_(AppKit.NSMakeRect(0, 0, cb.width, footer_h))
 				legend.setHidden_(footer_h <= 0.0)
-			# Full-width two-column button row, directly above the legend. Inset to
-			# _COV_PAD so the row's edges line up with the cards/legend, not wider.
-			row = getattr(self, "_button_row", None)
-			if row is not None:
-				# Bottom flush with the legend view; its internal top inset is the gap.
-				row.setFrame_(AppKit.NSMakeRect(_COV_PAD, footer_h,
-				                                max(0.0, cb.width - 2 * _COV_PAD), btn_h))
-			scroll.setFrame_(AppKit.NSMakeRect(0, footer_h + strip_h, cb.width,
-			                                   max(0.0, cb.height - footer_h - strip_h)))
+				# Two equal columns at the top of the card, inset to the card's padding
+				# (the legend view is flipped, so this y is its top).
+				row = getattr(self, "_button_row", None)
+				if row is not None:
+					inset = _COV_PAD + _COV_CARD_PADX
+					row.setFrame_(AppKit.NSMakeRect(inset, _COV_CARD_GAP + _COV_CARD_PADY,
+					                                max(0.0, cb.width - 2 * inset), _COV_BTN_H))
+			scroll.setFrame_(AppKit.NSMakeRect(0, footer_h, cb.width,
+			                                   max(0.0, cb.height - footer_h)))
 
 		@objc.python_method
 		def _resize_doc(self) -> None:
