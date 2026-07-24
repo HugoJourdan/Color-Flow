@@ -651,6 +651,7 @@ _COV_BAND_H = 24.0        # card header band (holds the section title)
 _COV_ROW_H = 22.0
 _COV_SUB_ROW_H = 20.0
 _COV_CARD_GAP = 6.0       # vertical gap between cards
+_COV_SECTION_GAP = 16.0   # bigger gap between the Category and Script groups inside one card
 _COV_CARD_PADX = 8.0      # inner horizontal padding inside a card
 _COV_CARD_PADY = 6.0      # inner vertical padding (below band / above bottom)
 _COV_CARD_RADIUS = 8.0
@@ -827,13 +828,19 @@ class _AZCoverageBarsView(AppKit.NSView):
 		return 1.0 if key in (getattr(self, "_expanded", None) or set()) else 0.0
 
 	@objc.python_method
-	def _card_height(self, rows: Any, expanded: Any = None) -> float:
-		rows_h = 0.0
-		for _name, _count, _segs, key, subs, _kind in rows:
-			rows_h += _COV_ROW_H
-			if subs:
-				rows_h += _COV_SUB_ROW_H * len(subs) * self._progress(key)
-		return _COV_BAND_H + _COV_CARD_PADY + rows_h + _COV_CARD_PADY
+	def _sections_card_height(self, sections: Any) -> float:
+		# One card holding every section (Category, Script, …), stacked with an inline
+		# title per group and a bigger gap between groups.
+		height = _COV_CARD_PADY
+		for index, (_title, rows) in enumerate(sections):
+			if index > 0:
+				height += _COV_SECTION_GAP
+			height += _COV_BAND_H             # inline section title row
+			for _name, _count, _segs, key, subs, _kind in rows:
+				height += _COV_ROW_H
+				if subs:
+					height += _COV_SUB_ROW_H * len(subs) * self._progress(key)
+		return height + _COV_CARD_PADY
 
 	@objc.python_method
 	def contentHeight(self) -> float:
@@ -843,8 +850,7 @@ class _AZCoverageBarsView(AppKit.NSView):
 		height = _COV_TOP
 		if getattr(self, "_global", None):
 			height += self._global_card_height() + _COV_CARD_GAP
-		for _title, rows in sections:
-			height += self._card_height(rows) + _COV_CARD_GAP
+		height += self._sections_card_height(sections) + _COV_CARD_GAP
 		return height + _COV_TOP - _COV_CARD_GAP
 
 	@objc.python_method
@@ -868,18 +874,19 @@ class _AZCoverageBarsView(AppKit.NSView):
 		AppKit.NSAttributedString.alloc().initWithString_attributes_(text, attrs).drawInRect_(rect)
 
 	@objc.python_method
-	def _draw_card(self, rect: Any) -> None:
+	def _draw_card(self, rect: Any, band: bool = True) -> None:
 		card = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
 			rect, _COV_CARD_RADIUS, _COV_CARD_RADIUS)
 		_card_fill_color().set()
 		card.fill()
-		context = AppKit.NSGraphicsContext.currentContext()
-		context.saveGraphicsState()
-		card.addClip()                        # darker header band, top corners rounded by the clip
-		AppKit.NSColor.blackColor().colorWithAlphaComponent_(0.15).set()
-		AppKit.NSBezierPath.bezierPathWithRect_(
-			AppKit.NSMakeRect(rect.origin.x, rect.origin.y, rect.size.width, _COV_BAND_H)).fill()
-		context.restoreGraphicsState()
+		if band:                              # darker header strip behind the card title
+			context = AppKit.NSGraphicsContext.currentContext()
+			context.saveGraphicsState()
+			card.addClip()                    # top corners rounded by the clip
+			AppKit.NSColor.blackColor().colorWithAlphaComponent_(0.15).set()
+			AppKit.NSBezierPath.bezierPathWithRect_(
+				AppKit.NSMakeRect(rect.origin.x, rect.origin.y, rect.size.width, _COV_BAND_H)).fill()
+			context.restoreGraphicsState()
 		AppKit.NSColor.separatorColor().set()
 		card.setLineWidth_(1.0)
 		card.stroke()
@@ -1072,13 +1079,17 @@ class _AZCoverageBarsView(AppKit.NSView):
 		cx0 = card_x + _COV_CARD_PADX
 		cw = card_w - 2 * _COV_CARD_PADX
 		y = self._draw_global(_COV_TOP, width)
-		for title, rows in sections:
-			card_h = self._card_height(rows)
-			self._draw_card(AppKit.NSMakeRect(card_x, y, card_w, card_h))
+		# Category and Script share ONE card, stacked with a bigger gap between groups.
+		card_h = self._sections_card_height(sections)
+		self._draw_card(AppKit.NSMakeRect(card_x, y, card_w, card_h), band=False)
+		inner_y = y + _COV_CARD_PADY
+		for index, (title, rows) in enumerate(sections):
+			if index > 0:
+				inner_y += _COV_SECTION_GAP
 			self._draw_text(title.upper(),
-			                AppKit.NSMakeRect(cx0, y + (_COV_BAND_H - 13.0) / 2.0, cw, 13.0),
+			                AppKit.NSMakeRect(cx0, inner_y + (_COV_BAND_H - 13.0) / 2.0, cw, 13.0),
 			                11.0, AppKit.NSColor.secondaryLabelColor(), bold=True)
-			row_y = y + _COV_BAND_H + _COV_CARD_PADY
+			row_y = inner_y + _COV_BAND_H
 			for name, count, segs, key, subs, kind in rows:
 				is_open = bool(subs) and key in target
 				open_frac = self._progress(key) if subs else 0.0
@@ -1108,7 +1119,8 @@ class _AZCoverageBarsView(AppKit.NSView):
 						sub_y += _COV_SUB_ROW_H
 					context.restoreGraphicsState()
 					row_y += visible_h
-			y += card_h + _COV_CARD_GAP
+			inner_y = row_y
+		y += card_h + _COV_CARD_GAP
 		window = self.window()
 		if window is not None:                # bars just moved -> rebuild the hand-cursor rects
 			window.invalidateCursorRectsForView_(self)
@@ -1392,7 +1404,15 @@ try:
 			def _text_button(symbol, fallback_name, title, action, tip, weight):
 				btn = AppKit.NSButton.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, 100, self._btn_h))
 				btn.setTitle_(title)
-				btn.setBezelStyle_(getattr(AppKit, "NSBezelStyleRounded", 1))
+				# Flat card-coloured background (RGB 46,46,46 + separator border) instead of the
+				# system bezel, so the buttons match the coverage cards above them.
+				btn.setBordered_(False)
+				btn.setWantsLayer_(True)
+				layer = btn.layer()
+				layer.setBackgroundColor_(_card_fill_color().CGColor())
+				layer.setCornerRadius_(_COV_CARD_RADIUS)
+				layer.setBorderWidth_(1.0)
+				layer.setBorderColor_(AppKit.NSColor.separatorColor().CGColor())
 				btn.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
 				image = None
 				if hasattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_"):

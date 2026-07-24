@@ -1181,3 +1181,28 @@ def test_coverage_cards_use_fixed_grey_fill() -> None:
     assert "46 / 255.0" in PLUGIN_SOURCE
     assert PLUGIN_SOURCE.count("_card_fill_color().set()") >= 2
     assert "quaternaryLabelColor()" not in PLUGIN_SOURCE
+
+
+def test_category_and_script_share_one_card() -> None:
+    # Category and Script render inside a single card (band-less), stacked with a
+    # bigger inter-group gap, instead of a card per section.
+    assert "def _sections_card_height(self" in PLUGIN_SOURCE
+    assert "_COV_SECTION_GAP" in PLUGIN_SOURCE
+    draw = PLUGIN_SOURCE[PLUGIN_SOURCE.index("y = self._draw_global(_COV_TOP, width)"):][:2200]
+    assert "self._sections_card_height(sections)" in draw
+    assert "band=False" in draw
+    assert "inner_y += _COV_SECTION_GAP" in draw
+    # The old one-card-per-section loop is gone.
+    assert "for title, rows in sections:" not in draw
+    assert "def _card_height(self" not in PLUGIN_SOURCE   # dead helper removed
+
+
+def test_sidebar_buttons_have_card_coloured_background() -> None:
+    # Global Overview / Settings buttons drop the system bezel for a flat card-coloured
+    # fill (RGB 46,46,46) with a separator border, matching the cards above.
+    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:900]
+    assert "btn.setBordered_(False)" in button
+    assert "btn.setWantsLayer_(True)" in button
+    assert "_card_fill_color().CGColor()" in button
+    assert "setCornerRadius_(_COV_CARD_RADIUS)" in button
+    assert "setBezelStyle_" not in button
