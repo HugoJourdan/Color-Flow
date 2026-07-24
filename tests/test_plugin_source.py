@@ -1249,7 +1249,7 @@ def test_cards_and_buttons_have_glass_rim() -> None:
     assert "def _draw_glass_border(rect: Any, radius: float)" in PLUGIN_SOURCE
     helper = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_glass_border("):][:2400]
     assert "initWithColors_atLocations_colorSpace_" in helper       # 3-stop diagonal gradient
-    assert "[light, dark, light]" in helper and "[0.0, 0.5, 1.0]" in helper
+    assert "[light, dark, dark, light]" in helper and "[0.0, 0.375, 0.625, 1.0]" in helper
     assert "drawInRect_angle_(rect, 45.0 if bool(context.isFlipped()) else 135.0)" in helper
     assert "WindingRuleEvenOdd" in helper or "EvenOddWindingRule" in helper
     # Used by both card drawers and the flat button, and the old flat strokes are gone.

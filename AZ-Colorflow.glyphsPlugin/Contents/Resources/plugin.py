@@ -691,10 +691,12 @@ def _draw_glass_border(rect: Any, radius: float) -> None:
 	context = AppKit.NSGraphicsContext.currentContext()
 	context.saveGraphicsState()
 	ring.addClip()
-	light = AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.45)
+	light = AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.32)
 	dark = AppKit.NSColor.blackColor().colorWithAlphaComponent_(0.35)
+	# White dominates (~75%): a narrow black band (~25%) centred on the TR/BL diagonal,
+	# white ramping out to the lit TL/BR corners.
 	gradient = AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
-		[light, dark, light], [0.0, 0.5, 1.0], AppKit.NSColorSpace.genericRGBColorSpace())
+		[light, dark, dark, light], [0.0, 0.375, 0.625, 1.0], AppKit.NSColorSpace.genericRGBColorSpace())
 	# A FIXED 45° lighting angle, not the corner-to-corner diagonal (whose angle would
 	# tilt with each card's aspect ratio and look inconsistent). The gradient's extremes
 	# still land exactly on the top-left & bottom-right corners for any rect. Flipped
