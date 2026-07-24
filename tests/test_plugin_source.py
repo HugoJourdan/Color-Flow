@@ -1257,8 +1257,20 @@ def test_cards_and_buttons_have_glass_rim() -> None:
     assert "[dark, card_clear, card_clear, dark]" in helper and "[0.0, 0.30, 0.70, 1.0]" in helper
     assert "rect, 135.0 if bool(context.isFlipped()) else 45.0" in helper  # pass 2: darken TR & BL only
     assert "WindingRuleEvenOdd" in helper or "EvenOddWindingRule" in helper
-    # Used by the card drawers (Overall + sections card + legend); old flat strokes gone.
-    # Buttons intentionally omit the rim (their dark layer bg must render in every state).
-    assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 3         # def + card + legend
+    # Used by the card drawers (Overall + sections card + legend) AND the button overlay.
+    assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 4         # def + card + legend + overlay
     assert "card.stroke()" not in PLUGIN_SOURCE
     assert "layer.setBorderColor_(AppKit.NSColor.separatorColor().CGColor())" not in PLUGIN_SOURCE
+
+
+def test_buttons_get_glass_rim_via_clickthrough_overlay() -> None:
+    # Buttons wear the same rim as the cards through a non-interactive overlay NSView
+    # (a plain NSView draws via drawRect_ reliably; hitTest_ nil clicks through). The
+    # button itself keeps NO drawRect_ so its dark layer bg renders in every state.
+    assert "class _AZGlassOverlay(AppKit.NSView)" in PLUGIN_SOURCE
+    overlay = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZGlassOverlay(AppKit.NSView)"):][:700]
+    assert "_draw_glass_border(self.bounds(), _COV_CARD_RADIUS)" in overlay
+    assert "def hitTest_(self, point" in overlay and "return None" in overlay
+    assert "_AZGlassOverlay.alloc().initWithFrame_(btn.bounds())" in PLUGIN_SOURCE
+    assert "overlay.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)" in PLUGIN_SOURCE
+    assert "btn.addSubview_(overlay)" in PLUGIN_SOURCE

@@ -750,6 +750,21 @@ class _AZFlatButton(AppKit.NSButton):
 		self.setTitle_(self.title())   # drop the attributed title -> back to default label colour
 
 
+class _AZGlassOverlay(AppKit.NSView):
+	# Non-interactive overlay that draws the glass rim on top of a flat button, so the
+	# buttons get the same rim as the cards. A plain NSView renders via drawRect_ reliably
+	# (no NSButton CoreUI/updateLayer bezel weirdness); hitTest_ returns nil so clicks pass
+	# straight through to the button underneath.
+	def drawRect_(self, rect: Any) -> None:
+		_draw_glass_border(self.bounds(), _COV_CARD_RADIUS)
+
+	def hitTest_(self, point: Any) -> Any:
+		return None
+
+	def isFlipped(self) -> bool:
+		return False
+
+
 def _glyph_symbol_image(codepoint: int, point_size: float = 15.0) -> Any:
 	"""Render an SF-Symbol PUA glyph (macOS substitutes it into the system font) to
 	a template NSImage — lets us use a symbol we only have the glyph for (no name)."""
@@ -1508,6 +1523,11 @@ try:
 				btn.setTarget_(self)
 				btn.setAction_(action)
 				btn.setToolTip_(tip)
+				# Glass rim on top (same as the cards), via a click-through overlay that
+				# resizes with the button.
+				overlay = _AZGlassOverlay.alloc().initWithFrame_(btn.bounds())
+				overlay.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
+				btn.addSubview_(overlay)
 				return btn
 
 			regular_w = getattr(AppKit, "NSFontWeightRegular", 0.0)
