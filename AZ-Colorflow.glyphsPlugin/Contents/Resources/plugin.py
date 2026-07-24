@@ -675,38 +675,33 @@ def _card_fill_color() -> Any:
 	return AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(46 / 255.0, 46 / 255.0, 46 / 255.0, 1.0)
 
 
-# Glass rim reflex strengths (see the Liquid-Glass CSS reference: an inset box-shadow
-# stack, not a gradient). Tunable — bump for a stronger sheen.
-_GLASS_LIGHT = 0.55   # specular highlight alpha
-_GLASS_DARK = 0.22    # inner shadow alpha
-
-
 def _draw_glass_border(rect: Any, radius: float) -> None:
-	# macOS Liquid-Glass rim, ported from the CSS inset box-shadow stack: crisp specular
-	# highlights on the top-left AND bottom-right inner edges, soft dark inner shadow at
-	# the top lip (and a touch at the bottom), over a faint full inner border. Each layer
-	# is a rounded-rect stroke offset toward one side and clipped to the card — the Core
-	# Graphics equivalent of an `inset` shadow. Flip-aware: `down` is visual-down in view
-	# coords (cards are flipped, buttons are not).
+	# macOS-Glass-like rim: a subtle 1pt ring lit diagonally — brighter at the top-left
+	# and bottom-right corners, darker at top-right and bottom-left. A 3-stop gradient
+	# (light -> dark -> light) along the TL->BR diagonal lands both off-diagonal corners
+	# on the dark midpoint. Flip-aware via the context (cards flipped, buttons not).
+	outer = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, radius, radius)
+	inner = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+		AppKit.NSInsetRect(rect, 1.0, 1.0), max(0.0, radius - 1.0), max(0.0, radius - 1.0))
+	ring = AppKit.NSBezierPath.bezierPath()
+	ring.appendBezierPath_(outer)
+	ring.appendBezierPath_(inner)
+	ring.setWindingRule_(getattr(AppKit, "NSWindingRuleEvenOdd",
+	                             getattr(AppKit, "NSEvenOddWindingRule", 1)))
 	context = AppKit.NSGraphicsContext.currentContext()
 	context.saveGraphicsState()
-	AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, radius, radius).addClip()
-	down = 1.0 if bool(context.isFlipped()) else -1.0
-	white = AppKit.NSColor.whiteColor()
-	black = AppKit.NSColor.blackColor()
-
-	def _edge(dx: float, dy: float, color: Any, width: float) -> None:
-		path = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
-			AppKit.NSOffsetRect(rect, dx, dy), radius, radius)
-		color.set()
-		path.setLineWidth_(width)
-		path.stroke()
-
-	_edge(0.0, 0.0, white.colorWithAlphaComponent_(0.10), 1.0)                       # faint full border
-	_edge(1.4, 2.4 * down, white.colorWithAlphaComponent_(_GLASS_LIGHT), 1.5)        # top-left specular
-	_edge(-1.4, -2.4 * down, white.colorWithAlphaComponent_(_GLASS_LIGHT * 0.85), 1.5)  # bottom-right specular
-	_edge(0.0, 3.0 * down, black.colorWithAlphaComponent_(_GLASS_DARK), 1.5)         # dark top lip
-	_edge(0.0, -4.0 * down, black.colorWithAlphaComponent_(_GLASS_DARK * 0.5), 1.5)  # soft bottom shadow
+	ring.addClip()
+	light = AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.32)
+	dark = AppKit.NSColor.blackColor().colorWithAlphaComponent_(0.35)
+	# White dominates (~75%): a narrow black band (~25%) centred on the TR/BL diagonal,
+	# white ramping out to the lit TL/BR corners.
+	gradient = AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
+		[light, dark, dark, light], [0.0, 0.375, 0.625, 1.0], AppKit.NSColorSpace.genericRGBColorSpace())
+	# A FIXED 45° lighting angle, not the corner-to-corner diagonal (whose angle would
+	# tilt with each card's aspect ratio and look inconsistent). The gradient's extremes
+	# still land exactly on the top-left & bottom-right corners for any rect. Flipped
+	# views (cards) want 45°, non-flipped (buttons) 135°, for the same visual result.
+	gradient.drawInRect_angle_(rect, 45.0 if bool(context.isFlipped()) else 135.0)
 	context.restoreGraphicsState()
 
 
