@@ -965,10 +965,10 @@ def test_coverage_sidebar_bars_show_hand_cursor() -> None:
 
 
 def test_coverage_sidebar_subcategories_indent_deeper() -> None:
-    # Sub-rows sit 6pt deeper than top-level names (nesting cue) + lighter grey.
-    marker = "# Lighter grey + a 6pt deeper indent"
+    # Sub-rows sit 10pt deeper than top-level names (nesting cue) + lighter grey.
+    marker = "# Lighter grey + a 10pt deeper indent"
     tail = PLUGIN_SOURCE[PLUGIN_SOURCE.index(marker):][:260]
-    assert "_COV_NAME_INDENT + 6.0, 11.5, AppKit.NSColor.secondaryLabelColor()" in tail
+    assert "_COV_NAME_INDENT + 10.0, 11.5, AppKit.NSColor.secondaryLabelColor()" in tail
 
 
 def test_settings_pane_icon_uses_chosen_sf_symbol() -> None:
@@ -1253,7 +1253,9 @@ def test_cards_and_buttons_have_glass_rim() -> None:
     helper = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_glass_border("):][:2400]
     assert "initWithColors_atLocations_colorSpace_" in helper       # 3-stop diagonal gradient
     assert "[light, dark, dark, light]" in helper and "[0.0, 0.375, 0.625, 1.0]" in helper
-    assert "drawInRect_angle_(rect, 90.0)" in helper               # vertical: lights top & bottom
+    assert "drawInRect_angle_(rect, 90.0)" in helper               # pass 1 vertical: top & bottom
+    assert "[dark, card_clear, card_clear, dark]" in helper and "[0.0, 0.22, 0.78, 1.0]" in helper
+    assert "drawInRect_angle_(rect, 0.0)" in helper                # pass 2 horizontal: dark corners
     assert "WindingRuleEvenOdd" in helper or "EvenOddWindingRule" in helper
     # Used by the card drawers (Overall + sections card + legend); old flat strokes gone.
     # Buttons intentionally omit the rim (their dark layer bg must render in every state).

@@ -692,15 +692,19 @@ def _draw_glass_border(rect: Any, radius: float) -> None:
 	context.saveGraphicsState()
 	ring.addClip()
 	light = AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.42)
-	dark = _card_fill_color()   # card colour, not black -> the dark stops blend into the card
-	# Liquid-Glass rim: the light catches the TOP and BOTTOM edges. A vertical
-	# light -> card -> light gradient (light at both ends, a card-coloured band through
-	# the vertical middle) lights the top and bottom borders and fades on the sides.
-	gradient = AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
-		[light, dark, dark, light], [0.0, 0.375, 0.625, 1.0], AppKit.NSColorSpace.genericRGBColorSpace())
-	# 90° = vertical; the gradient is symmetric (light at both ends) so it lights top and
-	# bottom identically regardless of the view's flip.
-	gradient.drawInRect_angle_(rect, 90.0)
+	dark = _card_fill_color()                        # opaque card colour, not black
+	card_clear = dark.colorWithAlphaComponent_(0.0)  # transparent card colour
+	space = AppKit.NSColorSpace.genericRGBColorSpace()
+	# Liquid-Glass rim in two passes, both clipped to the 1pt ring:
+	# 1) vertical light -> card -> light: the light catches the TOP and BOTTOM edges
+	#    (symmetric, so flip-independent).
+	AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
+		[light, dark, dark, light], [0.0, 0.375, 0.625, 1.0], space).drawInRect_angle_(rect, 90.0)
+	# 2) horizontal card -> clear -> card: fade the highlight back to the card colour toward
+	#    the left/right ends, so the corners (top-left, top-right, and the bottom pair) stay
+	#    dark while the centres of the top/bottom edges stay lit.
+	AppKit.NSGradient.alloc().initWithColors_atLocations_colorSpace_(
+		[dark, card_clear, card_clear, dark], [0.0, 0.22, 0.78, 1.0], space).drawInRect_angle_(rect, 0.0)
 	context.restoreGraphicsState()
 
 
@@ -1180,9 +1184,9 @@ class _AZCoverageBarsView(AppKit.NSView):
 						AppKit.NSMakeRect(card_x, row_y, card_w, visible_h)).addClip()
 					sub_y = row_y
 					for sub_name, sub_count, sub_segs, sub_key in subs:
-						# Lighter grey + a 6pt deeper indent than top-level names (nesting cue).
+						# Lighter grey + a 10pt deeper indent than top-level names (nesting cue).
 						self._draw_bar_row(sub_y, _COV_SUB_ROW_H, cx0, cw, sub_name, sub_count, sub_segs,
-						                   _COV_NAME_INDENT + 6.0, 11.5, AppKit.NSColor.secondaryLabelColor(),
+						                   _COV_NAME_INDENT + 10.0, 11.5, AppKit.NSColor.secondaryLabelColor(),
 						                   ("subcategory", key, sub_key))
 						sub_y += _COV_SUB_ROW_H
 					context.restoreGraphicsState()
