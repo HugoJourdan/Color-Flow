@@ -687,6 +687,28 @@ class _AZPaddedButtonCell(AppKit.NSButtonCell):
 		return objc.super(_AZPaddedButtonCell, self).drawingRectForBounds_(inset)
 
 
+class _AZFlatButton(AppKit.NSButton):
+	# Flat sidebar button: pointing-hand cursor + dim-on-hover, since the borderless
+	# card-coloured bezel gives no hover/press feedback of its own.
+	def resetCursorRects(self) -> None:
+		self.addCursorRect_cursor_(self.bounds(), AppKit.NSCursor.pointingHandCursor())
+
+	def updateTrackingAreas(self) -> None:
+		objc.super(_AZFlatButton, self).updateTrackingAreas()
+		for area in list(self.trackingAreas()):
+			self.removeTrackingArea_(area)
+		opts = (getattr(AppKit, "NSTrackingMouseEnteredAndExited", 0x01)
+		        | getattr(AppKit, "NSTrackingActiveInKeyWindow", 0x20))
+		self.addTrackingArea_(AppKit.NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
+			self.bounds(), opts, self, None))
+
+	def mouseEntered_(self, event: Any) -> None:
+		self.setAlphaValue_(0.65)
+
+	def mouseExited_(self, event: Any) -> None:
+		self.setAlphaValue_(1.0)
+
+
 def _glyph_symbol_image(codepoint: int, point_size: float = 15.0) -> Any:
 	"""Render an SF-Symbol PUA glyph (macOS substitutes it into the system font) to
 	a template NSImage — lets us use a symbol we only have the glyph for (no name)."""
@@ -1414,11 +1436,11 @@ try:
 			# Full-width icon+text buttons: [Report] [Settings], two equal columns above
 			# the legend (an equal-split NSStackView; frame set in _relayout).
 			def _text_button(symbol, fallback_name, title, action, tip, weight):
-				btn = AppKit.NSButton.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, 100, self._btn_h))
+				btn = _AZFlatButton.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, 100, self._btn_h))
 				cell = _AZPaddedButtonCell.alloc().init()          # inset icon+title from the edges
 				cell.setButtonType_(getattr(AppKit, "NSButtonTypeMomentaryPushIn", 7))
 				btn.setCell_(cell)
-				btn.setTitle_(title)
+				btn.setTitle_("  " + title)                        # gap between the icon and the label
 				# Flat card-coloured background (RGB 46,46,46 + separator border) instead of the
 				# system bezel, so the buttons match the coverage cards above them.
 				btn.setBordered_(False)

@@ -1034,7 +1034,7 @@ def test_sidebar_buttons_are_full_width_two_columns_above_the_legend() -> None:
     assert "NSStackView.alloc()" in block
     assert "NSStackViewDistributionFillEqually" in block          # two equal columns
     assert "NSImageLeading" in block                              # icon left of text
-    assert 'btn.setTitle_(title)' in block                        # text label
+    assert 'btn.setTitle_("  " + title)' in block                 # text label (spaced from icon)
     assert "addArrangedSubview_(self._report)" in block and "addArrangedSubview_(self._gear)" in block
     assert "row.setFrame_(AppKit.NSMakeRect(_COV_PAD, footer_h" in block   # card-aligned margin, flush
     assert "cb.width - 2 * _COV_PAD" in block                      # same inset as the cards/legend
@@ -1216,3 +1216,21 @@ def test_sidebar_buttons_have_internal_padding() -> None:
     button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:1000]
     assert "_AZPaddedButtonCell.alloc().init()" in button
     assert "btn.setCell_(cell)" in button
+
+
+def test_sidebar_buttons_hover_cursor_and_dim() -> None:
+    # Flat buttons show a pointing-hand cursor and dim on hover (no native bezel state).
+    assert "class _AZFlatButton(AppKit.NSButton)" in PLUGIN_SOURCE
+    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:900]
+    assert "addCursorRect_cursor_(self.bounds(), AppKit.NSCursor.pointingHandCursor())" in flat
+    assert "def updateTrackingAreas(self)" in flat
+    assert "NSTrackingMouseEnteredAndExited" in flat
+    assert "def mouseEntered_(self" in flat and "self.setAlphaValue_(0.65)" in flat
+    assert "def mouseExited_(self" in flat and "self.setAlphaValue_(1.0)" in flat
+    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:1000]
+    assert "_AZFlatButton.alloc().initWithFrame_" in button
+
+
+def test_sidebar_buttons_space_icon_from_label() -> None:
+    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:1000]
+    assert 'btn.setTitle_("  " + title)' in button
