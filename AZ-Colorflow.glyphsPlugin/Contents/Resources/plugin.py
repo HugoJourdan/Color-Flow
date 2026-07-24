@@ -675,7 +675,7 @@ def _card_fill_color() -> Any:
 	return AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(46 / 255.0, 46 / 255.0, 46 / 255.0, 1.0)
 
 
-_COV_BTN_INSET = (14.0, 5.0)   # (dx, dy) internal padding for the flat sidebar buttons
+_COV_BTN_INSET = (22.0, 8.0)   # (dx, dy) internal padding for the flat sidebar buttons
 
 
 class _AZPaddedButtonCell(AppKit.NSButtonCell):
