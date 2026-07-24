@@ -1535,13 +1535,12 @@ try:
 				# top in _AZFlatButton.drawRect_. No system bezel.
 				btn.setBordered_(False)
 				btn.setWantsLayer_(True)
+				# Card-coloured fill and NO border: these sit INSIDE the footer card, so they
+				# blend into it (AZ-Argus style — plain controls in a card, not nested pills).
+				# The fill is kept (rather than clear) because the layer path is what renders
+				# reliably here; a bare borderless NSButton falls back to the light bezel.
 				btn.layer().setBackgroundColor_(_card_fill_color().CGColor())
 				btn.layer().setCornerRadius_(_COV_CARD_RADIUS)
-				# Subtle light border (drawn by the layer, so it shows in every state). Not the
-				# cards' diagonal gradient rim — a CA sublayer would be needed for that.
-				btn.layer().setBorderWidth_(1.0)
-				btn.layer().setBorderColor_(
-					AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.22).CGColor())
 				btn.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
 				image = None
 				if hasattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_"):

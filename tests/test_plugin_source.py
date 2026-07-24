@@ -1213,8 +1213,8 @@ def test_sidebar_buttons_have_card_coloured_background() -> None:
     assert "btn.setWantsLayer_(True)" in button
     assert "btn.layer().setBackgroundColor_(_card_fill_color().CGColor())" in button
     assert "btn.layer().setCornerRadius_(_COV_CARD_RADIUS)" in button
-    assert "btn.layer().setBorderWidth_(1.0)" in button             # visible border in every state
-    assert "setBorderColor_" in button
+    # No border: the buttons sit inside the footer card and blend into it (Argus style).
+    assert "btn.layer().setBorderWidth_" not in button
     # No custom drawRect_ on the button: a drawRect_ override only won the initial paint
     # on hover, so the default state showed the light system bezel. The dark layer bg
     # renders in every state via updateLayer.
