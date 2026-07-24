@@ -718,24 +718,10 @@ class _AZPaddedButtonCell(AppKit.NSButtonCell):
 
 
 class _AZFlatButton(AppKit.NSButton):
-	# Flat sidebar button: pointing-hand cursor + hover feedback, drawn entirely in
-	# drawRect_ so the fill matches the cards.
-	def wantsUpdateLayer(self) -> bool:
-		# Inside Glyphs' (layer-backed) sidebar an NSButton would render via updateLayer
-		# / CoreUI and ignore drawRect_ — forcing False keeps our custom drawRect_.
-		return False
-
-	def drawRect_(self, rect: Any) -> None:
-		# Draw the whole button ourselves so the fill always matches the cards; calling
-		# super would repaint the default (light) button face over it.
-		bounds = self.bounds()
-		fill = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
-			bounds, _COV_CARD_RADIUS, _COV_CARD_RADIUS)
-		_card_fill_color().set()
-		fill.fill()
-		_draw_glass_border(bounds, _COV_CARD_RADIUS)          # glass rim, matching the cards
-		self.cell().drawInteriorWithFrame_inView_(bounds, self)   # icon + title only, no bezel
-
+	# Flat sidebar button: pointing-hand cursor + hover feedback. The dark fill comes from
+	# the layer's backgroundColor (set in _text_button) so it renders dark in EVERY state
+	# via updateLayer — a custom drawRect_ only won the initial paint on hover, leaving the
+	# default state showing the light system bezel.
 	def resetCursorRects(self) -> None:
 		self.addCursorRect_cursor_(self.bounds(), AppKit.NSCursor.pointingHandCursor())
 

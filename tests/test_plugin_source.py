@@ -1207,11 +1207,12 @@ def test_sidebar_buttons_have_card_coloured_background() -> None:
     assert "btn.setWantsLayer_(True)" in button
     assert "btn.layer().setBackgroundColor_(_card_fill_color().CGColor())" in button
     assert "btn.layer().setCornerRadius_(_COV_CARD_RADIUS)" in button
-    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:2600]
-    assert "def drawRect_(self" in flat
-    assert "_card_fill_color().set()" in flat and "fill.fill()" in flat
-    assert "drawInteriorWithFrame_inView_(bounds, self)" in flat   # cell content, no bezel
-    assert "objc.super(_AZFlatButton, self).drawRect_" not in flat  # super would repaint light
+    # No custom drawRect_ on the button: a drawRect_ override only won the initial paint
+    # on hover, so the default state showed the light system bezel. The dark layer bg
+    # renders in every state via updateLayer.
+    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:1400]
+    assert "def drawRect_(self" not in flat
+    assert "def wantsUpdateLayer(self)" not in flat
 
 
 def test_sidebar_buttons_have_internal_padding() -> None:
@@ -1254,9 +1255,8 @@ def test_cards_and_buttons_have_glass_rim() -> None:
     assert "[light, dark, dark, light]" in helper and "[0.0, 0.375, 0.625, 1.0]" in helper
     assert "drawInRect_angle_(rect, 45.0 if bool(context.isFlipped()) else 135.0)" in helper
     assert "WindingRuleEvenOdd" in helper or "EvenOddWindingRule" in helper
-    # Used by both card drawers and the flat button, and the old flat strokes are gone.
-    assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 4         # def + card + legend + button
+    # Used by the card drawers (Overall + sections card + legend); old flat strokes gone.
+    # Buttons intentionally omit the rim (their dark layer bg must render in every state).
+    assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 3         # def + card + legend
     assert "card.stroke()" not in PLUGIN_SOURCE
     assert "layer.setBorderColor_(AppKit.NSColor.separatorColor().CGColor())" not in PLUGIN_SOURCE
-    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:2400]
-    assert "_draw_glass_border(bounds, _COV_CARD_RADIUS)" in flat
