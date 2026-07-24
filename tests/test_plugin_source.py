@@ -1244,17 +1244,18 @@ def test_sidebar_buttons_space_icon_from_label() -> None:
 
 
 def test_cards_and_buttons_have_glass_rim() -> None:
-    # Cards, legend and buttons share a macOS-Glass-like top-lit gradient rim helper
-    # instead of a flat separator stroke.
+    # Cards, legend and buttons share a Liquid-Glass rim: an inset box-shadow stack
+    # (offset rounded-rect strokes clipped to the card), not a flat separator stroke.
     assert "def _draw_glass_border(rect: Any, radius: float)" in PLUGIN_SOURCE
-    helper = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_glass_border("):][:2400]
-    assert "initWithColors_atLocations_colorSpace_" in helper       # 3-stop diagonal gradient
-    assert "[light, dark, dark, light]" in helper and "[0.0, 0.375, 0.625, 1.0]" in helper
-    assert "drawInRect_angle_(rect, 45.0 if bool(context.isFlipped()) else 135.0)" in helper
-    assert "WindingRuleEvenOdd" in helper or "EvenOddWindingRule" in helper
+    helper = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_glass_border("):][:2000]
+    assert "AppKit.NSOffsetRect(rect, dx, dy)" in helper            # inset-shadow via offset stroke
+    assert "down = 1.0 if bool(context.isFlipped()) else -1.0" in helper   # flip-aware edges
+    assert "top-left specular" in helper and "bottom-right specular" in helper
+    assert "_GLASS_LIGHT" in helper and "_GLASS_DARK" in helper
+    assert ".addClip()" in helper                                   # inner shadows are clipped
     # Used by both card drawers and the flat button, and the old flat strokes are gone.
     assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 4         # def + card + legend + button
     assert "card.stroke()" not in PLUGIN_SOURCE
     assert "layer.setBorderColor_(AppKit.NSColor.separatorColor().CGColor())" not in PLUGIN_SOURCE
-    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:2400]
+    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:2600]
     assert "_draw_glass_border(bounds, _COV_CARD_RADIUS)" in flat
