@@ -1033,22 +1033,34 @@ def test_sidebar_buttons_and_legend_share_one_footer_card() -> None:
     # row INSIDE the footer card, above the legend grid (AZ-Argus style); the scroll
     # view fills everything above that card.
     block = _sidebar_block()
-    assert "NSStackView.alloc()" in block
-    assert "NSStackViewDistributionFillEqually" in block          # two equal columns
-    assert "NSImageLeading" in block                              # icon left of text
-    assert 'btn.setTitle_("  " + title)' in block                 # text label (spaced from icon)
-    assert "addArrangedSubview_(self._report)" in block and "addArrangedSubview_(self._gear)" in block
+    assert "_AZButtonBar.alloc()" in block                        # one joined slab, not a stack
+    assert "NSStackView.alloc()" not in block
+    assert "NSImageOnly" in block                                 # centred icon, no label
+    assert 'btn.setTitle_("")' in block
+    assert "button_row.addSubview_(self._report)" in block and "button_row.addSubview_(self._gear)" in block
     assert "legend.addSubview_(button_row)" in block              # buttons live in the panel
     assert "container.addSubview_(button_row)" not in block       # ...not beside it
     assert "inset = _COV_FOOTER_INSET_X" in block                 # panel content inset
-    assert "NSMakeRect(inset, _COV_FOOTER_INSET_Y" in block       # top of the (flipped) panel
+    assert "NSMakeRect(inset, legend.buttonBarTop()" in block      # bar sits UNDER the grid
     assert "cb.width - 2 * inset), _COV_BTN_H))" in block
+    assert "row.layoutButtons_(" in block                         # halves sized by the bar
     assert "cb.height - footer_h" in block                        # scroll fills above the panel
     assert "strip_h" not in block                                 # no separate button strip
-    assert "button_row.setSpacing_(_COV_CARD_GAP)" in block
-    # The legend view sizes the shared panel: buttons on top, grid below.
+    # The legend view sizes the shared panel: grid on top, button bar below it.
     assert "def legendTop(self)" in PLUGIN_SOURCE
-    assert "_COV_FOOTER_INSET_Y + _COV_BTN_H + _COV_CARD_GAP" in PLUGIN_SOURCE
+    assert "def buttonBarTop(self)" in PLUGIN_SOURCE
+    assert "return self.buttonBarTop() + _COV_BTN_H + _COV_FOOTER_INSET_Y" in PLUGIN_SOURCE
+
+
+def test_footer_button_bar_is_one_slab_with_a_divider() -> None:
+    # Two icon-only halves of ONE rounded bar, split by a hairline divider.
+    assert "class _AZButtonBar(AppKit.NSView)" in PLUGIN_SOURCE
+    bar = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZButtonBar(AppKit.NSView)"):][:1800]
+    assert "setCornerRadius_(_COV_CARD_RADIUS)" in bar
+    assert "setMasksToBounds_(True)" in bar                       # rounds the halves' outer corners
+    assert "bounds.size.width / 2.0 - 0.5, 0.0, 1.0" in bar       # 1pt divider down the middle
+    assert "def layoutButtons_(self" in bar
+    assert "def _button_bar_color()" in PLUGIN_SOURCE             # a step lighter than the panel
 
 
 def test_bottom_panel_is_full_bleed() -> None:
@@ -1120,7 +1132,7 @@ def test_sidebar_has_global_report_button() -> None:
     assert '"Global Overview", "openReport:"' in block              # renamed from "Report"
     assert "def openReport_(self, sender" in block
     assert '"list.clipboard.fill"' in block
-    assert "setImageHugsTitle_(True)" in block                      # icon stays next to the label
+    assert "NSImageOnly" in block                                   # icon-only bar segment
     assert "_AZColorflowLoaderBar.alloc()" in block                 # the loading window
     assert "beginSheet_completionHandler_" in block
     assert "def sidebarRunReport_(self, sender" in block
@@ -1223,9 +1235,9 @@ def test_sidebar_buttons_have_card_coloured_background() -> None:
     assert "btn.setBordered_(False)" in button
     assert "setBezelStyle_" not in button
     assert "btn.setWantsLayer_(True)" in button
-    assert "btn.layer().setBackgroundColor_(_card_fill_color().CGColor())" in button
-    assert "btn.layer().setCornerRadius_(_COV_CARD_RADIUS)" in button
-    # No border: the buttons sit inside the footer card and blend into it (Argus style).
+    # Bar-coloured fill so the two halves read as one slab; the BAR owns the corners.
+    assert "btn.layer().setBackgroundColor_(_button_bar_color().CGColor())" in button
+    assert "btn.layer().setCornerRadius_" not in button
     assert "btn.layer().setBorderWidth_" not in button
     # No custom drawRect_ on the button: a drawRect_ override only won the initial paint
     # on hover, so the default state showed the light system bezel. The dark layer bg
@@ -1235,35 +1247,28 @@ def test_sidebar_buttons_have_card_coloured_background() -> None:
     assert "def wantsUpdateLayer(self)" not in flat
 
 
-def test_sidebar_buttons_have_internal_padding() -> None:
-    # Flat buttons inset icon+title from the pill edges via a custom NSButtonCell.
-    assert "class _AZPaddedButtonCell(AppKit.NSButtonCell)" in PLUGIN_SOURCE
-    assert "def drawingRectForBounds_(self" in PLUGIN_SOURCE
-    assert "AppKit.NSInsetRect(rect, dx, dy)" in PLUGIN_SOURCE
-    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:1000]
-    assert "_AZPaddedButtonCell.alloc().init()" in button
-    assert "btn.setCell_(cell)" in button
+def test_sidebar_buttons_are_icon_only() -> None:
+    # Icon-only halves: no label, so the padding cell that spaced icon from text is gone.
+    assert "_AZPaddedButtonCell" not in PLUGIN_SOURCE
+    assert "_COV_BTN_INSET" not in PLUGIN_SOURCE
+    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:2200]
+    assert 'btn.setTitle_("")' in button
+    assert "NSImageOnly" in button
 
 
-def test_sidebar_buttons_hover_cursor_and_white_text() -> None:
-    # Flat buttons show a pointing-hand cursor and brighten the label to white on hover
-    # (background unchanged — no native bezel state).
+def test_sidebar_buttons_hover_cursor_and_highlight() -> None:
+    # Icon-only bar halves: pointing-hand cursor and a lighter fill on hover (no label
+    # left to brighten, and no native bezel state).
     assert "class _AZFlatButton(AppKit.NSButton)" in PLUGIN_SOURCE
     flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:2400]
     assert "addCursorRect_cursor_(self.bounds(), AppKit.NSCursor.pointingHandCursor())" in flat
     assert "def updateTrackingAreas(self)" in flat
     assert "NSTrackingMouseEnteredAndExited" in flat
-    assert "def mouseEntered_(self" in flat and "NSColor.whiteColor()" in flat
-    assert "setAttributedTitle_" in flat
-    assert "def mouseExited_(self" in flat and "self.setTitle_(self.title())" in flat
-    assert "setAlphaValue_" not in flat
+    assert "def mouseEntered_(self" in flat and "74 / 255.0" in flat      # lighter fill
+    assert "def mouseExited_(self" in flat and "_button_bar_color().CGColor()" in flat
+    assert "setAlphaValue_" not in flat                                   # no dimming
     button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:1000]
     assert "_AZFlatButton.alloc().initWithFrame_" in button
-
-
-def test_sidebar_buttons_space_icon_from_label() -> None:
-    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:1000]
-    assert 'btn.setTitle_("  " + title)' in button
 
 
 def test_cards_and_buttons_have_glass_rim() -> None:

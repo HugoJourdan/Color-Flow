@@ -740,16 +740,47 @@ def _draw_glass_border(rect: Any, radius: float) -> None:
 	context.restoreGraphicsState()
 
 
-_COV_BTN_INSET = (22.0, 8.0)   # (dx, dy) internal padding for the flat sidebar buttons
+def _button_bar_color() -> Any:
+	# The footer's button slab: a step lighter than the panel so it reads as one
+	# raised control sitting on the panel.
+	return AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(58 / 255.0, 58 / 255.0, 58 / 255.0, 1.0)
 
 
-class _AZPaddedButtonCell(AppKit.NSButtonCell):
-	# Flat sidebar buttons (bordered=False): inset the icon+title from the pill edges
-	# so a near-full-width label like "Global Overview" doesn't kiss the rounded ends.
-	def drawingRectForBounds_(self, rect: Any) -> Any:
-		dx, dy = _COV_BTN_INSET
-		inset = AppKit.NSInsetRect(rect, dx, dy)
-		return objc.super(_AZPaddedButtonCell, self).drawingRectForBounds_(inset)
+class _AZButtonBar(AppKit.NSView):
+	"""The footer's two-up button slab: ONE rounded bar split down the middle by a
+	hairline divider, with an icon centred in each half. The buttons are subviews
+	sized to the halves; the 1pt gap between them is where the divider shows."""
+
+	def initWithFrame_(self, frame: Any) -> Any:
+		self = objc.super(_AZButtonBar, self).initWithFrame_(frame)
+		if self is None:
+			return None
+		self.setWantsLayer_(True)
+		layer = self.layer()
+		layer.setBackgroundColor_(_button_bar_color().CGColor())
+		layer.setCornerRadius_(_COV_CARD_RADIUS)
+		layer.setMasksToBounds_(True)      # rounds the buttons' outer corners for free
+		return self
+
+	def isFlipped(self) -> bool:
+		return True
+
+	def drawRect_(self, rect: Any) -> None:
+		# Only the 1pt gutter between the two buttons is visible here — the divider.
+		bounds = self.bounds()
+		AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.16).set()
+		AppKit.NSBezierPath.bezierPathWithRect_(
+			AppKit.NSMakeRect(bounds.size.width / 2.0 - 0.5, 0.0, 1.0, bounds.size.height)).fill()
+
+	@objc.python_method
+	def layoutButtons_(self, buttons: Any) -> None:
+		bounds = self.bounds()
+		half = bounds.size.width / 2.0
+		for index, button in enumerate(buttons or []):
+			if button is None:
+				continue
+			x = 0.0 if index == 0 else half + 0.5
+			button.setFrame_(AppKit.NSMakeRect(x, 0.0, max(0.0, half - 0.5), bounds.size.height))
 
 
 class _AZFlatButton(AppKit.NSButton):
@@ -770,15 +801,17 @@ class _AZFlatButton(AppKit.NSButton):
 			self.bounds(), opts, self, None))
 
 	def mouseEntered_(self, event: Any) -> None:
-		# Hover: brighten the label to full white (background stays put).
-		font = self.font() or AppKit.NSFont.systemFontOfSize_(11.0)
-		attrs = {AppKit.NSFontAttributeName: font,
-		         AppKit.NSForegroundColorAttributeName: AppKit.NSColor.whiteColor()}
-		self.setAttributedTitle_(
-			AppKit.NSAttributedString.alloc().initWithString_attributes_(self.title(), attrs))
+		# Hover: lighten this half of the bar (icon-only, so there's no label to brighten).
+		layer = self.layer()
+		if layer is not None:
+			layer.setBackgroundColor_(
+				AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(
+					74 / 255.0, 74 / 255.0, 74 / 255.0, 1.0).CGColor())
 
 	def mouseExited_(self, event: Any) -> None:
-		self.setTitle_(self.title())   # drop the attributed title -> back to default label colour
+		layer = self.layer()
+		if layer is not None:
+			layer.setBackgroundColor_(_button_bar_color().CGColor())
 
 
 def _glyph_symbol_image(codepoint: int, point_size: float = 15.0) -> Any:
@@ -1353,21 +1386,21 @@ class _AZLegendView(AppKit.NSView):
 
 	@objc.python_method
 	def legendTop(self) -> float:
-		# y (in this flipped view) of the first legend row: below the button row that
-		# shares this panel.
-		return _COV_FOOTER_INSET_Y + _COV_BTN_H + _COV_CARD_GAP
+		# y (in this flipped view) of the first legend row — the grid sits at the top.
+		return _COV_FOOTER_INSET_Y
+
+	@objc.python_method
+	def buttonBarTop(self) -> float:
+		# y of the joined button bar: under the legend grid.
+		rows = self._row_count()
+		height = self.legendTop() + rows * _COV_LEGEND_ROW_H
+		return height + (_COV_CARD_GAP if rows > 0 else 0.0)
 
 	@objc.python_method
 	def heightForWidth_(self, width: float) -> float:
-		# Pinned bottom panel: button row on top, legend grid below it. Kept > 0 even
-		# with no colours so the buttons stay visible.
-		rows = self._row_count()
-		height = self.legendTop()
-		if rows > 0:
-			height += rows * _COV_LEGEND_ROW_H
-		else:
-			height -= _COV_CARD_GAP          # no grid -> no gap under the buttons
-		return height + _COV_FOOTER_INSET_Y
+		# Pinned bottom panel: legend grid on top, joined button bar under it. Kept > 0
+		# even with no colours so the buttons stay visible.
+		return self.buttonBarTop() + _COV_BTN_H + _COV_FOOTER_INSET_Y
 
 	def drawRect_(self, dirtyRect: Any) -> None:
 		self._cell_hits = []
@@ -1522,26 +1555,18 @@ try:
 			container = AppKit.NSView.alloc().initWithFrame_(rect)
 			self._btn_h = _COV_BTN_H
 
-			# Full-width icon+text buttons: [Report] [Settings], two equal columns at the
-			# top of the footer card, above the legend (equal-split NSStackView; frame in
-			# _relayout).
+			# Icon-only halves of one joined bar at the BOTTOM of the footer, under the
+			# legend grid. Each fills its half of _AZButtonBar (frames in _relayout); the
+			# bar owns the rounded corners and the divider.
 			def _text_button(symbol, fallback_name, title, action, tip, weight):
 				btn = _AZFlatButton.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, 100, _COV_BTN_H))
-				cell = _AZPaddedButtonCell.alloc().init()          # inset icon+title from the edges
-				cell.setButtonType_(getattr(AppKit, "NSButtonTypeMomentaryPushIn", 7))
-				btn.setCell_(cell)
-				btn.setTitle_("  " + title)                        # gap between the icon and the label
-				# Dark card-coloured fill via the layer (renders through updateLayer even when
-				# Glyphs' layer-backed sidebar bypasses drawRect_); the glass rim is drawn on
-				# top in _AZFlatButton.drawRect_. No system bezel.
+				btn.setTitle_("")                                  # icon only; the tooltip names it
 				btn.setBordered_(False)
 				btn.setWantsLayer_(True)
-				# Card-coloured fill and NO border: these sit INSIDE the footer card, so they
-				# blend into it (AZ-Argus style — plain controls in a card, not nested pills).
-				# The fill is kept (rather than clear) because the layer path is what renders
-				# reliably here; a bare borderless NSButton falls back to the light bezel.
-				btn.layer().setBackgroundColor_(_card_fill_color().CGColor())
-				btn.layer().setCornerRadius_(_COV_CARD_RADIUS)
+				# Bar-coloured fill so the two halves read as one slab. The fill is kept
+				# (rather than clear) because the layer path is what renders reliably here;
+				# a bare borderless NSButton falls back to the light system bezel.
+				btn.layer().setBackgroundColor_(_button_bar_color().CGColor())
 				btn.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
 				image = None
 				if hasattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_"):
@@ -1559,9 +1584,7 @@ try:
 					except Exception:
 						pass
 					btn.setImage_(image)
-					btn.setImagePosition_(getattr(AppKit, "NSImageLeading", 7))   # icon left of text
-					if hasattr(btn, "setImageHugsTitle_"):
-						btn.setImageHugsTitle_(True)     # keep the icon next to the (possibly long) label
+					btn.setImagePosition_(getattr(AppKit, "NSImageOnly", 1))   # centred icon, no label
 				btn.setTarget_(self)
 				btn.setAction_(action)
 				btn.setToolTip_(tip)
@@ -1574,13 +1597,10 @@ try:
 			                            "Global Overview", "openReport:", "Global overview", semibold_w)
 			self._gear = _text_button("gearshape", "NSActionTemplate",
 			                          "Settings", "openSettings:", "Color Flow settings", regular_w)
-			button_row = AppKit.NSStackView.alloc().initWithFrame_(
-				AppKit.NSMakeRect(0, 0, width, self._btn_h))
-			button_row.setOrientation_(getattr(AppKit, "NSUserInterfaceLayoutOrientationHorizontal", 0))
-			button_row.setDistribution_(getattr(AppKit, "NSStackViewDistributionFillEqually", 1))
-			button_row.setSpacing_(_COV_CARD_GAP)   # same gap between buttons as around the strip
-			button_row.addArrangedSubview_(self._report)
-			button_row.addArrangedSubview_(self._gear)
+			button_row = _AZButtonBar.alloc().initWithFrame_(
+				AppKit.NSMakeRect(0, 0, width, _COV_BTN_H))
+			button_row.addSubview_(self._report)
+			button_row.addSubview_(self._gear)
 			button_row.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewMaxYMargin)
 			self._button_row = button_row
 
@@ -1916,13 +1936,14 @@ try:
 				footer_h = legend.heightForWidth_(cb.width)
 				legend.setFrame_(AppKit.NSMakeRect(0, 0, cb.width, footer_h))
 				legend.setHidden_(footer_h <= 0.0)
-				# Two equal columns at the top of the panel, on its content inset (the
-				# legend view is flipped, so this y is its top).
+				# Joined two-up button bar UNDER the legend grid, on the panel's inset
+				# (the legend view is flipped, so y grows downward).
 				row = getattr(self, "_button_row", None)
 				if row is not None:
 					inset = _COV_FOOTER_INSET_X
-					row.setFrame_(AppKit.NSMakeRect(inset, _COV_FOOTER_INSET_Y,
+					row.setFrame_(AppKit.NSMakeRect(inset, legend.buttonBarTop(),
 					                                max(0.0, cb.width - 2 * inset), _COV_BTN_H))
+					row.layoutButtons_((getattr(self, "_report", None), getattr(self, "_gear", None)))
 			scroll.setFrame_(AppKit.NSMakeRect(0, footer_h, cb.width,
 			                                   max(0.0, cb.height - footer_h)))
 
