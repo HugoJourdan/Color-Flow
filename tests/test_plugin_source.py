@@ -1329,8 +1329,8 @@ def test_card_grey_is_declared_in_srgb_only() -> None:
 
 def test_settings_color_pills_are_smaller() -> None:
     # The colour well fills its List2 cell, so row height + column width ARE the pill
-    # size (row 26 -> 14, column 44 -> 35).
-    assert "_LC_ROW_H = 14.0" in PLUGIN_SOURCE
+    # size (row 26 -> 18, column 44 -> 35).
+    assert "_LC_ROW_H = 18.0" in PLUGIN_SOURCE
     assert "_LC_COLOR_W = 35" in PLUGIN_SOURCE
     assert "cellClass=ColorWellList2Cell,\n\t\t\t\t\t\teditable=True, width=_LC_COLOR_W)" in PLUGIN_SOURCE
     assert "getNSTableView().setRowHeight_(_LC_ROW_H)" in PLUGIN_SOURCE
