@@ -1050,7 +1050,7 @@ def test_sidebar_buttons_and_legend_share_one_footer_card() -> None:
 def test_footer_buttons_are_two_pills_under_a_separator() -> None:
     # Two standalone icon pills, left-aligned under a full-width hairline (no joined bar).
     assert "_AZButtonBar" not in PLUGIN_SOURCE
-    assert "_COV_BTN_W = 52.0" in PLUGIN_SOURCE and "_COV_BTN_GAP = 8.0" in PLUGIN_SOURCE
+    assert "_COV_BTN_W = 40.0" in PLUGIN_SOURCE and "_COV_BTN_GAP = 8.0" in PLUGIN_SOURCE
     assert "def separatorY(self)" in PLUGIN_SOURCE
     assert "return self.separatorY() + _COV_CARD_GAP" in PLUGIN_SOURCE
     legend = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZLegendView(AppKit.NSView)"):]

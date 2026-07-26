@@ -697,7 +697,7 @@ _COV_NAME_INDENT = 20.0   # disclosure/icon gutter for top-level names
 _COV_SUB_INDENT = _COV_NAME_INDENT + 10.0   # sub-category labels sit 10pt further right
 _COV_LEGEND_ROW_H = 18.0  # a swatch + colour name; the bottom legend grid's row height
 _COV_LEGEND_COLS = 2      # the bottom legend is a 2-column grid
-_COV_BTN_H = 26.0         # footer pill button height (buttons live in the footer panel)
+_COV_BTN_H = 22.0         # footer pill button height (buttons live in the footer panel)
 # Pinned bottom panel (buttons + legend), AZ-Argus style: FULL-BLEED — flush to the
 # sidebar's left/right/bottom edges, no margins and no rounded card, just an inset for
 # its contents.
@@ -751,7 +751,7 @@ def _button_bar_color() -> Any:
 	return AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(58 / 255.0, 58 / 255.0, 58 / 255.0, 1.0)
 
 
-_COV_BTN_W = 52.0         # footer pill button width
+_COV_BTN_W = 40.0         # footer pill button width
 _COV_BTN_GAP = 8.0        # gap between the two pill buttons
 
 
