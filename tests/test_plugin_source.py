@@ -993,7 +993,8 @@ def test_coverage_sidebar_has_color_legend() -> None:
     assert "class _AZLegendView(AppKit.NSView)" in PLUGIN_SOURCE
     assert "_COV_LEGEND_COLS = 2" in PLUGIN_SOURCE
     assert "_COV_FOOTER_INSET_Y" in PLUGIN_SOURCE           # panel content inset
-    assert "swatch, sw_h / 2.0, sw_h / 2.0" in PLUGIN_SOURCE   # pill swatch
+    assert "bezierPathWithOvalInRect_(swatch)" in PLUGIN_SOURCE   # circular swatch
+    assert "sw_w = sw_h = 11.0" in PLUGIN_SOURCE
     assert "def heightForWidth_(self" in PLUGIN_SOURCE
     assert "NSViewMaxYMargin" in _sidebar_block()          # legend pinned to the bottom
     assert '"COLORS"' not in PLUGIN_SOURCE                 # no title on the legend card

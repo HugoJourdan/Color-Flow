@@ -1400,11 +1400,9 @@ class _AZLegendView(AppKit.NSView):
 			x = cx0 + col * col_w
 			y = self.legendTop() + row * _COV_LEGEND_ROW_H
 			dim = focus is not None and color_key != focus
-			sw_w, sw_h = 16.0, 10.0
+			sw_w = sw_h = 11.0            # circular swatch
 			swatch = AppKit.NSMakeRect(x, y + (_COV_LEGEND_ROW_H - sw_h) / 2.0, sw_w, sw_h)
-			# Pill (fully rounded) swatch to match the bars.
-			chip = AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
-				swatch, sw_h / 2.0, sw_h / 2.0)
+			chip = AppKit.NSBezierPath.bezierPathWithOvalInRect_(swatch)
 			AppKit.NSColor.colorWithDeviceRed_green_blue_alpha_(
 				rgba[0], rgba[1], rgba[2], 0.22 if dim else 1.0).set()
 			chip.fill()
