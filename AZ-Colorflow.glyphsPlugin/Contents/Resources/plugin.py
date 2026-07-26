@@ -1358,8 +1358,9 @@ class _AZLegendView(AppKit.NSView):
 
 	@objc.python_method
 	def legendTop(self) -> float:
-		# y (in this flipped view) of the first legend row — the grid sits at the top.
-		return _COV_FOOTER_INSET_Y
+		# y (in this flipped view) of the first legend row — the grid sits at the top,
+		# 1pt tighter than the panel's inset.
+		return _COV_FOOTER_INSET_Y - 1.0
 
 	@objc.python_method
 	def separatorY(self) -> float:
@@ -1369,8 +1370,9 @@ class _AZLegendView(AppKit.NSView):
 
 	@objc.python_method
 	def buttonBarTop(self) -> float:
-		# y of the pill buttons: under the separator.
-		return self.separatorY() + _COV_CARD_GAP
+		# y of the pill buttons: under the separator, with 2pt more air than the
+		# gap above it.
+		return self.separatorY() + _COV_CARD_GAP + 2.0
 
 	@objc.python_method
 	def heightForWidth_(self, width: float) -> float:

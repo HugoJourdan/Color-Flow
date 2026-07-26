@@ -1342,3 +1342,10 @@ def test_window_menu_entry_uses_the_sidebar_icon() -> None:
     install = _module_function_body("_install_report_menu")
     assert "_glyph_symbol_image(0x101082)" in install
     assert "menu_item.setImage_(icon)" in install
+
+
+def test_footer_spacing_tweaks() -> None:
+    # Grid sits 1pt tighter than the panel inset; the buttons get 2pt more air
+    # under the separator than the gap above it.
+    assert "return _COV_FOOTER_INSET_Y - 1.0" in PLUGIN_SOURCE
+    assert "return self.separatorY() + _COV_CARD_GAP + 2.0" in PLUGIN_SOURCE
