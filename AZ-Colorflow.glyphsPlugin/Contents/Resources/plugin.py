@@ -653,7 +653,7 @@ AZ_CARD_RADIUS = 8.0     # rounded corner of a sidebar card
 AZ_CHIP_RADIUS = 6.0     # inner chips, pills and grid cells
 # Settings > Color Labels list. The colour well fills its cell, so these two ARE the
 # pill's size — both 20% down from the original 26 / 44.
-_LC_ROW_H = 21.0
+_LC_ROW_H = 14.0
 _LC_COLOR_W = 35
 AZ_SIDE_MARGIN = 10.0    # sidebar edge -> card
 AZ_CARD_PAD_X = 8.0      # card edge -> content, horizontal
