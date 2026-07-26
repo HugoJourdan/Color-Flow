@@ -2207,6 +2207,10 @@ def _install_report_menu() -> None:
 	menu_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
 		_REPORT_MENU_TITLE, "openGlobalOverview:", "")
 	menu_item.setTarget_(handler)
+	icon = _glyph_symbol_image(0x101082)   # same glyph as the Edit-view sidebar tab
+	if icon is not None:
+		icon.setSize_(AppKit.NSMakeSize(14.0, 14.0))   # menu-item icon metrics
+		menu_item.setImage_(icon)
 	bar_item = Glyphs.menu[WINDOW_MENU]
 	submenu = bar_item.submenu() if bar_item.respondsToSelector_(b"submenu") else None
 	if submenu is not None:

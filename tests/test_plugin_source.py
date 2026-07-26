@@ -1335,3 +1335,10 @@ def test_settings_color_pills_are_smaller() -> None:
     assert "cellClass=ColorWellList2Cell,\n\t\t\t\t\t\teditable=True, width=_LC_COLOR_W)" in PLUGIN_SOURCE
     assert "getNSTableView().setRowHeight_(_LC_ROW_H)" in PLUGIN_SOURCE
     assert "lc_list_h = int(12 * _LC_ROW_H + 8)" in PLUGIN_SOURCE   # list height follows
+
+
+def test_window_menu_entry_uses_the_sidebar_icon() -> None:
+    # The "AZ Colorflow" Window-menu item carries the same glyph as the sidebar tab.
+    install = _module_function_body("_install_report_menu")
+    assert "_glyph_symbol_image(0x101082)" in install
+    assert "menu_item.setImage_(icon)" in install
