@@ -1325,3 +1325,13 @@ def test_card_grey_is_declared_in_srgb_only() -> None:
     assert "colorWithCalibrated" not in PLUGIN_SOURCE.split("_az_card_fill")[0][-4000:]
     assert "def _az_card_fill(" in PLUGIN_SOURCE
     assert "colorWithSRGBRed_green_blue_alpha_(\n\t\tAZ_CARD_RGB" in PLUGIN_SOURCE
+
+
+def test_settings_color_pills_are_20_percent_smaller() -> None:
+    # The colour well fills its List2 cell, so row height + column width ARE the pill
+    # size: both 20% down from the original 26 / 44.
+    assert "_LC_ROW_H = 21.0" in PLUGIN_SOURCE
+    assert "_LC_COLOR_W = 35" in PLUGIN_SOURCE
+    assert "cellClass=ColorWellList2Cell,\n\t\t\t\t\t\teditable=True, width=_LC_COLOR_W)" in PLUGIN_SOURCE
+    assert "getNSTableView().setRowHeight_(_LC_ROW_H)" in PLUGIN_SOURCE
+    assert "lc_list_h = int(12 * _LC_ROW_H + 8)" in PLUGIN_SOURCE   # list height follows

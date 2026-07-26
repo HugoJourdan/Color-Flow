@@ -651,6 +651,10 @@ def _existing_report_path(font):
 # ---------------------------------------------------------------------------- #
 AZ_CARD_RADIUS = 8.0     # rounded corner of a sidebar card
 AZ_CHIP_RADIUS = 6.0     # inner chips, pills and grid cells
+# Settings > Color Labels list. The colour well fills its cell, so these two ARE the
+# pill's size — both 20% down from the original 26 / 44.
+_LC_ROW_H = 21.0
+_LC_COLOR_W = 35
 AZ_SIDE_MARGIN = 10.0    # sidebar edge -> card
 AZ_CARD_PAD_X = 8.0      # card edge -> content, horizontal
 AZ_CARD_PAD_Y = 6.0      # card edge -> content, vertical
@@ -2715,8 +2719,10 @@ class AZColorflowSettingsView:
 		lc_help_y = lc_label_y + 20
 		lc_help_h = 36
 		lc_list_y = lc_help_y + lc_help_h + 6
-		# 12 rows; List2 row height is ~24pt on modern macOS, plus a little chrome.
-		lc_list_h = 12 * 26 + 8
+		# 12 rows, plus a little chrome. The colour well fills its cell, so the row
+		# height IS the pill height: _LC_ROW_H and the colour column are both 20% down
+		# from the old 26/44 to shrink the pills.
+		lc_list_h = int(12 * _LC_ROW_H + 8)
 		# Font Glyph Order (below the list — reset is now the title's reload icon) ---
 		fgo_sep_y = lc_list_y + lc_list_h + 10
 		fgo_label_y = fgo_sep_y + 10
@@ -2778,7 +2784,7 @@ class AZColorflowSettingsView:
 					dict(identifier="visible", title="", cellClass=EyeToggleList2Cell,
 						editable=True, width=24),
 					dict(identifier="color", title="", cellClass=ColorWellList2Cell,
-						editable=True, width=44),
+						editable=True, width=_LC_COLOR_W),
 					dict(identifier="name", title="", cellClass=EditTextList2Cell,
 						editable=True),
 				],
@@ -2797,6 +2803,10 @@ class AZColorflowSettingsView:
 					performDropCallback=self._slot_perform_drop),
 			)
 			self._slot_list = group.lcList
+			try:      # the well fills the row, so this sets the pill height
+				group.lcList.getNSTableView().setRowHeight_(_LC_ROW_H)
+			except Exception:
+				pass
 		except Exception:
 			import traceback
 			print("AZ Colorflow [pane slot list build] error:\n" + traceback.format_exc())
