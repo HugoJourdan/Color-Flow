@@ -651,10 +651,11 @@ def _existing_report_path(font):
 # ---------------------------------------------------------------------------- #
 AZ_CARD_RADIUS = 8.0     # rounded corner of a sidebar card
 AZ_CHIP_RADIUS = 6.0     # inner chips, pills and grid cells
-# Settings > Color Labels list. The colour well fills its cell, so these two ARE the
-# pill's size — both 20% down from the original 26 / 44.
-_LC_ROW_H = 18.0
+# Settings > Color Labels list. The pill is _LC_WELL_H tall (constrained in
+# ColorWellCell) and _LC_COLOR_W wide, so it floats inside a _LC_ROW_H row.
+_LC_ROW_H = 21.0
 _LC_COLOR_W = 35
+_LC_WELL_H = 13.0        # colour well height: shorter than the row, so it never touches its edges
 AZ_SIDE_MARGIN = 10.0    # sidebar edge -> card
 AZ_CARD_PAD_X = 8.0      # card edge -> content, horizontal
 AZ_CARD_PAD_Y = 6.0      # card edge -> content, vertical
@@ -696,7 +697,7 @@ _COV_NAME_INDENT = 20.0   # disclosure/icon gutter for top-level names
 _COV_SUB_INDENT = _COV_NAME_INDENT + 10.0   # sub-category labels sit 10pt further right
 _COV_LEGEND_ROW_H = 18.0  # a swatch + colour name; the bottom legend grid's row height
 _COV_LEGEND_COLS = 2      # the bottom legend is a 2-column grid
-_COV_BTN_H = 30.0         # sidebar button height (buttons live in the footer panel)
+_COV_BTN_H = 26.0         # footer pill button height (buttons live in the footer panel)
 # Pinned bottom panel (buttons + legend), AZ-Argus style: FULL-BLEED — flush to the
 # sidebar's left/right/bottom edges, no margins and no rounded card, just an inset for
 # its contents.
@@ -750,41 +751,8 @@ def _button_bar_color() -> Any:
 	return AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(58 / 255.0, 58 / 255.0, 58 / 255.0, 1.0)
 
 
-class _AZButtonBar(AppKit.NSView):
-	"""The footer's two-up button slab: ONE rounded bar split down the middle by a
-	hairline divider, with an icon centred in each half. The buttons are subviews
-	sized to the halves; the 1pt gap between them is where the divider shows."""
-
-	def initWithFrame_(self, frame: Any) -> Any:
-		self = objc.super(_AZButtonBar, self).initWithFrame_(frame)
-		if self is None:
-			return None
-		self.setWantsLayer_(True)
-		layer = self.layer()
-		layer.setBackgroundColor_(_button_bar_color().CGColor())
-		layer.setCornerRadius_(_COV_CARD_RADIUS)
-		layer.setMasksToBounds_(True)      # rounds the buttons' outer corners for free
-		return self
-
-	def isFlipped(self) -> bool:
-		return True
-
-	def drawRect_(self, rect: Any) -> None:
-		# Only the 1pt gutter between the two buttons is visible here — the divider.
-		bounds = self.bounds()
-		AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.16).set()
-		AppKit.NSBezierPath.bezierPathWithRect_(
-			AppKit.NSMakeRect(bounds.size.width / 2.0 - 0.5, 0.0, 1.0, bounds.size.height)).fill()
-
-	@objc.python_method
-	def layoutButtons_(self, buttons: Any) -> None:
-		bounds = self.bounds()
-		half = bounds.size.width / 2.0
-		for index, button in enumerate(buttons or []):
-			if button is None:
-				continue
-			x = 0.0 if index == 0 else half + 0.5
-			button.setFrame_(AppKit.NSMakeRect(x, 0.0, max(0.0, half - 0.5), bounds.size.height))
+_COV_BTN_W = 52.0         # footer pill button width
+_COV_BTN_GAP = 8.0        # gap between the two pill buttons
 
 
 class _AZFlatButton(AppKit.NSButton):
@@ -1394,11 +1362,15 @@ class _AZLegendView(AppKit.NSView):
 		return _COV_FOOTER_INSET_Y
 
 	@objc.python_method
-	def buttonBarTop(self) -> float:
-		# y of the joined button bar: under the legend grid.
+	def separatorY(self) -> float:
+		# y of the full-width hairline under the legend grid.
 		rows = self._row_count()
-		height = self.legendTop() + rows * _COV_LEGEND_ROW_H
-		return height + (_COV_CARD_GAP if rows > 0 else 0.0)
+		return self.legendTop() + rows * _COV_LEGEND_ROW_H + (_COV_CARD_GAP if rows > 0 else 0.0)
+
+	@objc.python_method
+	def buttonBarTop(self) -> float:
+		# y of the pill buttons: under the separator.
+		return self.separatorY() + _COV_CARD_GAP
 
 	@objc.python_method
 	def heightForWidth_(self, width: float) -> float:
@@ -1449,6 +1421,10 @@ class _AZLegendView(AppKit.NSView):
 				AppKit.NSMakeRect(x + sw_w + 6.0, y + (_COV_LEGEND_ROW_H - 14.0) / 2.0,
 				                  col_w - sw_w - 10.0, 14.0))
 			self._cell_hits.append((x, x + col_w, y, y + _COV_LEGEND_ROW_H, color_key))
+		# Full-width hairline between the grid and the pill buttons.
+		AppKit.NSColor.whiteColor().colorWithAlphaComponent_(0.14).set()
+		AppKit.NSBezierPath.bezierPathWithRect_(
+			AppKit.NSMakeRect(0.0, self.separatorY(), bounds.size.width, 1.0)).fill()
 		window = self.window()
 		if window is not None:
 			window.invalidateCursorRectsForView_(self)
@@ -1559,9 +1535,8 @@ try:
 			container = AppKit.NSView.alloc().initWithFrame_(rect)
 			self._btn_h = _COV_BTN_H
 
-			# Icon-only halves of one joined bar at the BOTTOM of the footer, under the
-			# legend grid. Each fills its half of _AZButtonBar (frames in _relayout); the
-			# bar owns the rounded corners and the divider.
+			# Icon-only pill buttons at the BOTTOM of the footer, left-aligned under the
+			# legend grid's separator (frames in _relayout).
 			def _text_button(symbol, fallback_name, title, action, tip, weight):
 				btn = _AZFlatButton.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, 100, _COV_BTN_H))
 				btn.setTitle_("")                                  # icon only; the tooltip names it
@@ -1571,6 +1546,7 @@ try:
 				# (rather than clear) because the layer path is what renders reliably here;
 				# a bare borderless NSButton falls back to the light system bezel.
 				btn.layer().setBackgroundColor_(_button_bar_color().CGColor())
+				btn.layer().setCornerRadius_(_COV_CARD_RADIUS)     # its own rounded pill
 				btn.setFont_(AppKit.NSFont.systemFontOfSize_(11.0))
 				image = None
 				if hasattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_"):
@@ -1599,14 +1575,9 @@ try:
 			# Global report — same icon (list.clipboard.fill, semibold) as the palette's report button.
 			self._report = _text_button("list.clipboard.fill", None,
 			                            "Global Overview", "openReport:", "Global overview", semibold_w)
-			self._gear = _text_button("gearshape", "NSActionTemplate",
+			self._gear = _text_button("gearshape.fill", "NSActionTemplate",
 			                          "Settings", "openSettings:", "Color Flow settings", regular_w)
-			button_row = _AZButtonBar.alloc().initWithFrame_(
-				AppKit.NSMakeRect(0, 0, width, _COV_BTN_H))
-			button_row.addSubview_(self._report)
-			button_row.addSubview_(self._gear)
-			button_row.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewMaxYMargin)
-			self._button_row = button_row
+			self._buttons = (self._report, self._gear)   # positioned in _relayout
 
 			scroll = AppKit.NSScrollView.alloc().initWithFrame_(
 				AppKit.NSMakeRect(0, 0, width, rect.size.height - _COV_BTN_H))
@@ -1625,7 +1596,8 @@ try:
 			legend = _AZLegendView.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, width, 0))
 			legend._owner = self
 			legend.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewMaxYMargin)
-			legend.addSubview_(button_row)    # buttons live INSIDE the footer card
+			for _btn in self._buttons:        # pills live INSIDE the footer panel
+				legend.addSubview_(_btn)
 
 			container.addSubview_(scroll)
 			container.addSubview_(legend)
@@ -1940,14 +1912,14 @@ try:
 				footer_h = legend.heightForWidth_(cb.width)
 				legend.setFrame_(AppKit.NSMakeRect(0, 0, cb.width, footer_h))
 				legend.setHidden_(footer_h <= 0.0)
-				# Joined two-up button bar UNDER the legend grid, on the panel's inset
+				# Two pill buttons under the separator, left-aligned on the panel's inset
 				# (the legend view is flipped, so y grows downward).
-				row = getattr(self, "_button_row", None)
-				if row is not None:
-					inset = _COV_FOOTER_INSET_X
-					row.setFrame_(AppKit.NSMakeRect(inset, legend.buttonBarTop(),
-					                                max(0.0, cb.width - 2 * inset), _COV_BTN_H))
-					row.layoutButtons_((getattr(self, "_report", None), getattr(self, "_gear", None)))
+				bar_y = legend.buttonBarTop()
+				for index, button in enumerate(getattr(self, "_buttons", ()) or ()):
+					if button is None:
+						continue
+					x = _COV_FOOTER_INSET_X + index * (_COV_BTN_W + _COV_BTN_GAP)
+					button.setFrame_(AppKit.NSMakeRect(x, bar_y, _COV_BTN_W, _COV_BTN_H))
 			scroll.setFrame_(AppKit.NSMakeRect(0, footer_h, cb.width,
 			                                   max(0.0, cb.height - footer_h)))
 
@@ -2626,6 +2598,20 @@ def _eye_symbol(name: str):
 		return None
 
 
+class ColorWellCell(ColorWellList2Cell):
+	"""The colour column's well, pinned to a fixed height so the pill floats inside the
+	row instead of filling it edge to edge. vanilla builds the well with an "auto"
+	posSize (it stretches to the cell), so the height has to come from a constraint."""
+
+	def __init__(self, editable=False, callback=None, colorWellStyle=None) -> None:
+		super().__init__(editable=editable, callback=callback, colorWellStyle=colorWellStyle)
+		try:
+			well = self.getNSColorWell()
+			well.heightAnchor().constraintEqualToConstant_(_LC_WELL_H).setActive_(True)
+		except Exception:
+			pass
+
+
 class EyeToggleList2Cell(CheckBoxList2Cell):
 	"""The visibility column drawn as an eye icon instead of a checkbox: ``eye.fill`` when the
 	colour is SHOWN, ``eye.slash`` when HIDDEN. It is still a CheckBox underneath, so clicking
@@ -2723,9 +2709,8 @@ class AZColorflowSettingsView:
 		lc_help_y = lc_label_y + 20
 		lc_help_h = 36
 		lc_list_y = lc_help_y + lc_help_h + 6
-		# 12 rows, plus a little chrome. The colour well fills its cell, so the row
-		# height IS the pill height: _LC_ROW_H and the colour column are both 20% down
-		# from the old 26/44 to shrink the pills.
+		# 12 rows, plus a little chrome. The pill's own size is _LC_WELL_H x _LC_COLOR_W
+		# (ColorWellCell constrains the height), so the row keeps a comfortable 21.
 		lc_list_h = int(12 * _LC_ROW_H + 8)
 		# Font Glyph Order (below the list — reset is now the title's reload icon) ---
 		fgo_sep_y = lc_list_y + lc_list_h + 10
@@ -2787,7 +2772,7 @@ class AZColorflowSettingsView:
 					# then editCallback fires).
 					dict(identifier="visible", title="", cellClass=EyeToggleList2Cell,
 						editable=True, width=24),
-					dict(identifier="color", title="", cellClass=ColorWellList2Cell,
+					dict(identifier="color", title="", cellClass=ColorWellCell,
 						editable=True, width=_LC_COLOR_W),
 					dict(identifier="name", title="", cellClass=EditTextList2Cell,
 						editable=True),
@@ -2807,7 +2792,7 @@ class AZColorflowSettingsView:
 					performDropCallback=self._slot_perform_drop),
 			)
 			self._slot_list = group.lcList
-			try:      # the well fills the row, so this sets the pill height
+			try:      # row height; the pill itself is shorter (see ColorWellCell)
 				group.lcList.getNSTableView().setRowHeight_(_LC_ROW_H)
 			except Exception:
 				pass

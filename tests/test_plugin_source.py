@@ -420,7 +420,7 @@ def test_settings_pane_has_single_combined_slot_list() -> None:
     assert "self._slot_list_items(font)" in build
     assert 'identifier="visible"' in build
     assert "cellClass=EyeToggleList2Cell" in build
-    assert "cellClass=ColorWellList2Cell" in build
+    assert "cellClass=ColorWellCell" in build
     assert "cellClass=EditTextList2Cell" in build
     # The visible eye column comes BEFORE the colour well.
     assert build.index('identifier="visible"') < build.index('identifier="color"')
@@ -1033,17 +1033,12 @@ def test_sidebar_buttons_and_legend_share_one_footer_card() -> None:
     # row INSIDE the footer card, above the legend grid (AZ-Argus style); the scroll
     # view fills everything above that card.
     block = _sidebar_block()
-    assert "_AZButtonBar.alloc()" in block                        # one joined slab, not a stack
     assert "NSStackView.alloc()" not in block
     assert "NSImageOnly" in block                                 # centred icon, no label
     assert 'btn.setTitle_("")' in block
-    assert "button_row.addSubview_(self._report)" in block and "button_row.addSubview_(self._gear)" in block
-    assert "legend.addSubview_(button_row)" in block              # buttons live in the panel
-    assert "container.addSubview_(button_row)" not in block       # ...not beside it
-    assert "inset = _COV_FOOTER_INSET_X" in block                 # panel content inset
-    assert "NSMakeRect(inset, legend.buttonBarTop()" in block      # bar sits UNDER the grid
-    assert "cb.width - 2 * inset), _COV_BTN_H))" in block
-    assert "row.layoutButtons_(" in block                         # halves sized by the bar
+    assert "self._buttons = (self._report, self._gear)" in block
+    assert "legend.addSubview_(_btn)" in block                    # pills live in the panel
+    assert "bar_y = legend.buttonBarTop()" in block                # pills sit UNDER the grid
     assert "cb.height - footer_h" in block                        # scroll fills above the panel
     assert "strip_h" not in block                                 # no separate button strip
     # The legend view sizes the shared panel: grid on top, button bar below it.
@@ -1052,15 +1047,17 @@ def test_sidebar_buttons_and_legend_share_one_footer_card() -> None:
     assert "return self.buttonBarTop() + _COV_BTN_H + _COV_FOOTER_INSET_Y" in PLUGIN_SOURCE
 
 
-def test_footer_button_bar_is_one_slab_with_a_divider() -> None:
-    # Two icon-only halves of ONE rounded bar, split by a hairline divider.
-    assert "class _AZButtonBar(AppKit.NSView)" in PLUGIN_SOURCE
-    bar = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZButtonBar(AppKit.NSView)"):][:1800]
-    assert "setCornerRadius_(_COV_CARD_RADIUS)" in bar
-    assert "setMasksToBounds_(True)" in bar                       # rounds the halves' outer corners
-    assert "bounds.size.width / 2.0 - 0.5, 0.0, 1.0" in bar       # 1pt divider down the middle
-    assert "def layoutButtons_(self" in bar
-    assert "def _button_bar_color()" in PLUGIN_SOURCE             # a step lighter than the panel
+def test_footer_buttons_are_two_pills_under_a_separator() -> None:
+    # Two standalone icon pills, left-aligned under a full-width hairline (no joined bar).
+    assert "_AZButtonBar" not in PLUGIN_SOURCE
+    assert "_COV_BTN_W = 52.0" in PLUGIN_SOURCE and "_COV_BTN_GAP = 8.0" in PLUGIN_SOURCE
+    assert "def separatorY(self)" in PLUGIN_SOURCE
+    assert "return self.separatorY() + _COV_CARD_GAP" in PLUGIN_SOURCE
+    legend = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZLegendView(AppKit.NSView)"):]
+    assert "NSMakeRect(0.0, self.separatorY(), bounds.size.width, 1.0)" in legend   # full width
+    block = _sidebar_block()
+    assert "_COV_FOOTER_INSET_X + index * (_COV_BTN_W + _COV_BTN_GAP)" in block     # left-aligned
+    assert "NSMakeRect(x, bar_y, _COV_BTN_W, _COV_BTN_H)" in block
 
 
 def test_bottom_panel_is_full_bleed() -> None:
@@ -1235,9 +1232,8 @@ def test_sidebar_buttons_have_card_coloured_background() -> None:
     assert "btn.setBordered_(False)" in button
     assert "setBezelStyle_" not in button
     assert "btn.setWantsLayer_(True)" in button
-    # Bar-coloured fill so the two halves read as one slab; the BAR owns the corners.
     assert "btn.layer().setBackgroundColor_(_button_bar_color().CGColor())" in button
-    assert "btn.layer().setCornerRadius_" not in button
+    assert "btn.layer().setCornerRadius_(_COV_CARD_RADIUS)" in button   # its own pill
     assert "btn.layer().setBorderWidth_" not in button
     # No custom drawRect_ on the button: a drawRect_ override only won the initial paint
     # on hover, so the default state showed the light system bezel. The dark layer bg
@@ -1328,11 +1324,14 @@ def test_card_grey_is_declared_in_srgb_only() -> None:
 
 
 def test_settings_color_pills_are_smaller() -> None:
-    # The colour well fills its List2 cell, so row height + column width ARE the pill
-    # size (row 26 -> 18, column 44 -> 35).
-    assert "_LC_ROW_H = 18.0" in PLUGIN_SOURCE
+    # The pill is shorter than its row: a height constraint on the well (vanilla builds
+    # it "auto", i.e. filling the cell) keeps it clear of the row's top/bottom edges.
+    assert "_LC_ROW_H = 21.0" in PLUGIN_SOURCE
     assert "_LC_COLOR_W = 35" in PLUGIN_SOURCE
-    assert "cellClass=ColorWellList2Cell,\n\t\t\t\t\t\teditable=True, width=_LC_COLOR_W)" in PLUGIN_SOURCE
+    assert "_LC_WELL_H = 13.0" in PLUGIN_SOURCE
+    assert "class ColorWellCell(ColorWellList2Cell)" in PLUGIN_SOURCE
+    assert "heightAnchor().constraintEqualToConstant_(_LC_WELL_H).setActive_(True)" in PLUGIN_SOURCE
+    assert "cellClass=ColorWellCell,\n\t\t\t\t\t\teditable=True, width=_LC_COLOR_W)" in PLUGIN_SOURCE
     assert "getNSTableView().setRowHeight_(_LC_ROW_H)" in PLUGIN_SOURCE
     assert "lc_list_h = int(12 * _LC_ROW_H + 8)" in PLUGIN_SOURCE   # list height follows
 
