@@ -19,7 +19,8 @@ import objc
 from datetime import datetime
 from vanilla import Window, FloatingWindow, Group, Box, Button, PopUpButton, ActionButton, HorizontalLine, TextBox, CheckBox, dialogs
 from AppKit import NSColor
-from GlyphsApp.plugins import PalettePlugin, Message
+from GlyphsApp import Message
+from GlyphsApp.plugins import PalettePlugin
 #from GlyphsApp.UI import
 from GlyphsApp import Glyphs, UPDATEINTERFACE, DOCUMENTCLOSED
 
