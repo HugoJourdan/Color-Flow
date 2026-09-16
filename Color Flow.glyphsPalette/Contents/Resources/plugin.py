@@ -18,7 +18,7 @@ import codecs
 import objc
 from datetime import datetime
 from vanilla import Window, FloatingWindow, Group, Box, Button, PopUpButton, ActionButton, HorizontalLine, TextBox, CheckBox, dialogs
-from AppKit import NSColor
+from AppKit import NSColor, NSMenu, NSMenuItem
 from GlyphsApp import Message
 from GlyphsApp.plugins import PalettePlugin
 #from GlyphsApp.UI import
@@ -96,16 +96,7 @@ class ColorFlow(PalettePlugin):
 			self.report = False
 
 		# Draw Action Button
-		self.paletteView.frame.actionPopUpButton = ActionButton((self.width - 22, 0, 34, 19), [
-			dict(title="Setup Color Flow based on Color Layers", callback=self.Setup_Color_Flow),
-			dict(title="Reset Color Flow", callback=self.Color_Flow_Reset),
-			dict(title="Generate Color Flow Smart Filters", callback=self.Generate_Color_Flow_Smart_Filter),
-			dict(title="Copy Color Flow to Master", callback=self.Copy_Color_Flow_To_Master),
-			dict(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback=self.Activate_Color_Flow_Report),
-			"----",
-			dict(title="Open Color Flow Documentation", callback=self.Open_Color_Flow_Documentation),
-		],
-			sizeStyle='small')
+		self.Update_Settings_Button()
 
 		#---------------------------------------------------------------------------#
 		# Draw Master Name Field													#
@@ -137,6 +128,33 @@ class ColorFlow(PalettePlugin):
 
 		# Needed to display the palette plugin
 		self.dialog = self.paletteView.frame.getNSView()
+
+	def settingsMenu(self):
+		self._settingsMenu = NSMenu()
+		self._settingsMenu.addItem_(NSMenuItem("Setup Color Flow based on Color Layers", callback="SetupColorFlow:", target=self))
+		self._settingsMenu.addItem_(NSMenuItem(title="Reset Color Flow", callback="ColorFlowReset:", target=self))
+		self._settingsMenu.addItem_(NSMenuItem(title="Generate Color Flow Smart Filters", callback="GenerateColorFlowSmartFilter:", target=self))
+		self._settingsMenu.addItem_(NSMenuItem(title="Copy Color Flow to Master", callback="CopyColorFlowToMaster:", target=self))
+		self._settingsMenu.addItem_(NSMenuItem(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback="ActivateColorFlowReport:", target=self))
+		self._settingsMenu.addItem_(NSMenuItem.separatorItem())
+		self._settingsMenu.addItem_(NSMenuItem(title="Open Color Flow Documentation", callback="OpenColorFlowDocumentation:", target=self))
+		return self._settingsMenu
+
+	def Update_Settings_Button(self):
+		if Glyphs.versionNumber <= 3:
+			if hasattr(self.paletteView.frame, "actionPopUpButton"):
+				delattr(self.paletteView.frame, "actionPopUpButton")
+
+			self.paletteView.frame.actionPopUpButton = ActionButton((self.width - 22, 0, 34, 19), [
+					dict(title="Setup Color Flow based on Color Layers", callback=self.SetupColorFlow_),
+					dict(title="Reset Color Flow", callback=self.ColorFlowReset_),
+					dict(title="Generate Color Flow Smart Filters", callback=self.GenerateColorFlowSmartFilter_),
+					dict(title="Copy Color Flow to Master", callback=self.CopyColorFlowToMaster_),
+					dict(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback=self.ActivateColorFlowReport_),
+					"----",
+					dict(title="Open Color Flow Documentation", callback=self.OpenColorFlowDocumentation_),
+			],
+				sizeStyle='small')
 
 	@objc.python_method
 	def start(self):
@@ -585,8 +603,7 @@ class ColorFlow(PalettePlugin):
 	#																									#
 
 
-	@objc.python_method
-	def Setup_Color_Flow(self, sender):
+	def SetupColorFlow_(self, sender):
 		"""Setup ColorFlow based on Color Layers callback"""
 
 		print(f"✅ UPDATE > ColorFlow settings [{self.font.selectedFontMaster.name}]")
@@ -611,9 +628,7 @@ class ColorFlow(PalettePlugin):
 		Glyphs.showMacroWindow()
 		self.Update_Plugin_UI()
 
-
-	@objc.python_method
-	def Color_Flow_Reset(self, sender):
+	def ColorFlowReset_(self, sender):
 		"""Reset ColorFlow callback"""
 
 		print(f"✅ RESET > ColorFlow settings [{self.font.selectedFontMaster.name}]")
@@ -635,8 +650,7 @@ class ColorFlow(PalettePlugin):
 		self.Update_Plugin_UI()
 
 
-	@objc.python_method
-	def Generate_Color_Flow_Smart_Filter(self, sender):
+	def GenerateColorFlowSmartFilter_(self, sender):
 		"""Generate Color Flow smart filter"""
 
 		import plistlib
@@ -678,8 +692,7 @@ class ColorFlow(PalettePlugin):
 			Message("To Fix it, add an item in Filter Section and Restart Glyph. After that run again this function", title=".plist not writable", OKButton=None)
 
 
-	@objc.python_method
-	def Copy_Color_Flow_To_Master(self, sender):
+	def CopyColorFlowToMaster_(self, sender):
 		"""Copy Color Flow Data to Master"""
 
 		MASTER = []
@@ -712,15 +725,12 @@ class ColorFlow(PalettePlugin):
 
 		self.font.userData["com.hugojourdan.ColorFlow-master-data"][toMasterID] = self.font.userData["com.hugojourdan.ColorFlow-master-data"][fromMasterID]
 
-
-
 		for glyph in self.font.glyphs:
 			glyph.layers[toMasterID].color = glyph.layers[fromMasterID].color
 			colorFlowData = self.Get_Layer_Color_Flow_Data(glyph.layers[fromMasterID], clean=True)
 			self.Set_Layer_Color_Flow_Data(glyph.layers[toMasterID], colorFlowData)
 
-	@objc.python_method
-	def Open_Color_Flow_Documentation(self, sender):
+	def OpenColorFlowDocumentation_(self, sender):
 
 		URL = "https://github.com/HugoJourdan/Color-Flow"
 
@@ -793,8 +803,8 @@ class ColorFlow(PalettePlugin):
 		# with open('/Users/hugojourdan/Desktop/POUBELLE/DATA.json', 'w') as outfile:
 		# 	json.dump(layerColorData, outfile)
 
-	@objc.python_method
-	def Activate_Color_Flow_Report(self, sender):
+
+	def ActivateColorFlowReport_(self, sender):
 
 		if Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] == "Enable Color Flow Report":
 			self.report = True
@@ -804,22 +814,6 @@ class ColorFlow(PalettePlugin):
 
 			Glyphs.showMacroWindow()
 
-			if hasattr(self.paletteView.frame, "actionPopUpButton"):
-				delattr(self.paletteView.frame, "actionPopUpButton")
-			self.paletteView.frame.actionPopUpButton = ActionButton(
-				(self.width - 22, 0, 34, 19),
-				[
-					dict(title="Setup Color Flow based on Color Layers", callback=self.Setup_Color_Flow),
-					dict(title="Reset Color Flow", callback=self.Color_Flow_Reset),
-					dict(title="Generate Color Flow Smart Filters", callback=self.Generate_Color_Flow_Smart_Filter),
-					dict(title="Copy Color Flow to Master", callback=self.Copy_Color_Flow_To_Master),
-					dict(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback=self.Activate_Color_Flow_Report),
-					"----",
-					dict(title="Open Color Flow Documentation", callback=self.Open_Color_Flow_Documentation),
-				],
-				sizeStyle='small'
-			)
-
 		else:
 			self.report = False
 			Glyphs.removeCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
@@ -827,21 +821,7 @@ class ColorFlow(PalettePlugin):
 			print("Color Flow Report disabled")
 			Glyphs.showMacroWindow()
 
-			if hasattr(self.paletteView.frame, "actionPopUpButton"):
-				delattr(self.paletteView.frame, "actionPopUpButton")
-			self.paletteView.frame.actionPopUpButton = ActionButton(
-				(self.width - 22, 0, 34, 19),
-				[
-					dict(title="Setup Color Flow based on Color Layers", callback=self.Setup_Color_Flow),
-					dict(title="Reset Color Flow", callback=self.Color_Flow_Reset),
-					dict(title="Generate Color Flow Smart Filters", callback=self.Generate_Color_Flow_Smart_Filter),
-					dict(title="Copy Color Flow to Master", callback=self.Copy_Color_Flow_To_Master),
-					dict(title=Glyphs.defaults["com.hugojourdan.ColorFlow-Report"], callback=self.Activate_Color_Flow_Report),
-					"----",
-					dict(title="Open Color Flow Documentation", callback=self.Open_Color_Flow_Documentation),
-				],
-				sizeStyle='small'
-			)
+		self.Update_Settings_Button()
 
 
 	#####################################################################################################
