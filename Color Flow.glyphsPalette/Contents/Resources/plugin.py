@@ -193,11 +193,23 @@ class ColorFlow(PalettePlugin):
 		elif layer.userData[self.COLOR_FLOW_LAYER_KEY] is not None:
 			del layer.userData[self.COLOR_FLOW_LAYER_KEY]
 
+	@objc.python_method
+	def Update_Layer_Color(self, layer):
+		"""Update the native layer color using the configured workflow order."""
+		colorFlowData = self.Get_Layer_Color_Flow_Data(layer, clean=True)
+		layerColor = None
+		for color in self.meaning.keys():
+			if not colorFlowData.get(color, False):
+				break
+			layerColor = int(color)
+		if layer.color != layerColor:
+			layer.color = layerColor
+
 
 	@objc.python_method
 	def Get_Dic_Layer_Color_Label(self, masterId):
 		try:
-			self.LayerColorLabel = {k: False for k in self.meaning.keys()}
+			self.LayerColorLabel = {k: 0 for k in self.meaning.keys()}
 			for glyph in self.font.glyphs:
 				colorFlowData = self.Get_Layer_Color_Flow_Data(glyph.layers[masterId], clean=True)
 
@@ -214,6 +226,16 @@ class ColorFlow(PalettePlugin):
 	def Update_Plugin_UI(self):
 		try:
 			yPos = 36
+			selectedMasterId = self.font.selectedFontMaster.id
+
+			for layer in self.font.selectedLayers or []:
+				self.Update_Layer_Color(layer)
+
+			self.LayerColorLabel = self.Get_Dic_Layer_Color_Label(selectedMasterId)
+			masterData = self.font.userData["com.hugojourdan.ColorFlow-master-data"] or {}
+			if selectedMasterId not in masterData or masterData[selectedMasterId] != self.LayerColorLabel:
+				masterData[selectedMasterId] = self.LayerColorLabel
+				self.font.userData["com.hugojourdan.ColorFlow-master-data"] = masterData
 
 
 			#---------------------------------------------------------------------------#
@@ -234,9 +256,6 @@ class ColorFlow(PalettePlugin):
 			#---------------------------------------------------------------------------#
 			# Access, build data to update UI											#
 			#---------------------------------------------------------------------------#
-			selectedMasterId = self.font.selectedFontMaster.id
-			self.LayerColorLabel = self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterId]
-
 			for color in self.LayerColorLabel:
 				self.barWidthDic[color] = self.barWidth / len(self.font.glyphs) * self.LayerColorLabel[color]
 
@@ -326,7 +345,7 @@ class ColorFlow(PalettePlugin):
 		#-------------------------------------------------------------------------------#
 
 		try:
-			if self.Glyphs.font:
+			if self.font:
 				self.Update_Plugin_UI()
 				self.init = True
 				trigger = True
@@ -454,40 +473,15 @@ class ColorFlow(PalettePlugin):
 
 		color = sender.getTitle()
 		check = sender.get()
-		selectedMasterID = self.font.selectedFontMaster.id
-		firstMeaning = list(self.meaning.keys())[0]
-
-		for master in self.font.masters:
-			if master.id not in self.font.userData["com.hugojourdan.ColorFlow-master-data"]:
-				self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.id] = self.Get_Dic_Layer_Color_Label(master.id)
 
 		for k, v in self.meaning.items():
 			if color == v:
 				color = k
 
-
 		for layer in self.font.selectedLayers:
-			colorFlowData = self.Get_Layer_Color_Flow_Data(layer, clean=True)
-			if check and not colorFlowData.get(color, False):
-				self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterID][color] += 1
-				self.Set_Layer_Color_Flow_Value(layer, color, True)
-			if not check and colorFlowData.get(color, False):
-				self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterID][color] -= 1
-				self.Set_Layer_Color_Flow_Value(layer, color, False)
+			self.Set_Layer_Color_Flow_Value(layer, color, check)
 
-			colorFlowData = self.Get_Layer_Color_Flow_Data(layer)
-
-			# Update LayerColor
-			for COLOR in self.meaning.keys():
-
-				if not colorFlowData.get(firstMeaning, False):
-					layer.color = None
-
-				if colorFlowData.get(COLOR, False):
-					layer.color = int(COLOR)
-
-				else:
-					break
+		self.Update_Plugin_UI()
 
 
 	#####################################################################################################
