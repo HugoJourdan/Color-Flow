@@ -96,9 +96,13 @@ In the following example Layer Color is set to `Orange` because even if `Light G
 
 Shortcuts can be used to toggle checkboxes. To assign shortcuts, follow these steps:
 
+In Glyphs 4, open Settings > Shortcuts, search for “Color Flow,” and assign shortcuts to the commands registered by the plugin.
+
+In Glyphs 3:
+
 1. Download "Color Flow Shortcut" from Window > Plugin Manager.
-2. Reload script folder by pressing [ Option + MAJ + Command + Y ].
-3. In Glyph Preferences > Shortcuts, search "Color Flow" and assign a shortcut for each item. (I personnaly use Control+Number as shortcuts)
+2. Reload the script folder by pressing [ Option + Shift + Command + Y ].
+3. In Glyph Preferences > Shortcuts, search "Color Flow" and assign a shortcut for each item.
 
 
 _________________
@@ -118,5 +122,4 @@ Some extra features are accessible from the Action Button.
 <br>
 
 *Thanks to Gor Jihanian (@gorjious) for his contribution.*
-
 

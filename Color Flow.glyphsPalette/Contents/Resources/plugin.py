@@ -24,6 +24,23 @@ from GlyphsApp.plugins import PalettePlugin, Message
 from GlyphsApp import Glyphs, UPDATEINTERFACE, DOCUMENTCLOSED
 
 
+SHORTCUT_COMMANDS = (
+	("Toggle Red Checkbox", "red", "0", b"toggleRedShortcut:"),
+	("Toggle Orange Checkbox", "orange", "1", b"toggleOrangeShortcut:"),
+	("Toggle Brown Checkbox", "brown", "2", b"toggleBrownShortcut:"),
+	("Toggle Yellow Checkbox", "yellow", "3", b"toggleYellowShortcut:"),
+	("Toggle Green Checkbox", "green", "4", b"toggleGreenShortcut:"),
+	("Toggle DarkGreen Checkbox", "dark-green", "5", b"toggleDarkGreenShortcut:"),
+	("Toggle Blue Checkbox", "blue", "6", b"toggleBlueShortcut:"),
+	("Toggle DarkBlue Checkbox", "dark-blue", "7", b"toggleDarkBlueShortcut:"),
+	("Toggle Purple Checkbox", "purple", "8", b"togglePurpleShortcut:"),
+	("Toggle Magenta Checkbox", "magenta", "9", b"toggleMagentaShortcut:"),
+	("Toggle Grey Checkbox", "grey", "10", b"toggleGreyShortcut:"),
+	("Toggle Charcoal Checkbox", "charcoal", "11", b"toggleCharcoalShortcut:"),
+)
+
+shortcutTarget = None
+
 
 class ColorFlow(PalettePlugin):
 	COLOR_FLOW_LAYER_KEY = "com.hugojourdan.ColorFlow"
@@ -39,6 +56,11 @@ class ColorFlow(PalettePlugin):
 
 	@objc.python_method
 	def settings(self):
+		global shortcutTarget
+		if shortcutTarget is None:
+			shortcutTarget = self
+			self.Register_Shortcuts()
+
 		self.name = 'Color Flow'
 		self.init = False
 		self.compactedFonts = set()
@@ -115,7 +137,6 @@ class ColorFlow(PalettePlugin):
 		# Needed to display the palette plugin
 		self.dialog = self.paletteView.frame.getNSView()
 
-
 	@objc.python_method
 	def start(self):
 		Glyphs.addCallback(self.update, UPDATEINTERFACE)
@@ -129,6 +150,76 @@ class ColorFlow(PalettePlugin):
 		if Glyphs.defaults["com.hugojourdan.ColorFlow-Report"] == "Disable Color Flow Report":
 			self.report = True
 			Glyphs.addCallback(self.Color_Flow_Report_PRINT, DOCUMENTCLOSED)
+
+
+	@objc.python_method
+	def Register_Shortcuts(self):
+		"""Register assignable Color Flow commands when the Glyphs 4 API exists."""
+
+		try:
+			shortcutHandler = objc.lookUpClass("GSShortcutHandler")
+		except:
+			return
+
+		for title, identifier, color, action in SHORTCUT_COMMANDS:
+			shortcutHandler.registerShortcutCommand_group_identifier_action_target_character_modifierFlags_(
+				title,
+				"Color Flow",
+				"com.hugojourdan.ColorFlow." + identifier,
+				action,
+				shortcutTarget,
+				None,
+				0,
+			)
+
+	@objc.python_method
+	def Toggle_Color_From_Shortcut(self, color):
+		"""Apply the same sparse data toggle as the Glyphs 3 scripts."""
+		font = Glyphs.font
+		if font is None:
+			return
+		self.font = font
+		for layer in font.selectedLayers or []:
+			colorFlowData = self.Get_Layer_Color_Flow_Data(layer, clean=True)
+			self.Set_Layer_Color_Flow_Value(layer, color, not colorFlowData.get(color, False))
+		self.Update_Plugin_UI()
+		Glyphs.redraw()
+
+	def toggleRedShortcut_(self, sender):
+		self.Toggle_Color_From_Shortcut("0")
+
+	def toggleOrangeShortcut_(self, sender):
+		self.Toggle_Color_From_Shortcut("1")
+
+	def toggleBrownShortcut_(self, sender):
+		self.Toggle_Color_From_Shortcut("2")
+
+	def toggleYellowShortcut_(self, sender):
+		self.Toggle_Color_From_Shortcut("3")
+
+	def toggleGreenShortcut_(self, sender):
+		self.Toggle_Color_From_Shortcut("4")
+
+	def toggleDarkGreenShortcut_(self, sender):
+		self.Toggle_Color_From_Shortcut("5")
+
+	def toggleBlueShortcut_(self, sender):
+		self.Toggle_Color_From_Shortcut("6")
+
+	def toggleDarkBlueShortcut_(self, sender):
+		self.Toggle_Color_From_Shortcut("7")
+
+	def togglePurpleShortcut_(self, sender):
+		self.Toggle_Color_From_Shortcut("8")
+
+	def toggleMagentaShortcut_(self, sender):
+		self.Toggle_Color_From_Shortcut("9")
+
+	def toggleGreyShortcut_(self, sender):
+		self.Toggle_Color_From_Shortcut("10")
+
+	def toggleCharcoalShortcut_(self, sender):
+		self.Toggle_Color_From_Shortcut("11")
 
 
 	#####################################################################################################

@@ -1,6 +1,6 @@
 # COLOR FLOW SHORTCUT
 
-You can toggle checkbox with shortcuts. For that follow these steps :
+Glyphs 3 users can toggle Color Flow checkboxes with these scripts. To assign shortcuts:
 
 1. Download "Color Flow Shortcut" from Window > Plugin Manager.
 2. Reload script folder by pressing [ Option + Shift + Command + Y ].
