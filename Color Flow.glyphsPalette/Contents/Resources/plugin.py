@@ -86,7 +86,7 @@ class ColorFlow(PalettePlugin):
 		self.shift = 10
 		self.barWidth = self.width + 6
 		self.barWidthDic = {}
-		self.height = 22 * len([x for x in self.meaning.values() if x]) + 25
+		self.height = 20 * len([x for x in self.meaning.values() if x]) + 21
 		self.xPos = 9
 
 		self.paletteView = Window((self.width, self.height + 10))
@@ -103,11 +103,11 @@ class ColorFlow(PalettePlugin):
 		#---------------------------------------------------------------------------#
 
 		if Glyphs.versionNumber >= 4:
-			self.paletteView.frame.masterNameBox = Box((6, 2, -8, 15), fillColor=(NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.1)), cornerRadius=4, borderWidth=0)
-			self.paletteView.frame.masterName = TextBox((8, 2.6, -9, 20), "", alignment="left", sizeStyle='small')
+			self.paletteView.frame.masterNameBox = Box((6, 0, -8, 15), fillColor=(NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.1)), cornerRadius=4, borderWidth=0)
+			self.paletteView.frame.masterName = TextBox((8, 0, -9, 20), "", alignment="left", sizeStyle='small')
 		else:
-			self.paletteView.frame.masterNameBox = Box((6, 2, 127, 10), fillColor=(NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.1)), cornerRadius=4, borderWidth=0)
-			self.paletteView.frame.masterName = TextBox((8, 2.6, 140, 20), "", alignment="left", sizeStyle='small')
+			self.paletteView.frame.masterNameBox = Box((6, 0, 127, 10), fillColor=(NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.1)), cornerRadius=4, borderWidth=0)
+			self.paletteView.frame.masterName = TextBox((8, 0, 140, 20), "", alignment="left", sizeStyle='small')
 
 		cell = self.paletteView.frame.masterName.getNSTextField().cell()
 		cell.setLineBreakMode_(NSLineBreakByTruncatingTail)
@@ -115,23 +115,9 @@ class ColorFlow(PalettePlugin):
 		cell.setScrollable_(False)
 
 		#---------------------------------------------------------------------------#
-		# Draw Horitzontal Lines													#
+		# Set up color rows															#
 		#---------------------------------------------------------------------------#
-		yPos = 25
-		for k, v in self.meaning.items():
-			setattr(self.paletteView.frame, str(k) + "line", HorizontalLine((0, yPos, 0, 1)))
-			yPos += 22
-
-		#---------------------------------------------------------------------------#
-		# Draw Color Tags															#
-		#---------------------------------------------------------------------------#
-		yPos = 36
-		for k, v in self.meaning.items():
-			if v:
-				color_value = self.colorKeys.get(str(k))
-				color = NSColor.colorWithRed_green_blue_alpha_(*color_value) if color_value else None
-				setattr(self.paletteView.frame, str(k) + "colorTag", Box((0, yPos + 1 - self.shift, 3, 16), fillColor=(color), cornerRadius=0, borderWidth=0))
-				yPos += 22
+		self.Build_Color_Rows()
 
 		# # Select a master if none is selected
 		# if not self.font.selectedFontMaster:
@@ -139,6 +125,47 @@ class ColorFlow(PalettePlugin):
 
 		# Needed to display the palette plugin
 		self.dialog = self.paletteView.frame.getNSView()
+
+	@objc.python_method
+	def Build_Color_Rows(self):
+		"""Create the controls for every visible color row once."""
+		self.colorRows = {}
+		yPos = 32
+		gray = NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.06)
+
+		for color, meaning in self.meaning.items():
+			if not meaning:
+				continue
+
+			colorValue = self.colorKeys.get(str(color))
+			fillColor = NSColor.colorWithRed_green_blue_alpha_(*colorValue) if colorValue else None
+			barPosition = (self.xPos, yPos + 1 - self.shift, 0.01, 16)
+
+			line = HorizontalLine((0, yPos - 11, 0, 1))
+			colorTag = Box((0, yPos + 1 - self.shift, 3, 16), fillColor=fillColor, cornerRadius=0, borderWidth=0)
+			grayBar = Box(barPosition, fillColor=gray, cornerRadius=0, borderWidth=0)
+			colorBar = Box(barPosition, fillColor=fillColor, cornerRadius=0, borderWidth=0)
+			checkbox = CheckBox((12, yPos - 1 - self.shift, -10, 20), meaning, value=False, callback=self.CheckBox_Callback, sizeStyle='small')
+			countLabel = TextBox((self.width - 50, yPos + 2 - self.shift, -6, 20), "0/0", alignment="right", sizeStyle='small')
+
+			grayBar.show(False)
+			colorBar.show(False)
+
+			setattr(self.paletteView.frame, str(color) + "line", line)
+			setattr(self.paletteView.frame, str(color) + "colorTag", colorTag)
+			setattr(self.paletteView.frame, str(color) + "box", grayBar)
+			setattr(self.paletteView.frame, str(color) + "colorBox", colorBar)
+			setattr(self.paletteView.frame, str(color), checkbox)
+			setattr(self.paletteView.frame, str(color) + "count", countLabel)
+
+			self.colorRows[color] = {
+				"grayBar": grayBar,
+				"colorBar": colorBar,
+				"checkbox": checkbox,
+				"countLabel": countLabel,
+				"barY": yPos + 1 - self.shift,
+			}
+			yPos += 20
 
 	def settingsMenu(self):
 		self._settingsMenu = NSMenu()
@@ -346,7 +373,6 @@ class ColorFlow(PalettePlugin):
 	@objc.python_method
 	def Update_Plugin_UI(self):
 		try:
-			yPos = 36
 			selectedMasterId = self.font.selectedFontMaster.id
 
 			for layer in self.font.selectedLayers or []:
@@ -377,8 +403,9 @@ class ColorFlow(PalettePlugin):
 			#---------------------------------------------------------------------------#
 			# Access, build data to update UI											#
 			#---------------------------------------------------------------------------#
+			glyphCount = len(self.font.glyphs)
 			for color in self.LayerColorLabel:
-				self.barWidthDic[color] = self.barWidth / len(self.font.glyphs) * self.LayerColorLabel[color]
+				self.barWidthDic[color] = self.barWidth / glyphCount * self.LayerColorLabel[color] if glyphCount else 0
 
 			#---------------------------------------------------------------------------#
 			# Updated element in UI														#
@@ -388,62 +415,28 @@ class ColorFlow(PalettePlugin):
 			masterName = self.font.selectedFontMaster.name
 			self.paletteView.frame.masterName.set(masterName)
 
-			for color, meaning in self.meaning.items():
+			selectedLayers = list(self.font.selectedLayers or [])
+			selectedLayerData = [
+				self.Get_Layer_Color_Flow_Data(layer, clean=True)
+				for layer in selectedLayers
+			]
 
-				if hasattr(self.paletteView.frame, str(color)):
-					delattr(self.paletteView.frame, str(color))
-				if hasattr(self.paletteView.frame, str(color) + "box"):
-					delattr(self.paletteView.frame, str(color) + "box")
-				if hasattr(self.paletteView.frame, str(color) + "count"):
-					delattr(self.paletteView.frame, str(color) + "count")
+			for color, row in self.colorRows.items():
+				check = bool(selectedLayerData) and all(
+					colorFlowData.get(color, False)
+					for colorFlowData in selectedLayerData
+				)
+				row["checkbox"].set(check)
 
-				if meaning:
+				count = self.LayerColorLabel[color]
+				row["countLabel"].set("✅" if count >= glyphCount else f"{count}/{glyphCount}")
 
-					if self.font.selectedLayers:
-						check = self.Get_Layer_Color_Flow_Data(self.font.selectedLayers[0], clean=True).get(color, False)
-
-						if len(self.font.selectedLayers) > 1:
-							for layer in self.font.selectedLayers:
-								check = self.Get_Layer_Color_Flow_Data(layer, clean=True).get(color, False)
-								if not check:
-									break
-
-						# Draw Gray Bar if ◻️, Colored Bar if ✅
-						if not check and color is not None and self.barWidthDic[color] != 0:
-							setattr(self.paletteView.frame, str(color) + "box", Box((self.xPos, yPos + 1 - self.shift, self.barWidthDic[color] + 0.01, 16), fillColor=(NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.06)), cornerRadius=0, borderWidth=0))
-
-						if check and not color and self.barWidthDic[color] != 0 and self.font.selectedLayers[0].color != int(color):
-							setattr(self.paletteView.frame, str(color) + "box", Box((self.xPos, yPos + 1 - self.shift, self.barWidthDic[color] + 0.01, 16), fillColor=(NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.06)), cornerRadius=0, borderWidth=0))
-
-						if check and not color and self.barWidthDic[color] != 0 and self.font.selectedLayers[0].color == int(color):
-							setattr(self.paletteView.frame, str(color) + "box", Box((self.xPos, yPos + 1 - self.shift, self.barWidthDic[color] + 0.01, 16), fillColor=(NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])), cornerRadius=0, borderWidth=0))
-
-						## Draw checkboxes
-						#if len(meaning) > 16:
-							#meaning = meaning[0:16]+"…"
-						setattr(self.paletteView.frame, str(color), CheckBox((12, yPos - self.shift, -10, 20), meaning, value=check, callback=self.CheckBox_Callback, sizeStyle='small'))
-
-						# Replace Counter by ✅ if goal reached
-						if self.LayerColorLabel[color] >= len(self.font.glyphs):
-							setattr(self.paletteView.frame, str(color) + "count", TextBox((self.width - 50, yPos + 5 - self.shift, -6, 20), "✅", alignment="right", sizeStyle='mini'))
-						else:
-							setattr(self.paletteView.frame, str(color) + "count", TextBox((self.width - 50, yPos + 3 - self.shift, -6, 20), f"{self.LayerColorLabel[color]}/{len(self.font.glyphs)}", alignment="right", sizeStyle='small'))
-
-						yPos += 22
-
-					else:
-						if self.barWidthDic[color] != 0:
-							setattr(self.paletteView.frame, str(color) + "box", Box((self.xPos, yPos + 1 - self.shift, self.barWidthDic[color] + 0.01, 16), fillColor=(NSColor.colorWithRed_green_blue_alpha_(*self.colorKeys[str(color)])), cornerRadius=0, borderWidth=0))
-
-						setattr(self.paletteView.frame, str(color), CheckBox((12, yPos - self.shift, -10, 20), meaning, value=False, callback=self.CheckBox_Callback, sizeStyle='small'))
-
-						# Replace Counter by ✅ if goal reached
-						if self.LayerColorLabel[color] >= len(self.font.glyphs):
-							setattr(self.paletteView.frame, str(color) + "count", TextBox((self.width - 50, yPos + 5 - self.shift, -6, 20), "✅", alignment="right", sizeStyle='mini'))
-						else:
-							setattr(self.paletteView.frame, str(color) + "count", TextBox((self.width - 50, yPos + 3 - self.shift, -6, 20), f"{self.LayerColorLabel[color]}/{len(self.font.glyphs)}", alignment="right", sizeStyle='small'))
-
-						yPos += 22
+				barWidth = self.barWidthDic[color]
+				barPosition = (self.xPos, row["barY"], barWidth + 0.01, 16)
+				row["grayBar"].setPosSize(barPosition)
+				row["colorBar"].setPosSize(barPosition)
+				row["grayBar"].show(bool(selectedLayers) and not check and barWidth > 0)
+				row["colorBar"].show(not selectedLayers and barWidth > 0)
 		except:
 			pass
 
