@@ -63,7 +63,7 @@ class ColorFlow(PalettePlugin):
 			self.Register_Shortcuts()
 
 		self.name = 'Color Flow'
-		self.init = False
+		self._init = False
 		self.compactedFonts = set()
 		self.colorKeys = {
 			"0": (0.85, 0.26, 0.06, 0.5),
@@ -142,7 +142,7 @@ class ColorFlow(PalettePlugin):
 	def start(self):
 		Glyphs.addCallback(self.update, UPDATEINTERFACE)
 		self.font = Glyphs.font
-		self.init = False
+		self._init = False
 		self.startSession = datetime.now().strftime('%m/%d/%Y - %H:%M')
 		self.update(self._windowController)
 		self.Color_Flow_Report(self._windowController)
@@ -439,7 +439,7 @@ class ColorFlow(PalettePlugin):
 		try:
 			if self.font:
 				self.Update_Plugin_UI()
-				self.init = True
+				self._init = True
 				trigger = True
 		except:
 			pass
@@ -490,10 +490,10 @@ class ColorFlow(PalettePlugin):
 		except:
 			pass
 
-		if not self.init:
+		if not self._init:
 			try:
 				self.Update_Plugin_UI()
-				self.init = True
+				self._init = True
 				trigger = True
 			except:
 				pass
