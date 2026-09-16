@@ -18,7 +18,7 @@ import codecs
 import objc
 from datetime import datetime
 from vanilla import Window, FloatingWindow, Group, Box, Button, PopUpButton, ActionButton, HorizontalLine, TextBox, CheckBox, dialogs
-from AppKit import NSColor, NSMenu, NSMenuItem
+from AppKit import NSColor, NSMenu, NSMenuItem, NSLineBreakByTruncatingTail
 from GlyphsApp import Message
 from GlyphsApp.plugins import PalettePlugin
 #from GlyphsApp.UI import
@@ -101,7 +101,18 @@ class ColorFlow(PalettePlugin):
 		#---------------------------------------------------------------------------#
 		# Draw Master Name Field													#
 		#---------------------------------------------------------------------------#
-		self.paletteView.frame.masterNameBox = Box((6, 4, 127, 10), fillColor=(NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.1)), cornerRadius=4, borderWidth=0)
+
+		if Glyphs.versionNumber >= 4:
+			self.paletteView.frame.masterNameBox = Box((6, 2, -8, 15), fillColor=(NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.1)), cornerRadius=4, borderWidth=0)
+			self.paletteView.frame.masterName = TextBox((8, 2.6, -9, 20), "", alignment="left", sizeStyle='small')
+		else:
+			self.paletteView.frame.masterNameBox = Box((6, 2, 127, 10), fillColor=(NSColor.colorWithRed_green_blue_alpha_(0, 0, 0, 0.1)), cornerRadius=4, borderWidth=0)
+			self.paletteView.frame.masterName = TextBox((8, 2.6, 140, 20), "", alignment="left", sizeStyle='small')
+
+		cell = self.paletteView.frame.masterName.getNSTextField().cell()
+		cell.setLineBreakMode_(NSLineBreakByTruncatingTail)
+		cell.setWraps_(False)
+		cell.setScrollable_(False)
 
 		#---------------------------------------------------------------------------#
 		# Draw Horitzontal Lines													#
@@ -374,14 +385,8 @@ class ColorFlow(PalettePlugin):
 			#---------------------------------------------------------------------------#
 
 			# Update Master Name
-			if hasattr(self.paletteView.frame, "masterName"):
-				delattr(self.paletteView.frame, "masterName")
-
 			masterName = self.font.selectedFontMaster.name
-			if len(masterName) > 16:
-				masterName = masterName[0:16] + "…"
-			setattr(self.paletteView.frame, "masterName", TextBox((6, 2.6, 140, 20), masterName, alignment="left", sizeStyle='small'))
-
+			self.paletteView.frame.masterName.set(masterName)
 
 			for color, meaning in self.meaning.items():
 
