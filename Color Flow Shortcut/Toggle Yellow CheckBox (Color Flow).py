@@ -55,23 +55,38 @@ selectedMasterName = font.selectedFontMaster.name
 selectedLayers = font.selectedLayers
 
 colorCheck = "3"
+colorFlowKey = "com.hugojourdan.ColorFlow"
+
 for layer in selectedLayers:
 	layer.color = layer.color
 
-	layer.userData["com.hugojourdan.ColorFlow"][colorCheck] = not layer.userData["com.hugojourdan.ColorFlow"][colorCheck]
+	storedData = layer.userData[colorFlowKey]
+	colorFlowData = {}
+	if storedData:
+		colorFlowData = {
+			str(color): True
+			for color, value in storedData.items()
+			if value
+		}
 
-	if layer.userData["com.hugojourdan.ColorFlow"][colorCheck] == True:
-		font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterName][colorCheck]+= 1
+	check = not colorFlowData.get(colorCheck, False)
+	if check:
+		colorFlowData[colorCheck] = True
+		font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterName][colorCheck] += 1
 	else:
-		font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterName][colorCheck]-= 1
+		colorFlowData.pop(colorCheck, None)
+		font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterName][colorCheck] -= 1
+
+	if colorFlowData:
+		layer.userData[colorFlowKey] = colorFlowData
+	elif storedData is not None:
+		del layer.userData[colorFlowKey]
+
+	if not colorFlowData.get(colorCheck, False):
+		layer.color = None
 
 	for COLOR in meaning.keys():
-				
-		if layer.userData["com.hugojourdan.ColorFlow"][colorCheck] == False:
-			layer.color = None
-					
-		if layer.userData["com.hugojourdan.ColorFlow"][COLOR] == True:
+		if colorFlowData.get(COLOR, False):
 			layer.color = int(COLOR)
-				
 		else:
 			break

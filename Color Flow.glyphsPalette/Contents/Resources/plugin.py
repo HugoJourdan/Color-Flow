@@ -26,6 +26,7 @@ from GlyphsApp import Glyphs, UPDATEINTERFACE, DOCUMENTCLOSED
 
 
 class ColorFlow(PalettePlugin):
+	COLOR_FLOW_LAYER_KEY = "com.hugojourdan.ColorFlow"
 
 
 	#####################################################################################################
@@ -40,6 +41,7 @@ class ColorFlow(PalettePlugin):
 	def settings(self):
 		self.name = 'Color Flow'
 		self.init = False
+		self.compactedFonts = set()
 		self.colorKeys = {
 			"0": (0.85, 0.26, 0.06, 0.5),
 			"1": (0.99, 0.62, 0.11, 0.5),
@@ -138,6 +140,58 @@ class ColorFlow(PalettePlugin):
 	#																									#
 
 	# Build Dic with number of LayerColor
+	@objc.python_method
+	def Get_Layer_Color_Flow_Data(self, layer, clean=False):
+		"""Return only enabled Color Flow values for a layer.
+
+		Missing values represent unchecked colors.  When ``clean`` is true,
+		legacy dictionaries containing false values are rewritten sparsely.
+		"""
+		storedData = layer.userData[self.COLOR_FLOW_LAYER_KEY]
+		colorFlowData = {}
+
+		if storedData:
+			for color, value in storedData.items():
+				if value:
+					colorFlowData[str(color)] = True
+
+		if clean:
+			if colorFlowData:
+				if dict(storedData.items()) != colorFlowData:
+					layer.userData[self.COLOR_FLOW_LAYER_KEY] = colorFlowData
+			elif storedData is not None:
+				del layer.userData[self.COLOR_FLOW_LAYER_KEY]
+
+		return colorFlowData
+
+	@objc.python_method
+	def Set_Layer_Color_Flow_Value(self, layer, color, value):
+		"""Store an enabled value, or remove it (and an empty layer dictionary)."""
+		colorFlowData = self.Get_Layer_Color_Flow_Data(layer)
+		color = str(color)
+
+		if value:
+			colorFlowData[color] = True
+		else:
+			colorFlowData.pop(color, None)
+
+		if colorFlowData:
+			layer.userData[self.COLOR_FLOW_LAYER_KEY] = colorFlowData
+		elif layer.userData[self.COLOR_FLOW_LAYER_KEY] is not None:
+			del layer.userData[self.COLOR_FLOW_LAYER_KEY]
+
+	@objc.python_method
+	def Set_Layer_Color_Flow_Data(self, layer, colorFlowData):
+		"""Replace a layer's Color Flow data using the sparse representation."""
+		colorFlowData = {
+			str(color): True
+			for color, value in colorFlowData.items()
+			if value
+		}
+		if colorFlowData:
+			layer.userData[self.COLOR_FLOW_LAYER_KEY] = colorFlowData
+		elif layer.userData[self.COLOR_FLOW_LAYER_KEY] is not None:
+			del layer.userData[self.COLOR_FLOW_LAYER_KEY]
 
 
 	@objc.python_method
@@ -145,7 +199,7 @@ class ColorFlow(PalettePlugin):
 		try:
 			self.LayerColorLabel = {k: False for k in self.meaning.keys()}
 			for glyph in self.font.glyphs:
-				colorFlowData = glyph.layers[masterId].userData["com.hugojourdan.ColorFlow"].copy()
+				colorFlowData = self.Get_Layer_Color_Flow_Data(glyph.layers[masterId], clean=True)
 
 				# colorFlowData = ["0":0, "1":0, "2":1, ..."]
 				for k, v in colorFlowData.items():
@@ -167,11 +221,13 @@ class ColorFlow(PalettePlugin):
 			#---------------------------------------------------------------------------#
 			try:
 				for layer in self.font.selectedLayers:
-					for k, v in layer.userData["com.hugojourdan.ColorFlow"].items():
-						if v is True:
-							layer.userData["com.hugojourdan.ColorFlow_Color_" + str(k)] = str(k)
-						else:
-							del layer.userData["com.hugojourdan.ColorFlow_Color_" + str(k)]
+					colorFlowData = self.Get_Layer_Color_Flow_Data(layer, clean=True)
+					for k in self.meaning.keys():
+						filterKey = "com.hugojourdan.ColorFlow_Color_" + str(k)
+						if colorFlowData.get(k, False):
+							layer.userData[filterKey] = str(k)
+						elif layer.userData[filterKey] is not None:
+							del layer.userData[filterKey]
 			except:
 				pass
 
@@ -210,11 +266,11 @@ class ColorFlow(PalettePlugin):
 				if meaning:
 
 					if self.font.selectedLayers:
-						check = self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"][color]
+						check = self.Get_Layer_Color_Flow_Data(self.font.selectedLayers[0], clean=True).get(color, False)
 
 						if len(self.font.selectedLayers) > 1:
 							for layer in self.font.selectedLayers:
-								check = layer.userData["com.hugojourdan.ColorFlow"][color]
+								check = self.Get_Layer_Color_Flow_Data(layer, clean=True).get(color, False)
 								if not check:
 									break
 
@@ -278,15 +334,15 @@ class ColorFlow(PalettePlugin):
 			pass
 
 		#-------------------------------------------------------------------------------#
-		# Add ColorFlow data in layers if missing, allow to initialize a .glyphs file	#
+		# Compact legacy layer data to the sparse representation once per open font      #
 		#-------------------------------------------------------------------------------#
 		try:
-			masterId = self.font.selectedFontMaster.id
-			for glyph in self.font.glyphs:
-				if glyph.layers[masterId].userData["com.hugojourdan.ColorFlow"] is None:
-					glyph.layers[masterId].userData["com.hugojourdan.ColorFlow"] = {}
-					for color in self.meaning.keys():
-						glyph.layers[masterId].userData["com.hugojourdan.ColorFlow"][str(color)] = False
+			fontIdentity = id(self.font)
+			if fontIdentity not in self.compactedFonts:
+				for glyph in self.font.glyphs:
+					for layer in glyph.layers:
+						self.Get_Layer_Color_Flow_Data(layer, clean=True)
+				self.compactedFonts.add(fontIdentity)
 
 		except:
 			pass
@@ -313,24 +369,11 @@ class ColorFlow(PalettePlugin):
 
 
 		#---------------------------------------------------------------------------#
-		# If glyph is generated, create default Color Flow data						#
-		#---------------------------------------------------------------------------#
-		try:
-			for layer in self.font.selectedLayers:
-				if not layer.userData["com.hugojourdan.ColorFlow"]:
-					layer.userData["com.hugojourdan.ColorFlow"] = {color: False for color in self.meaning.keys()}
-		except:
-			pass
-
-		#---------------------------------------------------------------------------#
-		# If master added, create default Color Flow data							#
+		# If master added, create its aggregate Color Flow data                     #
 		#---------------------------------------------------------------------------#
 		try:
 			for master in self.font.masters:
 				if master.id not in self.font.userData["com.hugojourdan.ColorFlow-master-data"]:
-					for glyph in self.font.glyphs:
-						if not glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"]:
-							glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"] = {color: False for color in self.meaning.keys()}
 					self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.id] = self.Get_Dic_Layer_Color_Label(master.id)
 					self.Update_Plugin_UI()
 		except:
@@ -394,8 +437,9 @@ class ColorFlow(PalettePlugin):
 					#---------------------------------------------------------------------------#
 					try:
 						if not trigger:
-							if self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] != self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"]:
-								self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] = self.font.selectedLayers[0].userData["com.hugojourdan.ColorFlow"].copy()
+							selectedLayerData = self.Get_Layer_Color_Flow_Data(self.font.selectedLayers[0], clean=True)
+							if self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] != selectedLayerData:
+								self.font.userData["com.hugojourdan.ColorFlow-selectedLayer-data"] = selectedLayerData.copy()
 								self.Update_Plugin_UI()
 								trigger = True
 
@@ -415,10 +459,6 @@ class ColorFlow(PalettePlugin):
 
 		for master in self.font.masters:
 			if master.id not in self.font.userData["com.hugojourdan.ColorFlow-master-data"]:
-
-				for glyph in self.font.glyphs:
-					if not glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"]:
-						glyph.layers[master.id].userData["com.hugojourdan.ColorFlow"] = {color: False for color in self.meaning.keys()}
 				self.font.userData["com.hugojourdan.ColorFlow-master-data"][master.id] = self.Get_Dic_Layer_Color_Label(master.id)
 
 		for k, v in self.meaning.items():
@@ -427,21 +467,23 @@ class ColorFlow(PalettePlugin):
 
 
 		for layer in self.font.selectedLayers:
-			if check and not layer.userData["com.hugojourdan.ColorFlow"][color]:
+			colorFlowData = self.Get_Layer_Color_Flow_Data(layer, clean=True)
+			if check and not colorFlowData.get(color, False):
 				self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterID][color] += 1
-				layer.userData["com.hugojourdan.ColorFlow"][color] = True
-			if not check and layer.userData["com.hugojourdan.ColorFlow"][color]:
+				self.Set_Layer_Color_Flow_Value(layer, color, True)
+			if not check and colorFlowData.get(color, False):
 				self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterID][color] -= 1
-				layer.userData["com.hugojourdan.ColorFlow"][color] = False
+				self.Set_Layer_Color_Flow_Value(layer, color, False)
 
+			colorFlowData = self.Get_Layer_Color_Flow_Data(layer)
 
 			# Update LayerColor
 			for COLOR in self.meaning.keys():
 
-				if not layer.userData["com.hugojourdan.ColorFlow"][firstMeaning]:
+				if not colorFlowData.get(firstMeaning, False):
 					layer.color = None
 
-				if layer.userData["com.hugojourdan.ColorFlow"][COLOR]:
+				if colorFlowData.get(COLOR, False):
 					layer.color = int(COLOR)
 
 				else:
@@ -471,22 +513,14 @@ class ColorFlow(PalettePlugin):
 		for glyph in self.font.glyphs:
 			for layer in glyph.layers:
 				if layer.isMasterLayer and layer.layerId == selectedMasterId:
-					if not layer.color:
-						layer.userData["com.hugojourdan.ColorFlow"] = {x: False for x in layer.userData["com.hugojourdan.ColorFlow"]}
+					colorFlowData = {}
+					if layer.color is not None:
 						for k, v in self.meaning.items():
-							try:
-								k = int(k)
-							except:
-								pass
-							if k != layer.color:
-								layer.userData["com.hugojourdan.ColorFlow"][k] = True
-								self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterId][k] += 1
-							else:
-								layer.userData["com.hugojourdan.ColorFlow"][k] = True
-								self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterId][k] += 1
+							colorFlowData[k] = True
+							self.font.userData["com.hugojourdan.ColorFlow-master-data"][selectedMasterId][k] += 1
+							if int(k) == layer.color:
 								break
-					else:
-						layer.userData["com.hugojourdan.ColorFlow"] = {x: False for x in layer.userData["com.hugojourdan.ColorFlow"]}
+					self.Set_Layer_Color_Flow_Data(layer, colorFlowData)
 
 		Glyphs.showMacroWindow()
 		self.Update_Plugin_UI()
@@ -501,12 +535,7 @@ class ColorFlow(PalettePlugin):
 		for glyph in self.font.glyphs:
 			for layer in glyph.layers:
 				if layer.isMasterLayer and layer.layerId == self.font.selectedFontMaster.id:
-
-					for k in layer.userData.keys():
-						if k != "com.hugojourdan.ColorFlow":
-							del layer.userData[k]
-
-					layer.userData["com.hugojourdan.ColorFlow"] = {x: False for x in layer.userData["com.hugojourdan.ColorFlow"]}
+					self.Set_Layer_Color_Flow_Data(layer, {})
 					layer.color = None
 				else:
 					pass
@@ -601,7 +630,8 @@ class ColorFlow(PalettePlugin):
 
 		for glyph in self.font.glyphs:
 			glyph.layers[toMasterID].color = glyph.layers[fromMasterID].color
-			glyph.layers[toMasterID].userData["com.hugojourdan.ColorFlow"] = glyph.layers[fromMasterID].userData["com.hugojourdan.ColorFlow"]
+			colorFlowData = self.Get_Layer_Color_Flow_Data(glyph.layers[fromMasterID], clean=True)
+			self.Set_Layer_Color_Flow_Data(glyph.layers[toMasterID], colorFlowData)
 
 	@objc.python_method
 	def Open_Color_Flow_Documentation(self, sender):
