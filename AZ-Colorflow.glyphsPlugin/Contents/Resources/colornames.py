@@ -21,8 +21,18 @@ from typing import Any
 
 # Canonical color order — index 0..11 matches Glyphs' native layer color labels.
 COLOR_ORDER = [
-    "red", "orange", "brown", "yellow", "lightGreen", "darkGreen",
-    "lightBlue", "darkBlue", "purple", "magenta", "lightGray", "charcoal",
+    "red",
+    "orange",
+    "brown",
+    "yellow",
+    "lightGreen",
+    "darkGreen",
+    "lightBlue",
+    "darkBlue",
+    "purple",
+    "magenta",
+    "lightGray",
+    "charcoal",
 ]
 
 # colorName -> index string ("0".."11").
@@ -71,6 +81,7 @@ def _glyphs_support_dir() -> str:
     """
     try:
         from GlyphsApp import GSGlyphsInfo  # type: ignore[import]  # Glyphs-only
+
         path = os.path.expanduser(str(GSGlyphsInfo.applicationSupportPath()))
         if path and not path.startswith("~"):
             return path
@@ -82,6 +93,7 @@ def _glyphs_support_dir() -> str:
 def default_info_dir() -> str:
     """Shared Glyphs info dir, resolved at call time (not import time)."""
     return os.path.join(_glyphs_support_dir(), "info")
+
 
 # Content written when no colorNames.txt exists yet. Emoji labels + a None bucket
 # (matches what Rainbow FontView writes, so the two halves agree out of the box).
@@ -104,9 +116,18 @@ DEFAULT_COLOR_NAMES = (
 # Default display labels by int index (for Font-View section headers when the key
 # file omits an entry).
 DEFAULT_LABELS = {
-    0: "🚨 Red", 1: "🦊 Orange", 2: "🪵 Brown", 3: "🌼 Yellow",
-    4: "🍀 Light green", 5: "🫑 Dark green", 6: "💎 Light blue", 7: "🌀 Dark blue",
-    8: "🔮 Purple", 9: "🌺 Magenta", 10: "🏐 Light Gray", 11: "🎱 Charcoal",
+    0: "🚨 Red",
+    1: "🦊 Orange",
+    2: "🪵 Brown",
+    3: "🌼 Yellow",
+    4: "🍀 Light green",
+    5: "🫑 Dark green",
+    6: "💎 Light blue",
+    7: "🌀 Dark blue",
+    8: "🔮 Purple",
+    9: "🌺 Magenta",
+    10: "🏐 Light Gray",
+    11: "🎱 Charcoal",
     NO_COLOR: "🫥 None",
 }
 
@@ -238,8 +259,7 @@ def non_exporting_names(glyphs: Iterable[Any]) -> set[str]:
     return {str(glyph.name) for glyph in glyphs if not getattr(glyph, "export", True)}
 
 
-def exclude_named_colors(named_colors: Iterable[tuple[str, Any]],
-                         excluded: set[str]) -> list:
+def exclude_named_colors(named_colors: Iterable[tuple[str, Any]], excluded: set[str]) -> list:
     """Drop the colours of excluded glyphs from ``(glyph_name, color)`` pairs,
     returning the plain colour list the counting functions consume. An empty
     exclusion set keeps every colour (nothing to exclude — everything counts)."""
@@ -458,15 +478,13 @@ def label_for(index: int, meaning: dict[int, str]) -> str:
 
 def section_order(present: set[int], order: list[int]) -> list[int]:
     """Section sequence for the colours present in the font. Key-file order first,
-    then remaining present colours numerically; :data:`NO_COLOR` last unless the
-    key file positioned it explicitly."""
-    listed = [index for index in order if index in present]
+    then remaining present colours numerically; :data:`NO_COLOR` always last, even
+    when the key file lists it earlier (uncoloured glyphs belong at the end)."""
+    listed = [index for index in order if index in present and index != NO_COLOR]
     listed_set = set(listed)
-    remaining = sorted(
-        index for index in present if index not in listed_set and index != NO_COLOR
-    )
+    remaining = sorted(index for index in present if index not in listed_set and index != NO_COLOR)
     result = listed + remaining
-    if NO_COLOR in present and NO_COLOR not in listed_set:
+    if NO_COLOR in present:
         result.append(NO_COLOR)
     return result
 
@@ -567,7 +585,7 @@ def reorder_visible_rows(
         if index in visible_set and index not in placed:
             ordered.append(by_index[index])
             placed.add(index)
-    for index in visible_indices:           # any visible row not named in new order
+    for index in visible_indices:  # any visible row not named in new order
         if index not in placed:
             ordered.append(by_index[index])
             placed.add(index)

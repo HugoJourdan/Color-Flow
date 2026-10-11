@@ -13,10 +13,21 @@ import colornames as cc
 # Constants / canonical mapping
 # --------------------------------------------------------------------------- #
 
+
 def test_color_order_has_the_twelve_glyphs_labels_in_index_order() -> None:
     assert cc.COLOR_ORDER == [
-        "red", "orange", "brown", "yellow", "lightGreen", "darkGreen",
-        "lightBlue", "darkBlue", "purple", "magenta", "lightGray", "charcoal",
+        "red",
+        "orange",
+        "brown",
+        "yellow",
+        "lightGreen",
+        "darkGreen",
+        "lightBlue",
+        "darkBlue",
+        "purple",
+        "magenta",
+        "lightGray",
+        "charcoal",
     ]
 
 
@@ -30,16 +41,25 @@ def test_default_content_parses_to_the_twelve_emoji_default_labels() -> None:
     # parse_color_names drops the leading None= line, leaving the 12 colours.
     parsed = cc.parse_color_names(cc.DEFAULT_COLOR_NAMES)
     assert parsed == {
-        "0": "🚨 Red", "1": "🦊 Orange", "2": "🪵 Brown", "3": "🌼 Yellow",
-        "4": "🍀 Light green", "5": "🫑 Dark green", "6": "💎 Light blue",
-        "7": "🌀 Dark blue", "8": "🔮 Purple", "9": "🌺 Magenta",
-        "10": "🏐 Light Gray", "11": "🎱 Charcoal",
+        "0": "🚨 Red",
+        "1": "🦊 Orange",
+        "2": "🪵 Brown",
+        "3": "🌼 Yellow",
+        "4": "🍀 Light green",
+        "5": "🫑 Dark green",
+        "6": "💎 Light blue",
+        "7": "🌀 Dark blue",
+        "8": "🔮 Purple",
+        "9": "🌺 Magenta",
+        "10": "🏐 Light Gray",
+        "11": "🎱 Charcoal",
     }
 
 
 # --------------------------------------------------------------------------- #
 # parse_color_names
 # --------------------------------------------------------------------------- #
+
 
 def test_parse_preserves_file_line_order() -> None:
     text = "purple=Outline\nlightGreen=Anchors\nyellow=Export"
@@ -94,6 +114,7 @@ def test_parse_empty_text_returns_empty_mapping() -> None:
 # visible_labels
 # --------------------------------------------------------------------------- #
 
+
 def test_visible_labels_excludes_empty_labels() -> None:
     parsed = {"0": "", "1": "Step 2", "2": ""}
     assert cc.visible_labels(parsed) == {"1": "Step 2"}
@@ -103,15 +124,16 @@ def test_visible_labels_excludes_empty_labels() -> None:
 # final_visible_step
 # --------------------------------------------------------------------------- #
 
+
 def test_final_visible_step_returns_last_visible_key() -> None:
     meaning = cc.parse_color_names("red=Rough\nyellow=Refine\norange=Done\n")
-    assert cc.final_visible_step(meaning) == "1"   # orange = index 1
+    assert cc.final_visible_step(meaning) == "1"  # orange = index 1
 
 
 def test_final_visible_step_ignores_trailing_hidden_steps() -> None:
     # purple has an empty label -> hidden; the final step is the last *labelled* one
     meaning = cc.parse_color_names("red=Start\ndarkGreen=Done\npurple=\n")
-    assert cc.final_visible_step(meaning) == "5"   # darkGreen = index 5
+    assert cc.final_visible_step(meaning) == "5"  # darkGreen = index 5
 
 
 def test_final_visible_step_returns_none_when_no_visible_steps() -> None:
@@ -122,6 +144,7 @@ def test_final_visible_step_returns_none_when_no_visible_steps() -> None:
 # --------------------------------------------------------------------------- #
 # key-file resolution
 # --------------------------------------------------------------------------- #
+
 
 def test_resolve_prefers_local_file_when_it_exists(tmp_path) -> None:
     font_dir = tmp_path / "font"
@@ -151,15 +174,14 @@ def test_resolve_uses_info_dir_when_font_dir_is_none(tmp_path) -> None:
 # ensure_key_file  (real filesystem, fixes the handle leak + mkdir gaps)
 # --------------------------------------------------------------------------- #
 
+
 def test_ensure_creates_default_file_and_parent_dir_when_missing(tmp_path) -> None:
     target = tmp_path / "nested" / "info" / cc.KEY_FILE_NAME
     cc.ensure_key_file(str(target))
     assert target.exists()
     # The created file must parse back to the 12 defaults (proves it was flushed
     # and closed — no leaked, unflushed handle).
-    assert cc.parse_color_names(target.read_text()) == cc.parse_color_names(
-        cc.DEFAULT_COLOR_NAMES
-    )
+    assert cc.parse_color_names(target.read_text()) == cc.parse_color_names(cc.DEFAULT_COLOR_NAMES)
 
 
 def test_ensure_does_not_write_through_a_broken_symlink(tmp_path) -> None:
@@ -252,6 +274,7 @@ def test_load_meaning_round_trips_default(tmp_path) -> None:
 # default_state
 # --------------------------------------------------------------------------- #
 
+
 def test_default_state_is_all_false_in_order() -> None:
     assert cc.default_state(["0", "1", "2"]) == {"0": False, "1": False, "2": False}
 
@@ -260,6 +283,7 @@ def test_default_state_is_all_false_in_order() -> None:
 # layer_color_for_state — the documented "precedent color of the first
 # unchecked checkbox" rule, the single derivation used by palette + shortcuts.
 # --------------------------------------------------------------------------- #
+
 
 def test_color_is_none_when_first_step_unchecked() -> None:
     state = {"0": False, "1": True, "2": True}
@@ -307,6 +331,7 @@ def test_color_treats_missing_key_as_unchecked() -> None:
 # Used to self-heal corrupt/missing persisted counts.
 # --------------------------------------------------------------------------- #
 
+
 def test_count_states_counts_truthy_per_index() -> None:
     states = [{"0": True, "1": False}, {"0": True, "1": True}]
     assert cc.count_states(states, ["0", "1"]) == {"0": 2, "1": 1}
@@ -336,13 +361,14 @@ def test_count_states_follows_order_keys_only() -> None:
 # update() can early-return when nothing relevant changed.
 # --------------------------------------------------------------------------- #
 
+
 def test_selection_signature_changes_with_master_layer_or_state() -> None:
     base = cc.selection_signature("m1", [("a", {"0": True})])
-    assert cc.selection_signature("m1", [("a", {"0": True})]) == base       # stable
-    assert cc.selection_signature("m2", [("a", {"0": True})]) != base       # master change
-    assert cc.selection_signature("m1", [("a", {"0": False})]) != base      # state change
-    assert cc.selection_signature("m1", [("b", {"0": True})]) != base       # selection change
-    assert cc.selection_signature("m1", []) != base                        # empty selection
+    assert cc.selection_signature("m1", [("a", {"0": True})]) == base  # stable
+    assert cc.selection_signature("m2", [("a", {"0": True})]) != base  # master change
+    assert cc.selection_signature("m1", [("a", {"0": False})]) != base  # state change
+    assert cc.selection_signature("m1", [("b", {"0": True})]) != base  # selection change
+    assert cc.selection_signature("m1", []) != base  # empty selection
 
 
 def test_selection_signature_is_order_independent_within_a_state() -> None:
@@ -352,9 +378,7 @@ def test_selection_signature_is_order_independent_within_a_state() -> None:
 
 
 def test_selection_signature_tolerates_none_state() -> None:
-    assert cc.selection_signature("m1", [("g", None)]) == cc.selection_signature(
-        "m1", [("g", {})]
-    )
+    assert cc.selection_signature("m1", [("g", None)]) == cc.selection_signature("m1", [("g", {})])
 
 
 # --------------------------------------------------------------------------- #
@@ -362,28 +386,21 @@ def test_selection_signature_tolerates_none_state() -> None:
 # derive checkbox state from an existing native layer color.
 # --------------------------------------------------------------------------- #
 
+
 def test_checked_state_marks_contiguous_prefix_up_to_color() -> None:
-    assert cc.checked_state_for_color(1, ["0", "1", "2"]) == {
-        "0": True, "1": True, "2": False
-    }
+    assert cc.checked_state_for_color(1, ["0", "1", "2"]) == {"0": True, "1": True, "2": False}
 
 
 def test_checked_state_all_true_when_color_is_last() -> None:
-    assert cc.checked_state_for_color(2, ["0", "1", "2"]) == {
-        "0": True, "1": True, "2": True
-    }
+    assert cc.checked_state_for_color(2, ["0", "1", "2"]) == {"0": True, "1": True, "2": True}
 
 
 def test_checked_state_first_only_when_color_is_first() -> None:
-    assert cc.checked_state_for_color(0, ["0", "1", "2"]) == {
-        "0": True, "1": False, "2": False
-    }
+    assert cc.checked_state_for_color(0, ["0", "1", "2"]) == {"0": True, "1": False, "2": False}
 
 
 def test_checked_state_all_false_for_none_color() -> None:
-    assert cc.checked_state_for_color(None, ["0", "1", "2"]) == {
-        "0": False, "1": False, "2": False
-    }
+    assert cc.checked_state_for_color(None, ["0", "1", "2"]) == {"0": False, "1": False, "2": False}
 
 
 def test_checked_state_all_false_for_hidden_color() -> None:
@@ -401,6 +418,7 @@ def test_checked_state_round_trips_with_layer_color_for_state() -> None:
 # --------------------------------------------------------------------------- #
 # Font-View grouping (int-keyed parser + builders)
 # --------------------------------------------------------------------------- #
+
 
 def test_parse_key_file_is_int_keyed_with_none_bucket_and_order() -> None:
     meaning, order, rejected = cc.parse_key_file("None=Z\npurple=P\nlightGreen=G")
@@ -422,6 +440,8 @@ def test_label_for_falls_back_to_default() -> None:
 
 def test_section_order_lists_then_remaining_then_none_last() -> None:
     assert cc.section_order({0, 4, 8, cc.NO_COLOR}, [8, 0]) == [8, 0, 4, cc.NO_COLOR]
+    # a key file listing None first does not pull uncoloured glyphs to the front
+    assert cc.section_order({0, 8, cc.NO_COLOR}, [cc.NO_COLOR, 8, 0]) == [8, 0, cc.NO_COLOR]
 
 
 def test_build_glyph_order_groups_with_headers_in_font_order() -> None:
@@ -444,6 +464,7 @@ def test_render_key_file_round_trips_through_parse() -> None:
 # --------------------------------------------------------------------------- #
 # write_color_names (label-edit persistence)
 # --------------------------------------------------------------------------- #
+
 
 def test_write_color_names_creates_file(tmp_path) -> None:
     target = tmp_path / "info" / cc.KEY_FILE_NAME
@@ -477,6 +498,7 @@ def test_write_color_names_round_trips_a_label_edit(tmp_path) -> None:
 # the palette's displayed counts are single_counts_from_colors)
 # --------------------------------------------------------------------------- #
 
+
 def test_counts_from_colors_counts_contiguous_prefixes() -> None:
     # color 1 -> steps 0,1 done; color 0 -> step 0; None -> nothing.
     order = ["0", "1", "2"]
@@ -496,6 +518,7 @@ def test_counts_from_colors_ignores_hidden_colors() -> None:
 # --------------------------------------------------------------------------- #
 # parse_settings / render_settings (the Settings panel: order + visibility)
 # --------------------------------------------------------------------------- #
+
 
 def test_parse_settings_captures_order_visibility_and_hidden_labels() -> None:
     text = "None=Z\nmagenta=Mag\n#red=Red\nblue isnt a color\n"
@@ -535,9 +558,12 @@ def test_settings_round_trip() -> None:
 # badges/row bars, the title-bar segments and the report's dist)
 # --------------------------------------------------------------------------- #
 
+
 def test_single_counts_count_exact_colour_matches() -> None:
     assert cc.single_counts_from_colors([0, 0, 2, None], ["0", "1", "2"]) == {
-        "0": 2, "1": 0, "2": 1
+        "0": 2,
+        "1": 0,
+        "2": 1,
     }
 
 
@@ -545,14 +571,13 @@ def test_single_counts_all_on_final_step_credit_only_that_step() -> None:
     # Hugo's screenshot shape: every glyph Approved (final step) -> the final
     # row shows the full total, every earlier row shows 0 (no suffix-sum).
     order = ["0", "1", "2"]
-    assert cc.single_counts_from_colors([2, 2, 2], order) == {
-        "0": 0, "1": 0, "2": 3
-    }
+    assert cc.single_counts_from_colors([2, 2, 2], order) == {"0": 0, "1": 0, "2": 3}
 
 
 # --------------------------------------------------------------------------- #
 # In-font label storage (shared via the .glyphs file)
 # --------------------------------------------------------------------------- #
+
 
 def test_font_labels_text_reads_userdata() -> None:
     class _F:
@@ -560,15 +585,15 @@ def test_font_labels_text_reads_userdata() -> None:
             self.userData = ud
 
     assert cc.font_labels_text(_F({cc.FONT_LABELS_KEY: "red=Drawn\n"})) == "red=Drawn\n"
-    assert cc.font_labels_text(_F({})) is None              # key unset
+    assert cc.font_labels_text(_F({})) is None  # key unset
     assert cc.font_labels_text(_F({cc.FONT_LABELS_KEY: "   "})) is None  # blank skipped
     assert cc.font_labels_text(None) is None
 
 
 def test_pick_settings_text_precedence() -> None:
-    assert cc.pick_settings_text("UD", "FILE") == "UD"      # in-font wins
-    assert cc.pick_settings_text(None, "FILE") == "FILE"    # fall back to key file
-    assert cc.pick_settings_text("   ", "FILE") == "FILE"   # blank userData skipped
+    assert cc.pick_settings_text("UD", "FILE") == "UD"  # in-font wins
+    assert cc.pick_settings_text(None, "FILE") == "FILE"  # fall back to key file
+    assert cc.pick_settings_text("   ", "FILE") == "FILE"  # blank userData skipped
     assert cc.pick_settings_text(None, None) == cc.DEFAULT_COLOR_NAMES
     assert cc.pick_settings_text("", "  ") == cc.DEFAULT_COLOR_NAMES
 
@@ -576,6 +601,7 @@ def test_pick_settings_text_precedence() -> None:
 # --------------------------------------------------------------------------- #
 # Non-exporting exclusion (non-exporting glyphs never count)
 # --------------------------------------------------------------------------- #
+
 
 class _G:
     """Minimal glyph stand-in: a name + an optional GSGlyph-style export flag."""
@@ -625,8 +651,7 @@ def test_exclude_named_colors_threads_into_exact_counting() -> None:
     # dist) honours the same exclusion set as the cumulative counting.
     order = ["0", "1"]
     named = [("A", 1), ("nonexp", 0), ("B", 0)]
-    excluded = cc.single_counts_from_colors(
-        cc.exclude_named_colors(named, {"nonexp"}), order)
+    excluded = cc.single_counts_from_colors(cc.exclude_named_colors(named, {"nonexp"}), order)
     assert excluded == {"0": 1, "1": 1}
 
 
@@ -638,28 +663,32 @@ def test_exclude_named_colors_threads_into_exact_counting() -> None:
 def test_reorder_visible_rows_reorders_visible_block() -> None:
     rows = [(0, "A", True), (1, "B", True), (2, "C", True)]
     assert cc.reorder_visible_rows(rows, [2, 0, 1]) == [
-        (2, "C", True), (0, "A", True), (1, "B", True)]
+        (2, "C", True),
+        (0, "A", True),
+        (1, "B", True),
+    ]
 
 
 def test_reorder_visible_rows_keeps_hidden_rows_trailing() -> None:
     rows = [(0, "A", True), (1, "B", False), (2, "C", True)]
     # Only the visible rows (0, 2) reorder; the hidden row (1) trails unchanged.
     assert cc.reorder_visible_rows(rows, [2, 0]) == [
-        (2, "C", True), (0, "A", True), (1, "B", False)]
+        (2, "C", True),
+        (0, "A", True),
+        (1, "B", False),
+    ]
 
 
 def test_reorder_visible_rows_appends_omitted_visible_rows() -> None:
     rows = [(0, "A", True), (1, "B", True), (2, "C", True)]
     # New order names only one visible index; the rest keep original order after it.
-    assert cc.reorder_visible_rows(rows, [2]) == [
-        (2, "C", True), (0, "A", True), (1, "B", True)]
+    assert cc.reorder_visible_rows(rows, [2]) == [(2, "C", True), (0, "A", True), (1, "B", True)]
 
 
 def test_reorder_visible_rows_ignores_unknown_and_duplicate_indices() -> None:
     rows = [(0, "A", True), (1, "B", True)]
     # 9 isn't present, 0 is duplicated — both ignored; result stays valid + complete.
-    assert cc.reorder_visible_rows(rows, [1, 9, 0, 0]) == [
-        (1, "B", True), (0, "A", True)]
+    assert cc.reorder_visible_rows(rows, [1, 9, 0, 0]) == [(1, "B", True), (0, "A", True)]
 
 
 def test_reorder_visible_rows_roundtrips_through_render_and_parse() -> None:

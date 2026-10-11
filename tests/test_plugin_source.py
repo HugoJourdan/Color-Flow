@@ -11,10 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 RESOURCES = (
-    Path(__file__).resolve().parent.parent
-    / "AZ-Colorflow.glyphsPlugin"
-    / "Contents"
-    / "Resources"
+    Path(__file__).resolve().parent.parent / "AZ-Colorflow.glyphsPlugin" / "Contents" / "Resources"
 )
 
 PLUGIN_SOURCE = (RESOURCES / "plugin.py").read_text(encoding="utf-8")
@@ -211,8 +208,9 @@ def test_az_toolkit_hub_protocol() -> None:
     assert "delegate.addViewToPreferences_(hub)" in hub_finder
     # The jump opens Settings on the HUB identifier (our tab is selected first).
     opener = PLUGIN_SOURCE[
-        PLUGIN_SOURCE.index("def showSettingsPaneWithIdentifier_(") :
-        PLUGIN_SOURCE.index("def _recalc_preferred_size(")
+        PLUGIN_SOURCE.index("def showSettingsPaneWithIdentifier_(") : PLUGIN_SOURCE.index(
+            "def _recalc_preferred_size("
+        )
     ]
     assert "showMainPreferencesWithIdentifier_(_HUB_TITLE)" in opener
 
@@ -234,8 +232,7 @@ def test_az_toolkit_hub_popup_and_license_badge() -> None:
     badge_check = _method_body("azLicensed")
     assert '_SHARED_ENT.kind == "licensed"' in badge_check
     add_pane = PLUGIN_SOURCE[
-        PLUGIN_SOURCE.index("def addSettingsPane_(") :
-        PLUGIN_SOURCE.index("def _pane_licensed(")
+        PLUGIN_SOURCE.index("def addSettingsPane_(") : PLUGIN_SOURCE.index("def _pane_licensed(")
     ]
     assert "self._pane_licensed(pane)" in add_pane
     assert "setAttributedTitle_(text)" in add_pane
@@ -253,9 +250,7 @@ def test_settings_pane_vc_title_is_color_flow() -> None:
     assert "view_controller.setTitle_(COLORFLOW_PREF_IDENTIFIER)" in reg
     assert "view_controller.setRepresentedObject_(COLORFLOW_PREF_IDENTIFIER)" in reg
     init_start = PLUGIN_SOURCE.index("def initWithSettingsView_(")
-    init_body = PLUGIN_SOURCE[
-        init_start : PLUGIN_SOURCE.index("def loadView(", init_start)
-    ]
+    init_body = PLUGIN_SOURCE[init_start : PLUGIN_SOURCE.index("def loadView(", init_start)]
     assert "self.setTitle_(COLORFLOW_PREF_IDENTIFIER)" in init_body
     assert "self.setRepresentedObject_(COLORFLOW_PREF_IDENTIFIER)" in init_body
     # representedObject must be the identifier STRING, never an NSImage (that breaks the jump).
@@ -324,8 +319,9 @@ def test_store_labels_and_profile_controls_removed_from_pane() -> None:
 
 def test_settings_pane_build_order_labels_then_font_glyph_order() -> None:
     build = PLUGIN_SOURCE[
-        PLUGIN_SOURCE.index("def _build(self) -> None:") :
-        PLUGIN_SOURCE.index("def _slot_list_items(")
+        PLUGIN_SOURCE.index("def _build(self) -> None:") : PLUGIN_SOURCE.index(
+            "def _slot_list_items("
+        )
     ]
     # Top-to-bottom: Color Labels title, the help line, the combined list, then Font Glyph
     # Order (the inline legend was removed; the header now reads "Color Labels").
@@ -347,8 +343,9 @@ def test_settings_pane_build_order_labels_then_font_glyph_order() -> None:
 
 def test_color_glyph_order_is_a_checkbox_not_a_segmented_button() -> None:
     build = PLUGIN_SOURCE[
-        PLUGIN_SOURCE.index("def _build(self) -> None:") :
-        PLUGIN_SOURCE.index("def _slot_list_items(")
+        PLUGIN_SOURCE.index("def _build(self) -> None:") : PLUGIN_SOURCE.index(
+            "def _slot_list_items("
+        )
     ]
     # Font Glyph Order is now a single CheckBox "Color Glyph Order" (ON = Layer order,
     # OFF = Default), replacing the old 3-way Default/Layer/Glyph SegmentedButton.
@@ -392,7 +389,10 @@ def test_settings_pane_reset_is_a_reload_icon_next_to_the_title() -> None:
     # Reset is now a borderless "reload" (arrow.clockwise) icon button next to the title,
     # NOT the old full-width "Reset colours & order" button.
     assert "group.resetButton = ImageButton(" in PLUGIN_SOURCE
-    assert 'imageWithSystemSymbolName_accessibilityDescription_(\n\t\t\t"arrow.clockwise"' in PLUGIN_SOURCE
+    assert (
+        'imageWithSystemSymbolName_accessibilityDescription_(\n\t\t\t"arrow.clockwise"'
+        in PLUGIN_SOURCE
+    )
     assert "callback=self._reset_clicked" in PLUGIN_SOURCE
     assert "Reset colours & order" not in PLUGIN_SOURCE
     assert "group.resetButton = Button(" not in PLUGIN_SOURCE
@@ -411,8 +411,9 @@ def test_settings_pane_reset_is_a_reload_icon_next_to_the_title() -> None:
 
 def test_settings_pane_has_single_combined_slot_list() -> None:
     build = PLUGIN_SOURCE[
-        PLUGIN_SOURCE.index("def _build(self) -> None:") :
-        PLUGIN_SOURCE.index("def _slot_list_items(")
+        PLUGIN_SOURCE.index("def _build(self) -> None:") : PLUGIN_SOURCE.index(
+            "def _slot_list_items("
+        )
     ]
     # ONE List2 holds all label slots: an eye-toggle visibility column + a colour-well
     # column + an editable name column (eye FIRST so it reads left-to-right).
@@ -440,11 +441,12 @@ def test_visibility_cell_is_an_eye_toggle() -> None:
     # eye.slash (hidden), driven by the on/off state of a borderless toggle button.
     assert "class EyeToggleList2Cell(CheckBoxList2Cell):" in PLUGIN_SOURCE
     cell = PLUGIN_SOURCE[
-        PLUGIN_SOURCE.index("class EyeToggleList2Cell(CheckBoxList2Cell):") :
-        PLUGIN_SOURCE.index("class AZColorflowSettingsView:")
+        PLUGIN_SOURCE.index("class EyeToggleList2Cell(CheckBoxList2Cell):") : PLUGIN_SOURCE.index(
+            "class AZColorflowSettingsView:"
+        )
     ]
-    assert '_eye_symbol("eye.slash")' in cell      # state OFF = hidden
-    assert '_eye_symbol("eye.fill")' in cell        # state ON  = shown
+    assert '_eye_symbol("eye.slash")' in cell  # state OFF = hidden
+    assert '_eye_symbol("eye.fill")' in cell  # state ON  = shown
     assert "button.setImage_(off_eye)" in cell
     assert "button.setAlternateImage_(on_eye)" in cell
     assert "NSButtonTypeToggle" in cell
@@ -607,9 +609,7 @@ def test_register_uses_gscallbackhandler_api_unassigned() -> None:
     # The verified GlyphsCore API (GSCallbackHandler.h:94), reached via
     # objc.lookUpClass — never a hard import that could fail at module load.
     assert 'objc.lookUpClass("GSCallbackHandler")' in body
-    assert (
-        "registerShortcutCommand_group_identifier_action_target_character_modifierFlags_" in body
-    )
+    assert "registerShortcutCommand_group_identifier_action_target_character_modifierFlags_" in body
     # Commands ship unassigned (character "") with no modifiers — users map
     # their own keys natively in Settings > Shortcuts.
     assert '"",  # unassigned' in body
@@ -684,7 +684,7 @@ def test_derive_counts_threads_exclusion_set_through_colornames() -> None:
     excluded = _method_body("_excluded_glyph_names")
     # UNCONDITIONAL: the exclusion set is always the non-exporting names.
     assert "colornames.non_exporting_names(self.font.glyphs)" in excluded
-    assert "return set()" in excluded                       # only the exception fallback
+    assert "return set()" in excluded  # only the exception fallback
     assert "Glyphs.defaults" not in excluded
 
 
@@ -868,10 +868,14 @@ def test_coverage_sidebar_is_g4_gated_and_native() -> None:
     # with white + monospaced counts and a dark hairline stroke around every bar.
     assert "def _draw_card(self" in PLUGIN_SOURCE
     assert "_COV_CARD_RADIUS" in PLUGIN_SOURCE
-    assert "NSColor.blackColor().colorWithAlphaComponent_(0.15)" in PLUGIN_SOURCE   # darker header band
+    assert (
+        "NSColor.blackColor().colorWithAlphaComponent_(0.15)" in PLUGIN_SOURCE
+    )  # darker header band
     assert "NSColor.whiteColor(), align=_NS_ALIGN_LEFT, mono=True" in PLUGIN_SOURCE
     assert "monospacedSystemFontOfSize_weight_" in PLUGIN_SOURCE
-    assert "NSColor.blackColor().colorWithAlphaComponent_(0.35)" in PLUGIN_SOURCE   # darker bar stroke
+    assert (
+        "NSColor.blackColor().colorWithAlphaComponent_(0.35)" in PLUGIN_SOURCE
+    )  # darker bar stroke
     assert "track.setLineWidth_(0.75)" in PLUGIN_SOURCE and "track.stroke()" in PLUGIN_SOURCE
 
 
@@ -891,7 +895,7 @@ def test_coverage_sidebar_follows_selected_master_live() -> None:
 def test_coverage_sidebar_categories_collapse_to_subcategories() -> None:
     # Category rows carry a sub-category breakdown (with_subs) and toggle open on
     # click; a disclosure chevron marks expandable rows, the view reflows height.
-    assert "with_subs" in _sidebar_block()                          # controller attaches subRows
+    assert "with_subs" in _sidebar_block()  # controller attaches subRows
     assert "def mouseDown_(self, event" in PLUGIN_SOURCE
     assert "self._expanded" in PLUGIN_SOURCE
     assert "def _draw_disclosure(self" in PLUGIN_SOURCE and "is_open" in PLUGIN_SOURCE
@@ -905,9 +909,11 @@ def test_coverage_sidebar_collapse_is_animated() -> None:
     assert "def animTick_(self, timer" in PLUGIN_SOURCE
     assert "def _start_anim(self" in PLUGIN_SOURCE and "def _stop_anim(self" in PLUGIN_SOURCE
     assert "def _progress(self, key" in PLUGIN_SOURCE
-    assert "_COV_SUB_ROW_H * len(subs) * open_frac" in PLUGIN_SOURCE   # clip height follows progress
-    assert "step = 1.0 / 12.0" in PLUGIN_SOURCE                        # ~0.2s open/close
-    assert 'performSelector_withObject_afterDelay_("animStart:", None, 0.2)' in PLUGIN_SOURCE  # 0.2s beat
+    assert "_COV_SUB_ROW_H * len(subs) * open_frac" in PLUGIN_SOURCE  # clip height follows progress
+    assert "step = 1.0 / 12.0" in PLUGIN_SOURCE  # ~0.2s open/close
+    assert (
+        'performSelector_withObject_afterDelay_("animStart:", None, 0.2)' in PLUGIN_SOURCE
+    )  # 0.2s beat
 
 
 def test_coverage_sidebar_scripts_are_flat() -> None:
@@ -916,13 +922,12 @@ def test_coverage_sidebar_scripts_are_flat() -> None:
     assert "subscript" not in PLUGIN_SOURCE
 
 
-def test_coverage_sidebar_value_percent_toggle() -> None:
-    # Total/% toggle is a small switch drawn in the Overall card header (on the master's
-    # line), hit-tested via _pct_hit — no stray NSSwitch machinery remains.
-    assert "self._pct_hit" in PLUGIN_SOURCE
-    assert "controlAccentColor" in PLUGIN_SOURCE            # the ON track colour
-    assert "self._show_percent" in PLUGIN_SOURCE
+def test_coverage_sidebar_has_no_percent_toggle() -> None:
+    # The Total/% switch was removed: counts only, and no toggle state, hit rect or
+    # switch machinery is left behind to draw or hit-test.
     assert "def _count_label(self" in PLUGIN_SOURCE
+    assert "_show_percent" not in PLUGIN_SOURCE
+    assert "_pct_hit" not in PLUGIN_SOURCE
     assert "NSSwitch" not in PLUGIN_SOURCE
     assert "toggleValueMode" not in PLUGIN_SOURCE
 
@@ -941,16 +946,16 @@ def test_coverage_sidebar_has_global_progress_bar() -> None:
     # A whole-master card (its header the master name) sits above the cards;
     # double-click on its bar opens every glyph of that colour (kind "all").
     assert "def _draw_global(self" in PLUGIN_SOURCE
-    assert 'self._draw_global(_COV_TOP, width)' in PLUGIN_SOURCE
-    assert '(title or "Overall").upper()' in PLUGIN_SOURCE          # master-named card header
-    assert "font.selectedFontMaster.name" in PLUGIN_SOURCE          # title = the master
-    assert '"all", None, None, color_key' in PLUGIN_SOURCE          # global seg hit meta
-    assert 'if kind == "all":' in PLUGIN_SOURCE                     # matches every glyph
+    assert "self._draw_global(_COV_TOP, width)" in PLUGIN_SOURCE
+    assert '(title or "Overall").upper()' in PLUGIN_SOURCE  # master-named card header
+    assert "font.selectedFontMaster.name" in PLUGIN_SOURCE  # title = the master
+    assert '"all", None, None, color_key' in PLUGIN_SOURCE  # global seg hit meta
+    assert 'if kind == "all":' in PLUGIN_SOURCE  # matches every glyph
 
 
 def test_coverage_sidebar_scripts_use_glyphs_icons() -> None:
     # Script rows show Glyphs' own sidebar icon (a "*Template.pdf" via imageNamed_).
-    assert 'NSImage.imageNamed_(name)' in PLUGIN_SOURCE
+    assert "NSImage.imageNamed_(name)" in PLUGIN_SOURCE
     assert '"latin": "CapitalGTemplate"' in PLUGIN_SOURCE
     assert "def _script_icon(script_id" in PLUGIN_SOURCE
     assert "def _draw_icon(self" in PLUGIN_SOURCE
@@ -968,7 +973,7 @@ def test_coverage_sidebar_subcategories_are_indented() -> None:
     # Sub-rows are indented 10pt further right than the top-level names (lighter grey too).
     assert "_COV_SUB_INDENT = _COV_NAME_INDENT + 10.0" in PLUGIN_SOURCE
     marker = "# Same size as top-level names, indented"
-    tail = PLUGIN_SOURCE[PLUGIN_SOURCE.index(marker):][:260]
+    tail = PLUGIN_SOURCE[PLUGIN_SOURCE.index(marker) :][:260]
     assert "_COV_SUB_INDENT, 11.5, AppKit.NSColor.secondaryLabelColor()" in tail
 
 
@@ -984,7 +989,7 @@ def test_coverage_sidebar_tab_icon_uses_sf_symbol() -> None:
     block = _sidebar_block()
     assert "def tabBarImage(cls" in block
     assert "_glyph_symbol_image(0x101082)" in block
-    assert "def _drawn_ring_icon(cls" in PLUGIN_SOURCE      # fallback
+    assert "def _drawn_ring_icon(cls" in PLUGIN_SOURCE  # fallback
     assert "bezierPathWithOvalInRect_" in PLUGIN_SOURCE
 
 
@@ -992,30 +997,31 @@ def test_coverage_sidebar_has_color_legend() -> None:
     # A bottom-pinned, titleless 2-column legend grid of pill swatches, with a bottom margin.
     assert "class _AZLegendView(AppKit.NSView)" in PLUGIN_SOURCE
     assert "_COV_LEGEND_COLS = 2" in PLUGIN_SOURCE
-    assert "_COV_FOOTER_INSET_Y" in PLUGIN_SOURCE           # panel content inset
-    assert "bezierPathWithOvalInRect_(swatch)" in PLUGIN_SOURCE   # circular swatch
+    assert "_COV_FOOTER_INSET_Y" in PLUGIN_SOURCE  # panel content inset
+    assert "bezierPathWithOvalInRect_(swatch)" in PLUGIN_SOURCE  # circular swatch
     assert "sw_w = sw_h = 11.0" in PLUGIN_SOURCE
     assert "def heightForWidth_(self" in PLUGIN_SOURCE
-    assert "NSViewMaxYMargin" in _sidebar_block()          # legend pinned to the bottom
-    assert '"COLORS"' not in PLUGIN_SOURCE                 # no title on the legend card
+    assert "NSViewMaxYMargin" in _sidebar_block()  # legend pinned to the bottom
+    assert '"COLORS"' not in PLUGIN_SOURCE  # no title on the legend card
 
 
 def test_coverage_sidebar_color_focus_dims_others() -> None:
     # Clicking a legend swatch focuses that colour; the bars fade every other colour.
     assert "def focusColor_(self, color_key" in PLUGIN_SOURCE
-    assert "owner.focusColor_(str(color_key))" in PLUGIN_SOURCE          # legend click -> controller
-    assert "focus is not None and color_key != focus" in PLUGIN_SOURCE   # per-segment dim in _draw_bar
+    assert "owner.focusColor_(str(color_key))" in PLUGIN_SOURCE  # legend click -> controller
+    assert (
+        "focus is not None and color_key != focus" in PLUGIN_SOURCE
+    )  # per-segment dim in _draw_bar
 
 
 def test_coverage_sidebar_focus_narrows_count_label() -> None:
-    # While a colour is focused, the value/% shows only that colour's share of each
-    # group (fraction * group total, or fraction * 100) rather than the group total.
-    body = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _count_label(self"):][:700]
-    assert "focus = getattr(self, \"_focus\", None)" in body
+    # While a colour is focused, the count shows only that colour's share of each
+    # group (fraction * group total) rather than the group total.
+    body = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _count_label(self") :][:700]
+    assert 'focus = getattr(self, "_focus", None)' in body
     assert "if focus is not None:" in body
     assert "fraction = next((f for f, _rgba, key in (segs or []) if key == focus)" in body
-    assert "int(round(fraction * count))" in body                       # focused Total = colour's count
-    assert 'f"{int(round(fraction * 100.0))}%"' in body                 # focused % = colour's share
+    assert "int(round(fraction * count))" in body  # focused count = colour's count
 
 
 def test_sidebar_has_settings_gear() -> None:
@@ -1024,24 +1030,21 @@ def test_sidebar_has_settings_gear() -> None:
     block = _sidebar_block()
     assert "btn.setAction_(action)" in block
     assert '"openSettings:"' in block
-    assert '"Settings", "openSettings:"' in block                 # icon + text label
+    assert '_text_button("Settings", "openSettings:"' in block  # the pill's own label
     assert "def openSettings_(self, sender" in block
     assert "_open_preferences_pane()" in block
 
 
 def test_sidebar_buttons_and_legend_share_one_footer_card() -> None:
-    # Report + Settings are full-width icon+text buttons in an equal-split two-column
-    # row INSIDE the footer card, above the legend grid (AZ-Argus style); the scroll
-    # view fills everything above that card.
+    # Report + Settings are text pills in a row INSIDE the footer card, above the legend
+    # grid (AZ-Argus style); the scroll view fills everything above that card.
     block = _sidebar_block()
-    assert "NSStackView.alloc()" not in block
-    assert "NSImageOnly" in block                                 # centred icon, no label
-    assert 'btn.setTitle_("")' in block
+    assert "btn.setAttributedTitle_(" in block  # a label, not an icon
     assert "self._buttons = (self._report, self._gear)" in block
-    assert "legend.addSubview_(_btn)" in block                    # pills live in the panel
-    assert "bar_y = legend.buttonBarTop()" in block                # pills sit UNDER the grid
-    assert "cb.height - footer_h" in block                        # scroll fills above the panel
-    assert "strip_h" not in block                                 # no separate button strip
+    assert "legend.addSubview_(bar)" in block  # the pill row lives in the panel
+    assert "legend.buttonBarTop()" in block  # pills sit UNDER the grid
+    assert "cb.height - footer_h" in block  # scroll fills above the panel
+    assert "strip_h" not in block  # no separate button strip
     # The legend view sizes the shared panel: grid on top, button bar below it.
     assert "def legendTop(self)" in PLUGIN_SOURCE
     assert "def buttonBarTop(self)" in PLUGIN_SOURCE
@@ -1049,16 +1052,28 @@ def test_sidebar_buttons_and_legend_share_one_footer_card() -> None:
 
 
 def test_footer_buttons_are_two_pills_under_a_separator() -> None:
-    # Two standalone icon pills, left-aligned under a full-width hairline (no joined bar).
+    # Two standalone text pills, left-aligned under a full-width hairline (no joined bar).
     assert "_AZButtonBar" not in PLUGIN_SOURCE
-    assert "_COV_BTN_W = 40.0" in PLUGIN_SOURCE and "_COV_BTN_GAP = 8.0" in PLUGIN_SOURCE
+    assert "_COV_BTN_GAP = 8.0" in PLUGIN_SOURCE
     assert "def separatorY(self)" in PLUGIN_SOURCE
     assert "return self.separatorY() + _COV_CARD_GAP" in PLUGIN_SOURCE
-    legend = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZLegendView(AppKit.NSView)"):]
-    assert "NSMakeRect(0.0, self.separatorY(), bounds.size.width, 1.0)" in legend   # full width
+    legend = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZLegendView(AppKit.NSView)") :]
+    assert "NSMakeRect(0.0, self.separatorY(), bounds.size.width, 1.0)" in legend  # full width
     block = _sidebar_block()
-    assert "_COV_FOOTER_INSET_X + index * (_COV_BTN_W + _COV_BTN_GAP)" in block     # left-aligned
-    assert "NSMakeRect(x, bar_y, _COV_BTN_W, _COV_BTN_H)" in block
+    # Auto layout: the row is pinned to BOTH side insets and split into equal halves, so
+    # the pills widen with the sidebar. Only the row's y is set from _relayout.
+    assert "NSStackViewDistributionFillEqually" in block
+    assert "bar.setSpacing_(_COV_BTN_GAP)" in block
+    assert "bar.setTranslatesAutoresizingMaskIntoConstraints_(False)" in block
+    assert "legend.leadingAnchor(), _COV_FOOTER_INSET_X" in block
+    assert "legend.trailingAnchor(), -_COV_FOOTER_INSET_X" in block
+    assert "bar.heightAnchor().constraintEqualToConstant_(_COV_BTN_H)" in block
+    # fillEqually equalises width only — each pill needs its own height or the stack
+    # centres it at its intrinsic 14pt.
+    assert "_btn.heightAnchor().constraintEqualToConstant_(_COV_BTN_H).setActive_(True)" in block
+    assert "NSLayoutConstraint.activateConstraints_" in block
+    assert "top.setConstant_(legend.buttonBarTop())" in block  # y follows the row count
+    assert "setFrame_(AppKit.NSMakeRect(x, bar_y" not in block  # no manual pill frames
 
 
 def test_bottom_panel_is_full_bleed() -> None:
@@ -1066,11 +1081,11 @@ def test_bottom_panel_is_full_bleed() -> None:
     # margins, no rounded card, no rim — just an inset for its contents.
     assert "_COV_FOOTER_INSET_X = 14.0" in PLUGIN_SOURCE
     assert "_COV_FOOTER_INSET_Y = 12.0" in PLUGIN_SOURCE
-    draw = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZLegendView(AppKit.NSView)"):]
-    draw = draw[draw.index("def drawRect_(self"):][:900]
-    assert "bezierPathWithRect_(bounds).fill()" in draw           # fills the whole view
-    assert "_draw_glass_border" not in draw                       # no card rim
-    assert "_COV_CARD_RADIUS" not in draw                         # no rounded card
+    draw = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZLegendView(AppKit.NSView)") :]
+    draw = draw[draw.index("def drawRect_(self") :][:900]
+    assert "bezierPathWithRect_(bounds).fill()" in draw  # fills the whole view
+    assert "_draw_glass_border" not in draw  # no card rim
+    assert "_COV_CARD_RADIUS" not in draw  # no rounded card
     # The opener actually opens the window (selecting the tab alone won't front it).
     assert "def _open_settings_window(" in PLUGIN_SOURCE
     assert "performActionForItemAtIndex_" in PLUGIN_SOURCE
@@ -1082,20 +1097,30 @@ def test_sidebar_loadview_has_no_undefined_addsubview() -> None:
     # neither ruff (blind to it behind `from ... import *`) nor the string tests caught.
     # Every name added to the container must be assigned somewhere in loadView.
     import ast
+
     load_view = next(
-        node for node in ast.walk(ast.parse(PLUGIN_SOURCE))
-        if isinstance(node, ast.FunctionDef) and node.name == "loadView"
-        and any(getattr(call.func, "attr", "") == "setDocumentView_"
-                for call in ast.walk(node) if isinstance(call, ast.Call))
+        node
+        for node in ast.walk(ast.parse(PLUGIN_SOURCE))
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "loadView"
+        and any(
+            getattr(call.func, "attr", "") == "setDocumentView_"
+            for call in ast.walk(node)
+            if isinstance(call, ast.Call)
+        )
     )
     assigned = {
-        node.id for node in ast.walk(load_view)
+        node.id
+        for node in ast.walk(load_view)
         if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
     }
     added = [
-        call.args[0].id for call in ast.walk(load_view)
-        if isinstance(call, ast.Call) and getattr(call.func, "attr", "") == "addSubview_"
-        and call.args and isinstance(call.args[0], ast.Name)
+        call.args[0].id
+        for call in ast.walk(load_view)
+        if isinstance(call, ast.Call)
+        and getattr(call.func, "attr", "") == "addSubview_"
+        and call.args
+        and isinstance(call.args[0], ast.Name)
     ]
     undefined = sorted(name for name in added if name not in assigned)
     assert not undefined, f"container.addSubview_ of undefined local(s): {undefined}"
@@ -1108,12 +1133,17 @@ def test_palette_archived_general_plugin_is_principal() -> None:
     assert "class AZColorflowLoader(GeneralPlugin):" in PLUGIN_SOURCE
     assert "class AZColorflow(PalettePlugin):" in PLUGIN_SOURCE
     loader = PLUGIN_SOURCE[
-        PLUGIN_SOURCE.index("class AZColorflowLoader(GeneralPlugin):"):
-        PLUGIN_SOURCE.index("class AZColorflow(PalettePlugin):")
+        PLUGIN_SOURCE.index("class AZColorflowLoader(GeneralPlugin):") : PLUGIN_SOURCE.index(
+            "class AZColorflow(PalettePlugin):"
+        )
     ]
-    for register in ("_install_rainbow_menu", "_install_color_routing_hook",
-                     "_register_native_shortcuts", "_register_preferences_pane",
-                     "_register_coverage_sidebar"):
+    for register in (
+        "_install_rainbow_menu",
+        "_install_color_routing_hook",
+        "_register_native_shortcuts",
+        "_register_preferences_pane",
+        "_register_coverage_sidebar",
+    ):
         assert register in loader, register
     # Info.plist points at the loader, and the bundle is a general plugin.
     info = (RESOURCES.parent / "Info.plist").read_text(encoding="utf-8")
@@ -1127,15 +1157,13 @@ def test_sidebar_has_global_report_button() -> None:
     # report icon (list.clipboard.fill) and the shared dashboard entry point.
     block = _sidebar_block()
     assert '"openReport:"' in block
-    assert '"Global Overview", "openReport:"' in block              # renamed from "Report"
+    assert '_text_button("Open Report\u2026", "openReport:"' in block  # the pill's label
     assert "def openReport_(self, sender" in block
-    assert '"list.clipboard.fill"' in block
-    assert "NSImageOnly" in block                                   # icon-only bar segment
-    assert "_AZColorflowLoaderBar.alloc()" in block                 # the loading window
+    assert "_AZColorflowLoaderBar.alloc()" in block  # the loading window
     assert "beginSheet_completionHandler_" in block
     assert "def sidebarRunReport_(self, sender" in block
     assert "def sidebarFinishReport_(self, sender" in block
-    assert "progress=_on_progress, open_when_done=False" in block   # bar tracks real build progress
+    assert "progress=_on_progress, open_when_done=False" in block  # bar tracks real build progress
 
 
 def test_report_window_has_update_button() -> None:
@@ -1143,10 +1171,10 @@ def test_report_window_has_update_button() -> None:
     # the font it's about (captured at show time) and reloads the page.
     assert 'buttonWithTitle_target_action_("Update", self, "updateReport:")' in PLUGIN_SOURCE
     assert "def updateReport_(self, sender" in PLUGIN_SOURCE
-    assert "self._font = Glyphs.font" in PLUGIN_SOURCE                # captured when shown
-    update = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def updateReport_(self, sender"):][:1000]
-    assert "azcolorflow_dashboard.main(font, open_when_done=False)" in update   # fresh build
-    assert "loadFileURL_allowingReadAccessToURL_" in update                     # reload the page
+    assert "self._font = Glyphs.font" in PLUGIN_SOURCE  # captured when shown
+    update = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def updateReport_(self, sender") :][:1000]
+    assert "azcolorflow_dashboard.main(font, open_when_done=False)" in update  # fresh build
+    assert "loadFileURL_allowingReadAccessToURL_" in update  # reload the page
 
 
 def test_report_reopens_existing_before_rebuilding() -> None:
@@ -1167,15 +1195,25 @@ def test_report_reopens_existing_before_rebuilding() -> None:
 
 
 def test_window_menu_has_az_colorflow_entry() -> None:
-    # A Window-menu "AZ Colorflow" item triggers the report; registered once by the
-    # loader, targeting a retained singleton handler (mirrors the Rainbow File item).
+    # A "Colorflow" item under Window > AZ Toolkit triggers the report; registered
+    # once by the loader, targeting a retained singleton handler (mirrors the
+    # Rainbow File item).
     assert "def _install_report_menu(" in PLUGIN_SOURCE
     assert "Glyphs.menu[WINDOW_MENU]" in PLUGIN_SOURCE
-    assert '_REPORT_MENU_TITLE = "AZ Colorflow"' in PLUGIN_SOURCE
-    assert 'initWithTitle_action_keyEquivalent_(\n\t\t_REPORT_MENU_TITLE, "openGlobalOverview:"' in PLUGIN_SOURCE
+    # The label drops the "AZ " prefix — the AZ Toolkit parent already says it.
+    assert '_REPORT_MENU_TITLE = "Colorflow"' in PLUGIN_SOURCE
+    # Whitespace-agnostic on purpose: this once pinned the exact "\n\t\t" between
+    # the selector and its first argument, so re-indenting the file failed a test
+    # about the MENU.
+    assert '_REPORT_MENU_TITLE, "openGlobalOverview:"' in PLUGIN_SOURCE
+    # Into the suite's shared submenu rather than the root of the Window menu.
+    assert "_install_az_toolkit_item(menu_item)" in PLUGIN_SOURCE
+    assert 'AZ_TOOLKIT_MENU_TITLE = "AZ Toolkit"' in PLUGIN_SOURCE
+    assert 'AZ_TOOLKIT_SITE_TITLE = "More AZ plugins…"' in PLUGIN_SOURCE
+    assert 'AZ_TOOLKIT_SITE_URL = "https://azerty-typefaces.com"' in PLUGIN_SOURCE
     assert "def openGlobalOverview_(self, sender" in PLUGIN_SOURCE
     assert "def _open_global_overview(" in PLUGIN_SOURCE
-    assert '("report menu", _install_report_menu)' in PLUGIN_SOURCE   # registered by the loader
+    assert '("report menu", _install_report_menu)' in PLUGIN_SOURCE  # registered by the loader
 
 
 def test_settings_pane_has_no_behaviour_section() -> None:
@@ -1187,7 +1225,7 @@ def test_settings_pane_has_no_behaviour_section() -> None:
 
 def test_coverage_sidebar_disclosure_is_a_chevron() -> None:
     # Collapse marker is a thin stroked chevron (Hugo's icon), not a filled triangle.
-    marker = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_disclosure(self"):][:1000]
+    marker = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_disclosure(self") :][:1000]
     assert "setLineCapStyle_" in marker and "path.stroke()" in marker
     assert "path.fill()" not in marker
 
@@ -1197,7 +1235,11 @@ def test_hosted_report_never_spins_the_host_main_thread_needlessly() -> None:
     sync = _method_body("_sync_spin_state")
     assert "occlusionState" in sync
     assert "isKeyWindow" in sync
-    for selector in ("windowDidBecomeKey_", "windowDidResignKey_", "windowDidChangeOcclusionState_"):
+    for selector in (
+        "windowDidBecomeKey_",
+        "windowDidResignKey_",
+        "windowDidChangeOcclusionState_",
+    ):
         assert f"def {selector}(self, notification)" in PLUGIN_SOURCE
     assert "window.__cfdSpinPause && window.__cfdSpinPause(" in PLUGIN_SOURCE
 
@@ -1216,55 +1258,58 @@ def test_category_and_script_share_one_card() -> None:
     # bigger inter-group gap, instead of a card per section.
     assert "def _sections_card_height(self" in PLUGIN_SOURCE
     assert "_COV_SECTION_GAP" in PLUGIN_SOURCE
-    draw = PLUGIN_SOURCE[PLUGIN_SOURCE.index("y = self._draw_global(_COV_TOP, width)"):][:2200]
+    draw = PLUGIN_SOURCE[PLUGIN_SOURCE.index("y = self._draw_global(_COV_TOP, width)") :][:2200]
     assert "self._sections_card_height(sections)" in draw
     assert "band=False" in draw
     assert "inner_y += _COV_SECTION_GAP" in draw
     # The old one-card-per-section loop is gone.
     assert "for title, rows in sections:" not in draw
-    assert "def _card_height(self" not in PLUGIN_SOURCE   # dead helper removed
+    assert "def _card_height(self" not in PLUGIN_SOURCE  # dead helper removed
 
 
 def test_sidebar_buttons_have_card_coloured_background() -> None:
     # Global Overview / Settings buttons drop the system bezel for a dark card-coloured
     # fill. The layer background (updateLayer path) guarantees dark even where Glyphs'
     # layer-backed sidebar bypasses drawRect_; the rim is drawn on top in drawRect_.
-    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:1300]
+    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button(") :][:1300]
     assert "btn.setBordered_(False)" in button
     assert "setBezelStyle_" not in button
     assert "btn.setWantsLayer_(True)" in button
     assert "btn.layer().setBackgroundColor_(_button_bar_color().CGColor())" in button
-    assert "btn.layer().setCornerRadius_(_COV_CARD_RADIUS)" in button   # its own pill
+    assert "btn.layer().setCornerRadius_(_COV_CARD_RADIUS)" in button  # its own pill
     assert "btn.layer().setBorderWidth_" not in button
     # No custom drawRect_ on the button: a drawRect_ override only won the initial paint
     # on hover, so the default state showed the light system bezel. The dark layer bg
     # renders in every state via updateLayer.
-    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:1400]
+    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)") :][:1400]
     assert "def drawRect_(self" not in flat
     assert "def wantsUpdateLayer(self)" not in flat
 
 
-def test_sidebar_buttons_are_icon_only() -> None:
-    # Icon-only halves: no label, so the padding cell that spaced icon from text is gone.
+def test_sidebar_buttons_are_text_labels() -> None:
+    # Text pills, no icons: the title carries its own light colour because the pill fill is
+    # the same dark grey in both appearances (labelColor would vanish into it in light mode).
     assert "_AZPaddedButtonCell" not in PLUGIN_SOURCE
     assert "_COV_BTN_INSET" not in PLUGIN_SOURCE
-    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:2200]
-    assert 'btn.setTitle_("")' in button
-    assert "NSImageOnly" in button
+    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button(") :][:2200]
+    assert "btn.setAttributedTitle_(" in button
+    assert "NSForegroundColorAttributeName: AppKit.NSColor.whiteColor()" in button
+    assert "style.setAlignment_(_NS_ALIGN_CENTER)" in button
+    assert "NSImageOnly" not in button
+    assert "setImage_" not in button
 
 
 def test_sidebar_buttons_hover_cursor_and_highlight() -> None:
-    # Icon-only bar halves: pointing-hand cursor and a lighter fill on hover (no label
-    # left to brighten, and no native bezel state).
+    # Text pills: pointing-hand cursor and a lighter fill on hover (no native bezel state).
     assert "class _AZFlatButton(AppKit.NSButton)" in PLUGIN_SOURCE
-    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)"):][:2400]
+    flat = PLUGIN_SOURCE[PLUGIN_SOURCE.index("class _AZFlatButton(AppKit.NSButton)") :][:2400]
     assert "addCursorRect_cursor_(self.bounds(), AppKit.NSCursor.pointingHandCursor())" in flat
     assert "def updateTrackingAreas(self)" in flat
     assert "NSTrackingMouseEnteredAndExited" in flat
-    assert "def mouseEntered_(self" in flat and "74 / 255.0" in flat      # lighter fill
+    assert "def mouseEntered_(self" in flat and "74 / 255.0" in flat  # lighter fill
     assert "def mouseExited_(self" in flat and "_button_bar_color().CGColor()" in flat
-    assert "setAlphaValue_" not in flat                                   # no dimming
-    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button("):][:1000]
+    assert "setAlphaValue_" not in flat  # no dimming
+    button = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _text_button(") :][:1000]
     assert "_AZFlatButton.alloc().initWithFrame_" in button
 
 
@@ -1272,14 +1317,14 @@ def test_cards_and_buttons_have_glass_rim() -> None:
     # Cards, legend and buttons share a macOS-Glass-like top-lit gradient rim helper
     # instead of a flat separator stroke.
     assert "def _draw_glass_border(rect: Any, radius: float)" in PLUGIN_SOURCE
-    helper = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_glass_border("):][:2400]
-    assert "initWithColors_atLocations_colorSpace_" in helper       # 3-stop diagonal gradient
+    helper = PLUGIN_SOURCE[PLUGIN_SOURCE.index("def _draw_glass_border(") :][:2400]
+    assert "initWithColors_atLocations_colorSpace_" in helper  # 3-stop diagonal gradient
     assert "[light, dark, dark, light]" in helper and "[0.0, 0.375, 0.625, 1.0]" in helper
     assert "drawInRect_angle_(rect, 45.0 if bool(context.isFlipped()) else 135.0)" in helper
     assert "WindingRuleEvenOdd" in helper or "EvenOddWindingRule" in helper
     # Used by the scrolling cards (_draw_card); the full-bleed bottom panel and the
     # buttons intentionally omit the rim.
-    assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 2         # def + _draw_card
+    assert PLUGIN_SOURCE.count("_draw_glass_border(") >= 2  # def + _draw_card
     assert "card.stroke()" not in PLUGIN_SOURCE
     assert "layer.setBorderColor_(AppKit.NSColor.separatorColor().CGColor())" not in PLUGIN_SOURCE
 
@@ -1332,9 +1377,11 @@ def test_settings_color_pills_are_smaller() -> None:
     assert "_LC_WELL_H = 13.0" in PLUGIN_SOURCE
     assert "class ColorWellCell(ColorWellList2Cell)" in PLUGIN_SOURCE
     assert "heightAnchor().constraintEqualToConstant_(_LC_WELL_H).setActive_(True)" in PLUGIN_SOURCE
-    assert "cellClass=ColorWellCell,\n\t\t\t\t\t\teditable=True, width=_LC_COLOR_W)" in PLUGIN_SOURCE
+    assert (
+        "cellClass=ColorWellCell,\n\t\t\t\t\t\teditable=True, width=_LC_COLOR_W)" in PLUGIN_SOURCE
+    )
     assert "getNSTableView().setRowHeight_(_LC_ROW_H)" in PLUGIN_SOURCE
-    assert "lc_list_h = int(12 * _LC_ROW_H + 8)" in PLUGIN_SOURCE   # list height follows
+    assert "lc_list_h = int(12 * _LC_ROW_H + 8)" in PLUGIN_SOURCE  # list height follows
 
 
 def test_window_menu_entry_uses_the_sidebar_icon() -> None:
@@ -1349,3 +1396,49 @@ def test_footer_spacing_tweaks() -> None:
     # under the separator than the gap above it.
     assert "return _COV_FOOTER_INSET_Y - 1.0" in PLUGIN_SOURCE
     assert "return self.separatorY() + _COV_CARD_GAP + 2.0" in PLUGIN_SOURCE
+
+
+def test_licence_bootstrap_lives_on_the_principal_class() -> None:
+    """``bootstrap.start`` must run on the class Glyphs actually instantiates.
+
+    Regression guard for the 2026-07 bug: the palette ``AZColorflow`` was
+    archived (Info.plist names ``AZColorflowLoader``), but it still owned the
+    only ``bootstrap.start(CONFIG)``. Glyphs never built it, so ``_SHARED_ENT``
+    stayed ``None``, ``_shared_gate_blocked()`` evaluated ``bool(None and ...)``
+    → False at every call site, and the trial clock never started. Nothing in
+    the suite noticed, because no test instantiates a Glyphs plugin class.
+    """
+    import ast
+    import plistlib
+
+    info = plistlib.loads((RESOURCES.parent / "Info.plist").read_bytes())
+    principal = info["NSPrincipalClass"]
+
+    tree = ast.parse(PLUGIN_SOURCE)
+    owners = {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef)
+        and any(
+            isinstance(call.func, ast.Attribute)
+            and call.func.attr == "start"
+            and isinstance(call.func.value, ast.Name)
+            and call.func.value.id == "bootstrap"
+            for call in ast.walk(node)
+            if isinstance(call, ast.Call)
+        )
+    }
+
+    assert owners, "no class calls bootstrap.start() — the licence gate is dead"
+    assert principal in owners, (
+        f"Info.plist instantiates {principal!r}, but bootstrap.start() only runs "
+        f"on {sorted(owners)!r} — the licence gate would never arm"
+    )
+
+
+def test_shared_gate_is_published_where_the_shortcut_can_see_it() -> None:
+    # _shared_gate_blocked() reads the module global; the principal class must
+    # publish it, or every gate fails open.
+    settings = _method_body("settings")
+    assert "global _SHARED_ENT" in settings
+    assert "_SHARED_ENT = bootstrap.start(CONFIG)" in settings

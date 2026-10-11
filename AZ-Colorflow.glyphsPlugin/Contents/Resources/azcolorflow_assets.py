@@ -19,9 +19,9 @@ from xml.sax.saxutils import escape as xesc
 # excludes ``"`` ``'`` ``<`` ``>`` ``&`` ``\`` and every whitespace/control char,
 # so a hostile favicon value cannot close the attribute or inject new ones.
 _DATA_IMAGE_URI = re.compile(
-    r"data:image/[a-zA-Z0-9.+-]+"      # image/<subtype>, e.g. png, svg+xml, x-icon
-    r"(?:;[a-zA-Z0-9.+=-]+)*"          # optional parameters (e.g. ;charset=utf-8;base64)
-    r",[A-Za-z0-9+/=%_.!~*()-]+\Z"     # required comma + non-empty payload
+    r"data:image/[a-zA-Z0-9.+-]+"  # image/<subtype>, e.g. png, svg+xml, x-icon
+    r"(?:;[a-zA-Z0-9.+=-]+)*"  # optional parameters (e.g. ;charset=utf-8;base64)
+    r",[A-Za-z0-9+/=%_.!~*()-]+\Z"  # required comma + non-empty payload
 )
 
 
@@ -65,14 +65,14 @@ def _favicon_link(model: dict) -> str:
 
 def build_html(model: dict) -> str:
     """Assemble the complete, self-contained dashboard page from a model."""
-    title = xesc(f'{model.get("family") or "Untitled"} - Colorflow')
+    title = xesc(f"{model.get('family') or 'Untitled'} - Colorflow")
     return (
         '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         f"<title>{title}</title>{_favicon_link(model)}"
         f"<style>{DASHBOARD_CSS}</style>{_color_overrides(model)}</head>"
         '<body><div id="cfd-app"></div>'
-        '<noscript>This report needs JavaScript — please open it in a modern browser.</noscript>'
+        "<noscript>This report needs JavaScript — please open it in a modern browser.</noscript>"
         f"{embed_model(model)}"
         f"<script>{DASHBOARD_JS}</script>"
         "</body></html>"
@@ -142,6 +142,8 @@ body.ready{opacity:1;transition:opacity .35s ease}
 .vnav-fill.anim{animation:vnavGrow .45s cubic-bezier(.4,0,.2,1)}
 @keyframes vnavGrow{from{transform:scaleX(var(--vnav-from,0))}to{transform:scaleX(var(--vnav-to,1))}}
 .chip:hover{color:var(--text)}
+.chip[aria-disabled=true]{opacity:.45;cursor:not-allowed}
+.chip[aria-disabled=true]:hover{color:var(--muted)}
 .chip[aria-pressed=true]{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
 .overall{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin:16px 0}
 .master-overall{margin-top:8px}
@@ -280,9 +282,9 @@ button.ov-card-h:hover .ov-exp{filter:brightness(1.2)}
 /* Tiny cells (<26px): lay the category SECTIONS two-up so the grid fills the width and
    scrolls less. CSS columns flow blocks down col 1 then col 2; break-inside keeps each
    .cat block whole (never split across the column gap). */
-.heat.heat-2col .heat-cats{column-count:2;column-gap:24px}
-.heat.heat-2col .cat{margin:0 0 16px;break-inside:avoid;-webkit-column-break-inside:avoid}
-.heat.heat-2col .cat-h{margin-top:0}            /* zero top margins so both column tops align */
+.heat .heat-cats{column-count:2;column-gap:24px}
+.heat .cat{margin:0 0 16px;break-inside:avoid;-webkit-column-break-inside:avoid}
+.heat .cat-h{margin-top:0}            /* zero top margins so both column tops align */
 .cell-size{flex:0 0 92px;accent-color:var(--accent);cursor:pointer;height:14px}
 .heat-h .cell-size{margin-left:8px}
 .cell{aspect-ratio:1;border:0;padding:0;border-radius:5px;cursor:pointer;display:block;text-decoration:none;overflow:hidden;transition:background .45s ease,opacity .2s ease}
@@ -581,7 +583,7 @@ DASHBOARD_JS = r"""
     ovExpand: {},                          // which Overview cards are expanded
     heatSort: "category",                  // focus-mode glyph grid: "category" | "color"
     heatRecent: false,                     // focus-mode glyph grid: show only glyphs modified in the last 7 days
-    cellSize: 40,                          // glyph-grid cell min size in px (slider-controlled, 28..96)
+    cellSize: 40,                          // glyph-grid cell min size in px (slider-controlled, 20..40)
     tlPane: "graph",                       // Timeline card: "graph" (chart) | "calendar" (activity calendar)
     funnelOpen: false,                     // per-step funnel: collapsed by default, toggled by the % ring/number
     ocOpen: {},                            // Timeline "Shape changes" day blocks expanded? (closed by default)
@@ -838,7 +840,16 @@ DASHBOARD_JS = r"""
   function toolbar(){
     return '<div class="tb">'
       + '<button type="button" id="cfd-overview" class="chip" aria-pressed="true" title="Back to the overview">⌂ Overview</button>'
-      + '<button type="button" id="cfd-timeline" class="chip" aria-pressed="false">📈 Timeline</button></div>';
+      + '<button type="button" id="cfd-timeline" class="chip" aria-pressed="false"'+(timelineLock()?' aria-disabled="true" title="'+esc(timelineLock())+'"':'')+'>📈 Timeline</button></div>';
+  }
+  // The Timeline tab needs 3 snapshots (timelineView's gate); below that the chip is
+  // disabled and its title says what unlocks it. "" once ready.
+  function timelineLock(){
+    var n = ((H.trend && H.trend.dates) || []).length;
+    if (n >= 3) return "";
+    var byCommit = state.tlGran === "save";
+    return "Timeline unlocks at 3 "+(byCommit ? fineUnits() : "days")+" of history — "+n+" so far. "
+      + (byCommit ? "Make another "+fineNoun()+"." : "Save again tomorrow.");
   }
   // ----- Graded step progress -----------------------------------------------
   // Each colour is a workflow step ranked by the Palette order; a glyph sitting
@@ -1226,15 +1237,14 @@ DASHBOARD_JS = r"""
       : '';
     // glyph-cell size slider: live-resizes the grid cells (drives --cell-min on the section).
     var cz = state.cellSize || 40;
-    var sizeCtl = '<input type="range" class="cell-size" min="20" max="80" step="2" value="'+cz+'" data-cellsize title="Glyph cell size" aria-label="Glyph cell size">';
+    var sizeCtl = '<input type="range" class="cell-size" min="20" max="40" step="2" value="'+cz+'" data-cellsize title="Glyph cell size" aria-label="Glyph cell size">';
     // (The time-travel scrub pill above the grid was removed; the latest version node /
     // timeline already returns to the live moment, and scrubSnap still drives the cells.)
-    // Below 26px the cells are too small to scan as one long column -> lay the category
-    // SECTIONS two-up (CSS columns via .heat-2col; each .cat stays whole). The wrapper lets
-    // the column rule target the sections without catching the .heat-h controls.
-    var twoCol = cz < 26;
+    // The category SECTIONS always lay two-up (CSS columns on .heat-cats; each .cat stays
+    // whole). The wrapper lets the column rule target the sections without catching the
+    // .heat-h controls.
     var body = sections ? '<div class="heat-cats">'+sections+'</div>' : empty;
-    return '<section class="heat'+(scrubAnim?" scrub":"")+(twoCol?" heat-2col":"")+'" style="--cell-min:'+cz+'px"><div class="heat-h">'+focusInfo+toggle+recentCtl+sortCtl+sizeCtl+'</div>'
+    return '<section class="heat'+(scrubAnim?" scrub":"")+'" style="--cell-min:'+cz+'px"><div class="heat-h">'+focusInfo+toggle+recentCtl+sortCtl+sizeCtl+'</div>'
       + body+'</section>';
   }
   // ----- Overview extras (only when no master is selected) ------------------
@@ -3244,7 +3254,7 @@ DASHBOARD_JS = r"""
       state.view = v; update();
     }
     document.getElementById("cfd-overview").addEventListener("click", function(){ state.view = "tabs"; state.master = null; update(); });
-    document.getElementById("cfd-timeline").addEventListener("click", function(){ toggleView("timeline"); });
+    document.getElementById("cfd-timeline").addEventListener("click", function(){ if (!timelineLock()) toggleView("timeline"); });
     document.getElementById("cfd-export").addEventListener("click", openExport);
     document.addEventListener("keydown", function(e){
       if (e.key==="Escape"){ closeExport(); closeJourney(); if (state.focus!==null){ setFocus(null); } }
@@ -3258,7 +3268,7 @@ DASHBOARD_JS = r"""
       if (!sz) return;
       var v = parseInt(sz.value, 10) || 40;
       state.cellSize = v;
-      var heat = sz.closest(".heat"); if (heat){ heat.style.setProperty("--cell-min", v+"px"); heat.classList.toggle("heat-2col", v < 26); }
+      var heat = sz.closest(".heat"); if (heat){ heat.style.setProperty("--cell-min", v+"px"); }
     });
     bodyEl.addEventListener("mouseover", function(e){
       var cell = e.target.closest(".heat .cell"); if (cell) showTip(cell.getAttribute("data-glyph"), e.clientX, e.clientY);
@@ -3326,7 +3336,14 @@ DASHBOARD_JS = r"""
     if (!cv || !cv.getContext || !H.masters.length) return;
     var ctx = cv.getContext("2d");
     if (!ctx) return;                       // headless / no-canvas env: skip
-    var EMPTYFILL = (getComputedStyle(document.documentElement).getPropertyValue("--track")||"").trim() || "#15171c";   // empty disc ~ page bg
+    // Empty disc ~ page bg (--track). Read per theme, not once: data-theme flips after
+    // initTower() runs, and a cached dark value painted black discs in light mode.
+    var emptyFillCache = {};
+    function emptyFill(){
+      var t = document.documentElement.getAttribute("data-theme") || "";
+      if (!emptyFillCache[t]) emptyFillCache[t] = (getComputedStyle(document.documentElement).getPropertyValue("--track")||"").trim() || "#15171c";
+      return emptyFillCache[t];
+    }
     var W = cv.width, Hc = cv.height, FS = 320;
     // HiDPI: supersample every backing store by devicePixelRatio (capped at 3) while
     // keeping all geometry in CSS-pixel units. fit() recomputes dpr on resize; the
@@ -3483,7 +3500,7 @@ DASHBOARD_JS = r"""
       if (reveal===undefined) reveal=1;
       if (empty){   // no colours: a near-background tone at lower opacity (mixes with the bg)
         g.save(); g.translate(cx,cy); g.scale(1,ry/rx);
-        g.globalAlpha=0.6; g.fillStyle=EMPTYFILL; g.beginPath(); g.arc(0,0,rx,0,7); g.fill(); g.globalAlpha=1;
+        g.globalAlpha=0.6; g.fillStyle=emptyFill(); g.beginPath(); g.arc(0,0,rx,0,7); g.fill(); g.globalAlpha=1;
         g.restore();
         return;
       }
