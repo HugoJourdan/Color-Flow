@@ -78,10 +78,64 @@ OUTLINE_CHANGE_LIMIT = 60          # cap changed glyphs kept per day (avoid huge
 # Pure data layer (no GlyphsApp) — unit-tested in tests/test_azcolorflow_dashboard
 # --------------------------------------------------------------------------- #
 
+
 def color_to_key(color) -> int:
     """Native ``layer.color`` (int 0-11 or ``None``) -> a plist-safe storage/
     display key: ``None`` becomes ``colornames.NO_COLOR`` (-1)."""
     return colornames.NO_COLOR if color is None else int(color)
+
+
+def _unwrap(value, default=None):
+    """A KVC column entry as plain Python: a nil ObjC field arrives as ``NSNull``
+    (which is truthy and stringifies to "<null>"), so it has to become ``default``."""
+    if value is None or type(value).__name__ == "NSNull":
+        return default
+    return value
+
+
+def _glyph_columns(font, *keys: str) -> list[list] | None:
+    """The named ``GSGlyph`` field for every glyph, ONE bridge crossing per field.
+
+    Iterating ``font.glyphs`` in Python costs a crossing per glyph, which dominates
+    these whole-font reads on big families; ``valueForKey_`` lets Foundation collect
+    the column instead (measured 12.8 ms -> 1.9 ms for name+category+script on 860
+    glyphs). ``None`` when ``font`` is not a real GSFont — fakes and headless
+    callers fall back to the plain loop at each call site."""
+    getter = getattr(font, "valueForKey_", None)
+    if getter is None:
+        return None
+    try:
+        glyphs = getter("glyphs")
+        columns = [list(glyphs.valueForKey_(key)) for key in keys]
+    except Exception:  # pragma: no cover - app-only path
+        return None
+    if not columns or any(len(column) != len(columns[0]) for column in columns):
+        return None  # pragma: no cover - defensive: ragged columns are unusable
+    return columns
+
+
+def _layer_color_reader():
+    """A ``layer -> storage key`` reader for :func:`build_master_glyph_colors`.
+
+    On a real GSLayer the unbound ``colorIndex`` selector skips the ``layer.color``
+    property wrapper, which matters because this runs once per glyph per master;
+    255 is GSLayer's "no colour" sentinel. Falls back to ``layer.color`` for fakes
+    and for anything without the selector."""
+    try:
+        import objc
+
+        color_index = objc.lookUpClass("GSLayer").pyobjc_instanceMethods.colorIndex
+    except Exception:
+        return lambda layer: color_to_key(layer.color)
+
+    def read(layer) -> int:  # pragma: no cover - app-only path
+        try:
+            index = int(color_index(layer))
+        except Exception:
+            return color_to_key(layer.color)
+        return colornames.NO_COLOR if index == 255 else index
+
+    return read
 
 
 def snapshot_to_colors(per_glyph: dict[str, int]) -> list[int | None]:
@@ -141,6 +195,7 @@ def display_from_meaning(meaning: dict[str, str], none_label: str) -> list[tuple
 # GlyphsApp-touching helpers
 # --------------------------------------------------------------------------- #
 
+
 def no_glyph_svg() -> bool:
     """Hidden pref: skip embedding per-glyph outline SVGs to make the report much
     lighter. ``False`` (embed the outlines) when Glyphs is absent or the key unset."""
@@ -154,12 +209,30 @@ def non_exporting_names(font) -> list[str]:
     falsy). Cheap (one ``font.glyphs`` pass) and shipped in the model so the
     report can ALWAYS exclude these glyphs from every displayed percentage —
     empty list when every glyph exports (nothing to exclude)."""
+    columns = _glyph_columns(font, "name", "export")
+    if columns is not None:  # pragma: no cover - app-only path
+        names, exports = columns
+        # A nil export field counts as exporting, matching Glyphs' default and
+        # colornames.non_exporting_names' getattr fallback.
+        return sorted(
+            str(names[index]) for index in range(len(names)) if not _unwrap(exports[index], True)
+        )
     return sorted(colornames.non_exporting_names(font.glyphs))
 
 
 def glyph_meta(font) -> dict:
     """``{glyph_name: {category, script}}`` feeding the per-glyph ``categories`` /
     ``scripts`` model lists (heatmap lanes + coverage grouping)."""
+    columns = _glyph_columns(font, "name", "category", "script")
+    if columns is not None:  # pragma: no cover - app-only path
+        names, categories, scripts = columns
+        return {
+            str(names[index]): {
+                "category": str(_unwrap(categories[index]) or ""),
+                "script": str(_unwrap(scripts[index]) or ""),
+            }
+            for index in range(len(names))
+        }
     return {glyph.name: {"category": str(getattr(glyph, "category", None) or ""),
                          "script": str(getattr(glyph, "script", None) or "")}
             for glyph in font.glyphs}
@@ -190,15 +263,43 @@ def build_master_glyph_colors(font) -> dict[str, dict[str, int]]:
     """``{master_id: {glyph_name: key}}`` over ALL glyphs, taking the layer's own
     ``layer.color`` only (a missing layer is uncoloured) — exactly the set and
     source the palette counts (plugin.py ``_derive_counts``)."""
-    data: dict[str, dict[str, int]] = {}
-    for master in font.masters:
-        per_glyph: dict[str, int] = {}
-        for glyph in font.glyphs:
-            layer = glyph.layers[master.id]
-            color = layer.color if layer is not None else None
-            per_glyph[glyph.name] = color_to_key(color)
-        data[master.id] = per_glyph
+    master_ids = [master.id for master in font.masters]
+    data: dict[str, dict[str, int]] = {master_id: {} for master_id in master_ids}
+    read_color = _layer_color_reader()
+    # ONE font.glyphs pass, ONE glyph.layers access per glyph. Both are bridge
+    # crossings and the old master-outer/glyph-inner shape paid them masters-times
+    # over: 1253 ms -> 218 ms on 860 glyphs x 18 masters, same output.
+    for glyph in font.glyphs:
+        name = glyph.name
+        layers = glyph.layers
+        for master_id in master_ids:
+            layer = layers[master_id]
+            data[master_id][name] = colornames.NO_COLOR if layer is None else read_color(layer)
     return data
+
+
+def master_named_colors(font, master_id) -> list[tuple[str, object]]:
+    """``(glyph_name, native layer colour)`` for ONE master — the pairs the palette's
+    census and its step-tab selection consume, where ``None`` means uncoloured
+    exactly as ``layer.color`` does.
+
+    Batched: names come from one bridge crossing and each colour from the
+    ``colorIndex`` selector instead of the ``layer.color`` property wrapper
+    (measured 7.6 ms -> 2.1 ms per master on 860 glyphs). Falls back to the plain
+    attribute reads for fakes and headless callers."""
+    glyphs = list(font.glyphs)
+    columns = _glyph_columns(font, "name")
+    if columns is not None and len(columns[0]) == len(glyphs):  # pragma: no cover - app-only
+        names = [str(name) for name in columns[0]]
+    else:
+        names = [glyph.name for glyph in glyphs]
+    read_color = _layer_color_reader()
+    pairs: list[tuple[str, object]] = []
+    for index, glyph in enumerate(glyphs):
+        layer = glyph.layers[master_id]
+        key = colornames.NO_COLOR if layer is None else read_color(layer)
+        pairs.append((names[index], None if key == colornames.NO_COLOR else key))
+    return pairs
 
 
 def default_glyph_order(font, glyph_names: list[str]) -> list[str]:
@@ -449,8 +550,7 @@ def record_history(font, snapshot: dict, now: datetime) -> None:
         return                                          # nothing changed -> no junk entry
     series[now.strftime("%Y-%m-%dT%H:%M:%S")] = snapshot
     series = _keep_last_save_of_past_days(series)
-    _write_user_data(
-        font, TIMELINE_USERDATA_KEY, azcolorflow_history_store.encode_history(series))
+    _write_user_data(font, TIMELINE_USERDATA_KEY, azcolorflow_history_store.encode_history(series))
 
 
 def write_history(font, history: dict) -> None:
@@ -462,8 +562,7 @@ def write_history(font, history: dict) -> None:
     if Glyphs is None or font is None:
         return
     series = _keep_last_save_of_past_days({str(key): history[key] for key in history})
-    _write_user_data(
-        font, TIMELINE_USERDATA_KEY, azcolorflow_history_store.encode_history(series))
+    _write_user_data(font, TIMELINE_USERDATA_KEY, azcolorflow_history_store.encode_history(series))
 
 
 def _git_open_colors(path) -> dict | None:
@@ -683,6 +782,7 @@ def git_day_history(
 # "final" is the completion metric: the cumulative count at the last workflow
 # step.
 # --------------------------------------------------------------------------- #
+
 
 def _parse_iso(date: str) -> datetime:
     """ISO ``YYYY-MM-DD`` -> ``datetime`` (history keys are always this shape)."""
@@ -1486,6 +1586,7 @@ def build_model(font, now: datetime, current: dict, previous: dict, progress=Non
 # Entry point
 # --------------------------------------------------------------------------- #
 
+
 def report_path_for(font, when=None) -> Path | None:
     """Deterministic output path for ``font``'s report (temp dir, keyed by the font
     name + date). Same path :func:`main` writes, so a caller can check whether a
@@ -1499,12 +1600,13 @@ def report_path_for(font, when=None) -> Path | None:
     return Path(tempfile.gettempdir()) / f"{when.strftime('%Y%m%d')} {base} — AZ Colorflow.html"
 
 
-def main(font=None, progress=None, open_when_done: bool = True) -> Path | None:
-    """Build the report, write it to a temp file, and (when ``open_when_done``)
-    open it in the browser. ``progress`` (optional ``Callable[[float], None]``)
-    receives a monotonic 0->1 fraction at each phase boundary so a caller can drive
-    a determinate loading bar. Returns the written ``Path`` (so a caller can offer
-    Open/Save itself), or ``None`` if nothing was produced."""
+def build_report_model(font=None, progress=None) -> tuple[dict, dict] | None:
+    """The data half of :func:`main`: the report model for ``font`` plus the live
+    colour snapshot the caller persists via :func:`save_snapshot`. Shared by the
+    HTML report and the native AppKit report (azcolorflow_native_report), so both
+    always show the same numbers. ``progress`` receives 0 -> 0.80 like ``main``.
+    ``None`` when there is no font / no glyphs (after a Message)."""
+
     def _emit(frac: float) -> None:
         if progress is not None:
             try:
@@ -1516,11 +1618,11 @@ def main(font=None, progress=None, open_when_done: bool = True) -> Path | None:
         font = Glyphs.font
     if font is None:
         Message("Open a font first.", "Color Font Dashboard")
-        return
+        return None
     total = len(font.glyphs)
     if total == 0:
         Message("No glyphs to report on.", "Color Font Dashboard")
-        return
+        return None
 
     _emit(0.02)
     now = datetime.now()
@@ -1544,6 +1646,30 @@ def main(font=None, progress=None, open_when_done: bool = True) -> Path | None:
                         progress=lambda frac: _emit(0.15 + 0.65 * frac),
                         git_commits=git_commits)
     _emit(0.80)
+    return model, current
+
+
+def main(font=None, progress=None, open_when_done: bool = True) -> Path | None:
+    """Build the report, write it to a temp file, and (when ``open_when_done``)
+    open it in the browser. ``progress`` (optional ``Callable[[float], None]``)
+    receives a monotonic 0->1 fraction at each phase boundary so a caller can drive
+    a determinate loading bar. Returns the written ``Path`` (so a caller can offer
+    Open/Save itself), or ``None`` if nothing was produced."""
+
+    def _emit(frac: float) -> None:
+        if progress is not None:
+            try:
+                progress(frac)
+            except Exception:
+                pass
+
+    if font is None and Glyphs is not None:
+        font = Glyphs.font
+    built = build_report_model(font, progress)
+    if built is None or font is None:
+        return None
+    model, current = built
+    now = datetime.now()
     html = azcolorflow_assets.build_html(model)
     _emit(0.94)
     save_snapshot(font, current)
