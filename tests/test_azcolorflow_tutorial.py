@@ -29,7 +29,7 @@ def test_clamp_index_constrains_to_bounds() -> None:
     assert tut.clamp_index(0, 4) == 0
     assert tut.clamp_index(2, 4) == 2
     assert tut.clamp_index(9, 4) == 3
-    assert tut.clamp_index(1, 0) == 0          # no slides -> 0
+    assert tut.clamp_index(1, 0) == 0  # no slides -> 0
 
 
 def test_is_first_and_is_last() -> None:
@@ -37,7 +37,7 @@ def test_is_first_and_is_last() -> None:
     assert tut.is_first(1) is False
     assert tut.is_last(3, 4) is True
     assert tut.is_last(2, 4) is False
-    assert tut.is_last(0, 0) is False          # no slides -> never "last"
+    assert tut.is_last(0, 0) is False  # no slides -> never "last"
 
 
 def test_page_indicator_marks_current_slide() -> None:

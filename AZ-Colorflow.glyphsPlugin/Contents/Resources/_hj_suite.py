@@ -148,7 +148,9 @@ class _Registry:
 
     def capabilities(self) -> list[tuple[str, int, str | None]]:
         """[(name, version, plugin_id)] for introspection / a debug menu."""
-        out: list[tuple[str, int, str | None]] = [(n, v, pid) for n, (v, pid, _t) in self._explicit.items()]
+        out: list[tuple[str, int, str | None]] = [
+            (n, v, pid) for n, (v, pid, _t) in self._explicit.items()
+        ]
         out.append(("anchor.lock", __version__, "_hj_suite"))
         for n in _BUILTIN_OBJC:
             out.append((n, __version__, "_hj_suite:objc"))

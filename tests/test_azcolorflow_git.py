@@ -18,7 +18,7 @@ import azcolorflow_git as git
 
 def _run(args: list[str], cwd: Path, date: str | None = None) -> None:
     env = dict(os.environ)
-    env["GIT_CONFIG_GLOBAL"] = os.devnull          # isolate from the user's git config
+    env["GIT_CONFIG_GLOBAL"] = os.devnull  # isolate from the user's git config
     env["GIT_CONFIG_SYSTEM"] = os.devnull
     if date is not None:
         env["GIT_AUTHOR_DATE"] = date
@@ -58,6 +58,7 @@ def _load_json(path: Path) -> dict:
 # subprocess hardening — a stalled/hung git must fail fast, never freeze Glyphs
 # --------------------------------------------------------------------------- #
 
+
 def test_git_helpers_return_none_on_timeout(monkeypatch, tmp_path: Path) -> None:
     def hang(*args: object, **kwargs: object) -> None:
         raise subprocess.TimeoutExpired(cmd="git", timeout=git._GIT_TIMEOUT)
@@ -65,7 +66,7 @@ def test_git_helpers_return_none_on_timeout(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(git.subprocess, "run", hang)
     assert git._git_text(["status"], tmp_path) is None
     assert git._git_bytes(["status"], tmp_path) is None
-    assert git.git_root(tmp_path) is None                     # degrades to "no repo"
+    assert git.git_root(tmp_path) is None  # degrades to "no repo"
 
 
 def test_git_subprocess_runs_with_timeout_and_no_stdin(monkeypatch, tmp_path: Path) -> None:
@@ -79,7 +80,7 @@ def test_git_subprocess_runs_with_timeout_and_no_stdin(monkeypatch, tmp_path: Pa
     monkeypatch.setattr(git.subprocess, "run", spy)
     git._git_text(["--version"], tmp_path)
     assert seen["timeout"] == git._GIT_TIMEOUT
-    assert seen["stdin"] == subprocess.DEVNULL                # never waits on a prompt
+    assert seen["stdin"] == subprocess.DEVNULL  # never waits on a prompt
     seen.clear()
     git._git_bytes(["--version"], tmp_path)
     assert seen["timeout"] == git._GIT_TIMEOUT
@@ -95,6 +96,7 @@ def test_default_cap_bounds_history() -> None:
 # --------------------------------------------------------------------------- #
 # root / tracking
 # --------------------------------------------------------------------------- #
+
 
 def test_git_root_found_for_tracked_file(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
@@ -141,11 +143,12 @@ def test_rel_degrades_gracefully_for_target_outside_repo(tmp_path: Path) -> None
 # one-commit-per-day
 # --------------------------------------------------------------------------- #
 
+
 def test_day_commits_keep_last_per_day_oldest_first(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
     _commit_font(repo, _snap({"A": 0}), "2026-06-01")
     _commit_font(repo, _snap({"A": 1}), "2026-06-02")
-    _commit_font(repo, _snap({"A": 2}), "2026-06-02")   # same day, later -> wins
+    _commit_font(repo, _snap({"A": 2}), "2026-06-02")  # same day, later -> wins
     _commit_font(repo, _snap({"A": 3}), "2026-06-04")
     days = git.day_commits(repo, repo / "font.glyphs")
     assert [iso for iso, _ in days] == ["2026-06-01", "2026-06-02", "2026-06-04"]
@@ -176,6 +179,7 @@ def test_day_commits_no_truncation_notice_when_under_cap(tmp_path: Path, capsys)
 # --------------------------------------------------------------------------- #
 # collect_git_history end to end
 # --------------------------------------------------------------------------- #
+
 
 def test_collect_git_history_round_trips_per_day(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
@@ -214,7 +218,7 @@ def test_collect_git_history_skips_load_failures(tmp_path: Path) -> None:
     def flaky(path: Path) -> dict | None:
         data = _load_json(path)
         if data["m1"].get("A") == 0:
-            raise ValueError("boom")        # the first day fails to load
+            raise ValueError("boom")  # the first day fails to load
         return data
 
     history = git.collect_git_history(repo / "font.glyphs", flaky)
@@ -235,6 +239,7 @@ def test_collect_git_history_progress_reaches_one(tmp_path: Path) -> None:
 # .glyphspackage (directory) extraction
 # --------------------------------------------------------------------------- #
 
+
 def test_extract_commit_handles_package_directory(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
     pkg = repo / "Font.glyphspackage"
@@ -254,16 +259,17 @@ def test_extract_commit_handles_package_directory(tmp_path: Path) -> None:
 # merge
 # --------------------------------------------------------------------------- #
 
+
 def test_merge_history_live_wins_and_fills_gaps() -> None:
     git_hist = {
         "2026-06-01": _snap({"A": 0}),
-        "2026-06-02": _snap({"A": 1}),   # also live -> live wins
+        "2026-06-02": _snap({"A": 1}),  # also live -> live wins
     }
     live = {"2026-06-02": _snap({"A": 9}), "2026-06-03": _snap({"A": 2})}
     merged = git.merge_history(live, git_hist)
     assert merged == {
         "2026-06-01": _snap({"A": 0}),
-        "2026-06-02": _snap({"A": 9}),   # live value, not git's
+        "2026-06-02": _snap({"A": 9}),  # live value, not git's
         "2026-06-03": _snap({"A": 2}),
     }
 
@@ -272,12 +278,13 @@ def test_merge_history_caps_to_most_recent(capsys) -> None:
     git_hist = {f"2026-06-0{day}": _snap({"A": day}) for day in range(1, 6)}
     merged = git.merge_history({}, git_hist, cap=2)
     assert sorted(merged) == ["2026-06-04", "2026-06-05"]
-    assert "capped" in capsys.readouterr().out                 # truncation is announced
+    assert "capped" in capsys.readouterr().out  # truncation is announced
 
 
 # --------------------------------------------------------------------------- #
 # commit_points / collect_commit_history (the timeline's per-commit view)
 # --------------------------------------------------------------------------- #
+
 
 def _commit_at(repo: Path, snapshot: dict, when: str, name: str = "font.glyphs") -> None:
     """Write+commit ``snapshot`` with an explicit local datetime (YYYY-MM-DDTHH:MM:SS)."""
@@ -288,7 +295,7 @@ def _commit_at(repo: Path, snapshot: dict, when: str, name: str = "font.glyphs")
 
 _PLAN = [
     (_snap({"A": 0}), "2026-06-01T09:00:00"),
-    (_snap({"A": 1}), "2026-06-01T15:00:00"),   # same day as the first -> NOT collapsed
+    (_snap({"A": 1}), "2026-06-01T15:00:00"),  # same day as the first -> NOT collapsed
     (_snap({"A": 2}), "2026-06-02T10:00:00"),
 ]
 
@@ -306,16 +313,18 @@ def test_commit_points_caps_to_most_recent(tmp_path: Path, capsys) -> None:
     for snap, when in _PLAN:
         _commit_at(repo, snap, when)
     keys = [key for key, _sha in git.commit_points(repo, repo / "font.glyphs", cap=2)]
-    assert keys == ["2026-06-01T15:00:00", "2026-06-02T10:00:00"]   # oldest dropped
-    assert "capped" in capsys.readouterr().out                      # truncation is announced
+    assert keys == ["2026-06-01T15:00:00", "2026-06-02T10:00:00"]  # oldest dropped
+    assert "capped" in capsys.readouterr().out  # truncation is announced
 
 
 def test_commit_points_skips_known_keys(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
     for snap, when in _PLAN:
         _commit_at(repo, snap, when)
-    keys = [key for key, _sha in git.commit_points(
-        repo, repo / "font.glyphs", skip={"2026-06-01T15:00:00"})]
+    keys = [
+        key
+        for key, _sha in git.commit_points(repo, repo / "font.glyphs", skip={"2026-06-01T15:00:00"})
+    ]
     assert keys == ["2026-06-01T09:00:00", "2026-06-02T10:00:00"]
 
 
@@ -324,7 +333,8 @@ def test_collect_commit_history_one_snapshot_per_commit(tmp_path: Path) -> None:
     for snap, when in _PLAN:
         _commit_at(repo, snap, when)
     history = git.collect_commit_history(
-        repo / "font.glyphs", lambda path: json.loads(Path(path).read_text(encoding="utf-8")))
+        repo / "font.glyphs", lambda path: json.loads(Path(path).read_text(encoding="utf-8"))
+    )
     assert list(history) == ["2026-06-01T09:00:00", "2026-06-01T15:00:00", "2026-06-02T10:00:00"]
     assert history["2026-06-01T15:00:00"] == {"m1": {"A": 1}}
     assert history["2026-06-02T10:00:00"] == {"m1": {"A": 2}}
@@ -350,10 +360,11 @@ def test_collect_commit_history_skip_never_opens_known_commits(tmp_path: Path) -
         return data
 
     history = git.collect_commit_history(
-        repo / "font.glyphs", counting_load, skip={"2026-06-01T15:00:00"})
+        repo / "font.glyphs", counting_load, skip={"2026-06-01T15:00:00"}
+    )
     assert list(history) == ["2026-06-01T09:00:00", "2026-06-02T10:00:00"]
-    assert len(opened) == 2                                   # the skipped commit cost nothing
-    assert _snap({"A": 1}) not in opened                      # its snapshot was never loaded
+    assert len(opened) == 2  # the skipped commit cost nothing
+    assert _snap({"A": 1}) not in opened  # its snapshot was never loaded
 
 
 def test_collect_commit_history_caps_to_most_recent(tmp_path: Path, capsys) -> None:

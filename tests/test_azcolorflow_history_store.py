@@ -46,16 +46,19 @@ def test_decode_raises_on_undecodable_payload() -> None:
     # caller has to preserve the raw value instead of overwriting it with a fresh
     # log, so every corrupt shape raises HistoryDecodeError.
     with pytest.raises(store.HistoryDecodeError):
-        store.decode_history("not-base64-!!")                      # bad base64
+        store.decode_history("not-base64-!!")  # bad base64
     with pytest.raises(store.HistoryDecodeError):
         store.decode_history(base64.b64encode(b"plain").decode())  # not gzip/xz
     with pytest.raises(store.HistoryDecodeError):
-        store.decode_history(_wrap([1, 2, 3]))                     # JSON but not a mapping
+        store.decode_history(_wrap([1, 2, 3]))  # JSON but not a mapping
     with pytest.raises(store.HistoryDecodeError):
-        store.decode_history(_wrap({"v": 99, "h": {}}))            # unknown schema version
+        store.decode_history(_wrap({"v": 99, "h": {}}))  # unknown schema version
     with pytest.raises(store.HistoryDecodeError):
-        store.decode_history(_wrap(                                # malformed delta model
-            {"v": 2, "dates": ["2026-06-01"], "base": {"m1": {"A": "xx"}}, "steps": {}}))
+        store.decode_history(
+            _wrap(  # malformed delta model
+                {"v": 2, "dates": ["2026-06-01"], "base": {"m1": {"A": "xx"}}, "steps": {}}
+            )
+        )
 
 
 def test_decode_error_is_a_value_error() -> None:
@@ -80,7 +83,7 @@ def test_encoded_payload_is_far_smaller_than_raw() -> None:
     }
     encoded = store.encode_history(big)
     raw = json.dumps(big).encode("utf-8")
-    assert len(encoded) < len(raw) // 5          # at least 5x smaller
+    assert len(encoded) < len(raw) // 5  # at least 5x smaller
     assert store.decode_history(encoded) == big
 
 
@@ -88,6 +91,7 @@ def test_encoded_payload_is_far_smaller_than_raw() -> None:
 # Delta encoding: only changed glyphs are stored per save (forward-fill on read).
 # Must stay lossless across glyph/master additions AND removals.
 # --------------------------------------------------------------------------- #
+
 
 def _round_trip(history: dict) -> dict:
     return store.decode_history(store.encode_history(history))
@@ -104,7 +108,7 @@ def test_round_trips_when_glyph_added_between_saves() -> None:
 def test_round_trips_when_glyph_removed_between_saves() -> None:
     history = {
         "2026-06-01T10:00:00": {"m1": {"A": 0, "B": 1, "C": 2}},
-        "2026-06-02T10:00:00": {"m1": {"A": 0, "B": 1}},          # C deleted
+        "2026-06-02T10:00:00": {"m1": {"A": 0, "B": 1}},  # C deleted
     }
     assert _round_trip(history) == history
 
@@ -120,7 +124,7 @@ def test_round_trips_when_master_added_between_saves() -> None:
 def test_round_trips_when_master_removed_between_saves() -> None:
     history = {
         "2026-06-01T10:00:00": {"m1": {"A": 0}, "m2": {"A": 3}},
-        "2026-06-02T10:00:00": {"m1": {"A": 1}},                  # m2 deleted
+        "2026-06-02T10:00:00": {"m1": {"A": 1}},  # m2 deleted
     }
     assert _round_trip(history) == history
 
@@ -174,5 +178,5 @@ def test_delta_beats_dense_gzip_on_redundant_history() -> None:
     new_blob = store.encode_history(big)
     raw = json.dumps({"v": 1, "h": big}, separators=(",", ":")).encode("utf-8")
     dense_gzip = base64.b64encode(gzip.compress(raw, mtime=0)).decode("ascii")
-    assert len(new_blob) < len(dense_gzip) // 2   # at least 2x smaller than the old codec
+    assert len(new_blob) < len(dense_gzip) // 2  # at least 2x smaller than the old codec
     assert store.decode_history(new_blob) == big

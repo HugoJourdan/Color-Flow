@@ -19,12 +19,8 @@ from __future__ import annotations
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-CANONICAL_MODULE = (
-    REPO / "AZ-Colorflow.glyphsPlugin" / "Contents" / "Resources" / "colornames.py"
-)
-NAV_MODULE = (
-    REPO / "AZ-Colorflow.glyphsPlugin" / "Contents" / "Resources" / "colornav.py"
-)
+CANONICAL_MODULE = REPO / "AZ-Colorflow.glyphsPlugin" / "Contents" / "Resources" / "colornames.py"
+NAV_MODULE = REPO / "AZ-Colorflow.glyphsPlugin" / "Contents" / "Resources" / "colornav.py"
 SHORTCUT_DIR = REPO / "Color Flow Shortcut"
 
 JUMP_HEADER = """#MenuTitle: Jump To Next Unfinished (Color Flow)
@@ -44,7 +40,7 @@ JUMP_HEADER = """#MenuTitle: Jump To Next Unfinished (Color Flow)
 
 """
 
-JUMP_TAIL = '''
+JUMP_TAIL = """
 
 # ---------------------------------------------------------------------------
 # Navigation logic (auto-generated tail)
@@ -95,7 +91,7 @@ def _color_flow_jump():
 
 
 _color_flow_jump()
-'''
+"""
 
 
 def build_jump_script(module_source: str, nav_source: str) -> str:
@@ -106,9 +102,7 @@ def build_jump_script(module_source: str, nav_source: str) -> str:
     inside the embedded ``colornav`` source is dropped — a future import is only
     valid at the start of a module and would otherwise raise SyntaxError.
     """
-    nav_embedded = nav_source.replace(
-        "from __future__ import annotations\n", "", 1
-    )
+    nav_embedded = nav_source.replace("from __future__ import annotations\n", "", 1)
     return JUMP_HEADER + module_source + "\n" + nav_embedded + JUMP_TAIL
 
 

@@ -14,7 +14,10 @@ def test_build_group_one_filter_per_step_plus_none() -> None:
     assert group["name"] == "AZ Colorflow"
     items = group["subGroup"]
     assert [item["predicate"] for item in items] == [
-        "colorIndex == 8", "colorIndex == 4", f"colorIndex == {filters.NO_COLOR_INDEX}"]
+        "colorIndex == 8",
+        "colorIndex == 4",
+        f"colorIndex == {filters.NO_COLOR_INDEX}",
+    ]
     assert items[0]["name"] == "Outline" and items[-1]["name"] == "Untouched"
 
 
@@ -23,7 +26,10 @@ def test_build_group_preserves_workflow_order_not_numeric() -> None:
     # order, never be re-sorted into a (wrong) ascending colorIndex run.
     group = filters.build_filter_group([(8, "First"), (4, "Second"), (3, "Third")])
     assert [item["predicate"] for item in group["subGroup"][:3]] == [
-        "colorIndex == 8", "colorIndex == 4", "colorIndex == 3"]
+        "colorIndex == 8",
+        "colorIndex == 4",
+        "colorIndex == 3",
+    ]
 
 
 def test_build_group_blank_label_falls_back_to_index() -> None:
@@ -32,12 +38,17 @@ def test_build_group_blank_label_falls_back_to_index() -> None:
 
 
 def test_merge_replaces_previous_group_and_keeps_others() -> None:
-    existing = [{"name": "My filter", "predicate": "name LIKE 'a*'"},
-                {"name": "AZ Colorflow", "subGroup": [{"name": "old"}]}]
+    existing = [
+        {"name": "My filter", "predicate": "name LIKE 'a*'"},
+        {"name": "AZ Colorflow", "subGroup": [{"name": "old"}]},
+    ]
     group = filters.build_filter_group([(0, "Step")])
     merged = filters.merge_into_filters(existing, group)
-    assert [entry["name"] for entry in merged] == ["My filter", "AZ Colorflow"]   # one AZ Colorflow only
-    assert merged[-1]["subGroup"][0]["predicate"] == "colorIndex == 0"          # the new one
+    assert [entry["name"] for entry in merged] == [
+        "My filter",
+        "AZ Colorflow",
+    ]  # one AZ Colorflow only
+    assert merged[-1]["subGroup"][0]["predicate"] == "colorIndex == 0"  # the new one
 
 
 def test_merge_into_empty_filters() -> None:

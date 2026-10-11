@@ -10,7 +10,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-RESOURCES = Path(__file__).resolve().parent.parent / "AZ-Colorflow.glyphsPlugin" / "Contents" / "Resources"
+RESOURCES = (
+    Path(__file__).resolve().parent.parent / "AZ-Colorflow.glyphsPlugin" / "Contents" / "Resources"
+)
 sys.path.insert(0, str(RESOURCES))
 
 import azcolorflow_assets as assets  # noqa: E402
@@ -92,32 +94,54 @@ def _counts(keys: list[int]) -> dict[str, int]:
 
 
 def _model() -> dict:
-    preview = {"d": "M40 -700L300 -700L300 -100L40 -100ZM360 -640L600 -640L600 -100L360 -100Z",
-               "vb": "0 -740 640 680"}
+    preview = {
+        "d": "M40 -700L300 -700L300 -100L40 -100ZM360 -640L600 -640L600 -100L360 -100Z",
+        "vb": "0 -740 640 680",
+    }
     masters = []
     for offset, name in ((0, "Regular"), (5, "Bold")):
         keys = [SEQ[(i + offset) % len(SEQ)] for i in range(len(SEQ))]
         uncolored = sum(1 for k in keys if k == -1)
-        masters.append({"id": name.lower(), "name": name, "keys": keys,
-                        "counts": _counts(keys), "uncolored": uncolored,
-                        "preview": preview})
+        masters.append(
+            {
+                "id": name.lower(),
+                "name": name,
+                "keys": keys,
+                "counts": _counts(keys),
+                "uncolored": uncolored,
+                "preview": preview,
+            }
+        )
     outline = {"d": "M120 -700L520 -700L520 -100L120 -100Z", "vb": "80 -740 480 680"}
-    paths = {master["id"]: {name: outline for name, key in zip(NAMES, master["keys"], strict=False)
-                            if key != -1} for master in masters}
+    paths = {
+        master["id"]: {
+            name: outline for name, key in zip(NAMES, master["keys"], strict=False) if key != -1
+        }
+        for master in masters
+    }
     return {
-        "family": "Acme Sans", "fileName": "Acme.glyphs", "version": "2.5",
+        "family": "Acme Sans",
+        "fileName": "Acme.glyphs",
+        "version": "2.5",
         "generated": datetime(2026, 6, 5).strftime("%Y-%m-%d"),
         "glyphTotal": len(SEQ),
-        "order": ORDER, "steps": STEPS, "noneLabel": "🫥 None",
+        "order": ORDER,
+        "steps": STEPS,
+        "noneLabel": "🫥 None",
         "glyphNames": NAMES,
-        "categories": [("Letter" if i < 14 else "Number" if i < 18 else "Punctuation")
-                       for i in range(len(SEQ))],
+        "categories": [
+            ("Letter" if i < 14 else "Number" if i < 18 else "Punctuation") for i in range(len(SEQ))
+        ],
         "scripts": [_script_for(i) for i in range(len(SEQ))],
         "masters": masters,
         "colors": {str(index): "#888888" for index in range(12)},
-        "filePath": "/fonts/Acme.glyphs", "paths": paths,
+        "filePath": "/fonts/Acme.glyphs",
+        "paths": paths,
         "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-        "logo": {"d": "M0 0L100 0L100 -700L0 -700ZM200 0L360 0L360 -500L200 -500Z", "vb": "0 -740 360 780"},
+        "logo": {
+            "d": "M0 0L100 0L100 -700L0 -700ZM200 0L360 0L360 -500L200 -500Z",
+            "vb": "0 -740 360 780",
+        },
         "trend": _trend(),
         "journeyIndex": _journey_index(masters),
         "journeys": {"regular": {"A": [-1, 4, 8], "C": [-1, -1, 4]}, "bold": {}},
@@ -130,16 +154,45 @@ def _model() -> dict:
 def _coverage() -> dict:
     def script_rows(bump: int) -> list:
         return [
-            {"key": "latin", "total": 16, "final": 8 + bump, "started": 12, "uncolored": 4,
-             "counts": {}, "dist": {"8": 6, "4": 3, "6": 3}},
-            {"key": "punctuation", "total": 6, "final": 2, "started": 4, "uncolored": 2,
-             "counts": {}, "dist": {"6": 2, "3": 2}},
+            {
+                "key": "latin",
+                "total": 16,
+                "final": 8 + bump,
+                "started": 12,
+                "uncolored": 4,
+                "counts": {},
+                "dist": {"8": 6, "4": 3, "6": 3},
+            },
+            {
+                "key": "punctuation",
+                "total": 6,
+                "final": 2,
+                "started": 4,
+                "uncolored": 2,
+                "counts": {},
+                "dist": {"6": 2, "3": 2},
+            },
         ]
+
     category_rows = [
-        {"key": "Letter", "total": 18, "final": 10, "started": 15, "uncolored": 3,
-         "counts": {}, "dist": {"8": 5, "4": 5, "6": 3, "3": 2}},
-        {"key": "Punctuation", "total": 4, "final": 1, "started": 2, "uncolored": 2,
-         "counts": {}, "dist": {"3": 1, "6": 1}},
+        {
+            "key": "Letter",
+            "total": 18,
+            "final": 10,
+            "started": 15,
+            "uncolored": 3,
+            "counts": {},
+            "dist": {"8": 5, "4": 5, "6": 3, "3": 2},
+        },
+        {
+            "key": "Punctuation",
+            "total": 4,
+            "final": 1,
+            "started": 2,
+            "uncolored": 2,
+            "counts": {},
+            "dist": {"3": 1, "6": 1},
+        },
     ]
     return {
         "byScript": {"regular": script_rows(2), "bold": script_rows(0)},
@@ -157,15 +210,36 @@ def _trend() -> dict:
             masters[master] = {"final": final, "started": final + 2, "total": len(SEQ)}
         series.append({"date": date, "masters": masters})
     forecast = {
-        "regular": {"velocityPerWeek": 10.5, "remaining": 6, "final": 10, "total": len(SEQ),
-                    "etaIso": "2026-06-09", "bandDays": 2, "confidence": "high", "points": 3},
-        "bold": {"velocityPerWeek": 7.0, "remaining": 12, "final": 6, "total": len(SEQ),
-                 "etaIso": "2026-06-14", "bandDays": 4, "confidence": "med", "points": 3},
+        "regular": {
+            "velocityPerWeek": 10.5,
+            "remaining": 6,
+            "final": 10,
+            "total": len(SEQ),
+            "etaIso": "2026-06-09",
+            "bandDays": 2,
+            "confidence": "high",
+            "points": 3,
+        },
+        "bold": {
+            "velocityPerWeek": 7.0,
+            "remaining": 12,
+            "final": 6,
+            "total": len(SEQ),
+            "etaIso": "2026-06-14",
+            "bandDays": 4,
+            "confidence": "med",
+            "points": 3,
+        },
     }
     # snapshot dates drive the per-glyph reconstruction (stateAt) behind the Flow
     # streamgraph, activity calendar and day-rings card — keep them in the model.
-    return {"series": series, "dates": list(dates), "forecast": forecast,
-            "today": "2026-06-05", "streak": {"current": 3, "best": 5, "days": 3}}
+    return {
+        "series": series,
+        "dates": list(dates),
+        "forecast": forecast,
+        "today": "2026-06-05",
+        "streak": {"current": 3, "best": 5, "days": 3},
+    }
 
 
 def main() -> None:

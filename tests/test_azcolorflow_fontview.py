@@ -23,6 +23,7 @@ import fontview
 # Fakes — a GSFont-like object just rich enough for ``is_dirty``.
 # --------------------------------------------------------------------------- #
 
+
 class _FakeProxy(dict):
     """Mimics a Glyphs userData/tempData proxy: a missing key yields ``None``
     rather than raising, but ``del`` on a missing key still raises KeyError
@@ -145,9 +146,7 @@ def _make_font(mode: str = "Layer") -> tuple[_FakeFont, fontview.FontViewGroupin
     return font, grouping
 
 
-def _prime_snapshot(
-    font: _FakeFont, grouping: fontview.FontViewGrouping, master_id: str
-) -> None:
+def _prime_snapshot(font: _FakeFont, grouping: fontview.FontViewGrouping, master_id: str) -> None:
     """Populate ``tempData`` the way ``rebuild`` would, without touching the
     AppKit/customParameters path."""
     mode = grouping.mode(font)
@@ -162,6 +161,7 @@ def _prime_snapshot(
 # --------------------------------------------------------------------------- #
 # Tests
 # --------------------------------------------------------------------------- #
+
 
 def test_clean_state_is_not_dirty() -> None:
     font, grouping = _make_font()
@@ -237,6 +237,7 @@ def test_off_selection_recolour_of_existing_glyph_not_detected() -> None:
 # --------------------------------------------------------------------------- #
 # Restoring the user's glyphOrder (disable / strip_for_save)
 # --------------------------------------------------------------------------- #
+
 
 def _enable_with_our_order(font: _FakeFont) -> None:
     """Put the font in the enabled state with OUR grouping order active."""

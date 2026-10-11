@@ -26,8 +26,7 @@ def step_filter(label: str, color_index: int) -> dict:
     return {"name": label, "predicate": f"colorIndex == {int(color_index)}"}
 
 
-def build_filter_group(steps: list, none_label: str = "None",
-                       group_name: str = GROUP_NAME) -> dict:
+def build_filter_group(steps: list, none_label: str = "None", group_name: str = GROUP_NAME) -> dict:
     """A ``{"name", "subGroup": [...]}`` folder: one exact filter per step plus a
     trailing "no colour" filter. ``steps`` is ordered ``[(color_index, label)]``
     in workflow order; blank labels fall back to the colour index."""
@@ -36,8 +35,9 @@ def build_filter_group(steps: list, none_label: str = "None",
     return {"name": group_name, "subGroup": items}
 
 
-def merge_into_filters(existing: list[dict] | None, group: dict,
-                       group_name: str = GROUP_NAME) -> list[dict]:
+def merge_into_filters(
+    existing: list[dict] | None, group: dict, group_name: str = GROUP_NAME
+) -> list[dict]:
     """Return the ``Filters`` list with any previous group of the same name
     replaced by ``group`` (so regenerating updates in place, never duplicates).
     ``existing`` may be ``None`` (treated as an empty list)."""

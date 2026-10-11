@@ -11,6 +11,7 @@ def _p(d: str, vb: str = "0 0 10 10") -> dict:
 # diff_path_maps
 # --------------------------------------------------------------------------- #
 
+
 def test_diff_reports_only_changed_d() -> None:
     prev = {"m1": {"A": _p("M0 0"), "B": _p("M1 1")}}
     cur = {"m1": {"A": _p("M0 0"), "B": _p("M2 2")}}
@@ -38,8 +39,8 @@ def test_diff_ignores_added_and_removed_glyphs() -> None:
 
 
 def test_diff_skips_empty_outlines() -> None:
-    prev = {"m1": {"A": _p("")}}            # was inkless
-    cur = {"m1": {"A": _p("M0 0")}}          # now has ink
+    prev = {"m1": {"A": _p("")}}  # was inkless
+    cur = {"m1": {"A": _p("M0 0")}}  # now has ink
     assert od.diff_path_maps(prev, cur) == []
 
 
@@ -61,14 +62,15 @@ def test_diff_sorted_by_master_then_glyph() -> None:
 # outline_changes (chronological adjacent-day diff)
 # --------------------------------------------------------------------------- #
 
+
 def test_outline_changes_diffs_adjacent_days() -> None:
     day_maps = {
         "2026-06-01": {"m1": {"A": _p("M0 0")}},
-        "2026-06-02": {"m1": {"A": _p("M1 1")}},     # changed vs 06-01
-        "2026-06-03": {"m1": {"A": _p("M1 1")}},     # same as 06-02 -> no change
+        "2026-06-02": {"m1": {"A": _p("M1 1")}},  # changed vs 06-01
+        "2026-06-03": {"m1": {"A": _p("M1 1")}},  # same as 06-02 -> no change
     }
     result = od.outline_changes(day_maps)
-    assert set(result) == {"2026-06-02"}            # earliest has no predecessor; 06-03 unchanged
+    assert set(result) == {"2026-06-02"}  # earliest has no predecessor; 06-03 unchanged
     assert result["2026-06-02"][0]["glyph"] == "A"
 
 

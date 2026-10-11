@@ -20,10 +20,7 @@ from pathlib import Path
 import pytest
 
 RESOURCES = (
-    Path(__file__).resolve().parent.parent
-    / "AZ-Colorflow.glyphsPlugin"
-    / "Contents"
-    / "Resources"
+    Path(__file__).resolve().parent.parent / "AZ-Colorflow.glyphsPlugin" / "Contents" / "Resources"
 )
 PLUGIN_SOURCE = (RESOURCES / "plugin.py").read_text(encoding="utf-8")
 

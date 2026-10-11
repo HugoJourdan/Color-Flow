@@ -6,8 +6,12 @@ import glyphsvg
 
 
 def test_svg_path_d_flips_y_and_builds_commands() -> None:
-    elements = [("move", [(0, 100)]), ("line", [(50, 100)]),
-                ("curve", [(60, 90), (60, 10), (50, 0)]), ("close", [])]
+    elements = [
+        ("move", [(0, 100)]),
+        ("line", [(50, 100)]),
+        ("curve", [(60, 90), (60, 10), (50, 0)]),
+        ("close", []),
+    ]
     assert glyphsvg.svg_path_d(elements) == "M0 -100L50 -100C60 -90 60 -10 50 0Z"
 
 
@@ -41,8 +45,9 @@ class _FakeLayer:
 
 
 def test_layer_svg_path_from_bezier_elements() -> None:
-    bezier = _FakeBezier([(0, [(0, 0)]), (1, [(100, 0)]),
-                          (2, [(110, 10), (110, 90), (100, 100)]), (3, [])])
+    bezier = _FakeBezier(
+        [(0, [(0, 0)]), (1, [(100, 0)]), (2, [(110, 10), (110, 90), (100, 100)]), (3, [])]
+    )
     assert glyphsvg.layer_svg_path(_FakeLayer(bezier)) == "M0 0L100 0C110 -10 110 -90 100 -100Z"
 
 
@@ -111,8 +116,8 @@ def test_layer_outline_em_shares_baseline_regardless_of_ink_height() -> None:
     tall = _FakeBezier([(0, [(0, 0)]), (1, [(400, 0)]), (1, [(400, 900)]), (3, [])])
     vb_short = glyphsvg.layer_outline_em(_FakeLayer(short), 800.0, -200.0)["vb"].split()
     vb_tall = glyphsvg.layer_outline_em(_FakeLayer(tall), 800.0, -200.0)["vb"].split()
-    assert vb_short[1] == vb_tall[1]          # same box_y (vertical frame) -> shared baseline
-    assert vb_short[2:] == vb_tall[2:]        # same box side (uniform scale)
+    assert vb_short[1] == vb_tall[1]  # same box_y (vertical frame) -> shared baseline
+    assert vb_short[2:] == vb_tall[2:]  # same box side (uniform scale)
 
 
 def test_layer_outline_em_empty_without_path() -> None:
@@ -173,8 +178,7 @@ def test_quadratic_element_is_converted_to_cubic() -> None:
 
 def test_quadratic_keeps_contour_continuous() -> None:
     # A quad element must not blank the path nor leave a gap before the close.
-    bezier = _FakeBezier([(0, [(0, 0)]), (1, [(100, 0)]),
-                          (4, [(150, 50), (100, 100)]), (3, [])])
+    bezier = _FakeBezier([(0, [(0, 0)]), (1, [(100, 0)]), (4, [(150, 50), (100, 100)]), (3, [])])
     d = glyphsvg.layer_svg_path(_FakeLayer(bezier))
     assert d.startswith("M0 0L100 0C")
     assert d.endswith("100 -100Z")
@@ -190,8 +194,7 @@ def test_unknown_element_falls_back_to_line_to_endpoint() -> None:
 def test_view_box_uses_on_curve_bounds_not_control_points() -> None:
     # A curve whose control points bulge far outside the on-curve endpoints.
     # On-curve points: (0, 0) and (100, 0); controls (50, 999)/(50, -999) ignored.
-    elements = [("move", [(0, 0)]),
-                ("curve", [(50, 999), (50, -999), (100, 0)]), ("close", [])]
+    elements = [("move", [(0, 0)]), ("curve", [(50, 999), (50, -999), (100, 0)]), ("close", [])]
     # Tight box on on-curve bounds [0..100] x [0..0] with pad 40.
     assert glyphsvg.view_box(elements, pad=40) == "-40 -40 180 80"
 
@@ -199,8 +202,9 @@ def test_view_box_uses_on_curve_bounds_not_control_points() -> None:
 def test_layer_outline_em_centres_x_on_on_curve_bounds() -> None:
     # Control points bulge far off-curve; horizontal centring must ignore them, and
     # the vertical frame is baseline-based (independent of ink height).
-    bezier = _FakeBezier([(0, [(0, 0)]), (1, [(200, 0)]),
-                          (2, [(100, 5000), (100, 5000), (200, 400)]), (3, [])])
+    bezier = _FakeBezier(
+        [(0, [(0, 0)]), (1, [(200, 0)]), (2, [(100, 5000), (100, 5000), (200, 400)]), (3, [])]
+    )
     outline = glyphsvg.layer_outline_em(_FakeLayer(bezier), 800.0, -200.0)
     # On-curve xs: 0, 200, 200 -> centre 100; box 1300 -> box_x = 100 - 650 = -550.
     # box_y baseline-framed = -(800+200) = -1000.

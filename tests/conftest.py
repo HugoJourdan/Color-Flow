@@ -8,10 +8,7 @@ import sys
 from pathlib import Path
 
 RESOURCES = (
-    Path(__file__).resolve().parent.parent
-    / "AZ-Colorflow.glyphsPlugin"
-    / "Contents"
-    / "Resources"
+    Path(__file__).resolve().parent.parent / "AZ-Colorflow.glyphsPlugin" / "Contents" / "Resources"
 )
 
 sys.path.insert(0, str(RESOURCES))

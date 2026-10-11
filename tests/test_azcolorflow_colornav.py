@@ -6,12 +6,12 @@ import colornav
 
 
 def test_next_unfinished_finds_following_glyph() -> None:
-    glyphs = [("A", 1), ("B", None), ("C", 1)]   # final step = "1"
+    glyphs = [("A", 1), ("B", None), ("C", 1)]  # final step = "1"
     assert colornav.next_unfinished_index(glyphs, "1", 0) == 1
 
 
 def test_next_unfinished_wraps_around_to_earlier_glyph() -> None:
-    glyphs = [("A", None), ("B", 1), ("C", 1)]   # only A is unfinished
+    glyphs = [("A", None), ("B", 1), ("C", 1)]  # only A is unfinished
     assert colornav.next_unfinished_index(glyphs, "1", 1) == 0
 
 
@@ -21,7 +21,7 @@ def test_next_unfinished_skips_final_step_glyphs() -> None:
 
 
 def test_next_unfinished_treats_uncoloured_and_offpalette_as_unfinished() -> None:
-    glyphs = [("A", 1), ("B", None), ("C", 7)]   # B uncoloured, C wrong colour
+    glyphs = [("A", 1), ("B", None), ("C", 7)]  # B uncoloured, C wrong colour
     assert colornav.next_unfinished_index(glyphs, "1", 0) == 1
     assert colornav.next_unfinished_index(glyphs, "1", 1) == 2
 

@@ -26,42 +26,42 @@ _OTHER_MOUSE_DOWN = 25
 _OTHER_MOUSE_UP = 26
 
 MOUSE_EVENT_TYPES: frozenset[int] = frozenset(
-	{
-		_LEFT_MOUSE_DOWN,
-		_LEFT_MOUSE_UP,
-		_RIGHT_MOUSE_DOWN,
-		_RIGHT_MOUSE_UP,
-		_OTHER_MOUSE_DOWN,
-		_OTHER_MOUSE_UP,
-	}
+    {
+        _LEFT_MOUSE_DOWN,
+        _LEFT_MOUSE_UP,
+        _RIGHT_MOUSE_DOWN,
+        _RIGHT_MOUSE_UP,
+        _OTHER_MOUSE_DOWN,
+        _OTHER_MOUSE_UP,
+    }
 )
 
 
 def should_apply_swap(
-	event_type: int | None, mouse_types: frozenset[int] = MOUSE_EVENT_TYPES
+    event_type: int | None, mouse_types: frozenset[int] = MOUSE_EVENT_TYPES
 ) -> bool:
-	"""True only when the current event is a real mouse interaction.
+    """True only when the current event is a real mouse interaction.
 
-	A non-mouse event type (e.g. a key event from a colour shortcut) or ``None``
-	(no current event — a programmatic call) returns False, so the caller can fall
-	back to stock glyph routing instead of misrouting a non-click.
-	"""
-	if event_type is None:
-		return False
-	return event_type in mouse_types
+    A non-mouse event type (e.g. a key event from a colour shortcut) or ``None``
+    (no current event — a programmatic call) returns False, so the caller can fall
+    back to stock glyph routing instead of misrouting a non-click.
+    """
+    if event_type is None:
+        return False
+    return event_type in mouse_types
 
 
 def resolve_color_target(option_pressed: bool, swap_enabled: bool) -> Literal["glyph", "layer"]:
-	"""Decide whether the colour goes on the glyph or the active layer.
+    """Decide whether the colour goes on the glyph or the active layer.
 
-	Stock behaviour: Option-click -> layer, plain click -> glyph. With swap on, the
-	two are inverted. Both reduce to XOR of the two booleans::
+    Stock behaviour: Option-click -> layer, plain click -> glyph. With swap on, the
+    two are inverted. Both reduce to XOR of the two booleans::
 
-	    option | swap  | target
-	    -------+-------+-------
-	    False  | False | glyph
-	    True   | False | layer
-	    False  | True  | layer
-	    True   | True  | glyph
-	"""
-	return "layer" if (option_pressed ^ swap_enabled) else "glyph"
+        option | swap  | target
+        -------+-------+-------
+        False  | False | glyph
+        True   | False | layer
+        False  | True  | layer
+        True   | True  | glyph
+    """
+    return "layer" if (option_pressed ^ swap_enabled) else "glyph"

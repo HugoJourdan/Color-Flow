@@ -22,8 +22,9 @@ RAINBOW_SOURCES = ("Layer", "Glyph")
 _COLOR_EPSILON = 1e-3
 
 
-def build_profile(color_names: str, rainbow_source: str,
-                  label_colors: list, name: str = "") -> dict:
+def build_profile(
+    color_names: str, rainbow_source: str, label_colors: list, name: str = ""
+) -> dict:
     """Assemble a portable profile dict from the live Color Flow config values."""
     source = rainbow_source if rainbow_source in RAINBOW_SOURCES else "Layer"
     return {
@@ -122,12 +123,21 @@ def diff_profile(current: dict, incoming: dict) -> list[dict]:
     profile never silently overwrites local choices. Empty when identical."""
     diffs: list[dict] = []
     if current.get("rainbowSource") != incoming.get("rainbowSource"):
-        diffs.append({"field": "Rainbow source",
-                      "detail": f"{current.get('rainbowSource')} -> {incoming.get('rainbowSource')}"})
-    changed = _label_color_changes(current.get("labelColors") or [], incoming.get("labelColors") or [])
+        diffs.append(
+            {
+                "field": "Rainbow source",
+                "detail": f"{current.get('rainbowSource')} -> {incoming.get('rainbowSource')}",
+            }
+        )
+    changed = _label_color_changes(
+        current.get("labelColors") or [], incoming.get("labelColors") or []
+    )
     if changed:
         diffs.append({"field": "Label colours", "detail": f"{changed} of 12 differ"})
-    diffs.extend({"field": field, "detail": detail}
-                 for field, detail in _color_names_diff(current.get("colorNames") or "",
-                                                         incoming.get("colorNames") or ""))
+    diffs.extend(
+        {"field": field, "detail": detail}
+        for field, detail in _color_names_diff(
+            current.get("colorNames") or "", incoming.get("colorNames") or ""
+        )
+    )
     return diffs

@@ -39,8 +39,8 @@ except ImportError:  # pragma: no cover - platform without _lzma; fall back to g
 
 History = dict[str, dict[str, dict[str, int]]]
 
-SCHEMA_VERSION = 1   # legacy dense payload {"v":1,"h":history} (still decoded)
-DELTA_VERSION = 2    # current delta payload (see _to_delta)
+SCHEMA_VERSION = 1  # legacy dense payload {"v":1,"h":history} (still decoded)
+DELTA_VERSION = 2  # current delta payload (see _to_delta)
 
 
 class HistoryDecodeError(ValueError):
@@ -51,6 +51,7 @@ class HistoryDecodeError(ValueError):
     must preserve the raw payload (e.g. stash it under a backup key) before any
     overwrite — otherwise one bad read silently destroys the font's timeline."""
 
+
 _GZIP_MAGIC = b"\x1f\x8b"
 _XZ_MAGIC = b"\xfd7zXZ\x00"
 
@@ -59,6 +60,7 @@ _XZ_MAGIC = b"\xfd7zXZ\x00"
 # Compression (deterministic so re-encoding identical history yields identical
 # bytes — avoids spuriously re-dirtying the font when nothing changed).
 # --------------------------------------------------------------------------- #
+
 
 def _gzip(data: bytes) -> bytes:
     """Deterministic gzip (mtime pinned to 0)."""
@@ -96,6 +98,7 @@ def _decompress(blob: bytes) -> bytes:
 # Empty members are omitted. Reconstruct by forward-filling base through the steps.
 # --------------------------------------------------------------------------- #
 
+
 def _to_delta(history: History) -> dict:
     dates = sorted(history)
     if not dates:
@@ -109,7 +112,7 @@ def _to_delta(history: History) -> dict:
         removed: dict[str, list[str]] = {}
         for master, glyphs in current.items():
             prev_glyphs = previous.get(master)
-            if prev_glyphs is None:                      # whole new master
+            if prev_glyphs is None:  # whole new master
                 changed[master] = dict(glyphs)
                 continue
             master_changed = {
@@ -168,6 +171,7 @@ def _from_delta(model: dict) -> History:
 # --------------------------------------------------------------------------- #
 # Public codec
 # --------------------------------------------------------------------------- #
+
 
 def encode_history(history: History) -> str:
     """Encode ``history`` to a compact base64(xz(json(delta))) string for ``userData``."""

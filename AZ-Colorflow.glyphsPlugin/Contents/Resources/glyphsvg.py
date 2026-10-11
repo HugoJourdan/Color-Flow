@@ -203,9 +203,9 @@ def layer_outline_em(
         span = abs(ascender) + abs(descender) or 1000.0
     pad_top = span * top_pad
     pad_bot = span * bot_pad
-    box = span + pad_top + pad_bot          # square side, constant for the master
-    box_x = center_x - box / 2.0            # ink-centred horizontally
-    box_y = -(ascender + pad_top)           # flipped Y; baseline (font y=0) fixed in every cell
+    box = span + pad_top + pad_bot  # square side, constant for the master
+    box_x = center_x - box / 2.0  # ink-centred horizontally
+    box_y = -(ascender + pad_top)  # flipped Y; baseline (font y=0) fixed in every cell
     return {"d": d, "vb": f"{_num(box_x)} {_num(box_y)} {_num(box)} {_num(box)}"}
 
 

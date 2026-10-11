@@ -17,10 +17,18 @@ from __future__ import annotations
 # Glyphs' built-in label colours as (r, g, b, a) in 0..1, index 0-11. Used when the
 # user has not overridden them (matches the Set Label Colors defaults).
 DEFAULTS: list[tuple[float, float, float, float]] = [
-    (0.85, 0.26, 0.06, 1.0), (0.99, 0.62, 0.11, 1.0), (0.65, 0.48, 0.20, 1.0),
-    (0.97, 0.90, 0.00, 1.0), (0.67, 0.95, 0.38, 1.0), (0.04, 0.57, 0.04, 1.0),
-    (0.06, 0.60, 0.98, 1.0), (0.00, 0.20, 0.88, 1.0), (0.50, 0.09, 0.79, 1.0),
-    (0.98, 0.36, 0.67, 1.0), (0.75, 0.75, 0.75, 1.0), (0.25, 0.25, 0.25, 1.0),
+    (0.85, 0.26, 0.06, 1.0),
+    (0.99, 0.62, 0.11, 1.0),
+    (0.65, 0.48, 0.20, 1.0),
+    (0.97, 0.90, 0.00, 1.0),
+    (0.67, 0.95, 0.38, 1.0),
+    (0.04, 0.57, 0.04, 1.0),
+    (0.06, 0.60, 0.98, 1.0),
+    (0.00, 0.20, 0.88, 1.0),
+    (0.50, 0.09, 0.79, 1.0),
+    (0.98, 0.36, 0.67, 1.0),
+    (0.75, 0.75, 0.75, 1.0),
+    (0.25, 0.25, 0.25, 1.0),
 ]
 
 # The Glyphs preference key holding the archived label colours.
@@ -60,8 +68,14 @@ def read_label_colors() -> list[tuple[float, float, float, float]]:
             # colour written by Color Flow reads back byte-for-byte; converting to calibrated
             # here would shift every component and make each save/load cycle drift the colours.
             rgb = color.colorUsingColorSpaceName_("NSDeviceRGBColorSpace") or color
-            colors.append((rgb.redComponent(), rgb.greenComponent(),
-                           rgb.blueComponent(), rgb.alphaComponent()))
+            colors.append(
+                (
+                    rgb.redComponent(),
+                    rgb.greenComponent(),
+                    rgb.blueComponent(),
+                    rgb.alphaComponent(),
+                )
+            )
         except Exception:
             colors.append(DEFAULTS[index])
     return colors
@@ -106,6 +120,7 @@ def refresh_app_label_colors(colors: list) -> None:
         return
     try:
         import objc
+
         info = objc.lookUpClass("GSGlyphsInfo")
     except Exception:
         info = None

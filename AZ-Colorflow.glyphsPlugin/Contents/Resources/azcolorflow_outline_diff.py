@@ -40,12 +40,14 @@ def diff_path_maps(prev: PathMap, cur: PathMap) -> list[dict]:
             new_d = new_path.get("d") or ""
             if not old_d or not new_d or old_d == new_d:
                 continue
-            changes.append({
-                "glyph": glyph_name,
-                "master": master_id,
-                "old": {"d": old_d, "vb": old_path.get("vb") or ""},
-                "new": {"d": new_d, "vb": new_path.get("vb") or ""},
-            })
+            changes.append(
+                {
+                    "glyph": glyph_name,
+                    "master": master_id,
+                    "old": {"d": old_d, "vb": old_path.get("vb") or ""},
+                    "new": {"d": new_d, "vb": new_path.get("vb") or ""},
+                }
+            )
     changes.sort(key=lambda change: (str(change["master"]), str(change["glyph"])))
     return changes
 

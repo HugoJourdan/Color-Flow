@@ -52,8 +52,13 @@ def _git_text(args: list[str], cwd: Path) -> str | None:
     is missing, times out, or the command fails (non-zero exit)."""
     try:
         result = subprocess.run(
-            ["git", *args], cwd=str(cwd), capture_output=True, text=True, check=False,
-            timeout=_GIT_TIMEOUT, stdin=subprocess.DEVNULL,
+            ["git", *args],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_GIT_TIMEOUT,
+            stdin=subprocess.DEVNULL,
         )
     except (OSError, ValueError, subprocess.TimeoutExpired):
         return None
@@ -65,8 +70,12 @@ def _git_bytes(args: list[str], cwd: Path) -> bytes | None:
     failure/timeout — used for blob/archive content that should not be text-decoded."""
     try:
         result = subprocess.run(
-            ["git", *args], cwd=str(cwd), capture_output=True, check=False,
-            timeout=_GIT_TIMEOUT, stdin=subprocess.DEVNULL,
+            ["git", *args],
+            cwd=str(cwd),
+            capture_output=True,
+            check=False,
+            timeout=_GIT_TIMEOUT,
+            stdin=subprocess.DEVNULL,
         )
     except (OSError, ValueError, subprocess.TimeoutExpired):
         return None
@@ -119,9 +128,7 @@ def day_commits(
     rel = _rel(repo, target)
     if rel is None:
         return []
-    out = _git_text(
-        ["log", "--first-parent", "--date=short", "--format=%cd|%H", "--", rel], repo
-    )
+    out = _git_text(["log", "--first-parent", "--date=short", "--format=%cd|%H", "--", rel], repo)
     if not out:
         return []
     # git log is newest-first; the first sha seen for a date is that day's latest.
@@ -133,10 +140,10 @@ def day_commits(
         iso, sha = line.split("|", 1)
         if iso and sha and iso not in latest_per_day:
             latest_per_day[iso] = sha
-    days = sorted(latest_per_day)            # oldest-first
+    days = sorted(latest_per_day)  # oldest-first
     if cap and len(days) > cap:
         _note_truncation("days", cap, len(days) - cap)
-        days = days[-cap:]                   # keep the most-recent `cap` days
+        days = days[-cap:]  # keep the most-recent `cap` days
     if skip:
         days = [iso for iso in days if iso not in skip]
     return [(iso, latest_per_day[iso]) for iso in days]
@@ -188,8 +195,15 @@ def commit_points(
     if rel is None:
         return []
     out = _git_text(
-        ["log", "--first-parent", "--date=format-local:%Y-%m-%dT%H:%M:%S",
-         "--format=%cd|%H", "--", rel], repo
+        [
+            "log",
+            "--first-parent",
+            "--date=format-local:%Y-%m-%dT%H:%M:%S",
+            "--format=%cd|%H",
+            "--",
+            rel,
+        ],
+        repo,
     )
     if not out:
         return []
@@ -201,10 +215,10 @@ def commit_points(
         when, sha = line.split("|", 1)
         if when and sha:
             raw.append((when, sha))
-    raw.reverse()                                # git log is newest-first -> oldest-first
+    raw.reverse()  # git log is newest-first -> oldest-first
     if cap and len(raw) > cap:
         _note_truncation("commits", cap, len(raw) - cap)
-        raw = raw[-cap:]                         # keep the most-recent `cap` commits
+        raw = raw[-cap:]  # keep the most-recent `cap` commits
     counts: dict[str, int] = {}
     points: list[tuple[str, str]] = []
     for when, sha in raw:
@@ -218,8 +232,11 @@ def commit_points(
 
 
 def _collect_snapshots(
-    repo: Path, target: Path, load_colors: Callable[[Path], Snapshot | None],
-    points: list[tuple[str, str]], progress: Callable[[float], None] | None,
+    repo: Path,
+    target: Path,
+    load_colors: Callable[[Path], Snapshot | None],
+    points: list[tuple[str, str]],
+    progress: Callable[[float], None] | None,
 ) -> dict[str, Snapshot]:
     """Extract each ``(key, sha)`` point's font into a temp dir and load its snapshot,
     returning ``{key: snapshot}``. Points that fail to extract or load are skipped."""
@@ -267,7 +284,8 @@ def collect_git_history(
     if repo is None or not is_tracked(repo, target):
         return {}
     return _collect_snapshots(
-        repo, target, load_colors, day_commits(repo, target, cap, skip), progress)
+        repo, target, load_colors, day_commits(repo, target, cap, skip), progress
+    )
 
 
 def collect_commit_history(
@@ -287,7 +305,8 @@ def collect_commit_history(
     if repo is None or not is_tracked(repo, target):
         return {}
     return _collect_snapshots(
-        repo, target, load_colors, commit_points(repo, target, cap, skip), progress)
+        repo, target, load_colors, commit_points(repo, target, cap, skip), progress
+    )
 
 
 def merge_history(
@@ -298,7 +317,7 @@ def merge_history(
     result is capped to the most-recent ``cap`` dates (0 = uncapped) — dropping any
     is announced, never silent."""
     merged: dict[str, Snapshot] = dict(git_history)
-    merged.update(existing)                  # live snapshots take precedence
+    merged.update(existing)  # live snapshots take precedence
     if cap and len(merged) > cap:
         _note_truncation("dates", cap, len(merged) - cap)
         for old_date in sorted(merged)[: len(merged) - cap]:
